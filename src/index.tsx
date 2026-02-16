@@ -27,7 +27,7 @@ app.get('/', (c) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go to Top — Продвижение на Wildberries | Առաջխաdelays Wildberries-ում</title>
+<title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
 <meta name="description" content="Go to Top — безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы, живые люди, собственный склад в Ереване.">
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries">
 <meta property="og:description" content="Реальные выкупы живыми людьми. Собственный склад в Ереване.">
