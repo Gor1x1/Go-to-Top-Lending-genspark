@@ -353,18 +353,18 @@ img{max-width:100%;height:auto}
       Реальные выкупы живыми людьми с собственного склада в Ереване. Ни одной блокировки за всё время работы. Полная безопасность вашего кабинета.
     </p>
     <div class="hero-stats">
-      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապرانք ТОП-ում">товаров в ТОП</div></div>
-      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արгелافакум">блокировок</div></div>
-      <div class="stat"><div class="stat-num" data-count="2000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հаշիв">аккаунтов</div></div>
+      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանք ТОП-ում">товаров в ТОП</div></div>
+      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արգելափակում">блокировок</div></div>
+      <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հաշիվ">аккаунтов</div></div>
     </div>
     <div class="hero-buttons">
       <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary btn-lg">
         <i class="fab fa-telegram"></i>
-        <span data-ru="Написать в Telegram" data-am="Գրел Telegram-ում">Написать в Telegram</span>
+        <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ում">Написать в Telegram</span>
       </a>
       <a href="#calculator" class="btn btn-outline btn-lg">
         <i class="fas fa-calculator"></i>
-        <span data-ru="Рассчитать стоимость" data-am="Հаշвել аржеque">Рассчитать стоимость</span>
+        <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">Рассчитать стоимость</span>
       </a>
     </div>
   </div>
@@ -395,7 +395,7 @@ img{max-width:100%;height:auto}
   <div class="services-grid">
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-shopping-cart"></i></div>
-      <h3 data-ru="Выкупы по ключевым запросам" data-am="Gnumner banali bareri hamar">Выкупы по ключевым запросам</h3>
+      <h3 data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի բառերի համար">Выкупы по ключевым запросам</h3>
       <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов через наш склад в Ереване." data-am="Dzer apr'anke gnvum e irakan mardkandzov irakan hashivnerov mer Erevani pahesti midzotdzov.">Ваш товар выкупается реальными людьми с реальных аккаунтов через наш склад в Ереване.</p>
       <ul class="svc-features">
         <li><i class="fas fa-check"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Irakan hashivner gnumneri patmut'yamb">Реальные аккаунты с историей покупок</span></li>
@@ -412,7 +412,7 @@ img{max-width:100%;height:auto}
         <li><i class="fas fa-check"></i> <span data-ru="Текст отзыва + фото/видео" data-am="Kardziki tekst + lusankar'/tesankar'">Текст отзыва + фото/видео</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Профессиональная фотосессия" data-am="Profesional lusankar'ahanum">Профессиональная фотосессия</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Tarber vayrer ev modelner">Разные локации и модели</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Gnumneri minchev 50% kardzik'ner">До 50% отзывов от выкупов</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Գնումների մինչև 50% կարծիքներ">До 50% отзывов от выкупов</span></li>
       </ul>
     </div>
     <div class="svc-card fade-up">
@@ -445,7 +445,7 @@ img{max-width:100%;height:auto}
         <tr><td data-ru="Фотосессия с женской моделью" data-am="Lusankar'ahanum kanandz modelov">Фотосессия с женской моделью</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏3 500</td></tr>
         <tr><td data-ru="Фотосессия с мужской моделью" data-am="Lusankar'ahanum trakan modelov">Фотосессия с мужской моделью</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏4 500</td></tr>
         <tr><td data-ru="Предметная фотосъёмка товара" data-am="Apr'anqi ar'arkayin lusankar'ahanum">Предметная фотосъёмка товара</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏2 500</td></tr>
-        <tr><td data-ru="Предметная съёмка (крупный / техника)" data-am="Ar'arkayin nkar'ahanum (khoshore / tekhn.)">Предметная съёмка (крупный / техника)</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏5 000</td></tr>
+        <tr><td data-ru="Предметная съёмка (крупный / техника)" data-am="Առարկային նկարահանում (խոշոր / տեխն.)">Предметная съёмка (крупный / техника)</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏5 000</td></tr>
         <tr><td data-ru="Доставка одежды (одиночная вещь)" data-am="Haghusti ar'ak'um (mek irq)">Доставка одежды (одиночная вещь)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏1 500</td></tr>
         <tr><td data-ru="Доставка одежды (верхняя одежда)" data-am="Haghusti ar'ak'um (verelust)">Доставка одежды (верхняя одежда)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏2 500</td></tr>
         <tr><td data-ru="Детская модель (до 14 лет)" data-am="Mankakan model (minchev 14 tar)">Детская модель (до 14 лет)</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏2 500</td></tr>
@@ -461,7 +461,7 @@ img{max-width:100%;height:auto}
   </div>
   <div class="pricing-note fade-up">
     <i class="fas fa-info-circle"></i>
-    <span data-ru="Крупный товар — свыше 3 кг или одна сторона длиннее 55 см. Товар свыше 10 кг — стоимость индивидуально. Отзывы публикуются на не более 50% выкупленных товаров. Защитные пломбы / заводская упаковка после съёмки не восстанавливаются." data-am="Khoshore apr'anq — aveli kan 3 kg kam mi koghme aveli 55 sm. 10 kg-itz aveli — arjeke anhatakan. Kardzik'nere hratarakum en gnvadz apr'ankneri oche aveli kan 50%-i hamar. Pahpanich kniqner / gortsar'anain p'at'et'avorum nkar'ahanumitz heto chi verkaнgnvum.">Крупный товар — свыше 3 кг или одна сторона длиннее 55 см. Товар свыше 10 кг — стоимость индивидуально. Отзывы публикуются на не более 50% выкупленных товаров. Защитные пломбы / заводская упаковка после съёмки не восстанавливаются.</span>
+    <span data-ru="Крупный товар — свыше 3 кг или одна сторона длиннее 55 см. Товар свыше 10 кг — стоимость индивидуально. Отзывы публикуются на не более 50% выкупленных товаров. Защитные пломбы / заводская упаковка после съёмки не восстанавливаются." data-am="Խոշոր ապրանք — 3 կգ-ից ավելի կամ մի կողմը 55 սմ-ից երկար։ 10 կգ-ից ավելի — գինը անհատական։ Կարծիքներ հրատարակվում են գնված ապրանքների 50%-ից ոչ ավելի։ Պահպանիչ կնիքներ / գործառանաին փաթեթավորում նկարահանումից հետո չի վերականգնվում։">Крупный товар — свыше 3 кг или одна сторона длиннее 55 см. Товар свыше 10 кг — стоимость индивидуально. Отзывы публикуются на не более 50% выкупленных товаров. Защитные пломбы / заводская упаковка после съёмки не восстанавливаются.</span>
   </div>
 </div>
 </section>
@@ -588,7 +588,7 @@ img{max-width:100%;height:auto}
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2000">
-        <div class="calc-label" data-ru="Доставка на склад WB (коробка)" data-am="Ar'ak'um WB pahest (arkgh)">Доставка на склад WB (коробка)</div>
+        <div class="calc-label" data-ru="Доставка на склад WB (коробка)" data-am="Առաքում WB պահեստ (տուփ)">Доставка на склад WB (коробка)</div>
         <div class="calc-price">֏2 000</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
@@ -625,8 +625,8 @@ img{max-width:100%;height:auto}
     <div class="step">
       <div class="step-line"></div>
       <div class="step-num">2</div>
-      <h4 data-ru="Анализ" data-am="Verlut'yun">Анализ</h4>
-      <p data-ru="Анализируем нишу и создаём стратегию" data-am="Verlut'syum enq nich'e ev steghdz'um strategia">Анализируем нишу и создаём стратегию</p>
+      <h4 data-ru="Анализ" data-am="Վերլուծություն">Анализ</h4>
+      <p data-ru="Анализируем нишу и создаём стратегию" data-am="Վերլուծում ենք նիշը և ստեղծում ստրատեգիա">Анализируем нишу и создаём стратегию</p>
     </div>
     <div class="step">
       <div class="step-line"></div>
@@ -772,7 +772,7 @@ img{max-width:100%;height:auto}
     <div class="svc-card">
       <div class="svc-icon"><i class="fas fa-box"></i></div>
       <h3 data-ru="Защитные пломбы" data-am="Pahpanich kniqner">Защитные пломбы</h3>
-      <p data-ru="Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются." data-am="Pahpanich kniqnerov kam gortsar'anain p'at'et'avorumov apr'anqnere lusankar'ahanumitz heto chi verkangnvum.">Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются.</p>
+      <p data-ru="Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются." data-am="Պահպանիչ կնիքներով կամ գործառանաին փաթեթավորումով ապրանքները լուսանկարահանումից հետո չի վերականգնվում։">Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются.</p>
     </div>
   </div>
 </div>
@@ -802,7 +802,7 @@ img{max-width:100%;height:auto}
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Выкупы делают реальные люди или боты?" data-am="Gnumner katum en irakan mardik, te boter?">Выкупы делают реальные люди или боты?</span>
+        <span data-ru="Выкупы делают реальные люди или боты?" data-am="Գնումները կատարում են իրական մարդիկ, թէ բոտեր՞">Выкупы делают реальные люди или боты?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
       <div class="faq-a"><p data-ru="Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов." data-am="Miaayn irakan mardik. Menk unents' sepakan pahest sarqerov ev irakan hashivnerov. Yurakanch'yur gnume katarvum e dzerkov, voch' mi bot.">Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов.</p></div>
@@ -816,17 +816,17 @@ img{max-width:100%;height:auto}
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Можно ли заказать только отзывы без выкупов?" data-am="Hnараvor e patvirel miayn kardzik'ner arants' gnumneri?">Можно ли заказать только отзывы без выкупов?</span>
+        <span data-ru="Можно ли заказать только отзывы без выкупов?" data-am="Հնարավոր է պատվիրել միայն կարծիքներ առանց գնումների։">Можно ли заказать только отзывы без выкупов?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера." data-am="Ayo, karogh enq gnvel apr'anq lusankar'/tesankar' kardziki hamar ev apayin veradar'dznel PVZ. Arjeke djshtets'rek menedzheri mot.">Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера.</p></div>
+      <div class="faq-a"><p data-ru="Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера." data-am="Այո, կարող ենք գնվել ապրանք լուսանկար/տեսանկար կարծիքի համար և ապային վերադարձնել ՊՎԶ։ Արժեքը ճշտեցրեք մենեջերի մոտ։">Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
         <span data-ru="Какие отчёты мы получаем?" data-am="Inch hashvetvut'yunner enq stanum?">Какие отчёты мы получаем?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Ежедневные отчёты: статус каждого выкупа, QR-коды, даты забора, статус отзывов. Полная прозрачность на каждом этапе." data-am="Amenorya hashvetvut'yunner: yurakanch'yur gnumi statuse, QR-kodner, stadsman amsat'vner, kardzik'neri statuse. Ldzar'uy t'ap'antzikut'yun yurakanch'yur k'aylum.">Ежедневные отчёты: статус каждого выкупа, QR-коды, даты забора, статус отзывов. Полная прозрачность на каждом этапе.</p></div>
+      <div class="faq-a"><p data-ru="Ежедневные отчёты: статус каждого выкупа, QR-коды, даты забора, статус отзывов. Полная прозрачность на каждом этапе." data-am="Ամենօրյա հաշվետվություններ՝ յուրաքանչյուր գնումի ստատուսը, QR-կոդեր, ստացման ամսաթվեր, կարծիքների ստատուսը։ Լձառույ թափանցիկություն յուրաքանչյուր քայլում։">Ежедневные отчёты: статус каждого выкупа, QR-коды, даты забора, статус отзывов. Полная прозрачность на каждом этапе.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
@@ -865,7 +865,7 @@ img{max-width:100%;height:auto}
     <form id="leadForm" onsubmit="submitForm(event)">
       <div class="form-group">
         <label data-ru="Ваше имя" data-am="Dzer anune">Ваше имя</label>
-        <input type="text" id="formName" required placeholder="Имя / Anun">
+        <input type="text" id="formName" required placeholder="Имя / Անուն">
       </div>
       <div class="form-group">
         <label data-ru="Telegram / Телефон" data-am="Telegram / Herakhose">Telegram / Телефон</label>
@@ -873,7 +873,7 @@ img{max-width:100%;height:auto}
       </div>
       <div class="form-group">
         <label data-ru="Что продаёте на WB?" data-am="Inch' ek vadzar'um WB-um?">Что продаёте на WB?</label>
-        <input type="text" id="formProduct" placeholder="Одежда, электроника... / Hagustr, elektronika...">
+        <input type="text" id="formProduct" placeholder="Одежда, электроника... / Հագուստ, էլեկտրոնիկա...">
       </div>
       <div class="form-group">
         <label data-ru="Какие услуги интересуют?" data-am="Inch' dzar'ayut'yunner en hetekar'qrum?">Какие услуги интересуют?</label>
@@ -886,7 +886,7 @@ img{max-width:100%;height:auto}
       </div>
       <div class="form-group">
         <label data-ru="Комментарий (необязательно)" data-am="Meknabanut'yun (oche partadir)">Комментарий (необязательно)</label>
-        <textarea id="formMessage" placeholder="Опишите ваш товар... / Nkaragrets'ek dzer apr'anke..."></textarea>
+        <textarea id="formMessage" placeholder="Опишите ваш товар... / Նկարագրեցեք ձեր ապրանքը..."></textarea>
       </div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
         <i class="fab fa-telegram"></i>
@@ -928,7 +928,7 @@ img{max-width:100%;height:auto}
   </div>
   <div class="footer-bottom">
     <span>© 2025 Go to Top. <span data-ru="Все права защищены" data-am="Bolor iravunk'nere pahpanvadz en">Все права защищены</span></span>
-    <span data-ru="Ереван, Армения" data-am="Erevan, Hayastan">Ереван, Армения</span>
+    <span data-ru="Ереван, Армения" data-am="Երևան, Հայաստան">Ереван, Армения</span>
   </div>
 </div>
 </footer>
@@ -991,11 +991,11 @@ document.querySelectorAll('.nav-links a').forEach(a => {
 (function initTicker() {
   const items = [
     {icon:"fa-check-circle", ru:"Реальные люди, не боты", am:"Irakan mardik, voch boter"},
-    {icon:"fa-shield-alt", ru:"0 блокировок за всё время", am:"0 argelapakum oghj entrakum"},
+    {icon:"fa-shield-alt", ru:"0 блокировок за всё время", am:"0 արգելափակում ողջ ընթացքում"},
     {icon:"fa-warehouse", ru:"Собственный склад в Ереване", am:"Sepakan pahest Erevanum"},
-    {icon:"fa-mobile-alt", ru:"2000+ смартфонов", am:"2000+ smartfonner"},
+    {icon:"fa-mobile-alt", ru:"2000+ смартфонов", am:"2000+ սմարտֆոններ"},
     {icon:"fa-map-marker-alt", ru:"Ереван, Армения", am:"Erevan, Hayastan"},
-    {icon:"fa-star", ru:"Профессиональные фото для отзывов", am:"Profesional lusankarner kardzikneri hamar"},
+    {icon:"fa-star", ru:"Профессиональные фото для отзывов", am:"Պրոֆեսիոնալ լուսանկարներ կարծիքների համար"},
     {icon:"fa-camera", ru:"Фотосессии с моделями", am:"Lusankarahanum modelnerov"},
     {icon:"fa-truck", ru:"Доставка на склады WB", am:"Arakum WB pahestner"}
   ];
@@ -1035,7 +1035,7 @@ function recalc() {
     if (qty > 0) items.push(row.querySelector('.calc-label').textContent + ': ' + qty);
   });
   document.getElementById('calcTotal').textContent = '֏' + total.toLocaleString('ru-RU');
-  const msg = (lang === 'am' ? 'Barev! Uzum em patvirel:\\n' : 'Здравствуйте! Хочу заказать:\\n') + items.join('\\n') + '\\n\\n' + (lang === 'am' ? 'Yndhanuire: ' : 'Итого: ') + '֏' + total.toLocaleString('ru-RU');
+  const msg = (lang === 'am' ? 'Բարև! Ուզում եմ պատվիրել\\n' : 'Здравствуйте! Хочу заказать:\\n') + items.join('\\n') + '\\n\\n' + (lang === 'am' ? 'Yndhanuire: ' : 'Итого: ') + '֏' + total.toLocaleString('ru-RU');
   document.getElementById('calcTgBtn').href = 'https://t.me/goo_to_top?text=' + encodeURIComponent(msg);
 }
 
@@ -1081,11 +1081,11 @@ function submitForm(e) {
   const message = document.getElementById('formMessage').value;
 
   let msg = lang === 'am' ? 'Barev! Haytz Go to Top kaysqitz:\\n\\n' : 'Здравствуйте! Заявка с сайта Go to Top:\\n\\n';
-  msg += '👤 ' + (lang === 'am' ? 'Anun: ' : 'Имя: ') + name + '\\n';
+  msg += '👤 ' + (lang === 'am' ? 'Անուն՝ ' : 'Имя: ') + name + '\\n';
   msg += '📱 ' + (lang === 'am' ? 'Kap: ' : 'Контакт: ') + contact + '\\n';
-  if (product) msg += '📦 ' + (lang === 'am' ? 'Apr\\'anq: ' : 'Товар: ') + product + '\\n';
-  msg += '🎯 ' + (lang === 'am' ? 'Dzar\\'ayut\\'yun: ' : 'Услуга: ') + serviceText + '\\n';
-  if (message) msg += '💬 ' + (lang === 'am' ? 'Meknabanut\\'yun: ' : 'Комментарий: ') + message;
+  if (product) msg += '📦 ' + (lang === 'am' ? 'Ապրանք՝ ' : 'Товар: ') + product + '\\n';
+  msg += '🎯 ' + (lang === 'am' ? 'Ծառայություն՝ ' : 'Услуга: ') + serviceText + '\\n';
+  if (message) msg += '💬 ' + (lang === 'am' ? 'Մեկնաբանություն՝ ' : 'Комментарий: ') + message;
 
   fetch('/api/lead', {
     method: 'POST',
@@ -1097,7 +1097,7 @@ function submitForm(e) {
 
   const btn = e.target.querySelector('button[type=submit]');
   const orig = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-check"></i> ' + (lang === 'am' ? 'Uugharkvedz!' : 'Отправлено!');
+  btn.innerHTML = '<i class="fas fa-check"></i> ' + (lang === 'am' ? 'Ուղարկվեց!' : 'Отправлено!');
   btn.style.background = 'var(--success)';
   setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 3000);
   e.target.reset();
