@@ -569,8 +569,6 @@ img{max-width:100%;height:auto}
       </div>
       <div class="section-cta">
         <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
-        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկdelays առաજ">Начать продвижение</span></a>
-        <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
       </div>
     </div>
   </div>
@@ -621,9 +619,7 @@ img{max-width:100%;height:auto}
     </div>
   </div>
   <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիма">Заказать сейчас</span></a>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սкse gnemner hima">Начать выкупы сейчас</span></a>
-    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առdelays">Начать продвижение</span></a>
   </div>
 </div>
 </section>
@@ -663,10 +659,7 @@ img{max-width:100%;height:auto}
   </div>
 
   <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պатвирel hima">Заказать сейчас</span></a>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Skse arajkhagh">Начать продвижение</span></a>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Skse gnemner hima">Начать выкупы сейчас</span></a>
-    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Grel meneger">Написать менеджеру</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սկdelays gnumner hima">Начать выкупы сейчас</span></a>
   </div>
 </div>
 </section>
@@ -826,6 +819,9 @@ img{max-width:100%;height:auto}
     <div class="step"><div class="step-line"></div><div class="step-num">4</div><h4 data-ru="Контроль" data-am="Վերահսկողություն">Контроль</h4><p data-ru="Ежедневные отчёты о прогрессе" data-am="Ամենօրյա հաշվետվություններ ընթացքի մասին">Ежедневные отчёты о прогрессе</p></div>
     <div class="step"><div class="step-num">5</div><h4 data-ru="Результат" data-am="Արդյունք">Результат</h4><p data-ru="Ваш товар в ТОПе выдачи WB" data-am="Ձեր ապրանքը WB-ի ՏՕՊ-ում է">Ваш товар в ТОПе выдачи WB</p></div>
   </div>
+  <div class="section-cta">
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
+  </div>
 </div>
 </section>
 
@@ -847,6 +843,9 @@ img{max-width:100%;height:auto}
       <div class="wh-caption" data-ru="Система учёта" data-am="Հաշվառման համակարգ">Система учёта</div>
     </div>
 
+  </div>
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
   </div>
 </div>
 </section>
@@ -870,9 +869,7 @@ img{max-width:100%;height:auto}
         <span data-ru="0 блокировок за всё время работы" data-am="0 արգելափակում աշխատանքի ողջ ընթացքում">0 блокировок за всё время работы</span>
       </div>
       <div class="section-cta" style="margin-top:24px">
-        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
-        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղdelays">Начать продвижение</span></a>
-        <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գdelays մeneger">Написать менеджеру</span></a>
+        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկdelays arajkhagh">Начать продвижение</span></a>
       </div>
     </div>
   </div>
@@ -903,9 +900,7 @@ img{max-width:100%;height:auto}
   </table>
   </div>
   <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սկսել գնdelays">Начать выкупы сейчас</span></a>
-    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գdelays մeneger">Написать менеджеру</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սкdelays gnumner">Начать выкупы сейчас</span></a>
   </div>
 </div>
 </section>
@@ -935,9 +930,7 @@ img{max-width:100%;height:auto}
     </div>
   </div>
   <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատវ. հdelays">Заказать сейчас</span></a>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սdelays առdelays">Начать продвижение</span></a>
-    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գdelays մeneger">Написать менеджеру</span></a>
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
   </div>
 </div>
 </section>
@@ -978,6 +971,9 @@ img{max-width:100%;height:auto}
       <div class="faq-q" onclick="toggleFaq(this)"><span data-ru="В какой валюте идут цены?" data-am="Ինչ արժույթով են գները։">В какой валюте идут цены?</span><i class="fas fa-chevron-down"></i></div>
       <div class="faq-a"><p data-ru="Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах." data-am="Բոլոր գները նշված են հայկական դրամով (֏ AMD): Վճարումը դրամով:">Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах.</p></div>
     </div>
+  </div>
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պатvиrел hima">Заказать сейчас</span></a>
   </div>
 </div>
 </section>
