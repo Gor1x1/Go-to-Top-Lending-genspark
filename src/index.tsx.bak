@@ -32,8 +32,8 @@ app.get('/', (c) => {
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries и Ozon">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="/static/img/logo-new.png">
-<link rel="icon" type="image/png" href="/static/img/logo-new.png">
+<meta property="og:image" content="/static/img/logo.png">
+<link rel="icon" type="image/png" href="/static/img/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
 <style>
@@ -310,61 +310,6 @@ img{max-width:100%;height:auto}
 .stat-card .stat-big{font-size:2.8rem;font-weight:900;color:var(--purple);line-height:1}
 .stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
 
-
-/* ===== WB BANNER ===== */
-.wb-banner{padding:20px 0;background:var(--bg-surface);border-bottom:1px solid var(--border)}
-.wb-banner-inner{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
-.wb-banner-card{display:flex;align-items:center;gap:16px;padding:16px 28px;background:linear-gradient(135deg,#ff3366,var(--purple));border-radius:var(--r);flex:1;min-width:280px;position:relative;overflow:hidden}
-.wb-banner-card::after{content:"!";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:3.5rem;font-weight:900;color:rgba(255,255,255,0.15)}
-.wb-banner-card .wb-icon{font-size:1.6rem;color:#fff}
-.wb-banner-card .wb-text{font-weight:800;font-size:1rem;color:#fff;line-height:1.3;text-transform:uppercase}
-.wb-banner-right{display:flex;align-items:center;gap:16px;padding:16px 28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);flex:1;min-width:280px}
-.wb-banner-right .wb-r-icon{font-size:1.4rem}
-.wb-banner-right .wb-r-text{font-weight:700;font-size:0.92rem;line-height:1.4}
-.wb-banner-right .btn{margin-left:auto;white-space:nowrap;font-size:0.82rem;padding:10px 20px}
-
-/* ===== ABOUT SECTION ===== */
-.about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:center}
-.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border)}
-.about-img img{width:100%;height:auto;display:block}
-.about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
-.about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
-.about-highlight{background:rgba(139,92,246,0.08);border:1px solid var(--border);border-radius:var(--r);padding:20px 24px;margin-top:16px}
-.about-highlight p{font-weight:600;color:var(--accent);margin:0!important}
-
-/* ===== BUYOUT SERVICE DETAIL ===== */
-.buyout-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px}
-.buyout-detail-header{margin-bottom:32px}
-.buyout-detail-header h2{font-size:2rem;font-weight:800;margin-bottom:12px}
-.buyout-detail-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.buyout-detail-header .subtitle{font-weight:700;font-size:1.1rem;margin-bottom:8px}
-.buyout-detail-header p{color:var(--text-sec);font-size:0.92rem;line-height:1.7}
-.buyout-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px}
-.buyout-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;transition:var(--t)}
-.buyout-card:hover{border-color:rgba(139,92,246,0.3)}
-.buyout-card h4{font-size:1rem;font-weight:700;margin-bottom:12px;text-transform:uppercase;color:var(--accent)}
-.buyout-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7}
-.buyout-card ul{list-style:none;margin-top:12px}
-.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec)}
-.buyout-card ul li::before{content:"\2022";color:var(--purple);margin-right:8px}
-.buyout-cta{text-align:right;margin-top:24px}
-
-/* ===== REVIEWS DETAIL ===== */
-.reviews-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;margin-top:32px}
-.reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:32px}
-.review-point{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;transition:var(--t)}
-.review-point:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-3px)}
-.review-point i{font-size:2rem;color:var(--purple);margin-bottom:14px}
-.review-point h4{font-size:1rem;font-weight:700;margin-bottom:8px}
-.review-point p{color:var(--text-sec);font-size:0.85rem;line-height:1.6}
-
-/* ===== STATS BAR ===== */
-.stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
-.stat-card .stat-big{font-size:2.8rem;font-weight:900;color:var(--purple);line-height:1}
-.stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
-
 @media(max-width:1024px){
   .hero h1{font-size:2.4rem}
   .hero-grid{grid-template-columns:1fr;gap:40px}
@@ -373,7 +318,7 @@ img{max-width:100%;height:auto}
   .step:nth-child(n+4){margin-top:16px}
   .guarantee-card{grid-template-columns:1fr;gap:32px}
   .footer-grid{grid-template-columns:1fr 1fr}
-  .wb-banner-inner{flex-direction:column}
+  .wb-banner-inner{grid-template-columns:1fr}
   .about-grid{grid-template-columns:1fr}
   .buyout-grid{grid-template-columns:1fr 1fr}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
@@ -422,11 +367,10 @@ img{max-width:100%;height:auto}
 <div class="container">
 <nav class="nav">
   <a href="#" class="logo">
-    <img src="/static/img/logo-new.png" alt="Go to Top">
+    <img src="/static/img/logo.png" alt="Go to Top">
     <span class="logo-text">Go to Top</span>
   </a>
   <ul class="nav-links" id="navLinks">
-    <li><a href="#about" data-ru="О нас" data-am="Մեր մասին">О нас</a></li>
     <li><a href="#services" data-ru="Услуги" data-am="Ծառայություններ">Услуги</a></li>
     <li><a href="#calculator" data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</a></li>
     <li><a href="#warehouse" data-ru="Склад" data-am="Պահեստ">Склад</a></li>
@@ -458,14 +402,14 @@ img{max-width:100%;height:auto}
   <div>
     <div class="hero-badge">
       <i class="fas fa-circle" style="color:var(--success);font-size:0.5rem"></i>
-      <span data-ru="Успешный опыт с 2021 года" data-am="Հաdelays 2021 delaysdelays">Успешный опыт с 2021 года</span>
+      <span data-ru="Работаем в Армении" data-am="Աշխատում ենք Հայաստանում">Работаем в Армении</span>
     </div>
     <h1>
       <span data-ru="Выведем ваш товар" data-am="Մենք կբերենք ձեր ապրանքը">Выведем ваш товар</span><br>
       <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի ՏՕՊ">в ТОП Wildberries</span>
     </h1>
-    <p class="hero-desc" data-ru="Выкупы живыми людьми и продающий контент. С нами ваши товары становятся ТОПами продаж. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Գնումներ իрakan մardkancov ev vachароgh kontент. Мez het dzer apranqnere darnum en vacharqi ТОП-er. Sephakan pahest ev 1000+ irakan hashivner Erevanum.">
-      Выкупы живыми людьми и продающий контент. С нами ваши товары становятся ТОПами продаж. Собственный склад и более 1000 реальных аккаунтов в Ереване.
+    <p class="hero-desc" data-ru="Реальные выкупы живыми людьми быстро и надолго закрепляют позицию в топе, разные ПВЗ по всему Еревану, забор товара с ПВЗ и хранение в собственном складе в Ереване." data-am="Իրական մարդկանցով իրական գնումները արագ և երկար ամրապնդում են դիրքը տոպում, տարբեր ՊՎԶ-ներ ամբողջ Երևանում, ապրանքի վերցնում ՊՎԶ-ներից և պահեստավորում սեփական պահեստում Երևանում:">
+      Реальные выкупы живыми людьми быстро и надолго закрепляют позицию в топе, разные ПВЗ по всему Еревану, забор товара с ПВЗ и хранение в собственном складе в Ереване.
     </p>
     <div class="hero-stats">
       <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանքներ ՏՕՊ-ում">товаров в ТОП</div></div>
@@ -498,68 +442,6 @@ img{max-width:100%;height:auto}
 <div class="ticker">
 <div class="ticker-track" id="tickerTrack"></div>
 </div>
-
-
-<!-- ===== WB BANNER ===== -->
-<div class="wb-banner fade-up">
-<div class="container">
-<div class="wb-banner-inner">
-  <div class="wb-banner-card">
-    <i class="fas fa-gavel wb-icon"></i>
-    <div class="wb-text" data-ru="WB официально отменил штрафы за выкупы!" data-am="WB-ն պաշտոնապես վերացրել է տուգանքները գնումների համար!">WB официально отменил штрафы за выкупы!</div>
-  </div>
-  <div class="wb-banner-right">
-    <span class="wb-r-icon">🚀</span>
-    <div class="wb-r-text" data-ru="Повысь рейтинг магазина прямо сейчас" data-am="Բարձրացրեք խանութի վարկանիշը հիմա">Повысь рейтинг магазина прямо сейчас</div>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary">Узнать</a>
-  </div>
-</div>
-</div>
-</div>
-
-<!-- ===== STATS BAR ===== -->
-<div class="stats-bar fade-up">
-<div class="container">
-  <div class="stats-grid">
-    <div class="stat-card">
-      <div class="stat-big" data-count-s="500">0</div>
-      <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ">поставщиков сотрудничают с нами</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-big" data-count-s="1000">0+</div>
-      <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով">аккаунтов с индивидуальной картой</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-big" data-count-s="21">0</div>
-      <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="օր մինչև ՏՍՊ դուրս գաл">день до выхода в ТОП</div>
-    </div>
-    <div class="stat-card">
-      <div class="stat-big" data-count-s="200">0+</div>
-      <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">выкупов каждый день</div>
-    </div>
-  </div>
-</div>
-</div>
-
-<!-- ===== ABOUT ===== -->
-<section class="section" id="about">
-<div class="container">
-  <div class="about-grid fade-up">
-    <div class="about-img">
-      <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
-    </div>
-    <div class="about-text">
-      <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
-      <h2>Что такое <span class="gr">Go to Top</span>?</h2>
-      <p data-ru="«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам." data-am="«Go to Top» — ձեր բիզնեսի զարգացման ծառայություն մարկետպլեյսներում՝ համապարփակ առաջխաղացման և գնումների ծառայության միջոցով:">«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам.</p>
-      <p data-ru="Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную." data-am="Մեր մասնագետների թիմը 2021 թվականից աշխատում է արդյունքի համար: Մենք ունենք սեփական պահեստներ և գրասենյակներ Երևանում: Գնումների համար օգտագործում ենք միայն իրական մարդկանց հաշիվներ և ամեն ինչ անում ենք ձեռքով:">Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную.</p>
-      <div class="about-highlight">
-        <p data-ru="Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!" data-am="Լավագույն արդյունքը կստանաք օգտվելով մեր ծառայությունների փաթեթը!"><i class="fas fa-bolt" style="margin-right:8px"></i>Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!</p>
-      </div>
-    </div>
-  </div>
-</div>
-</section>
 
 <!-- ===== SERVICES ===== -->
 <section class="section" id="services">
@@ -602,73 +484,6 @@ img{max-width:100%;height:auto}
         <li><i class="fas fa-check"></i> <span data-ru="Видеообзоры товаров" data-am="Ապրանքների տեսանյութներ">Видеообзоры товаров</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">Ребёнок модель (до 14 лет)</span></li>
       </ul>
-    </div>
-  </div>
-</div>
-</section>
-
-
-<!-- ===== BUYOUT DETAIL ===== -->
-<section class="section">
-<div class="container">
-  <div class="buyout-detail fade-up">
-    <div class="buyout-detail-header">
-      <div class="section-badge"><i class="fas fa-shopping-bag"></i> <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն">Услуга выкупа</span></div>
-      <h2 data-ru="Что включает в себя услуга выкупа" data-am="Ինչ է ներառում գնումի ծառայությունը">Что включает в себя <span class="gr">услуга выкупа</span></h2>
-      <p data-ru="Индивидуальный подход к каждому клиенту. Выкупы только по ключевым запросам, каждый заказ оформляет реальный человек вручную." data-am="Անհատական մоտեցում յուրաքանչյուր հաճախоրդի համար: Գնումներ միայն բանաлի հարցումներով, յուրաքանչյուր պատվեր կատարում է իրական մարդ ձեռքоվ:">Индивидуальный подход к каждому клиенту. Выкупы только по ключевым запросам, каждый заказ оформляет реальный человек вручную.</p>
-    </div>
-    <div class="buyout-grid">
-      <div class="buyout-card">
-        <h4 data-ru="Полное сопровождение" data-am="Լիարժեք ուղեկցում">Полное сопровождение</h4>
-        <ul>
-          <li data-ru="Консультация" data-am="Խորհրդատվություն">Консультация</li>
-          <li data-ru="Создание чата с менеджером" data-am="Մենեջերի հետ չատի ստեղծում">Создание чата с менеджером</li>
-          <li data-ru="Согласование плана выкупов" data-am="Գնումների պлանի համաձայնեցում">Согласование плана выкупов</li>
-          <li data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանաлի հարցումներоվ">Выкупы по ключевым запросам</li>
-          <li data-ru="Забор товара из ПВЗ курьерами" data-am="Ապрանքի վերցնում ՊՎԶ-ից սուրհանդակներով">Забор товара из ПВЗ курьерами</li>
-          <li data-ru="Возврат на склады маркетплейсов" data-am="Վերադարձ мարկետպлեյսների պահեստներ">Возврат на склады маркетплейсов</li>
-          <li data-ru="Публикация отзывов" data-am="Կարծիքների հрապարակում">Публикация отзывов</li>
-        </ul>
-      </div>
-      <div class="buyout-card">
-        <h4 data-ru="Отчётность" data-am="Հաշվետվություն">Отчётность</h4>
-        <p data-ru="Формирование итоговой отчётности по каждому выкупу. Полная прозрачность на каждом этапе." data-am="Վերջնական հաշվետվության ձևավоրուм յուրաքանչյուր գնումի համար: Լիարժեք թափանցիկություն յուրաքանչյուր փուлուм:">Формирование итоговой отчётности по каждому выкупу. Полная прозрачность на каждом этапе.</p>
-      </div>
-      <div class="buyout-card">
-        <h4 data-ru="Контроль" data-am="Վերահսկоղություն">Контроль</h4>
-        <p data-ru="Сопровождение и контроль на всех этапах. Точное следование алгоритму для безопасности вашего кабинета." data-am="Ուղեկցում և վերահսկоղություն բолоր փուлերուм: Աлգоրիթмի ճիշտ հետևորмաн ձեր կաբիнետի անվտանգությաн հաмար:">Сопровождение и контроль на всех этапах. Точное следование алгоритму для безопасности вашего кабинета.</p>
-      </div>
-    </div>
-  </div>
-
-  <!-- Reviews under ключ -->
-  <div class="reviews-detail fade-up">
-    <div class="buyout-detail-header">
-      <div class="section-badge"><i class="fas fa-comments"></i> <span data-ru="Отзывы под ключ" data-am="Կարծիքներ աмբоղջակաн">Отзывы под ключ</span></div>
-      <h2 data-ru="Что включает услуга «отзывы под ключ»" data-am="Ինչ է ներառում «կարծիքներ աмբоղջակաн» ծառայությունը">Что включает услуга <span class="gr">«отзывы под ключ»</span></h2>
-      <p data-ru="Рейтинг карточки станет максимальным. Ваши клиенты будут доверять Вам и чаще заказывать." data-am="Քարտի վարկանիշը կդառնա ամենաբարձր: Ձեր հաճախоրդները կվստահեն ձեզ և կպատվիրեն ավեлի հաճախ:">Рейтинг карточки станет максимальным. Ваши клиенты будут доверять Вам и чаще заказывать.</p>
-    </div>
-    <div class="reviews-grid">
-      <div class="review-point">
-        <i class="fas fa-pen-fancy"></i>
-        <h4 data-ru="Написание текста" data-am="Տեքստի գրուм">Написание текста</h4>
-        <p data-ru="Описание всех достоинств товара" data-am="Ապրանքի բолоր առավեлությունների նկարագրоւм">Описание всех достоинств товара</p>
-      </div>
-      <div class="review-point">
-        <i class="fas fa-camera-retro"></i>
-        <h4 data-ru="Фото и видео" data-am="Լուսանկար և տեսանյութ">Фото и видեо</h4>
-        <p data-ru="Показываем все плюсы Вашего товара в разных локациях" data-am="Ցույց ենք տաлիս ձեր ապрանքի բолоր առավեлությունները տարբեր վայրերուм">Показываем все плюсы Вашего товара в разных локациях</p>
-      </div>
-      <div class="review-point">
-        <i class="fas fa-map-marked-alt"></i>
-        <h4 data-ru="Разные локации" data-am="Տարբեր վայրեր">Разные локации</h4>
-        <p data-ru="ПВЗ, кафе, природа, домашний интерьер, предметные фото" data-am="ՊՎԶ, սրճարան, բնություն, տնային ինտերիեր, առարկայակաн лուսանկարներ">ПВЗ, кафе, природа, домашний интерьер, предметные фото</p>
-      </div>
-      <div class="review-point">
-        <i class="fas fa-user-friends"></i>
-        <h4 data-ru="Реальные аккаунты" data-am="Իրակաн հաշիվнեր">Реальные аккаунты</h4>
-        <p data-ru="Все отзывы публикуются с реальных аккаунтов с историей" data-am="Բолоր կարծիքները հրապարակվուм են իրակաн հաշիվներից պատмությաнբ">Все отзывы публикуются с реальных аккаунтов с историей</p>
-      </div>
     </div>
   </div>
 </div>
@@ -857,10 +672,13 @@ img{max-width:100%;height:auto}
 <!-- ===== GUARANTEE ===== -->
 <section class="section" id="guarantee">
 <div class="container">
-    <div class="guarantee-card fade-up">
+  <div class="guarantee-card fade-up">
+    <div>
+      <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
+    </div>
     <div>
       <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">Гарантия безопасности</span></div>
-      <h2 data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեн իнչ կազмակերպված է և կարգավоրված. Մեր թիмը">Всё организовано и по полочкам. Наша команда</h2>
+      <h2 data-ru="Команда профессионалов на вашей стороне" data-am="Մասնագետների թիմը ձեր կողքին">Команда профессионалов на вашей стороне</h2>
       <p data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе." data-am="Աշխատանքի ողջ ընթացքում ոց մի հաճախորդի կաբինետ չի արգելափակվել: Երբ նախագիծ վարում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:">За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе.</p>
       <ul class="g-list">
         <li><i class="fas fa-check-circle"></i> <span data-ru="Реальные товары с собственного склада" data-am="Իրական ապրանքներ սեփական պահեստից">Реальные товары с собственного склада</span></li>
@@ -1017,7 +835,7 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="footer-grid">
     <div class="footer-brand">
-      <div class="logo"><img src="/static/img/logo-new.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
+      <div class="logo"><img src="/static/img/logo.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
       <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայաստանում: Իրական գնումներ իրական մարդկանցով սեփական պահեստից Երևանում:">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
     </div>
     <div class="footer-col">
@@ -1061,9 +879,9 @@ img{max-width:100%;height:auto}
   <div class="popup-card">
     <button class="popup-close" id="popupCloseBtn">✕</button>
     <div id="popupFormWrap">
-      <div class="popup-icon"><i class="fas fa-chart-line"></i></div>
-      <h3 data-ru="Повысь рейтинг магазина прямо сейчас!" data-am="Բարձրացրեք խանութի վարկանիշը հիմա!">Повысь рейтинг магазина прямо сейчас!</h3>
-      <p class="popup-sub" data-ru="Выкупы живыми людьми, отзывы с фото, профессиональные фотосессии. Узнайте сколько это стоит!" data-am="Անձնական մենեջերը կկապվի ձեզ և կպատրաստի անհատական հաշվարկ">Персональный менеджер свяжется с вами и подготовит индивидуальный расчёт</p>
+      <div class="popup-icon"><i class="fas fa-calculator"></i></div>
+      <h3 data-ru="Получите бесплатный расчёт!" data-am="Ստացեք անվճար հաշվարկ!">Получите бесплатный расчёт!</h3>
+      <p class="popup-sub" data-ru="Персональный менеджер свяжется с вами и подготовит индивидуальный расчёт" data-am="Անձնական մենեջերը կկապվի ձեզ և կպատրաստի անհատական հաշվարկ">Персональный менеджер свяжется с вами и подготовит индивидуальный расчёт</p>
       <form id="popupForm">
         <div class="pf-row">
           <div class="pf-group">
@@ -1311,26 +1129,6 @@ var cObs = new IntersectionObserver(function(entries) {
 }, {threshold:0.5});
 document.querySelectorAll('.stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
 
-/* Stats bar counter animation */
-var sObs = new IntersectionObserver(function(entries) {
-  entries.forEach(function(entry) {
-    if (entry.isIntersecting) {
-      var el = entry.target;
-      var target = parseInt(el.dataset.countS);
-      var dur = 2000; var start = performance.now();
-      function animS(now) {
-        var p = Math.min((now - start) / dur, 1);
-        var val = Math.floor(target * (1 - Math.pow(1 - p, 3)));
-        el.textContent = val.toLocaleString('ru-RU') + (el.textContent.includes('+') ? '+' : '');
-        if (p < 1) requestAnimationFrame(animS);
-        else el.textContent = target.toLocaleString('ru-RU') + (target > 100 ? '+' : '');
-      }
-      requestAnimationFrame(animS); sObs.unobserve(el);
-    }
-  });
-}, {threshold:0.5});
-document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { cObs.observe(el); });
-
 /* ===== SMOOTH SCROLL ===== */
 document.querySelectorAll('a[href^="#"]').forEach(function(a) {
   a.addEventListener('click', function(e) {
@@ -1341,7 +1139,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a) {
   });
 });
 
-console.log('Go to Top — site loaded v5 - competitor blocks added');
+console.log('Go to Top — site loaded v4');
 </script>
 </body>
 </html>`)
