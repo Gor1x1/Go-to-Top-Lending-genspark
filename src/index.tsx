@@ -253,35 +253,32 @@ img{max-width:100%;height:auto}
 
 /* ===== POPUP - GUARANTEED VISIBLE ===== */
 .popup-overlay{
+  position:fixed;
+  top:0;left:0;
+  width:100vw;height:100vh;
+  background:rgba(0,0,0,0.88);
+  z-index:999999;
   display:none;
-  position:fixed;top:0;left:0;right:0;bottom:0;
-  width:100%;height:100%;
-  background:rgba(0,0,0,0.85);
-  z-index:100000;
-  justify-content:center;align-items:center;
-  padding:20px;
-  overflow-y:auto;
+  overflow:hidden;
 }
 .popup-overlay.show{
-  display:flex !important;
-  visibility:visible !important;
-  opacity:1 !important;
+  display:block !important;
 }
 .popup-card{
+  position:fixed;
+  top:50%;left:50%;
+  transform:translate(-50%,-50%) scale(1);
   background:linear-gradient(145deg,#2a1a4e,#3d2470);
   border:2px solid rgba(167,139,250,0.6);
   border-radius:20px;
   padding:36px;
   text-align:center;
-  max-width:460px;width:100%;
-  position:relative;
-  z-index:100001;
+  max-width:460px;width:calc(100% - 40px);
+  z-index:1000000;
   box-shadow:0 0 80px rgba(139,92,246,0.4),0 25px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);
-  animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
   opacity:1;
-  transform:scale(1);
+  visibility:visible;
 }
-@keyframes popIn{0%{transform:scale(0.7) translateY(30px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
 .popup-card .popup-close{
   position:absolute;top:14px;right:14px;
   width:34px;height:34px;border-radius:50%;
@@ -289,6 +286,7 @@ img{max-width:100%;height:auto}
   color:#fff;font-size:1.2rem;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   transition:var(--t);line-height:1;
+  z-index:1000001;
 }
 .popup-card .popup-close:hover{background:rgba(239,68,68,0.5);border-color:rgba(239,68,68,0.6)}
 .popup-card .popup-icon{
@@ -1409,35 +1407,36 @@ function toggleFaq(el) {
 function openLightbox(el) { document.getElementById('lightboxImg').src = el.querySelector('img').src; document.getElementById('lightbox').classList.add('show'); }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
 
-/* ===== TIMED POPUP (5 sec) — ROBUST ===== */
+/* ===== TIMED POPUP (5 sec) — BULLETPROOF ===== */
 var popupEl = document.getElementById('popupOverlay');
+var popupCard = popupEl ? popupEl.querySelector('.popup-card') : null;
 var popupDismissed = false;
 
 function showPopup() {
   if (popupDismissed) return;
   if (sessionStorage.getItem('popupDone')) return;
-  if (!popupEl) return;
-  /* Force display and visibility for all browsers/screens */
-  popupEl.style.display = 'flex';
-  popupEl.style.visibility = 'visible';
-  popupEl.style.opacity = '1';
+  if (!popupEl || !popupCard) { console.log('Popup elements missing!'); return; }
+  
+  /* Show overlay (dark background) */
+  popupEl.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.88);z-index:999999;display:block;overflow:hidden;';
+  
+  /* Show card — centered via fixed position + translate */
+  popupCard.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:linear-gradient(145deg,#2a1a4e,#3d2470);border:2px solid rgba(167,139,250,0.6);border-radius:20px;padding:36px;text-align:center;max-width:460px;width:calc(100% - 40px);z-index:1000000;box-shadow:0 0 80px rgba(139,92,246,0.4),0 25px 60px rgba(0,0,0,0.5);opacity:1;visibility:visible;';
+  
   popupEl.classList.add('show');
-  /* Ensure popup card is visible */
-  var card = popupEl.querySelector('.popup-card');
-  if (card) {
-    card.style.opacity = '1';
-    card.style.visibility = 'visible';
-    card.style.transform = 'scale(1) translateY(0)';
-  }
   document.body.style.overflow = 'hidden';
-  console.log('Popup shown');
+  console.log('Popup shown - card visible at center');
 }
 
 function hidePopup() {
   popupDismissed = true;
-  popupEl.classList.remove('show');
-  popupEl.style.display = 'none';
-  popupEl.style.visibility = 'hidden';
+  if (popupEl) {
+    popupEl.classList.remove('show');
+    popupEl.style.display = 'none';
+  }
+  if (popupCard) {
+    popupCard.style.display = 'none';
+  }
   document.body.style.overflow = '';
   sessionStorage.setItem('popupDone', '1');
 }
