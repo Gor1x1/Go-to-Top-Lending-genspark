@@ -132,7 +132,9 @@ img{max-width:100%;height:auto}
 .calc-input{display:flex;align-items:center;gap:8px}
 .calc-input button{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:1.1rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
 .calc-input button:hover{border-color:var(--purple);background:rgba(139,92,246,0.1)}
-.calc-input span{width:40px;text-align:center;font-weight:600;font-size:1rem}
+.calc-input input[type="number"]{width:56px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 4px;-moz-appearance:textfield;outline:none;transition:var(--t)}
+.calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+.calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .calc-total{display:flex;justify-content:space-between;align-items:center;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple)}
 .calc-total-label{font-size:1.1rem;font-weight:600}
 .calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple)}
@@ -675,120 +677,148 @@ img{max-width:100%;height:auto}
   <div class="calc-wrap fade-up">
     <div class="calc-tabs">
       <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Գնումներ">Выкупы</div>
-      <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Կարծիքներ">Отзывы</div>
-      <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Լուսանկարահանում">Фотосъёмка</div>
-      <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Լոգիստիկա">Логистика</div>
+      <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Կարծիdelays">Отзывы</div>
+      <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Լুdelays">Фотосъёмка</div>
+      <div class="calc-tab" onclick="showCalcTab('ff',this)" data-ru="ФФ" data-am="ՖՖ">ФФ</div>
+      <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Լdelays">Логистика</div>
+      <div class="calc-tab" onclick="showCalcTab('other',this)" data-ru="Прочие услуги" data-am="Այdelays">Прочие услуги</div>
     </div>
+
+    <!-- ===== ВЫКУПЫ ===== -->
     <div class="calc-group active" id="cg-buyouts">
       <div class="calc-row" data-price="buyout" id="buyoutRow">
-        <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Գնում + վերցնում ՊՎԶ-ից">Выкуп + забор из ПВЗ</div>
+        <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Գdelays + ՊՎԶ">Выкуп + забор из ПВЗ</div>
         <div class="calc-price" id="buyoutPriceLabel">֏2 000</div>
-        <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><span id="buyoutQty">0</span><button onclick="ccBuyout(1)">+</button></div>
+        <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><input type="number" id="buyoutQty" value="0" min="0" max="999" onchange="onBuyoutInput()" oninput="onBuyoutInput()"><button onclick="ccBuyout(1)">+</button></div>
       </div>
       <div class="buyout-tier-info">
-        <strong data-ru="Чем больше выкупов — тем дешевле:" data-am="Որքան շատ գնումներ — այնքան էժան:">Чем больше выкупов — тем дешевле:</strong><br>
+        <strong data-ru="Чем больше выкупов — тем дешевле:" data-am="Որdelays:">Чем больше выкупов — тем дешевле:</strong><br>
         1-20 шт → ֏2 000 &nbsp;|&nbsp; 21-40 шт → ֏1 700 &nbsp;|&nbsp; 41-60 шт → ֏1 500 &nbsp;|&nbsp; 60+ шт → ֏1 250
       </div>
-      <div class="calc-row" data-price="100">
-        <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Բաժանորդագրություն բրենդին / էջին">Подписка на бренд / страницу</div>
-        <div class="calc-price">֏100</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+      <div class="calc-row" data-price="2500">
+        <div class="calc-label" data-ru="Выкуп КГТ + забор из ПВЗ" data-am="ԽGT գdelays + ՊՎԶ">Выкуп КГТ + забор из ПВЗ</div>
+        <div class="calc-price">֏2 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
+
+    <!-- ===== ОТЗЫВЫ ===== -->
     <div class="calc-group" id="cg-reviews">
       <div class="calc-row" data-price="300">
-        <div class="calc-label" data-ru="Оценка" data-am="Գնահատական">Оценка</div>
+        <div class="calc-label" data-ru="Оценка" data-am="Գdelays">Оценка</div>
         <div class="calc-price">֏300</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="500">
-        <div class="calc-label" data-ru="Оценка + отзыв" data-am="Գնահատական + կարծիք">Оценка + отзыв</div>
+        <div class="calc-label" data-ru="Оценка + отзыв" data-am="Գdelays + կdelays">Оценка + отзыв</div>
         <div class="calc-price">֏500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="500">
-        <div class="calc-label" data-ru="Вопрос к товару" data-am="Հարց ապրանքի վերաբերյալ">Вопрос к товару</div>
+        <div class="calc-label" data-ru="Вопрос к товару" data-am="Հdelays">Вопрос к товару</div>
         <div class="calc-price">֏500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="250">
-        <div class="calc-label" data-ru="Написание текста отзыва" data-am="Կարծիքի տեքստի գրում">Написание текста отзыва</div>
+        <div class="calc-label" data-ru="Написание текста отзыва" data-am="Կdelays">Написание текста отзыва</div>
         <div class="calc-price">֏250</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-    </div>
-    <div class="calc-group" id="cg-photo">
-      <div class="calc-row" data-price="3500">
-        <div class="calc-label" data-ru="Фотосессия в гардеробной WB (жен. модель)" data-am="Լուսանկարահանում WB գարդերոբում (կան. մոդել)">Фотосессия в гардеробной WB (жен. модель)</div>
-        <div class="calc-price">֏3 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="4500">
-        <div class="calc-label" data-ru="Фотосессия в гардеробной WB (муж. модель)" data-am="Լուսանկարահանում WB գարդերոբում (տղ. մոդել)">Фотосессия в гардеробной WB (муж. модель)</div>
-        <div class="calc-price">֏4 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Предметная фотосъёмка (3 фото)" data-am="Առարկայական լուսանկարահանում (3 լուսանկար)">Предметная фотосъёмка (3 фото)</div>
-        <div class="calc-price">֏2 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="5000">
-        <div class="calc-label" data-ru="Предметная съёмка (крупное / техника, 3 фото)" data-am="Առարկայական (խոշոր / տեխնիկա, 3 լուսանկար)">Предметная съёмка (крупное / техника, 3 фото)</div>
-        <div class="calc-price">֏5 000</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">Ребёнок модель (до 14 лет)</div>
-        <div class="calc-price">֏2 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="7000">
-        <div class="calc-label" data-ru="Видеообзор товара" data-am="Ապրանքի տեսանյութ">Видеообзор товара</div>
-        <div class="calc-price">֏7 000</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-    </div>
-    <div class="calc-group" id="cg-logistics">
-      <div class="calc-row" data-price="1500">
-        <div class="calc-label" data-ru="Глажка одежды (одиночная вещь)" data-am="Հագուստի արդուկում (մեկ իր)">Глажка одежды (одиночная вещь)</div>
-        <div class="calc-price">֏1 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Глажка одежды (верхняя одежда)" data-am="Հագուստի արդուկում (վերնահագուստ)">Глажка одежды (верхняя одежда)</div>
-        <div class="calc-price">֏2 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="1500">
-        <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Վերցնում ՊՎԶ-ից լուսանկարահանման համար">Забор из ПВЗ для съёмки</div>
-        <div class="calc-price">֏1 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
-      </div>
-      <div class="calc-row" data-price="1500">
-        <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Վերադարձ ՊՎԶ լուսանկարահանման հետո">Возврат в ПВЗ после съёмки</div>
-        <div class="calc-price">֏1 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="100">
-        <div class="calc-label" data-ru="Замена штрихкода" data-am="Շտրիխկոդի փոխարինում">Замена штрихкода</div>
+        <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Բdelays">Подписка на бренд / страницу</div>
         <div class="calc-price">֏100</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+    </div>
+
+    <!-- ===== ФОТОСЪЁМКА ===== -->
+    <div class="calc-group" id="cg-photo">
+      <div class="calc-row" data-price="3500">
+        <div class="calc-label" data-ru="Фотосессия в гардеробной WB (жен. модель)" data-am="Լdelays WB (կdelays)">Фотосессия в гардеробной WB (жен. модель)</div>
+        <div class="calc-price">֏3 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="4500">
+        <div class="calc-label" data-ru="Фотосессия в гардеробной WB (муж. модель)" data-am="Լdelays WB (տdelays)">Фотосессия в гардеробной WB (муж. модель)</div>
+        <div class="calc-price">֏4 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="2500">
+        <div class="calc-label" data-ru="Предметная фотосъёмка (3 фото)" data-am="Առdelays (3)">Предметная фотосъёмка (3 фото)</div>
+        <div class="calc-price">֏2 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="5000">
+        <div class="calc-label" data-ru="Предметная съёмка (крупное / техника, 3 фото)" data-am="Առdelays (խdelays, 3)">Предметная съёмка (крупное / техника, 3 фото)</div>
+        <div class="calc-price">֏5 000</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="2500">
+        <div class="calc-label" data-ru="Ребёнок модель (до 14 лет)" data-am="Երdelays (14)">Ребёнок модель (до 14 лет)</div>
+        <div class="calc-price">֏2 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="7000">
+        <div class="calc-label" data-ru="Видеообзор товара" data-am="Տdelays">Видеообзор товара</div>
+        <div class="calc-price">֏7 000</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+    </div>
+
+    <!-- ===== ФФ (Фулфилмент) ===== -->
+    <div class="calc-group" id="cg-ff">
+      <div class="calc-row" data-price="100">
+        <div class="calc-label" data-ru="Замена штрихкода" data-am="Շdelays">Замена штрихкода</div>
+        <div class="calc-price">֏100</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="200">
-        <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Վերափաթեթավորում (մեր)">Переупаковка (наша)</div>
+        <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Վdelays (մdelays)">Переупаковка (наша)</div>
         <div class="calc-price">֏200</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="150">
-        <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Վերափաթեթավորում (հաճախորդի)">Переупаковка (клиента)</div>
+        <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Վdelays (հdelays)">Переупаковка (клиента)</div>
         <div class="calc-price">֏150</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
+    </div>
+
+    <!-- ===== ЛОГИСТИКА ===== -->
+    <div class="calc-group" id="cg-logistics">
       <div class="calc-row" data-price="2000">
-        <div class="calc-label" data-ru="Доставка на склад WB (коробка)" data-am="Առաքում WB պահեստ (տուփ)">Доставка на склад WB (коробка)</div>
+        <div class="calc-label" data-ru="Доставка на склад WB (1 коробка 60х40х40)" data-am="Առdelays WB (1 տdelays 60x40x40)">Доставка на склад WB (1 коробка 60х40х40)</div>
         <div class="calc-price">֏2 000</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="2500">
+        <div class="calc-label" data-ru="Доставка до вашего склада (1 коробка 60х40х40)" data-am="Առdelays ձdelays (1 տdelays 60x40x40)">Доставка до вашего склада (1 коробка 60х40х40)</div>
+        <div class="calc-price">֏2 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+    </div>
+
+    <!-- ===== ПРОЧИЕ УСЛУГИ ===== -->
+    <div class="calc-group" id="cg-other">
+      <div class="calc-row" data-price="1500">
+        <div class="calc-label" data-ru="Глажка одежды (одиночная вещь)" data-am="Հdelays (մdelays)">Глажка одежды (одиночная вещь)</div>
+        <div class="calc-price">֏1 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="2500">
+        <div class="calc-label" data-ru="Глажка одежды (верхняя одежда)" data-am="Հdelays (վdelays)">Глажка одежды (верхняя одежда)</div>
+        <div class="calc-price">֏2 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="1500">
+        <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Վdelays ՊՎԶ">Забор из ПВЗ для съёмки</div>
+        <div class="calc-price">֏1 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+      </div>
+      <div class="calc-row" data-price="1500">
+        <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Վdelays ՊՎԶ">Возврат в ПВЗ после съёмки</div>
+        <div class="calc-price">֏1 500</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
     <div class="calc-total">
@@ -1181,29 +1211,39 @@ function getBuyoutTotal(qty) {
   return 20 * 2000 + 20 * 1700 + 20 * 1500 + (qty - 60) * 1250;
 }
 function ccBuyout(delta) {
-  const sp = document.getElementById('buyoutQty');
-  let v = parseInt(sp.textContent) + delta;
+  const inp = document.getElementById('buyoutQty');
+  let v = parseInt(inp.value || 0) + delta;
   if (v < 0) v = 0; if (v > 999) v = 999;
-  sp.textContent = v;
+  inp.value = v;
+  const price = getBuyoutPrice(v);
+  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? '֏' + price.toLocaleString('ru-RU') + '/шт' : '֏2 000';
+  recalc();
+}
+function onBuyoutInput() {
+  const inp = document.getElementById('buyoutQty');
+  let v = parseInt(inp.value || 0);
+  if (isNaN(v) || v < 0) v = 0; if (v > 999) v = 999;
+  inp.value = v;
   const price = getBuyoutPrice(v);
   document.getElementById('buyoutPriceLabel').textContent = v > 0 ? '֏' + price.toLocaleString('ru-RU') + '/шт' : '֏2 000';
   recalc();
 }
 function cc(btn, delta) {
   const row = btn.closest('.calc-row');
-  const sp = row.querySelector('.calc-input span');
-  let v = parseInt(sp.textContent) + delta;
+  const inp = row.querySelector('.calc-input input');
+  let v = parseInt(inp.value || 0) + delta;
   if (v < 0) v = 0; if (v > 999) v = 999;
-  sp.textContent = v;
+  inp.value = v;
   recalc();
 }
 function recalc() {
   let total = 0; const items = [];
-  const buyoutQty = parseInt(document.getElementById('buyoutQty').textContent);
+  const buyoutQty = parseInt(document.getElementById('buyoutQty').value || 0);
   if (buyoutQty > 0) { total += getBuyoutTotal(buyoutQty); items.push('Выкуп + забор: ' + buyoutQty + ' шт (' + getBuyoutPrice(buyoutQty) + '֏/шт)'); }
   document.querySelectorAll('.calc-row:not(#buyoutRow)').forEach(row => {
     const price = parseInt(row.dataset.price);
-    const qty = parseInt(row.querySelector('.calc-input span').textContent);
+    const inp = row.querySelector('.calc-input input');
+    const qty = parseInt(inp ? inp.value : 0);
     if (!isNaN(price) && qty > 0) { total += price * qty; items.push(row.querySelector('.calc-label').textContent + ': ' + qty); }
   });
   document.getElementById('calcTotal').textContent = '֏' + total.toLocaleString('ru-RU');
