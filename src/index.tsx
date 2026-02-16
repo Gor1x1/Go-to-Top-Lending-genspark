@@ -27,7 +27,7 @@ app.get('/', (c) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
+<title>Go to Top — Продвижение на Wildberries | Առաջخاdelays Wildberries-ում</title>
 <meta name="description" content="Go to Top — безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы, живые люди, собственный склад в Ереване.">
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries">
 <meta property="og:description" content="Реальные выкупы живыми людьми. Собственный склад в Ереване.">
@@ -146,14 +146,16 @@ img{max-width:100%;height:auto}
 .step:last-child .step-line{display:none}
 .step h4{font-size:0.92rem;font-weight:600;margin-bottom:8px}
 .step p{font-size:0.78rem;color:var(--text-muted);line-height:1.5}
-.wh-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+.wh-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
 .wh-item{position:relative;border-radius:var(--r);overflow:hidden;border:1px solid var(--border);cursor:pointer;transition:var(--t)}
 .wh-item:hover{transform:scale(1.02);border-color:rgba(139,92,246,0.3)}
 .wh-item img{width:100%;height:250px;object-fit:cover;transition:var(--t)}
 .wh-item:hover img{transform:scale(1.05)}
 .wh-caption{position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.8));font-size:0.85rem;font-weight:500}
 .guarantee-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
-.guarantee-card img{border-radius:var(--r);width:100%;height:400px;object-fit:cover;object-position:center top;border:1px solid var(--border)}
+.guarantee-card img{border-radius:var(--r);width:100%;height:auto;object-fit:contain;border:1px solid var(--border)}
+
+
 .guarantee-card h2{font-size:1.9rem;font-weight:800;margin-bottom:16px}
 .guarantee-card>div p{color:var(--text-sec);margin-bottom:16px;line-height:1.8}
 .g-list{list-style:none;margin:20px 0}
@@ -612,10 +614,7 @@ img{max-width:100%;height:auto}
       <img src="/static/img/warehouse2.jpg" alt="Склад с товарами">
       <div class="wh-caption" data-ru="Система учёта" data-am="Հաշվառման համակարգ">Система учёта</div>
     </div>
-    <div class="wh-item" onclick="openLightbox(this)">
-      <img src="/static/img/team.jpg" alt="Команда Go to Top">
-      <div class="wh-caption" data-ru="Наша команда" data-am="Մեր թիմը">Наша команда</div>
-    </div>
+
   </div>
 </div>
 </section>
@@ -625,7 +624,7 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="guarantee-card fade-up">
     <div>
-      <img src="/static/img/team.jpg" alt="Команда Go to Top">
+      <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
     </div>
     <div>
       <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">Гарантия безопасности</span></div>
