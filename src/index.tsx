@@ -208,6 +208,17 @@ img{max-width:100%;height:auto}
 .lightbox.show{display:flex}
 .lightbox img{max-width:90%;max-height:90vh;border-radius:var(--r);object-fit:contain}
 
+/* ===== CTA BUTTONS AFTER SECTIONS ===== */
+.section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:40px;padding-top:32px;border-top:1px solid var(--border)}
+.section-cta .btn{font-size:0.9rem;padding:12px 24px}
+.section-cta .btn i{margin-right:6px}
+.btn-success{background:linear-gradient(135deg,#10B981,#059669);color:white;box-shadow:0 4px 15px rgba(16,185,129,0.3)}
+.btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(16,185,129,0.5)}
+.btn-warning{background:linear-gradient(135deg,#F59E0B,#D97706);color:white;box-shadow:0 4px 15px rgba(245,158,11,0.3)}
+.btn-warning:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(245,158,11,0.5)}
+.btn-tg{background:linear-gradient(135deg,#0088cc,#0077b5);color:white;box-shadow:0 4px 15px rgba(0,136,204,0.3)}
+.btn-tg:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,136,204,0.5)}
+
 /* ===== POPUP - GUARANTEED VISIBLE ===== */
 .popup-overlay{
   display:none;
@@ -546,7 +557,7 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="about-grid fade-up">
     <div class="about-img">
-      <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
+      <img src="/static/img/founder.jpg" alt="Основатель Go to Top">
     </div>
     <div class="about-text">
       <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
@@ -555,6 +566,11 @@ img{max-width:100%;height:auto}
       <p data-ru="Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную." data-am="Մեր մասնագետների թիմը 2021 թվականից աշխատում է արդյունքի համար: Մենք ունենք սեփական պահեստներ և գրասենյակներ Երևանում: Գնումների համար օգտագործում ենք միայն իրական մարդկանց հաշիվներ և ամեն ինչ անում ենք ձեռքով:">Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную.</p>
       <div class="about-highlight">
         <p data-ru="Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!" data-am="Լավագույն արդյունքը կստանաք օգտվելով մեր ծառայությունների փաթեթը!"><i class="fas fa-bolt" style="margin-right:8px"></i>Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!</p>
+      </div>
+      <div class="section-cta">
+        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
+        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկdelays առաજ">Начать продвижение</span></a>
+        <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
       </div>
     </div>
   </div>
@@ -603,6 +619,11 @@ img{max-width:100%;height:auto}
         <li><i class="fas fa-check"></i> <span data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">Ребёнок модель (до 14 лет)</span></li>
       </ul>
     </div>
+  </div>
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիма">Заказать сейчас</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սкse gnemner hima">Начать выкупы сейчас</span></a>
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
   </div>
 </div>
 </section>
@@ -670,6 +691,12 @@ img{max-width:100%;height:auto}
         <p data-ru="Все отзывы публикуются с реальных аккаунтов с историей" data-am="Բолоր կարծիքները հրապարակվուм են իրակաн հաշիվներից պատмությաнբ">Все отзывы публикуются с реальных аккаунтов с историей</p>
       </div>
     </div>
+  </div>
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պатвирel hima">Заказать сейчас</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Skse arajkhagh">Начать продвижение</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Skse gnemner hima">Начать выкупы сейчас</span></a>
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Grel meneger">Написать менеджеру</span></a>
   </div>
 </div>
 </section>
@@ -858,6 +885,7 @@ img{max-width:100%;height:auto}
 <section class="section" id="guarantee">
 <div class="container">
     <div class="guarantee-card fade-up">
+    <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
     <div>
       <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">Гарантия безопасности</span></div>
       <h2 data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեн իнչ կազмակերպված է և կարգավоրված. Մեր թիмը">Всё организовано и по полочкам. Наша команда</h2>
@@ -870,6 +898,11 @@ img{max-width:100%;height:auto}
       <div class="g-badge">
         <i class="fas fa-award"></i>
         <span data-ru="0 блокировок за всё время работы" data-am="0 արգելափակում աշխատանքի ողջ ընթացքում">0 блокировок за всё время работы</span>
+      </div>
+      <div class="section-cta" style="margin-top:24px">
+        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
+        <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղdelays">Начать продвижение</span></a>
+        <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գdelays մeneger">Написать менеджеру</span></a>
       </div>
     </div>
   </div>
@@ -899,6 +932,11 @@ img{max-width:100%;height:auto}
     </tbody>
   </table>
   </div>
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սկսել գնdelays">Начать выкупы сейчас</span></a>
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գdelays մeneger">Написать менеджеру</span></a>
+  </div>
 </div>
 </section>
 
@@ -925,6 +963,11 @@ img{max-width:100%;height:auto}
       <h3 data-ru="Защитные пломбы" data-am="Պաշտպանիչ կապարաններ">Защитные пломбы</h3>
       <p data-ru="Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются." data-am="Պաշտպանիչ կապարաններով կամ գործարանային փաթեթավորմամբ ապրանքները լուսանկարահանման հետո չեն վերականգնվում:">Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются.</p>
     </div>
+  </div>
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատវ. հdelays">Заказать сейчас</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սdelays առdelays">Начать продвижение</span></a>
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գdelays մeneger">Написать менеджеру</span></a>
   </div>
 </div>
 </section>
@@ -1316,7 +1359,8 @@ var sObs = new IntersectionObserver(function(entries) {
   entries.forEach(function(entry) {
     if (entry.isIntersecting) {
       var el = entry.target;
-      var target = parseInt(el.dataset.countS);
+      var target = parseInt(el.dataset.countS) || 0;
+      if (isNaN(target) || target === 0) { sObs.unobserve(el); return; }
       var dur = 2000; var start = performance.now();
       function animS(now) {
         var p = Math.min((now - start) / dur, 1);
@@ -1329,7 +1373,7 @@ var sObs = new IntersectionObserver(function(entries) {
     }
   });
 }, {threshold:0.5});
-document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { cObs.observe(el); });
+document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
 
 /* ===== SMOOTH SCROLL ===== */
 document.querySelectorAll('a[href^="#"]').forEach(function(a) {
@@ -1341,7 +1385,7 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a) {
   });
 });
 
-console.log('Go to Top — site loaded v5 - competitor blocks added');
+console.log('Go to Top — site loaded v6 - CTA buttons + team photo moved');
 </script>
 </body>
 </html>`)
