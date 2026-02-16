@@ -544,7 +544,7 @@ img{max-width:100%;height:auto}
     <img src="/static/img/founder.jpg" alt="Go to Top">
     <div class="hero-badge-img">
       <i class="fas fa-shield-alt"></i>
-      <span data-ru="Собственный склад в Ереване" data-am="Սեփական պահեստ Երևանում">Собственный склад в Ереване</span>
+      <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">Надежный метод продвижения</span>
     </div>
   </div>
 </div>
@@ -1418,59 +1418,59 @@ function toggleFaq(el) {
 function openLightbox(el) { document.getElementById('lightboxImg').src = el.querySelector('img').src; document.getElementById('lightbox').classList.add('show'); }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
 
-/* ===== TIMED POPUP (5 sec) — ROBUST v2 ===== */
-var popupEl = document.getElementById('popupOverlay');
+/* ===== TIMED POPUP (5 sec) — BULLETPROOF ===== */
 var popupDismissed = false;
 
 function showPopup() {
-  console.log('[Popup] showPopup called, dismissed=' + popupDismissed + ', sessionDone=' + sessionStorage.getItem('popupDone'));
-  if (popupDismissed) { console.log('[Popup] Skipped: dismissed'); return; }
-  if (sessionStorage.getItem('popupDone')) { console.log('[Popup] Skipped: sessionStorage'); return; }
-  if (!popupEl) { console.log('[Popup] ERROR: popupEl not found!'); return; }
-  /* Force display and visibility for all browsers/screens */
-  popupEl.style.cssText = 'display:flex !important;visibility:visible !important;opacity:1 !important;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;justify-content:center;align-items:center;padding:20px;overflow-y:auto;';
-  popupEl.classList.add('show');
-  /* Ensure popup card is visible */
-  var card = popupEl.querySelector('.popup-card');
+  if (popupDismissed) return;
+  if (sessionStorage.getItem('popupDone')) return;
+  var ov = document.getElementById('popupOverlay');
+  if (!ov) return;
+  /* Force every possible style to guarantee visibility on ALL screens */
+  ov.setAttribute('style','display:flex!important;visibility:visible!important;opacity:1!important;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;justify-content:center;align-items:center;padding:20px;overflow-y:auto;');
+  ov.classList.add('show');
+  var card = ov.querySelector('.popup-card');
   if (card) {
     card.style.opacity = '1';
     card.style.visibility = 'visible';
     card.style.transform = 'scale(1) translateY(0)';
+    card.style.display = 'block';
   }
   document.body.style.overflow = 'hidden';
-  console.log('[Popup] Shown successfully, display=' + getComputedStyle(popupEl).display);
+  console.log('[Popup] Shown on ' + (window.innerWidth > 768 ? 'desktop' : 'mobile') + ', w=' + window.innerWidth);
 }
 
 function hidePopup() {
   popupDismissed = true;
-  if (popupEl) {
-    popupEl.classList.remove('show');
-    popupEl.style.cssText = 'display:none !important;visibility:hidden !important;';
+  var ov = document.getElementById('popupOverlay');
+  if (ov) {
+    ov.classList.remove('show');
+    ov.setAttribute('style','display:none!important;visibility:hidden!important;opacity:0!important;');
   }
   document.body.style.overflow = '';
   sessionStorage.setItem('popupDone', '1');
-  console.log('[Popup] Hidden');
 }
 
 /* Close button */
-var closeBtn = document.getElementById('popupCloseBtn');
-if (closeBtn) {
-  closeBtn.addEventListener('click', function(e) {
+var _closeBtn = document.getElementById('popupCloseBtn');
+if (_closeBtn) {
+  _closeBtn.addEventListener('click', function(e) {
     e.stopPropagation();
     hidePopup();
   });
 }
 
 /* Click overlay to close */
-if (popupEl) {
-  popupEl.addEventListener('click', function(e) {
-    if (e.target === popupEl) hidePopup();
+var _popupOv = document.getElementById('popupOverlay');
+if (_popupOv) {
+  _popupOv.addEventListener('click', function(e) {
+    if (e.target === _popupOv) hidePopup();
   });
 }
 
-/* Show after 5 seconds — clear any stale session data on fresh page load */
-console.log('[Popup] Timer set for 5 seconds...');
+/* Show after 5 seconds — guaranteed */
 setTimeout(showPopup, 5000);
+console.log('[Popup] Timer set, will fire in 5s');
 
 /* Form submit */
 document.getElementById('popupForm').addEventListener('submit', function(e) {
