@@ -73,6 +73,7 @@ img{max-width:100%;height:auto}
 .hamburger.active span:nth-child(1){transform:rotate(45deg) translate(5px,5px)}
 .hamburger.active span:nth-child(2){opacity:0}
 .hamburger.active span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
+.nav-mobile-cta{display:none}
 .hero{padding:140px 0 80px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
 .hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
@@ -253,13 +254,19 @@ img{max-width:100%;height:auto}
 /* ===== POPUP - GUARANTEED VISIBLE ===== */
 .popup-overlay{
   display:none;
-  position:fixed;top:0;left:0;width:100vw;height:100vh;
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  width:100%;height:100%;
   background:rgba(0,0,0,0.85);
   z-index:100000;
   justify-content:center;align-items:center;
   padding:20px;
+  overflow-y:auto;
 }
-.popup-overlay.show{display:flex !important}
+.popup-overlay.show{
+  display:flex !important;
+  visibility:visible !important;
+  opacity:1 !important;
+}
 .popup-card{
   background:linear-gradient(145deg,#2a1a4e,#3d2470);
   border:2px solid rgba(167,139,250,0.6);
@@ -268,10 +275,13 @@ img{max-width:100%;height:auto}
   text-align:center;
   max-width:460px;width:100%;
   position:relative;
+  z-index:100001;
   box-shadow:0 0 80px rgba(139,92,246,0.4),0 25px 60px rgba(0,0,0,0.5),inset 0 1px 0 rgba(255,255,255,0.1);
-  animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1);
+  animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+  opacity:1;
+  transform:scale(1);
 }
-@keyframes popIn{from{transform:scale(0.7) translateY(30px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+@keyframes popIn{0%{transform:scale(0.7) translateY(30px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
 .popup-card .popup-close{
   position:absolute;top:14px;right:14px;
   width:34px;height:34px;border-radius:50%;
@@ -421,10 +431,14 @@ img{max-width:100%;height:auto}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:768px){
-  .nav-links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,10,26,0.98);flex-direction:column;justify-content:center;align-items:center;gap:32px;padding:20px;z-index:1001}
-  .nav-links.active{display:flex}
-  .nav-links a{font-size:1.2rem}
-  .hamburger{display:flex}
+  .nav-links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100vh;background:rgba(15,10,26,0.98);flex-direction:column;justify-content:center;align-items:center;gap:28px;padding:80px 20px 20px;z-index:10000;overflow-y:auto}
+  .nav-links.active{display:flex !important}
+  .nav-links li{list-style:none;width:100%;text-align:center}
+  .nav-links a{font-size:1.3rem;display:block;padding:14px 20px;color:#fff;border-radius:12px;transition:background 0.2s;font-weight:600}
+  .nav-links a:hover,.nav-links a:active{background:rgba(139,92,246,0.2)}
+  .nav-mobile-cta{display:list-item;list-style:none;margin-top:16px;width:100%;text-align:center}
+  .nav-mobile-cta .btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;font-size:1.1rem;border-radius:12px;font-weight:700}
+  .hamburger{display:flex;z-index:10001;position:relative}
   .nav-right .nav-cta{display:none}
   .hero{padding:110px 0 60px}
   .hero h1{font-size:1.9rem}
@@ -475,6 +489,7 @@ img{max-width:100%;height:auto}
     <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
     <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
     <li><a href="#contact" data-ru="Контакты" data-am="Կոնտակտներ">Контакты</a></li>
+    <li class="nav-mobile-cta"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fab fa-telegram"></i> Написать нам</a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
@@ -1257,14 +1272,45 @@ window.addEventListener('scroll', () => {
 
 /* ===== MOBILE MENU ===== */
 function toggleMenu() {
-  document.getElementById('navLinks').classList.toggle('active');
-  document.getElementById('hamburger').classList.toggle('active');
+  var nav = document.getElementById('navLinks');
+  var ham = document.getElementById('hamburger');
+  var isOpen = nav.classList.contains('active');
+  if (isOpen) {
+    nav.classList.remove('active');
+    ham.classList.remove('active');
+    document.body.style.overflow = '';
+  } else {
+    nav.classList.add('active');
+    ham.classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
 }
-document.querySelectorAll('.nav-links a').forEach(a => {
-  a.addEventListener('click', () => {
-    document.getElementById('navLinks').classList.remove('active');
-    document.getElementById('hamburger').classList.remove('active');
+
+function closeMenu() {
+  document.getElementById('navLinks').classList.remove('active');
+  document.getElementById('hamburger').classList.remove('active');
+  document.body.style.overflow = '';
+}
+
+document.querySelectorAll('.nav-links a').forEach(function(a) {
+  a.addEventListener('click', function(e) {
+    e.preventDefault();
+    closeMenu();
+    var href = this.getAttribute('href');
+    if (href && href.startsWith('#')) {
+      var target = document.querySelector(href);
+      if (target) {
+        setTimeout(function() {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 100);
+      }
+    }
   });
+});
+
+/* Close menu when tapping outside nav links (on overlay area) */
+document.getElementById('navLinks').addEventListener('click', function(e) {
+  if (e.target === this) closeMenu();
 });
 
 /* ===== TICKER ===== */
@@ -1370,13 +1416,29 @@ var popupDismissed = false;
 function showPopup() {
   if (popupDismissed) return;
   if (sessionStorage.getItem('popupDone')) return;
+  if (!popupEl) return;
+  /* Force display and visibility for all browsers/screens */
+  popupEl.style.display = 'flex';
+  popupEl.style.visibility = 'visible';
+  popupEl.style.opacity = '1';
   popupEl.classList.add('show');
+  /* Ensure popup card is visible */
+  var card = popupEl.querySelector('.popup-card');
+  if (card) {
+    card.style.opacity = '1';
+    card.style.visibility = 'visible';
+    card.style.transform = 'scale(1) translateY(0)';
+  }
+  document.body.style.overflow = 'hidden';
   console.log('Popup shown');
 }
 
 function hidePopup() {
   popupDismissed = true;
   popupEl.classList.remove('show');
+  popupEl.style.display = 'none';
+  popupEl.style.visibility = 'hidden';
+  document.body.style.overflow = '';
   sessionStorage.setItem('popupDone', '1');
 }
 
