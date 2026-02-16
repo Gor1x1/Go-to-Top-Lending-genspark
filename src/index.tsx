@@ -101,13 +101,13 @@ img{max-width:100%;height:auto}
 .ticker-item{display:flex;align-items:center;gap:10px;padding:0 40px;font-size:0.88rem;color:var(--text-sec);flex-shrink:0}
 .ticker-item i{color:var(--purple)}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.section{padding:80px 0}
+.section{padding:56px 0}
 .section-dark{background:var(--bg-surface)}
 .section-header{text-align:center;margin-bottom:56px}
 .section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
 .section-title{font-size:2.2rem;font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
 .section-sub{font-size:1rem;color:var(--text-sec);max-width:640px;margin:0 auto;line-height:1.7}
-.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-bottom:40px}
+.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-bottom:16px}
 .svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:32px;transition:var(--t);position:relative;overflow:hidden}
 .svc-card:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-4px);box-shadow:var(--glow)}
 .svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--purple),var(--accent));opacity:0;transition:var(--t)}
@@ -211,7 +211,7 @@ img{max-width:100%;height:auto}
 .lightbox img{max-width:90%;max-height:90vh;border-radius:var(--r);object-fit:contain}
 
 /* ===== CTA BUTTONS AFTER SECTIONS ===== */
-.section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:40px;padding-top:32px;border-top:1px solid var(--border)}
+.section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
 .section-cta .btn{font-size:0.9rem;padding:12px 24px}
 .section-cta .btn i{margin-right:6px}
 .btn-success{background:linear-gradient(135deg,#10B981,#059669);color:white;box-shadow:0 4px 15px rgba(16,185,129,0.3)}
@@ -423,7 +423,7 @@ img{max-width:100%;height:auto}
 }
 @media(max-width:480px){
   .hero h1{font-size:1.6rem}
-  .section{padding:56px 0}
+  .section{padding:44px 0}
   .section-title{font-size:1.4rem}
 }
 </style>
@@ -607,6 +607,7 @@ img{max-width:100%;height:auto}
         <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Տարբեր վայրեր և մոդելներ">Разные локации и модели</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Մինչև 50% կարծիքներ գնումներից">До 50% отзывов от выкупов</span></li>
       </ul>
+      <div style="margin-top:20px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկسel arajkh">Начать продвижение</span></a></div>
     </div>
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-camera"></i></div>
@@ -618,10 +619,8 @@ img{max-width:100%;height:auto}
         <li><i class="fas fa-check"></i> <span data-ru="Видеообзоры товаров" data-am="Ապրանքների տեսանյութներ">Видеообзоры товаров</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">Ребёнок модель (до 14 лет)</span></li>
       </ul>
+      <div style="margin-top:20px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-camera"></i> <span data-ru="Заказать съёмку" data-am="Patv. lusank.">Заказать съёмку</span></a></div>
     </div>
-  </div>
-  <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առdelays">Начать продвижение</span></a>
   </div>
 </div>
 </section>
@@ -652,16 +651,14 @@ img{max-width:100%;height:auto}
       <div class="buyout-card">
         <h4 data-ru="Отчётность" data-am="Հաշվետվություն">Отчётность</h4>
         <p data-ru="Формирование итоговой отчётности по каждому выкупу. Полная прозрачность на каждом этапе." data-am="Վերջնական հաշվետվության ձևավоրուм յուրաքանչյուր գնումի համար: Լիարժեք թափանցիկություն յուրաքանչյուր փուлուм:">Формирование итоговой отчётности по каждому выкупу. Полная прозрачность на каждом этапе.</p>
+        <div style="margin-top:16px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning" style="font-size:0.82rem;padding:9px 18px"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Sksel gnumner">Начать выкупы сейчас</span></a></div>
       </div>
       <div class="buyout-card">
         <h4 data-ru="Контроль" data-am="Վերահսկоղություն">Контроль</h4>
         <p data-ru="Сопровождение и контроль на всех этапах. Точное следование алгоритму для безопасности вашего кабинета." data-am="Ուղեկցում և վերահսկоղություն բолоր փուлերուм: Աлգоրիթмի ճիշտ հետևորмաн ձեր կաբիнետի անվտանգությաн հաмար:">Сопровождение и контроль на всех этапах. Точное следование алгоритму для безопасности вашего кабинета.</p>
+        <div style="margin-top:16px;text-align:center"><a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg" style="font-size:0.82rem;padding:9px 18px"><i class="fab fa-telegram"></i> <span data-ru="Получить индивидуальный расчёт" data-am="Stanal indiv hashvark">Получить индивидуальный расчёт</span></a></div>
       </div>
     </div>
-  </div>
-
-  <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սկdelays gnumner hima">Начать выкупы сейчас</span></a>
   </div>
 </div>
 </section>
@@ -861,7 +858,6 @@ img{max-width:100%;height:auto}
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-warehouse"></i> <span data-ru="Наш склад" data-am="Մեր պահեստը">Наш склад</span></div>
     <h2 class="section-title" data-ru="Всё организовано и по полочкам" data-am="Ամեն ինչ կազմակերպված է և կարգավորված">Всё организовано и по полочкам</h2>
-    <p class="section-sub" data-ru="Собственный склад в Ереване. Забор ваших товаров с ПВЗ. Надежное хранение товара. Отгрузка Ваших товаров на склад WB СЦ Ереван" data-am="Սեփական պահեստ Երևանում: Ձեր ապրանքների վերցնում ՊՎԶ-ից: Հուսալի պահպանում: Ձեր ապրանքների առաքում WB ՍՑ Երևան պահեստ">Собственный склад в Ереване. Забор ваших товаров с ПВЗ. Надежное хранение товара. Отгрузка Ваших товаров на склад WB СЦ Ереван</p>
   </div>
   <div class="wh-grid fade-up">
     <div class="wh-item" onclick="openLightbox(this)">
@@ -874,6 +870,7 @@ img{max-width:100%;height:auto}
     </div>
 
   </div>
+  <p class="section-sub fade-up" style="text-align:center;max-width:700px;margin:32px auto 0" data-ru="Собственный склад в Ереване. Забор ваших товаров с ПВЗ. Надежное хранение товара. Отгрузка Ваших товаров на склад WB СЦ Ереван" data-am="Sep. pahest Erevanum. Dzer aprankneri vertsnum PVZ-its. Husali pahpanum. Dzer aprankneri araqum WB SC Erevan pahest">Собственный склад в Ереване. Забор ваших товаров с ПВЗ. Надежное хранение товара. Отгрузка Ваших товаров на склад WB СЦ Ереван</p>
   <div class="section-cta">
     <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
   </div>
@@ -930,7 +927,7 @@ img{max-width:100%;height:auto}
   </table>
   </div>
   <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սкdelays gnumner">Начать выкупы сейчас</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Убедитесь сами — начните сейчас" data-am="Սкdelays gnumner">Начать выкупы сейчас</span></a>
   </div>
 </div>
 </section>
@@ -960,7 +957,7 @@ img{max-width:100%;height:auto}
     </div>
   </div>
   <div class="section-cta">
-    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գrel meneger">Написать менеджеру</span></a>
+    <a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Уточнить условия" data-am="Գrel meneger">Написать менеджеру</span></a>
   </div>
 </div>
 </section>
@@ -1003,7 +1000,7 @@ img{max-width:100%;height:auto}
     </div>
   </div>
   <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պатvиrел hima">Заказать сейчас</span></a>
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Остались вопросы? Напишите нам" data-am="Պатvиrел hima">Заказать сейчас</span></a>
   </div>
 </div>
 </section>
