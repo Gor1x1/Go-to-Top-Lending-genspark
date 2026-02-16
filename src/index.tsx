@@ -32,8 +32,8 @@ app.get('/', (c) => {
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries и Ozon">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="/static/img/logo-new.png">
-<link rel="icon" type="image/png" href="/static/img/logo-new.png">
+<meta property="og:image" content="/static/img/logo-gototop.png">
+<link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
 <style>
@@ -433,7 +433,7 @@ img{max-width:100%;height:auto}
 <div class="container">
 <nav class="nav">
   <a href="#" class="logo">
-    <img src="/static/img/logo-new.png" alt="Go to Top">
+    <img src="/static/img/logo-gototop.png" alt="Go to Top">
     <span class="logo-text">Go to Top</span>
   </a>
   <ul class="nav-links" id="navLinks">
@@ -557,7 +557,7 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="about-grid fade-up">
     <div class="about-img">
-      <img src="/static/img/founder.jpg" alt="Основатель Go to Top">
+      <img src="/static/img/about-hero.jpg" alt="Go to Top — Business Growth">
     </div>
     <div class="about-text">
       <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
@@ -1060,7 +1060,7 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="footer-grid">
     <div class="footer-brand">
-      <div class="logo"><img src="/static/img/logo-new.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
+      <div class="logo"><img src="/static/img/logo-gototop.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
       <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայաստանում: Իրական գնումներ իրական մարդկանցով սեփական պահեստից Երևանում:">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
     </div>
     <div class="footer-col">
