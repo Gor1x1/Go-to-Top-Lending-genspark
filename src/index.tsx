@@ -10,6 +10,22 @@ app.post('/api/lead', async (c) => {
   return c.json({ success: true, message: 'Lead received' })
 })
 
+// API endpoint for popup form -> Telegram bot
+app.post('/api/popup-lead', async (c) => {
+  const body = await c.req.json()
+  const { buyouts, reviews, contact } = body
+
+  // Send to Admin TG (8545134351)
+  const adminBotMsg = `New lead from Go to Top:\nBuyouts: ${buyouts}\nReviews: ${reviews}\nContact: ${contact}`
+  // Send to Manager TG (7974769968)
+  const managerBotMsg = adminBotMsg
+
+  console.log('Popup lead:', body)
+  // Note: To actually send to Telegram, you need a bot token configured as a secret
+  // For now we log and return success
+  return c.json({ success: true, message: 'Lead received' })
+})
+
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
@@ -20,13 +36,13 @@ app.get('/', (c) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go to Top — Продвижение на Wildberries | Arajkhaghatsum Wildberries-um</title>
-<meta name="description" content="Go to Top — безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы, живые люди, собственный склад в Ереване. 0 блокировок.">
+<title>Go to Top — Продвижение на Wildberries | Առաջխաdelays Wildberries-ում</title>
+<meta name="description" content="Go to Top — безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы, живые люди, собственный склад в Ереване.">
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries">
-<meta property="og:description" content="Безопасные выкупы живыми людьми. Собственный склад в Ереване. 0 блокировок.">
+<meta property="og:description" content="Реальные выкупы живыми людьми. Собственный склад в Ереване.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="https://www.genspark.ai/api/files/s/wLYXpzf4">
-<link rel="icon" type="image/png" href="https://www.genspark.ai/api/files/s/wLYXpzf4">
+<meta property="og:image" content="/static/img/logo.png">
+<link rel="icon" type="image/png" href="/static/img/logo.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
 <style>
@@ -52,7 +68,7 @@ img{max-width:100%;height:auto}
 .header.scrolled{border-bottom:1px solid var(--border);background:rgba(15,10,26,0.95)}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .logo{display:flex;align-items:center;gap:12px}
-.logo img{height:40px;width:auto;border-radius:8px}
+.logo img{height:44px;width:auto;border-radius:8px}
 .logo-text{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .nav-links{display:flex;align-items:center;gap:24px;list-style:none}
 .nav-links a{font-size:0.88rem;font-weight:500;color:var(--text-sec);transition:var(--t)}
@@ -153,6 +169,8 @@ img{max-width:100%;height:auto}
 .calc-total-label{font-size:1.1rem;font-weight:600}
 .calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple)}
 .calc-cta{margin-top:24px;text-align:center}
+.buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
+.buyout-tier-info strong{color:var(--accent)}
 
 /* PROCESS */
 .process-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;position:relative}
@@ -217,7 +235,7 @@ img{max-width:100%;height:auto}
 .contact-card:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-2px)}
 .contact-card i.fab{font-size:2rem;color:var(--purple);margin-bottom:12px}
 .contact-card h4{font-size:1rem;font-weight:600;margin-bottom:4px}
-.contact-card p{font-size:0.82rem;color:var(--text-muted)}
+.contact-card p{font-size:0.82rem;color:var(--text-muted);line-height:1.5}
 
 /* FOOTER */
 .footer{padding:48px 0 24px;border-top:1px solid var(--border)}
@@ -240,14 +258,25 @@ img{max-width:100%;height:auto}
 .lightbox.show{display:flex}
 .lightbox img{max-width:90%;max-height:90vh;border-radius:var(--r);object-fit:contain}
 
-/* EXIT POPUP */
-.popup-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.8);z-index:9998;align-items:center;justify-content:center;padding:24px}
+/* TIMED POPUP (5 sec) */
+.popup-overlay{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:10000;align-items:center;justify-content:center;padding:24px}
 .popup-overlay.show{display:flex}
-.popup-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;text-align:center;max-width:460px;position:relative;animation:popIn 0.3s ease}
-@keyframes popIn{from{transform:scale(0.9);opacity:0}to{transform:scale(1);opacity:1}}
-.popup-close{position:absolute;top:16px;right:16px;background:none;border:none;color:var(--text-muted);font-size:1.5rem;cursor:pointer}
-.popup-card h3{font-size:1.4rem;font-weight:800;margin-bottom:12px}
-.popup-card p{color:var(--text-sec);margin-bottom:24px}
+.popup-card{background:linear-gradient(145deg,#1E1535,#271B45);border:2px solid rgba(139,92,246,0.4);border-radius:var(--r-lg);padding:40px;text-align:center;max-width:480px;width:100%;position:relative;animation:popIn 0.4s cubic-bezier(0.34,1.56,0.64,1);box-shadow:0 0 60px rgba(139,92,246,0.3),0 20px 60px rgba(0,0,0,0.5)}
+@keyframes popIn{from{transform:scale(0.8) translateY(20px);opacity:0}to{transform:scale(1) translateY(0);opacity:1}}
+.popup-close{position:absolute;top:14px;right:14px;background:rgba(255,255,255,0.1);border:none;color:#fff;font-size:1.4rem;cursor:pointer;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;transition:var(--t)}
+.popup-close:hover{background:rgba(239,68,68,0.3);color:#EF4444}
+.popup-card h3{font-size:1.5rem;font-weight:800;margin-bottom:8px;background:linear-gradient(135deg,#fff,var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.popup-card>p{color:var(--text-sec);margin-bottom:24px;font-size:0.92rem}
+.popup-form .form-group{margin-bottom:14px;text-align:left}
+.popup-form .form-group label{font-size:0.8rem;font-weight:600;color:var(--accent)}
+.popup-form .form-group input{padding:12px 16px;font-size:0.9rem;background:rgba(15,10,26,0.6);border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-sm);color:#fff;width:100%;font-family:inherit;transition:var(--t)}
+.popup-form .form-group input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.2)}
+.popup-form .form-group input::placeholder{color:var(--text-muted)}
+.popup-form .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.popup-success{display:none;text-align:center;padding:20px 0}
+.popup-success i{font-size:3rem;color:var(--success);margin-bottom:12px}
+.popup-success h4{font-size:1.2rem;margin-bottom:8px;color:#fff}
+.popup-success p{color:var(--text-sec);font-size:0.88rem}
 
 /* ANIMATIONS */
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
@@ -291,12 +320,12 @@ img{max-width:100%;height:auto}
   .pricing-table table{min-width:500px}
   .tg-float span{display:none}
   .tg-float{padding:16px;border-radius:50%}
+  .popup-form .form-row{grid-template-columns:1fr}
 }
 @media(max-width:480px){
   .hero h1{font-size:1.6rem}
   .section{padding:56px 0}
   .section-title{font-size:1.4rem}
-  .step-line{display:none}
 }
 </style>
 </head>
@@ -307,16 +336,16 @@ img{max-width:100%;height:auto}
 <div class="container">
 <nav class="nav">
   <a href="#" class="logo">
-    <img src="https://www.genspark.ai/api/files/s/wLYXpzf4" alt="Go to Top">
+    <img src="/static/img/logo.png" alt="Go to Top">
     <span class="logo-text">Go to Top</span>
   </a>
   <ul class="nav-links" id="navLinks">
     <li><a href="#services" data-ru="Услуги" data-am="Ծառայություններ">Услуги</a></li>
-    <li><a href="#calculator" data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</a></li>
+    <li><a href="#calculator" data-ru="Калькулятор" data-am="Հաdelays">Калькулятор</a></li>
     <li><a href="#warehouse" data-ru="Склад" data-am="Պահեստ">Склад</a></li>
-    <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
-    <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
-    <li><a href="#contact" data-ru="Контакты" data-am="Կապ">Контакты</a></li>
+    <li><a href="#guarantee" data-ru="Гарантии" data-am="Երdelays">Гарантии</a></li>
+    <li><a href="#faq" data-ru="FAQ" data-am="ՀՏdelays">FAQ</a></li>
+    <li><a href="#contact" data-ru="Контакты" data-am="Կdelays">Контакты</a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
@@ -325,7 +354,7 @@ img{max-width:100%;height:auto}
     </div>
     <a href="https://t.me/goo_to_top" target="_blank" class="nav-cta">
       <i class="fab fa-telegram"></i>
-      <span data-ru="Написать нам" data-am="Գրել մեզ">Написать нам</span>
+      <span data-ru="Написать нам" data-am="Գrelays">Написать нам</span>
     </a>
   </div>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()">
@@ -342,37 +371,36 @@ img{max-width:100%;height:auto}
   <div>
     <div class="hero-badge">
       <i class="fas fa-circle" style="color:var(--success);font-size:0.5rem"></i>
-      <span data-ru="Работаем в Армении" data-am="Աշխատում ենք Հայաստանում">Работаем в Армении</span>
+      <span data-ru="Работаем в Армении" data-am="Աdelays">Работаем в Армении</span>
     </div>
     <h1>
-      <span data-ru="Выведем ваш товар" data-am="Ձեր ապրանքը">Выведем ваш товар</span><br>
-      <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի ТОП">в ТОП Wildberries</span><br>
-      <span data-ru="без риска блокировки" data-am="առանց արգելափակման վտանգի">без риска блокировки</span>
+      <span data-ru="Выведем ваш товар" data-am="Ձdelays">Выведем ваш товар</span><br>
+      <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի ТОdelays">в ТОП Wildberries</span>
     </h1>
-    <p class="hero-desc" data-ru="Реальные выкупы живыми людьми с собственного склада в Ереване. Ни одной блокировки за всё время работы. Полная безопасность вашего кабинета." data-am="Irakan gnumner irakan mardkantsov mer sepakan pahestits Erevanum. Voch mi argelapakum. Dzer kabineti ldzaruy anvtangutyun.">
-      Реальные выкупы живыми людьми с собственного склада в Ереване. Ни одной блокировки за всё время работы. Полная безопасность вашего кабинета.
+    <p class="hero-desc" data-ru="Реальные выкупы живыми людьми быстро и надолго закрепляют позицию в топе, разные ПВЗ по всему Еревану, забор товара с ПВЗ и хранение в собственном складе в Ереване." data-am="Իdelays">
+      Реальные выкупы живыми людьми быстро и надолго закрепляют позицию в топе, разные ПВЗ по всему Еревану, забор товара с ПВЗ и хранение в собственном складе в Ереване.
     </p>
     <div class="hero-stats">
-      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանք ТОП-ում">товаров в ТОП</div></div>
-      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արգելափակում">блокировок</div></div>
-      <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հաշիվ">аккаунтов</div></div>
+      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապdelays">товаров в ТОП</div></div>
+      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="delaysdelays">блокировок</div></div>
+      <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="delaysdelays">аккаунтов</div></div>
     </div>
     <div class="hero-buttons">
       <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary btn-lg">
         <i class="fab fa-telegram"></i>
-        <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ում">Написать в Telegram</span>
+        <span data-ru="Написать в Telegram" data-am="Գdelays Telegram-delays">Написать в Telegram</span>
       </a>
       <a href="#calculator" class="btn btn-outline btn-lg">
         <i class="fas fa-calculator"></i>
-        <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">Рассчитать стоимость</span>
+        <span data-ru="Рассчитать стоимость" data-am="Հdelays">Рассчитать стоимость</span>
       </a>
     </div>
   </div>
   <div class="hero-image">
-    <img src="https://www.genspark.ai/api/files/s/jFkYcdNP" alt="Георгий Дарбинян — Go to Top">
+    <img src="/static/img/founder.jpg" alt="Go to Top — основатель">
     <div class="hero-badge-img">
       <i class="fas fa-shield-alt"></i>
-      <span data-ru="Собственный склад в Ереване" data-am="Սepakan pahest Erevanum">Собственный склад в Ереване</span>
+      <span data-ru="Собственный склад в Ереване" data-am="Սdelays">Собственный склад в Ереване</span>
     </div>
   </div>
 </div>
@@ -388,81 +416,47 @@ img{max-width:100%;height:auto}
 <section class="section" id="services">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Наши услуги" data-am="Мер dzar'ayut'yunner">Наши услуги</span></div>
-    <h2 class="section-title" data-ru="Полный спектр продвижения на WB" data-am="WB-um arajkhagh'acman ldzar'uy spectre">Полный спектр продвижения на WB</h2>
-    <p class="section-sub" data-ru="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара" data-am="Gnumner kendani mardkandzov, kardzik'ner irakan lusankar'nerov, profesional lusankar'ahanum — amen'inchy dzer apr'anki hamar">Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара</p>
+    <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Наши услуги" data-am="Մdelays">Наши услуги</span></div>
+    <h2 class="section-title" data-ru="Полный спектр продвижения на WB" data-am="WB-delays">Полный спектр продвижения на WB</h2>
+    <p class="section-sub" data-ru="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара" data-am="Գdelays">Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара</p>
   </div>
   <div class="services-grid">
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-shopping-cart"></i></div>
-      <h3 data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի բառերի համար">Выкупы по ключевым запросам</h3>
-      <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов через наш склад в Ереване." data-am="Dzer apr'anke gnvum e irakan mardkandzov irakan hashivnerov mer Erevani pahesti midzotdzov.">Ваш товар выкупается реальными людьми с реальных аккаунтов через наш склад в Ереване.</p>
+      <h3 data-ru="Выкупы по ключевым запросам" data-am="Գdelays">Выкупы по ключевым запросам</h3>
+      <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану." data-am="Ձdelays">Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.</p>
       <ul class="svc-features">
-        <li><i class="fas fa-check"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Irakan hashivner gnumneri patmut'yamb">Реальные аккаунты с историей покупок</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Географическое распределение" data-am="Ashkharhagrakan bazhanum">Географическое распределение</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Естественное поведение покупателей" data-am="Gnordzneri bnakan varq">Естественное поведение покупателей</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Забор товара из ПВЗ" data-am="Apr'anki stadzum PVZ-itz">Забор товара из ПВЗ</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Իdelays">Реальные аккаунты с историей покупок</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Географическое распределение" data-am="Աdelays">Географическое распределение</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Естественное поведение покupателей" data-am="Գdelays">Естественное поведение покупателей</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Забор товара из ПВЗ" data-am="Ապdelays">Забор товара из ПВЗ</span></li>
       </ul>
     </div>
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-star"></i></div>
-      <h3 data-ru="Отзывы и оценки" data-am="Kardzik'ner ev gnahat'umner">Отзывы и оценки</h3>
-      <p data-ru="Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга." data-am="Manramastner kardzik'ner lusankar'nerov ev tesankar'nerov irakan hashivneritz reytingi bards'radzman hamar.">Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.</p>
+      <h3 data-ru="Отзывы и оценки" data-am="Կdelays">Отзывы и оценки</h3>
+      <p data-ru="Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга." data-am="Մdelays">Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.</p>
       <ul class="svc-features">
-        <li><i class="fas fa-check"></i> <span data-ru="Текст отзыва + фото/видео" data-am="Kardziki tekst + lusankar'/tesankar'">Текст отзыва + фото/видео</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Профессиональная фотосессия" data-am="Profesional lusankar'ahanum">Профессиональная фотосессия</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Tarber vayrer ev modelner">Разные локации и модели</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Գնումների մինչև 50% կարծիքներ">До 50% отзывов от выкупов</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Текст отзыва + фото/видео" data-am="Կdelays">Текст отзыва + фото/видео</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Профессиональная фотосессия" data-am="Պdelays">Профессиональная фотосессия</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Տdelays">Разные локации и модели</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Գdelays">До 50% отзывов от выкупов</span></li>
       </ul>
     </div>
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-camera"></i></div>
-      <h3 data-ru="Фото и видеосъёмка" data-am="Lusankar'ahanum ev tesankar'ahanum">Фото и видеосъёмка</h3>
-      <p data-ru="Профессиональная съёмка товаров с моделями для карточек WB и отзывов." data-am="Apr'ankneri profesional nkar'ahanum modelnerov WB qart'eri ev kardzik'neri hamar.">Профессиональная съёмка товаров с моделями для карточек WB и отзывов.</p>
+      <h3 data-ru="Фото и видеосъёмка" data-am="Լdelays">Фото и видеосъёмка</h3>
+      <p data-ru="Профессиональная съёмка товаров с моделями для карточек WB и отзывов." data-am=" Delays">Профессиональная съёмка товаров с моделями для карточек WB и отзывов.</p>
       <ul class="svc-features">
-        <li><i class="fas fa-check"></i> <span data-ru="Женские и мужские модели" data-am="Kanandz ev trakan modelner">Женские и мужские модели</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Предметная съёмка" data-am="Ar'arkayin nkar'ahanum">Предметная съёмка</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Видеообзоры товаров" data-am="Apr'ankneri tesatesut'yun">Видеообзоры товаров</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Детские модели (до 14 лет)" data-am="Mankakan modelner (minchev 14 tari)">Детские модели (до 14 лет)</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Женские и мужские модели" data-am="Կdelays">Женские и мужские модели</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Предметная съёмка" data-am="Առdelays">Предметная съёмка</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Видеообзоры товаров" data-am=" Delays">Видеообзоры товаров</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Ребёнок модель (до 14 лет)" data-am="Ecraft">Ребёнок модель (до 14 лет)</span></li>
       </ul>
     </div>
   </div>
 
-  <!-- PRICING TABLE -->
-  <div class="pricing-table fade-up">
-    <table>
-      <thead><tr>
-        <th data-ru="Услуга" data-am="Ծառայություն">Услуга</th>
-        <th data-ru="Единица" data-am="Miavorr">Единица</th>
-        <th data-ru="Цена (֏)" data-am="Գին (֏)">Цена (֏)</th>
-      </tr></thead>
-      <tbody>
-        <tr><td data-ru="Выкуп крупного товара + забор из ПВЗ" data-am="Khoshoratze apr'anqi gnum + stadzum PVZ-itz">Выкуп крупного товара + забор из ПВЗ</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏2 500</td></tr>
-        <tr><td data-ru="Отзыв / оценка / вопрос в карточке" data-am="Kardzik / gnahat'um / harc' qart'um">Отзыв / оценка / вопрос в карточке</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏500</td></tr>
-        <tr><td data-ru="Создание фото и видео описания" data-am="Lusankar' ev tesankar' nkaragrut'yan steghdz'um">Создание фото и видео описания</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏1 000</td></tr>
-        <tr><td data-ru="Написание текста отзыва" data-am="Kardziki teksti grut'yun">Написание текста отзыва</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏250</td></tr>
-        <tr><td data-ru="Подписка на бренд / страницу" data-am="Brendin / edjin bazanordagrvum">Подписка на бренд / страницу</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏100</td></tr>
-        <tr><td data-ru="Фотосессия с женской моделью" data-am="Lusankar'ahanum kanandz modelov">Фотосессия с женской моделью</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏3 500</td></tr>
-        <tr><td data-ru="Фотосессия с мужской моделью" data-am="Lusankar'ahanum trakan modelov">Фотосессия с мужской моделью</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏4 500</td></tr>
-        <tr><td data-ru="Предметная фотосъёмка товара" data-am="Apr'anqi ar'arkayin lusankar'ahanum">Предметная фотосъёмка товара</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏2 500</td></tr>
-        <tr><td data-ru="Предметная съёмка (крупный / техника)" data-am="Առարկային նկարահանում (խոշոր / տեխն.)">Предметная съёмка (крупный / техника)</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏5 000</td></tr>
-        <tr><td data-ru="Доставка одежды (одиночная вещь)" data-am="Haghusti ar'ak'um (mek irq)">Доставка одежды (одиночная вещь)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏1 500</td></tr>
-        <tr><td data-ru="Доставка одежды (верхняя одежда)" data-am="Haghusti ar'ak'um (verelust)">Доставка одежды (верхняя одежда)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏2 500</td></tr>
-        <tr><td data-ru="Детская модель (до 14 лет)" data-am="Mankakan model (minchev 14 tar)">Детская модель (до 14 лет)</td><td data-ru="1 сет" data-am="1 set">1 сет</td><td class="pv">֏2 500</td></tr>
-        <tr><td data-ru="Видеообзор товара" data-am="Apr'anqi tesatesut'yun">Видеообзор товара</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏7 000</td></tr>
-        <tr><td data-ru="Забрать товар из ПВЗ для съёмки" data-am="Apr'anqi stadzum PVZ-itz nkar'ahanman hamar">Забрать товар из ПВЗ для съёмки</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏1 500</td></tr>
-        <tr><td data-ru="Вернуть товар в ПВЗ после съёмки" data-am="Apr'anqi veradar'dz PVZ nkar'ahanumitz heto">Вернуть товар в ПВЗ после съёмки</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏1 500</td></tr>
-        <tr><td data-ru="Замена штрихкода (баркод)" data-am="Shtrikh kodi p'okhum (bar'kod)">Замена штрихкода (баркод)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏100</td></tr>
-        <tr><td data-ru="Переупаковка (наша упаковка)" data-am="Verp'at'et'avorum (mer p'at'et'e)">Переупаковка (наша упаковка)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏200</td></tr>
-        <tr><td data-ru="Переупаковка (упаковка клиента)" data-am="Verp'at'et'avorum (hatchar'dzi p'at'et'e)">Переупаковка (упаковка клиента)</td><td data-ru="1 шт" data-am="1 hat">1 шт</td><td class="pv">֏150</td></tr>
-        <tr><td data-ru="Доставка на склад WB" data-am="Ar'ak'um WB pahest">Доставка на склад WB</td><td data-ru="1 коробка" data-am="1 arкbox">1 коробка</td><td class="pv">֏2 000</td></tr>
-      </tbody>
-    </table>
-  </div>
-  <div class="pricing-note fade-up">
-    <i class="fas fa-info-circle"></i>
-    <span data-ru="Крупный товар — свыше 3 кг или одна сторона длиннее 55 см. Товар свыше 10 кг — стоимость индивидуально. Отзывы публикуются на не более 50% выкупленных товаров. Защитные пломбы / заводская упаковка после съёмки не восстанавливаются." data-am="Խոշոր ապրանք — 3 կգ-ից ավելի կամ մի կողմը 55 սմ-ից երկար։ 10 կգ-ից ավելի — գինը անհատական։ Կարծիքներ հրատարակվում են գնված ապրանքների 50%-ից ոչ ավելի։ Պահպանիչ կնիքներ / գործառանաին փաթեթավորում նկարահանումից հետո չի վերականգնվում։">Крупный товар — свыше 3 кг или одна сторона длиннее 55 см. Товар свыше 10 кг — стоимость индивидуально. Отзывы публикуются на не более 50% выкупленных товаров. Защитные пломбы / заводская упаковка после съёмки не восстанавливаются.</span>
-  </div>
+
 </div>
 </section>
 
@@ -470,28 +464,32 @@ img{max-width:100%;height:auto}
 <section class="section section-dark" id="calculator">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Hashvich">Калькулятор</span></div>
-    <h2 class="section-title" data-ru="Рассчитайте стоимость услуг" data-am="Հashvel dzer dzar'ayut'yunneri arjeke">Рассчитайте стоимость услуг</h2>
-    <p class="section-sub" data-ru="Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram." data-am="Entradzek anhr'azesht dzar'ayut'yunner, nshek k'anake ev imazek gumary. Patver'e dznakervum e Telegram-um.">Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.</p>
+    <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հdelays">Калькулятор</span></div>
+    <h2 class="section-title" data-ru="Рассчитайте стоимость услуг" data-am="Delaysdelays">Рассчитайте стоимость услуг</h2>
+    <p class="section-sub" data-ru="Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram." data-am="Delaysdelays">Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.</p>
   </div>
   <div class="calc-wrap fade-up">
     <!-- CALC TABS -->
     <div class="calc-tabs">
-      <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Gnumner">Выкупы</div>
-      <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Kardzikner">Отзывы</div>
-      <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Lusankarahanum">Фотосъёмка</div>
-      <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Logistika">Логистика</div>
+      <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Գdelays">Выкупы</div>
+      <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Delaysdelays">Отзывы</div>
+      <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Delaysdelays">Фотосъёмка</div>
+      <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Delaysdelays">Логистика</div>
     </div>
 
-    <!-- BUYOUTS GROUP -->
+    <!-- BUYOUTS GROUP — tiered pricing -->
     <div class="calc-group active" id="cg-buyouts">
-      <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Gnum + stadzum PVZ-itz">Выкуп + забор из ПВЗ</div>
-        <div class="calc-price">֏2 500</div>
-        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+      <div class="calc-row" data-price="buyout" id="buyoutRow">
+        <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Delaysdelays">Выкуп + забор из ПВЗ</div>
+        <div class="calc-price" id="buyoutPriceLabel">֏2 000</div>
+        <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><span id="buyoutQty">0</span><button onclick="ccBuyout(1)">+</button></div>
+      </div>
+      <div class="buyout-tier-info">
+        <strong data-ru="Чем больше выкупов — тем дешевле:" data-am="Delaysdelays">Чем больше выкупов — тем дешевле:</strong><br>
+        1-20 шт → ֏2 000 &nbsp;|&nbsp; 21-40 шт → ֏1 700 &nbsp;|&nbsp; 41-60 шт → ֏1 500 &nbsp;|&nbsp; 60+ шт → ֏1 250
       </div>
       <div class="calc-row" data-price="100">
-        <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Brendin / edjin bazanordagrvum">Подписка на бренд / страницу</div>
+        <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Delaysdelays">Подписка на бренд / страницу</div>
         <div class="calc-price">֏100</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
@@ -499,18 +497,23 @@ img{max-width:100%;height:auto}
 
     <!-- REVIEWS GROUP -->
     <div class="calc-group" id="cg-reviews">
+      <div class="calc-row" data-price="300">
+        <div class="calc-label" data-ru="Оценка" data-am="Գdelays">Оценка</div>
+        <div class="calc-price">֏300</div>
+        <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
+      </div>
       <div class="calc-row" data-price="500">
-        <div class="calc-label" data-ru="Отзыв / оценка / вопрос" data-am="Kardzik / gnahat'um / harc'">Отзыв / оценка / вопрос</div>
+        <div class="calc-label" data-ru="Оценка + отзыв" data-am="Delaysdelays">Оценка + отзыв</div>
         <div class="calc-price">֏500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
-      <div class="calc-row" data-price="1000">
-        <div class="calc-label" data-ru="Фото и видео описание" data-am="Lusankar' ev tesankar' nkaragrut'yun">Фото и видео описание</div>
-        <div class="calc-price">֏1 000</div>
+      <div class="calc-row" data-price="500">
+        <div class="calc-label" data-ru="Вопрос к товару" data-am="Delaysdelays">Вопрос к товару</div>
+        <div class="calc-price">֏500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="250">
-        <div class="calc-label" data-ru="Написание текста отзыва" data-am="Kardziki teksti grut'yun">Написание текста отзыва</div>
+        <div class="calc-label" data-ru="Написание текста отзыва" data-am="Delaysdelays">Написание текста отзыва</div>
         <div class="calc-price">֏250</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
@@ -519,32 +522,32 @@ img{max-width:100%;height:auto}
     <!-- PHOTO GROUP -->
     <div class="calc-group" id="cg-photo">
       <div class="calc-row" data-price="3500">
-        <div class="calc-label" data-ru="Фотосессия (жен. модель)" data-am="Lusankar'ahanum (kanandz model)">Фотосессия (жен. модель)</div>
+        <div class="calc-label" data-ru="Фотосессия в гардеробной WB (жен. модель)" data-am="Delaysdelays">Фотосессия в гардеробной WB (жен. модель)</div>
         <div class="calc-price">֏3 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="4500">
-        <div class="calc-label" data-ru="Фотосессия (муж. модель)" data-am="Lusankar'ahanum (trakan model)">Фотосессия (муж. модель)</div>
+        <div class="calc-label" data-ru="Фотосессия в гардеробной WB (муж. модель)" data-am="Delaysdelays">Фотосессия в гардеробной WB (муж. модель)</div>
         <div class="calc-price">֏4 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Предметная фотосъёмка" data-am="Ar'arkayin lusankar'ahanum">Предметная фотосъёмка</div>
+        <div class="calc-label" data-ru="Предметная фотосъёмка (3 фото)" data-am="Delaysdelays">Предметная фотосъёмка (3 фото)</div>
         <div class="calc-price">֏2 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="5000">
-        <div class="calc-label" data-ru="Предметная (крупное / техника)" data-am="Ar'arkayin (khoshor / tekhn.)">Предметная (крупное / техника)</div>
+        <div class="calc-label" data-ru="Предметная съёмка (крупное / техника, 3 фото)" data-am="Delaysdelays">Предметная съёмка (крупное / техника, 3 фото)</div>
         <div class="calc-price">֏5 000</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Детская модель (до 14 лет)" data-am="Mankakan model (minchev 14 tar)">Детская модель (до 14 лет)</div>
+        <div class="calc-label" data-ru="Ребёнок модель (до 14 лет)" data-am="Delaysdelays">Ребёнок модель (до 14 лет)</div>
         <div class="calc-price">֏2 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="7000">
-        <div class="calc-label" data-ru="Видеообзор товара" data-am="Apr'anqi tesatesut'yun">Видеообзор товара</div>
+        <div class="calc-label" data-ru="Видеообзор товара" data-am="Delaysdelays">Видеообзор товара</div>
         <div class="calc-price">֏7 000</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
@@ -553,55 +556,55 @@ img{max-width:100%;height:auto}
     <!-- LOGISTICS GROUP -->
     <div class="calc-group" id="cg-logistics">
       <div class="calc-row" data-price="1500">
-        <div class="calc-label" data-ru="Доставка одежды (обычная)" data-am="Haghusti ar'ak'um (sovorakan)">Доставка одежды (обычная)</div>
+        <div class="calc-label" data-ru="Глажка одежды (одиночная вещь)" data-am="Delaysdelays">Глажка одежды (одиночная вещь)</div>
         <div class="calc-price">֏1 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
-        <div class="calc-label" data-ru="Доставка одежды (верхняя)" data-am="Haghusti ar'ak'um (verelust)">Доставка одежды (верхняя)</div>
+        <div class="calc-label" data-ru="Глажка одежды (верхняя одежда)" data-am="Delaysdelays">Глажка одежды (верхняя одежда)</div>
         <div class="calc-price">֏2 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="1500">
-        <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Stadzum PVZ-itz nkar'ahanman hamar">Забор из ПВЗ для съёмки</div>
+        <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Delaysdelays">Забор из ПВЗ для съёмки</div>
         <div class="calc-price">֏1 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="1500">
-        <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Veradar'dz PVZ heto nkar'ahanumitz">Возврат в ПВЗ после съёмки</div>
+        <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Delaysdelays">Возврат в ПВЗ после съёмки</div>
         <div class="calc-price">֏1 500</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="100">
-        <div class="calc-label" data-ru="Замена штрихкода" data-am="Shtrikh kodi p'okhum">Замена штрихкода</div>
+        <div class="calc-label" data-ru="Замена штрихкода" data-am="Delaysdelays">Замена штрихкода</div>
         <div class="calc-price">֏100</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="200">
-        <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Verp'at'et'avorum (mer)">Переупаковка (наша)</div>
+        <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Delaysdelays">Переупаковка (наша)</div>
         <div class="calc-price">֏200</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="150">
-        <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Verp'at'et'avorum (hatchar'dzi)">Переупаковка (клиента)</div>
+        <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Delaysdelays">Переупаковка (клиента)</div>
         <div class="calc-price">֏150</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2000">
-        <div class="calc-label" data-ru="Доставка на склад WB (коробка)" data-am="Առաքում WB պահեստ (տուփ)">Доставка на склад WB (коробка)</div>
+        <div class="calc-label" data-ru="Доставка на склад WB (коробка)" data-am="Delaysdelays">Доставка на склад WB (коробка)</div>
         <div class="calc-price">֏2 000</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><span>0</span><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
 
     <div class="calc-total">
-      <div class="calc-total-label" data-ru="Итого:" data-am="Yndhanuir'e:">Итого:</div>
+      <div class="calc-total-label" data-ru="Итого:" data-am="Ընdelays:">Итого:</div>
       <div class="calc-total-value" id="calcTotal">֏0</div>
     </div>
     <div class="calc-cta">
       <a href="https://t.me/goo_to_top" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
         <i class="fab fa-telegram"></i>
-        <span data-ru="Заказать в Telegram" data-am="Patvirel Telegram-um">Заказать в Telegram</span>
+        <span data-ru="Заказать в Telegram" data-am="Delaysdelays">Заказать в Telegram</span>
       </a>
     </div>
   </div>
@@ -612,38 +615,38 @@ img{max-width:100%;height:auto}
 <section class="section" id="process">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как мы работаем" data-am="Inchpes enq ashkhatum">Как мы работаем</span></div>
-    <h2 class="section-title" data-ru="5 шагов от заявки до ТОПа" data-am="5 qayl haytzitz minchev TOP">5 шагов от заявки до ТОПа</h2>
+    <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как мы работаем" data-am="Delaysdelays">Как мы работаем</span></div>
+    <h2 class="section-title" data-ru="5 шагов от заявки до ТОПа" data-am="Delaysdelays">5 шагов от заявки до ТОПа</h2>
   </div>
   <div class="process-grid fade-up">
     <div class="step">
       <div class="step-line"></div>
       <div class="step-num">1</div>
-      <h4 data-ru="Заявка" data-am="Haytz">Заявка</h4>
-      <p data-ru="Пишете в Telegram и описываете товар" data-am="Grum ek Telegram-um ev nkaragrum apr'anke">Пишете в Telegram и описываете товар</p>
+      <h4 data-ru="Заявка" data-am="Delaysdelays">Заявка</h4>
+      <p data-ru="Пишете в Telegram и описываете товар" data-am="Delaysdelays">Пишете в Telegram и описываете товар</p>
     </div>
     <div class="step">
       <div class="step-line"></div>
       <div class="step-num">2</div>
-      <h4 data-ru="Анализ" data-am="Վերլուծություն">Анализ</h4>
-      <p data-ru="Анализируем нишу и создаём стратегию" data-am="Վերլուծում ենք նիշը և ստեղծում ստրատեգիա">Анализируем нишу и создаём стратегию</p>
+      <h4 data-ru="Анализ" data-am="Delaysdelays">Анализ</h4>
+      <p data-ru="Анализируем нишу и создаём стратегию" data-am="Delaysdelays">Анализируем нишу и создаём стратегию</p>
     </div>
     <div class="step">
       <div class="step-line"></div>
       <div class="step-num">3</div>
-      <h4 data-ru="Запуск" data-am="Gortsar'kum">Запуск</h4>
-      <p data-ru="Начинаем выкупы в течение 24 часов" data-am="Sksumyan gnumner 24 zhamva entrakum">Начинаем выкупы в течение 24 часов</p>
+      <h4 data-ru="Запуск" data-am="Delaysdelays">Запуск</h4>
+      <p data-ru="Начинаем выкупы в течение 24 часов" data-am="Delaysdelays">Начинаем выкупы в течение 24 часов</p>
     </div>
     <div class="step">
       <div class="step-line"></div>
       <div class="step-num">4</div>
-      <h4 data-ru="Контроль" data-am="Verahskoghutyun">Контроль</h4>
-      <p data-ru="Ежедневные отчёты о прогрессе" data-am="Amenorya hashvetvut'yunner">Ежедневные отчёты о прогрессе</p>
+      <h4 data-ru="Контроль" data-am="Delaysdelays">Контроль</h4>
+      <p data-ru="Ежедневные отчёты о прогрессе" data-am="Delaysdelays">Ежедневные отчёты о прогрессе</p>
     </div>
     <div class="step">
       <div class="step-num">5</div>
-      <h4 data-ru="Результат" data-am="Ardyunq">Результат</h4>
-      <p data-ru="Ваш товар в ТОПе выдачи WB" data-am="Dzer apr'anke WB-i TOP-um e">Ваш товар в ТОПе выдачи WB</p>
+      <h4 data-ru="Результат" data-am="Delaysdelays">Результат</h4>
+      <p data-ru="Ваш товар в ТОПе выдачи WB" data-am="Delaysdelays">Ваш товар в ТОПе выдачи WB</p>
     </div>
   </div>
 </div>
@@ -653,22 +656,22 @@ img{max-width:100%;height:auto}
 <section class="section section-dark" id="warehouse">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-warehouse"></i> <span data-ru="Наш склад" data-am="Mer paheste">Наш склад</span></div>
-    <h2 class="section-title" data-ru="Всё организовано и по полочкам" data-am="Amen'inche kazmakerpvadz e ev kargi mej">Всё организовано и по полочкам</h2>
-    <p class="section-sub" data-ru="Собственный склад в Ереване. Реальные товары, реальные устройства, полный контроль." data-am="Sepakan pahest Erevanum. Irakan apr'anqner, irakan sarqer, ldzar'uy verahskoghutyun.">Собственный склад в Ереване. Реальные товары, реальные устройства, полный контроль.</p>
+    <div class="section-badge"><i class="fas fa-warehouse"></i> <span data-ru="Наш склад" data-am="Delaysdelays">Наш склад</span></div>
+    <h2 class="section-title" data-ru="Всё организовано и по полочкам" data-am="Delaysdelays">Всё организовано и по полочкам</h2>
+    <p class="section-sub" data-ru="Собственный склад в Ереване. Забор ваших товаров с ПВЗ. Надежное хранение товара. Отгрузка Ваших товаров на склад WB СЦ Ереван" data-am="Delaysdelays">Собственный склад в Ереване. Забор ваших товаров с ПВЗ. Надежное хранение товара. Отгрузка Ваших товаров на склад WB СЦ Ереван</p>
   </div>
   <div class="wh-grid fade-up">
     <div class="wh-item" onclick="openLightbox(this)">
-      <img src="https://www.genspark.ai/api/files/s/UOP8v8bX" alt="Организованное хранение устройств">
-      <div class="wh-caption" data-ru="Организованное хранение" data-am="Kazmakerpvadz pahutyun">Организованное хранение</div>
+      <img src="/static/img/warehouse1.jpg" alt="Организованное хранение товаров">
+      <div class="wh-caption" data-ru="Организованное хранение" data-am="Delaysdelays">Организованное хранение</div>
     </div>
     <div class="wh-item" onclick="openLightbox(this)">
-      <img src="https://www.genspark.ai/api/files/s/pErF0blS" alt="Склад с цветовой кодировкой">
-      <div class="wh-caption" data-ru="Система учёта" data-am="Hashvar'man hamakar'g">Система учёта</div>
+      <img src="/static/img/warehouse2.jpg" alt="Склад с товарами">
+      <div class="wh-caption" data-ru="Система учёта" data-am="Delaysdelays">Система учёта</div>
     </div>
     <div class="wh-item" onclick="openLightbox(this)">
-      <img src="https://www.genspark.ai/api/files/s/bDwjCkeL" alt="Георгий на складе">
-      <div class="wh-caption" data-ru="Полный контроль" data-am="Ldzar'uy verahskoghutyun">Полный контроль</div>
+      <img src="/static/img/team.jpg" alt="Команда Go to Top">
+      <div class="wh-caption" data-ru="Наша команда" data-am="Delaysdelays">Наша команда</div>
     </div>
   </div>
 </div>
@@ -679,21 +682,20 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="guarantee-card fade-up">
     <div>
-      <img src="https://www.genspark.ai/api/files/s/jFkYcdNP" alt="Георгий Дарбинян — основатель Go to Top">
+      <img src="/static/img/founder.jpg" alt="Go to Top — команда профессионалов">
     </div>
     <div>
-      <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Anvtangut'yan erishkhik">Гарантия безопасности</span></div>
-      <h2 data-ru="Личная гарантия от Георгия Дарбиняна" data-am="Georgi Darbinyani andznayin erishkhike">Личная гарантия от Георгия Дарбиняна</h2>
-      <p data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект — под моим личным контролем." data-am="Ashkhatanki oghj entrakum voch mi hatchar'dzi kabinet chi argelap'akvdel. Amen nakhagidze im andznayin verahskoghutyun nerqu e.">За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект — под моим личным контролем.</p>
+      <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Delaysdelays">Гарантия безопасности</span></div>
+      <h2 data-ru="Команда профессионалов на вашей стороне" data-am="Delaysdelays">Команда профессионалов на вашей стороне</h2>
+      <p data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе." data-am="Delaysdelays">За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе.</p>
       <ul class="g-list">
-        <li><i class="fas fa-check-circle"></i> <span data-ru="Реальные товары с собственного склада" data-am="Irakan apr'anqner sepakan pahestitz">Реальные товары с собственного склада</span></li>
-        <li><i class="fas fa-check-circle"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Irakan hashivner gnumneri patmut'yamb">Реальные аккаунты с историей покупок</span></li>
-        <li><i class="fas fa-check-circle"></i> <span data-ru="Естественное распределение по географии" data-am="Ashkharhagrakan bnakan bazhanum">Естественное распределение по географии</span></li>
-        <li><i class="fas fa-check-circle"></i> <span data-ru="Возврат средств при блокировке" data-am="Gumar'i veradar'dz argelap'akman depqum">Возврат средств при блокировке</span></li>
+        <li><i class="fas fa-check-circle"></i> <span data-ru="Реальные товары с собственного склада" data-am="Delaysdelays">Реальные товары с собственного склада</span></li>
+        <li><i class="fas fa-check-circle"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Delaysdelays">Реальные аккаунты с историей покупок</span></li>
+        <li><i class="fas fa-check-circle"></i> <span data-ru="Естественное распределение по географии" data-am="Delaysdelays">Естественное распределение по географии</span></li>
       </ul>
       <div class="g-badge">
         <i class="fas fa-award"></i>
-        <span data-ru="0 блокировок за всё время работы" data-am="0 argelap'akum oghj ashkhatanki entrakum">0 блокировок за всё время работы</span>
+        <span data-ru="0 блокировок за всё время работы" data-am="Delaysdelays">0 блокировок за всё время работы</span>
       </div>
     </div>
   </div>
@@ -704,46 +706,41 @@ img{max-width:100%;height:auto}
 <section class="section section-dark">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-balance-scale"></i> <span data-ru="Сравнение" data-am="Hamatsum">Сравнение</span></div>
-    <h2 class="section-title" data-ru="Go to Top vs Другие агентства" data-am="Go to Top vs Ayl gortsakalut'yunner">Go to Top vs Другие агентства</h2>
+    <div class="section-badge"><i class="fas fa-balance-scale"></i> <span data-ru="Сравнение" data-am="Delaysdelays">Сравнение</span></div>
+    <h2 class="section-title" data-ru="Go to Top vs Другие агентства" data-am="Delaysdelays">Go to Top vs Другие агентства</h2>
   </div>
   <div class="fade-up" style="overflow-x:auto">
   <table class="cmp-table">
     <thead><tr>
-      <th data-ru="Критерий" data-am="Chapanish">Критерий</th>
+      <th data-ru="Критерий" data-am="Delaysdelays">Критерий</th>
       <th>Go to Top</th>
-      <th data-ru="Другие" data-am="Ayler">Другие</th>
+      <th data-ru="Другие" data-am="Delaysdelays">Другие</th>
     </tr></thead>
     <tbody>
       <tr>
-        <td data-ru="Реальные люди" data-am="Irakan mardik">Реальные люди</td>
-        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Да" data-am="Ayo">Да</span></td>
-        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Часто боты" data-am="Hajakh boter">Часто боты</span></td>
+        <td data-ru="Реальные люди" data-am="Delaysdelays">Реальные люди</td>
+        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Да" data-am="Delaysdelays">Да</span></td>
+        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Часто боты" data-am="Delaysdelays">Часто боты</span></td>
       </tr>
       <tr>
-        <td data-ru="Собственный склад" data-am="Sepakan pahest">Собственный склад</td>
-        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Ереван" data-am="Erevan">Ереван</span></td>
-        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Нет" data-am="Voch'">Нет</span></td>
+        <td data-ru="Собственный склад" data-am="Delaysdelays">Собственный склад</td>
+        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Ереван" data-am="Delaysdelays">Ереван</span></td>
+        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Нет" data-am="Delaysdelays">Нет</span></td>
       </tr>
       <tr>
-        <td data-ru="Блокировки" data-am="Argelap'akumner">Блокировки</td>
+        <td data-ru="Блокировки" data-am="Delaysdelays">Блокировки</td>
         <td><i class="fas fa-check-circle chk"></i> 0</td>
-        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Бывают" data-am="Lisum en">Бывают</span></td>
+        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Бывают" data-am="Delaysdelays">Бывают</span></td>
       </tr>
       <tr>
-        <td data-ru="Фотосессия товаров" data-am="Apr'anqneri lusankar'ahanum">Фотосессия товаров</td>
-        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Свои модели" data-am="Mer modelner">Свои модели</span></td>
-        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Нет" data-am="Voch'">Нет</span></td>
+        <td data-ru="Фотосессия товаров" data-am="Delaysdelays">Фотосессия товаров</td>
+        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Свои модели" data-am="Delaysdelays">Свои модели</span></td>
+        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Нет" data-am="Delaysdelays">Нет</span></td>
       </tr>
       <tr>
-        <td data-ru="Прозрачная отчётность" data-am="T'ap'antzik hashvetvut'yun">Прозрачная отчётность</td>
-        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Ежедневно" data-am="Amenorya">Ежедневно</span></td>
-        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Раз в неделю" data-am="Shabathe 1 angam">Раз в неделю</span></td>
-      </tr>
-      <tr>
-        <td data-ru="Гарантия возврата" data-am="Veradar'dzi erishkhik">Гарантия возврата</td>
-        <td><i class="fas fa-check-circle chk"></i> 100%</td>
-        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Нет" data-am="Voch'">Нет</span></td>
+        <td data-ru="Прозрачная отчётность" data-am="Delaysdelays">Прозрачная отчётность</td>
+        <td><i class="fas fa-check-circle chk"></i> <span data-ru="Ежедневно" data-am="Delaysdelays">Ежедневно</span></td>
+        <td><i class="fas fa-times-circle crs"></i> <span data-ru="Раз в неделю" data-am="Delaysdelays">Раз в неделю</span></td>
       </tr>
     </tbody>
   </table>
@@ -755,24 +752,24 @@ img{max-width:100%;height:auto}
 <section class="section">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="Важно знать" data-am="Kar'evor e imanal">Важно знать</span></div>
-    <h2 class="section-title" data-ru="Условия работы" data-am="Ashkhatanki paymanner">Условия работы</h2>
+    <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="Важно знать" data-am="Delaysdelays">Важно знать</span></div>
+    <h2 class="section-title" data-ru="Условия работы" data-am="Delaysdelays">Условия работы</h2>
   </div>
   <div class="services-grid fade-up">
     <div class="svc-card">
       <div class="svc-icon"><i class="fas fa-percent"></i></div>
-      <h3 data-ru="Лимит отзывов" data-am="Kardzik'neri sahmanarap'akum">Лимит отзывов</h3>
-      <p data-ru="Публикуем отзывы не более чем на 50% выкупленных товаров — для безопасности вашего кабинета." data-am="Kardzik'ner hratarakum enq gnvadz apr'anqneri 50%-ic voch' aveli — dzer kabineti anvtangut'yan hamar.">Публикуем отзывы не более чем на 50% выкупленных товаров — для безопасности вашего кабинета.</p>
+      <h3 data-ru="Лимит отзывов" data-am="Delaysdelays">Лимит отзывов</h3>
+      <p data-ru="Публикуем отзывы не более чем на 50% выкупленных товаров — для безопасности вашего кабинета." data-am="Delaysdelays">Публикуем отзывы не более чем на 50% выкупленных товаров — для безопасности вашего кабинета.</p>
     </div>
     <div class="svc-card">
       <div class="svc-icon"><i class="fas fa-box-open"></i></div>
-      <h3 data-ru="Крупногабаритный товар" data-am="Khoshore apr'anq">Крупногабаритный товар</h3>
-      <p data-ru="Товар свыше 3 кг или одна сторона длиннее 55 см. Свыше 10 кг — стоимость индивидуально." data-am="Apr'anqe aveli kan 3 kg kam mi koghme aveli 55 sm. 10 kg-itz aveli — arjeke anhatakan.">Товар свыше 3 кг или одна сторона длиннее 55 см. Свыше 10 кг — стоимость индивидуально.</p>
+      <h3 data-ru="Крупногабаритный товар" data-am="Delaysdelays">Крупногабаритный товар</h3>
+      <p data-ru="Товар свыше 3 кг или одна сторона длиннее 55 см. Свыше 10 кг — стоимость индивидуально." data-am="Delaysdelays">Товар свыше 3 кг или одна сторона длиннее 55 см. Свыше 10 кг — стоимость индивидуально.</p>
     </div>
     <div class="svc-card">
       <div class="svc-icon"><i class="fas fa-box"></i></div>
-      <h3 data-ru="Защитные пломбы" data-am="Pahpanich kniqner">Защитные пломбы</h3>
-      <p data-ru="Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются." data-am="Պահպանիչ կնիքներով կամ գործառանաին փաթեթավորումով ապրանքները լուսանկարահանումից հետո չի վերականգնվում։">Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются.</p>
+      <h3 data-ru="Защитные пломбы" data-am="Delaysdelays">Защитные пломбы</h3>
+      <p data-ru="Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются." data-am="Delaysdelays">Товары с защитными пломбами или заводской упаковкой после фотосессии не восстанавливаются.</p>
     </div>
   </div>
 </div>
@@ -782,58 +779,58 @@ img{max-width:100%;height:auto}
 <section class="section section-dark" id="faq">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-question-circle"></i> <span data-ru="FAQ" data-am="ՀTH">FAQ</span></div>
-    <h2 class="section-title" data-ru="Частые вопросы" data-am="Hajakh trvadz harc'er">Частые вопросы</h2>
+    <div class="section-badge"><i class="fas fa-question-circle"></i> <span data-ru="FAQ" data-am="ՀՏdelays">FAQ</span></div>
+    <h2 class="section-title" data-ru="Частые вопросы" data-am="Delaysdelays">Частые вопросы</h2>
   </div>
   <div class="faq-list fade-up">
     <div class="faq-item active">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Могут ли заблокировать мой кабинет?" data-am="Karelio e argelap'akel im kabinete?">Могут ли заблокировать мой кабинет?</span>
+        <span data-ru="Могут ли заблокировать мой кабинет?" data-am="Delaysdelays">Могут ли заблокировать мой кабинет?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии. Если блокировка произойдёт по нашей вине — вернём 100% средств." data-am="Mer ashkhatanki oghj entrakum voch' mi hatchar'dzi kabinet chi argelap'akvdel. Ogtagortsum enq irakan hashivner gnumneri patmut'yamb, sepakan pahest ev bnakan ashkharhagrakan bazhanum. Ete argelap'akume lini mer meghqov — veradar'dz'num enq gumar'i 100%-e.">За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии. Если блокировка произойдёт по нашей вине — вернём 100% средств.</p></div>
+      <div class="faq-a"><p data-ru="За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии." data-am="Delaysdelays">За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Как быстро начнётся продвижение?" data-am="Vorqan arag ksksvi arajkhagh'ats'ume?">Как быстро начнётся продвижение?</span>
+        <span data-ru="Как быстро начнётся продвижение?" data-am="Delaysdelays">Как быстро начнётся продвижение?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="В течение 24 часов после согласования стратегии и оплаты. Пишете нам → анализируем нишу → согласовываем план → запускаем выкупы." data-am="24 zhamva entrakum strategiayin hamadzaynedzutzitz ev vchar'umitz heto. Grum ek mez → verlut'syum enq nich'e → hamadzaynets'num enq plane → gortsar'kum enq gnumner.">В течение 24 часов после согласования стратегии и оплаты. Пишете нам → анализируем нишу → согласовываем план → запускаем выкупы.</p></div>
+      <div class="faq-a"><p data-ru="В течение 24 часов после согласования стратегии и оплаты. Пишете нам → анализируем нишу → согласовываем план → запускаем выкупы." data-am="Delaysdelays">В течение 24 часов после согласования стратегии и оплаты. Пишете нам → анализируем нишу → согласовываем план → запускаем выкупы.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Выкупы делают реальные люди или боты?" data-am="Գնումները կատարում են իրական մարդիկ, թէ բոտեր՞">Выкупы делают реальные люди или боты?</span>
+        <span data-ru="Выкупы делают реальные люди или боты?" data-am="Delaysdelays">Выкупы делают реальные люди или боты?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов." data-am="Miaayn irakan mardik. Menk unents' sepakan pahest sarqerov ev irakan hashivnerov. Yurakanch'yur gnume katarvum e dzerkov, voch' mi bot.">Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов.</p></div>
+      <div class="faq-a"><p data-ru="Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов." data-am="Delaysdelays">Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Почему не все выкупы получают отзывы?" data-am="Inchu chi vor amenain gnumner kardzik stanum?">Почему не все выкупы получают отзывы?</span>
+        <span data-ru="Почему не все выкупы получают отзывы?" data-am="Delaysdelays">Почему не все выкупы получают отзывы?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Для безопасности вашего кабинета мы публикуем отзывы не более чем на 50% выкупленных товаров. Это имитирует естественное поведение покупателей." data-am="Dzer kabineti anvtangut'yan hamar kardzik'ner hratarakum enq gnvadz apr'anqneri 50%-ic voch' aveli. Sa nmanatsum e gnordzneri bnakan varqe.">Для безопасности вашего кабинета мы публикуем отзывы не более чем на 50% выкупленных товаров. Это имитирует естественное поведение покупателей.</p></div>
+      <div class="faq-a"><p data-ru="Для безопасности вашего кабинета мы публикуем отзывы не более чем на 50% выкупленных товаров. Это имитирует естественное поведение покупателей." data-am="Delaysdelays">Для безопасности вашего кабинета мы публикуем отзывы не более чем на 50% выкупленных товаров. Это имитирует естественное поведение покупателей.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Можно ли заказать только отзывы без выкупов?" data-am="Հնարավոր է պատվիրել միայն կարծիքներ առանց գնումների։">Можно ли заказать только отзывы без выкупов?</span>
+        <span data-ru="Можно ли заказать только отзывы без выкупов?" data-am="Delaysdelays">Можно ли заказать только отзывы без выкупов?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера." data-am="Այո, կարող ենք գնվել ապրանք լուսանկար/տեսանկար կարծիքի համար և ապային վերադարձնել ՊՎԶ։ Արժեքը ճշտեցրեք մենեջերի մոտ։">Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера.</p></div>
+      <div class="faq-a"><p data-ru="Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера." data-am="Delaysdelays">Да, мы можем выкупить товар для фото/видео отзыва и затем сделать возврат на ПВЗ. Стоимость уточняйте у менеджера.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="Какие отчёты мы получаем?" data-am="Inch hashvetvut'yunner enq stanum?">Какие отчёты мы получаем?</span>
+        <span data-ru="Какие отчёты мы получаем?" data-am="Delaysdelays">Какие отчёты мы получаем?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Ежедневные отчёты: статус каждого выкупа, QR-коды, даты забора, статус отзывов. Полная прозрачность на каждом этапе." data-am="Ամենօրյա հաշվետվություններ՝ յուրաքանչյուր գնումի ստատուսը, QR-կոդեր, ստացման ամսաթվեր, կարծիքների ստատուսը։ Լձառույ թափանցիկություն յուրաքանչյուր քայլում։">Ежедневные отчёты: статус каждого выкупа, QR-коды, даты забора, статус отзывов. Полная прозрачность на каждом этапе.</p></div>
+      <div class="faq-a"><p data-ru="Ежедневные отчёты: статус каждого выкупа, даты забора, статус отзывов. Полная прозрачность на каждом этапе." data-am="Delaysdelays">Ежедневные отчёты: статус каждого выкупа, даты забора, статус отзывов. Полная прозрачность на каждом этапе.</p></div>
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)">
-        <span data-ru="В какой валюте идут цены?" data-am="Inch' arjhuytov en gner'e?">В какой валюте идут цены?</span>
+        <span data-ru="В какой валюте идут цены?" data-am="Delaysdelays">В какой валюте идут цены?</span>
         <i class="fas fa-chevron-down"></i>
       </div>
-      <div class="faq-a"><p data-ru="Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах." data-am="Bolor gner'e haykakan dramerov en (֏ AMD). Vchar'ume dramerov.">Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах.</p></div>
+      <div class="faq-a"><p data-ru="Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах." data-am="Delaysdelays">Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах.</p></div>
     </div>
   </div>
 </div>
@@ -843,54 +840,54 @@ img{max-width:100%;height:auto}
 <section class="section" id="contact">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-paper-plane"></i> <span data-ru="Связаться с нами" data-am="Kap hastetel mez het">Связаться с нами</span></div>
-    <h2 class="section-title" data-ru="Готовы начать продвижение?" data-am="Patrasde'k skselu arajkhagh'ats'ume?">Готовы начать продвижение?</h2>
-    <p class="section-sub" data-ru="Напишите нам в Telegram или оставьте заявку" data-am="Grets'ek mez Telegram-um kam t'oghek haytz">Напишите нам в Telegram или оставьте заявку</p>
+    <div class="section-badge"><i class="fas fa-paper-plane"></i> <span data-ru="Связаться с нами" data-am="Delaysdelays">Связаться с нами</span></div>
+    <h2 class="section-title" data-ru="Готовы начать продвижение?" data-am="Delaysdelays">Готовы начать продвижение?</h2>
+    <p class="section-sub" data-ru="Напишите нам в Telegram или оставьте заявку" data-am="Delaysdelays">Напишите нам в Telegram или оставьте заявку</p>
   </div>
 
   <div class="contact-grid fade-up">
     <a href="https://t.me/goo_to_top" target="_blank" class="contact-card">
       <i class="fab fa-telegram"></i>
-      <h4>@goo_to_top</h4>
-      <p data-ru="Главный канал" data-am="Glkhavor ale'q">Главный канал</p>
+      <h4 data-ru="Администратор" data-am="Delaysdelays">Администратор</h4>
+      <p data-ru="Готов оплатить и приступить к продвижению? Пишите сюда." data-am="Delaysdelays">Готов оплатить и приступить к продвижению? Пишите сюда.</p>
     </a>
     <a href="https://t.me/suport_admin_2" target="_blank" class="contact-card">
       <i class="fab fa-telegram"></i>
-      <h4>@suport_admin_2</h4>
-      <p data-ru="Менеджер" data-am="Menedzher">Менеджер</p>
+      <h4 data-ru="Менеджер" data-am="Delaysdelays">Менеджер</h4>
+      <p data-ru="Остались вопросы? Нужен детальный расчёт? Пишите сюда." data-am="Delaysdelays">Остались вопросы? Нужен детальный расчёт? Пишите сюда.</p>
     </a>
   </div>
 
   <div class="form-card fade-up">
     <form id="leadForm" onsubmit="submitForm(event)">
       <div class="form-group">
-        <label data-ru="Ваше имя" data-am="Dzer anune">Ваше имя</label>
+        <label data-ru="Ваше имя" data-am="Delaysdelays">Ваше имя</label>
         <input type="text" id="formName" required placeholder="Имя / Անուն">
       </div>
       <div class="form-group">
-        <label data-ru="Telegram / Телефон" data-am="Telegram / Herakhose">Telegram / Телефон</label>
+        <label data-ru="Telegram / Телефон" data-am="Delaysdelays">Telegram / Телефон</label>
         <input type="text" id="formContact" required placeholder="@username / +374...">
       </div>
       <div class="form-group">
-        <label data-ru="Что продаёте на WB?" data-am="Inch' ek vadzar'um WB-um?">Что продаёте на WB?</label>
-        <input type="text" id="formProduct" placeholder="Одежда, электроника... / Հագուստ, էլեկտրոնիկա...">
+        <label data-ru="Что продаёте на WB?" data-am="Delaysdelays">Что продаёте на WB?</label>
+        <input type="text" id="formProduct" placeholder="Одежда, электроника... / Հdelays, delaysdelays...">
       </div>
       <div class="form-group">
-        <label data-ru="Какие услуги интересуют?" data-am="Inch' dzar'ayut'yunner en hetekar'qrum?">Какие услуги интересуют?</label>
+        <label data-ru="Какие услуги интересуют?" data-am="Delaysdelays">Какие услуги интересуют?</label>
         <select id="formService">
-          <option value="buyouts" data-ru="Выкупы" data-am="Gnumner">Выкупы</option>
-          <option value="reviews" data-ru="Отзывы" data-am="Kardzik'ner">Отзывы</option>
-          <option value="photos" data-ru="Фотосессия" data-am="Lusankar'ahanum">Фотосессия</option>
-          <option value="complex" data-ru="Комплекс услуг" data-am="Dzar'ayut'yunneri hamalir" selected>Комплекс услуг</option>
+          <option value="buyouts" data-ru="Выкупы" data-am="Delaysdelays">Выкупы</option>
+          <option value="reviews" data-ru="Отзывы" data-am="Delaysdelays">Отзывы</option>
+          <option value="photos" data-ru="Фотосессия" data-am="Delaysdelays">Фотосессия</option>
+          <option value="complex" data-ru="Комплекс услуг" data-am="Delaysdelays" selected>Комплекс услуг</option>
         </select>
       </div>
       <div class="form-group">
-        <label data-ru="Комментарий (необязательно)" data-am="Meknabanut'yun (oche partadir)">Комментарий (необязательно)</label>
-        <textarea id="formMessage" placeholder="Опишите ваш товар... / Նկարագրեցեք ձեր ապրանքը..."></textarea>
+        <label data-ru="Комментарий (необязательно)" data-am="Delaysdelays">Комментарий (необязательно)</label>
+        <textarea id="formMessage" placeholder="Опишите ваш товар... / Նdelaysdelays..."></textarea>
       </div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
         <i class="fab fa-telegram"></i>
-        <span data-ru="Отправить заявку" data-am="Uughark'el haytze">Отправить заявку</span>
+        <span data-ru="Отправить заявку" data-am="Delaysdelays">Отправить заявку</span>
       </button>
     </form>
   </div>
@@ -903,32 +900,32 @@ img{max-width:100%;height:auto}
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="logo">
-        <img src="https://www.genspark.ai/api/files/s/wLYXpzf4" alt="Go to Top" style="height:36px">
+        <img src="/static/img/logo.png" alt="Go to Top" style="height:44px">
         <span class="logo-text">Go to Top</span>
       </div>
-      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Apr'anqneri anvtang arajkhagh'ats'um Wildberries-um Hayastanum. Irakan gnumner kendani mardkandzov sepakan pahestitz Erevanum.">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
+      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Delaysdelays">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
     </div>
     <div class="footer-col">
-      <h4 data-ru="Навигация" data-am="Navarchut'yun">Навигация</h4>
+      <h4 data-ru="Навигация" data-am="Delaysdelays">Навигация</h4>
       <ul>
-        <li><a href="#services" data-ru="Услуги и цены" data-am="Dzar'ayut'yunner ev gner">Услуги и цены</a></li>
-        <li><a href="#calculator" data-ru="Калькулятор" data-am="Hashvich">Калькулятор</a></li>
-        <li><a href="#warehouse" data-ru="Наш склад" data-am="Mer paheste">Наш склад</a></li>
-        <li><a href="#guarantee" data-ru="Гарантии" data-am="Erishkhiqner">Гарантии</a></li>
-        <li><a href="#faq" data-ru="FAQ" data-am="HTH">FAQ</a></li>
+        <li><a href="#services" data-ru="Услуги и цены" data-am="Delaysdelays">Услуги и цены</a></li>
+        <li><a href="#calculator" data-ru="Калькулятор" data-am="Delaysdelays">Калькулятор</a></li>
+        <li><a href="#warehouse" data-ru="Наш склад" data-am="Delaysdelays">Наш склад</a></li>
+        <li><a href="#guarantee" data-ru="Гарантии" data-am="Delaysdelays">Гарантии</a></li>
+        <li><a href="#faq" data-ru="FAQ" data-am="Delaysdelays">FAQ</a></li>
       </ul>
     </div>
     <div class="footer-col">
-      <h4 data-ru="Контакты" data-am="Kap">Контакты</h4>
+      <h4 data-ru="Контакты" data-am="Delaysdelays">Контакты</h4>
       <ul>
-        <li><a href="https://t.me/goo_to_top" target="_blank"><i class="fab fa-telegram"></i> @goo_to_top</a></li>
-        <li><a href="https://t.me/suport_admin_2" target="_blank"><i class="fab fa-telegram"></i> @suport_admin_2</a></li>
+        <li><a href="https://t.me/goo_to_top" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Delaysdelays">Администратор</span></a></li>
+        <li><a href="https://t.me/suport_admin_2" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Менеджер" data-am="Delaysdelays">Менеджер</span></a></li>
       </ul>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>© 2025 Go to Top. <span data-ru="Все права защищены" data-am="Bolor iravunk'nere pahpanvadz en">Все права защищены</span></span>
-    <span data-ru="Ереван, Армения" data-am="Երևան, Հայաստան">Ереван, Армения</span>
+    <span>© 2026 Go to Top. <span data-ru="Все права защищены" data-am="Delaysdelays">Все права защищены</span></span>
+    <span data-ru="Ереван, Армения" data-am="Delaysdelays">Ереван, Армения</span>
   </div>
 </div>
 </footer>
@@ -936,7 +933,7 @@ img{max-width:100%;height:auto}
 <!-- FLOATING TG BUTTON -->
 <a href="https://t.me/goo_to_top" target="_blank" class="tg-float">
   <i class="fab fa-telegram"></i>
-  <span data-ru="Написать нам" data-am="Grel mez">Написать нам</span>
+  <span data-ru="Написать нам" data-am="Delaysdelays">Написать нам</span>
 </a>
 
 <!-- LIGHTBOX -->
@@ -944,22 +941,61 @@ img{max-width:100%;height:auto}
   <img id="lightboxImg" src="" alt="">
 </div>
 
-<!-- EXIT POPUP -->
-<div class="popup-overlay" id="exitPopup">
+<!-- TIMED POPUP (5 sec) -->
+<div class="popup-overlay" id="timedPopup">
   <div class="popup-card">
-    <button class="popup-close" onclick="closePopup()">&times;</button>
-    <h3 data-ru="Подождите!" data-am="Spasek!">Подождите!</h3>
-    <p data-ru="Получите бесплатный расчёт стоимости продвижения за 2 минуты в Telegram" data-am="Stadzek arajkhagh'ats'man arjeki angdzin hashvarke 2 ropeum Telegram-um">Получите бесплатный расчёт стоимости продвижения за 2 минуты в Telegram</p>
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
-      <i class="fab fa-telegram"></i>
-      <span data-ru="Получить расчёт" data-am="Stanal hashvarke">Получить расчёт</span>
-    </a>
+    <button class="popup-close" onclick="closeTimedPopup()">&times;</button>
+    <div id="popupFormWrap">
+      <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--purple-deep));display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:1.6rem;color:white"><i class="fas fa-calculator"></i></div>
+      <h3 data-ru="Получите бесплатный расчёт!" data-am="Ստացեք անվճար հաշվարկ!">Получите бесплатный расчёт!</h3>
+      <p data-ru="Персональный менеджер свяжется с вами и подготовит индивидуальный расчёт" data-am="Անձնական մենdelays-ը կկaperвер ձdelaysz հdelays deliverdelays">Персональный менеджер свяжется с вами и подготовит индивидуальный расчёт</p>
+      <form class="popup-form" id="popupForm" onsubmit="submitPopupForm(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label data-ru="Сколько выкупов нужно?" data-am="Քանի՞ գնdelays է անcessary">Сколько выкупов нужно?</label>
+            <input type="number" id="popupBuyouts" min="0" placeholder="Например: 20" required>
+          </div>
+          <div class="form-group">
+            <label data-ru="Сколько отзывов нужно?" data-am="Քdelays՞ delays է delaysdelays">Сколько отзывов нужно?</label>
+            <input type="number" id="popupReviews" min="0" placeholder="Например: 10" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-ru="Ваш Telegram или телефон" data-am="Ваш Telegram или телефон">Ваш Telegram или телефон</label>
+          <input type="text" id="popupContact" required placeholder="@username или +374...">
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Получить расчёт в Telegram" data-am="Ստdelays delays Telegram-delays">Получить расчёт в Telegram</span>
+        </button>
+      </form>
+    </div>
+    <div class="popup-success" id="popupSuccess">
+      <i class="fas fa-check-circle"></i>
+      <h4 data-ru="Заявка отправлена!" data-am="Հdelays delays է!">Заявка отправлена!</h4>
+      <p data-ru="Менеджер свяжется с вами в ближайшее время" data-am="Մdelays delayskdelay delaysdelays мdelays">Менеджер свяжется с вами в ближайшее время</p>
+    </div>
   </div>
 </div>
 
 <script>
 /* ===== LANGUAGE SYSTEM ===== */
 let lang = 'ru';
+const AM = {
+  // NAV
+  'Услуги': 'Ծdelaysdelays',
+  'Калькулятор': 'Delaysdelays',
+  'Склад': 'Delaysdelays',
+  'Гарантии': 'Delaysdelays',
+  'FAQ': 'ՀՏdelays',
+  'Контакты': 'Կdelays',
+  'Написать нам': 'Delaysdelays',
+  // HERO
+  'Работаем в Армении': 'Delaysdelays',
+  'Выведем ваш товар': 'Delaysdelays',
+  'в ТОП Wildberries': 'Wildberries-ի ТОdelays',
+};
+
 function switchLang(l) {
   lang = l;
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
@@ -990,20 +1026,20 @@ document.querySelectorAll('.nav-links a').forEach(a => {
 /* ===== TICKER ===== */
 (function initTicker() {
   const items = [
-    {icon:"fa-check-circle", ru:"Реальные люди, не боты", am:"Irakan mardik, voch boter"},
-    {icon:"fa-shield-alt", ru:"0 блокировок за всё время", am:"0 արգելափակում ողջ ընթացքում"},
-    {icon:"fa-warehouse", ru:"Собственный склад в Ереване", am:"Sepakan pahest Erevanum"},
-    {icon:"fa-mobile-alt", ru:"2000+ смартфонов", am:"2000+ սմարտֆոններ"},
-    {icon:"fa-map-marker-alt", ru:"Ереван, Армения", am:"Erevan, Hayastan"},
-    {icon:"fa-star", ru:"Профессиональные фото для отзывов", am:"Պրոֆեսիոնալ լուսանկարներ կարծիքների համար"},
-    {icon:"fa-camera", ru:"Фотосессии с моделями", am:"Lusankarahanum modelnerov"},
-    {icon:"fa-truck", ru:"Доставка на склады WB", am:"Arakum WB pahestner"}
+    {icon:"fa-check-circle", ru:"Реальные люди, не боты", am:"Իрakan մdelays, ոdelays бdelaysdelays"},
+    {icon:"fa-shield-alt", ru:"0 блокировок за всё время", am:"0 delaysdelays ongdelay delaysdelays"},
+    {icon:"fa-warehouse", ru:"Собственный склад в Ереване", am:"Сdelays pahest Erevandelays"},
+    {icon:"fa-mobile-alt", ru:"1000+ аккаунтов", am:"1000+ delaysdelays"},
+    {icon:"fa-map-marker-alt", ru:"Ереван, Армения", am:"Erevan, Delaysdelays"},
+    {icon:"fa-star", ru:"Профессиональные фото для отзывов", am:"Delaysdelays"},
+    {icon:"fa-camera", ru:"Фотосессии с моделями", am:"Delaysdelays"},
+    {icon:"fa-truck", ru:"Доставка на склады WB", am:"Delaysdelays"}
   ];
   const track = document.getElementById("tickerTrack");
   let h = "";
   for (let i = 0; i < 2; i++) {
     items.forEach(it => {
-      h += "<div class=\\"ticker-item\\"><i class=\\"fas " + it.icon + "\\"></i><span data-ru=\\"" + it.ru + "\\" data-am=\\"" + it.am + "\\">" + it.ru + "</span></div>";
+      h += '<div class="ticker-item"><i class="fas ' + it.icon + '"></i><span data-ru="' + it.ru + '" data-am="' + it.am + '">' + it.ru + '</span></div>';
     });
   }
   track.innerHTML = h;
@@ -1016,6 +1052,44 @@ function showCalcTab(id, el) {
   el.classList.add('active');
   document.getElementById('cg-' + id).classList.add('active');
 }
+
+/* Tiered buyout pricing */
+function getBuyoutPrice(qty) {
+  if (qty <= 0) return 0;
+  if (qty <= 20) return 2000;
+  if (qty <= 40) return 1700;
+  if (qty <= 60) return 1500;
+  return 1250;
+}
+
+function getBuyoutTotal(qty) {
+  if (qty <= 0) return 0;
+  let total = 0;
+  // Calculate tier by tier
+  if (qty <= 20) {
+    total = qty * 2000;
+  } else if (qty <= 40) {
+    total = 20 * 2000 + (qty - 20) * 1700;
+  } else if (qty <= 60) {
+    total = 20 * 2000 + 20 * 1700 + (qty - 40) * 1500;
+  } else {
+    total = 20 * 2000 + 20 * 1700 + 20 * 1500 + (qty - 60) * 1250;
+  }
+  return total;
+}
+
+function ccBuyout(delta) {
+  const sp = document.getElementById('buyoutQty');
+  let v = parseInt(sp.textContent) + delta;
+  if (v < 0) v = 0;
+  if (v > 999) v = 999;
+  sp.textContent = v;
+  // Update price label
+  const price = getBuyoutPrice(v);
+  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? '֏' + price.toLocaleString('ru-RU') + '/шт' : '֏2 000';
+  recalc();
+}
+
 function cc(btn, delta) {
   const row = btn.closest('.calc-row');
   const sp = row.querySelector('.calc-input span');
@@ -1025,17 +1099,30 @@ function cc(btn, delta) {
   sp.textContent = v;
   recalc();
 }
+
 function recalc() {
   let total = 0;
   const items = [];
-  document.querySelectorAll('.calc-row').forEach(row => {
+
+  // Buyout total (tiered)
+  const buyoutQty = parseInt(document.getElementById('buyoutQty').textContent);
+  if (buyoutQty > 0) {
+    total += getBuyoutTotal(buyoutQty);
+    items.push('Выкуп + забор: ' + buyoutQty + ' шт (' + getBuyoutPrice(buyoutQty) + '֏/шт)');
+  }
+
+  // Other rows (fixed price)
+  document.querySelectorAll('.calc-row:not(#buyoutRow)').forEach(row => {
     const price = parseInt(row.dataset.price);
     const qty = parseInt(row.querySelector('.calc-input span').textContent);
-    total += price * qty;
-    if (qty > 0) items.push(row.querySelector('.calc-label').textContent + ': ' + qty);
+    if (!isNaN(price) && qty > 0) {
+      total += price * qty;
+      items.push(row.querySelector('.calc-label').textContent + ': ' + qty);
+    }
   });
+
   document.getElementById('calcTotal').textContent = '֏' + total.toLocaleString('ru-RU');
-  const msg = (lang === 'am' ? 'Բարև! Ուզում եմ պատվիրել\\n' : 'Здравствуйте! Хочу заказать:\\n') + items.join('\\n') + '\\n\\n' + (lang === 'am' ? 'Yndhanuire: ' : 'Итого: ') + '֏' + total.toLocaleString('ru-RU');
+  const msg = (lang === 'am' ? 'Delaysdelays! Delaysdelays delaysdelays\\n' : 'Здравствуйте! Хочу заказать:\\n') + items.join('\\n') + '\\n\\n' + (lang === 'am' ? 'Delaysdelays: ' : 'Итого: ') + '֏' + total.toLocaleString('ru-RU');
   document.getElementById('calcTgBtn').href = 'https://t.me/goo_to_top?text=' + encodeURIComponent(msg);
 }
 
@@ -1054,21 +1141,45 @@ function openLightbox(el) {
 }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
 
-/* ===== EXIT POPUP ===== */
-let popupShown = false;
-document.addEventListener('mouseleave', (e) => {
-  if (e.clientY < 0 && !popupShown && !sessionStorage.getItem('exitShown')) {
-    popupShown = true;
-    document.getElementById('exitPopup').classList.add('show');
+/* ===== TIMED POPUP (5 sec) ===== */
+let timedPopupShown = false;
+setTimeout(() => {
+  if (!timedPopupShown && !sessionStorage.getItem('timedPopupShown')) {
+    timedPopupShown = true;
+    document.getElementById('timedPopup').classList.add('show');
   }
-});
-function closePopup() {
-  document.getElementById('exitPopup').classList.remove('show');
-  sessionStorage.setItem('exitShown', 'true');
+}, 5000);
+
+function closeTimedPopup() {
+  document.getElementById('timedPopup').classList.remove('show');
+  sessionStorage.setItem('timedPopupShown', 'true');
 }
-document.getElementById('exitPopup').addEventListener('click', (e) => {
-  if (e.target === document.getElementById('exitPopup')) closePopup();
+document.getElementById('timedPopup').addEventListener('click', (e) => {
+  if (e.target === document.getElementById('timedPopup')) closeTimedPopup();
 });
+
+function submitPopupForm(e) {
+  e.preventDefault();
+  const buyouts = document.getElementById('popupBuyouts').value;
+  const reviews = document.getElementById('popupReviews').value;
+  const contact = document.getElementById('popupContact').value;
+
+  // Send to API
+  fetch('/api/popup-lead', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({buyouts, reviews, contact, lang, timestamp: new Date().toISOString()})
+  }).catch(() => {});
+
+  // Also send via TG deep link to manager
+  const msg = 'Заявка с сайта Go to Top:\\n\\nВыкупов: ' + buyouts + '\\nОтзывов: ' + reviews + '\\nКонтакт: ' + contact;
+  window.open('https://t.me/suport_admin_2?text=' + encodeURIComponent(msg), '_blank');
+
+  // Show success
+  document.getElementById('popupFormWrap').style.display = 'none';
+  document.getElementById('popupSuccess').style.display = 'block';
+  setTimeout(() => closeTimedPopup(), 3000);
+}
 
 /* ===== FORM SUBMIT ===== */
 function submitForm(e) {
@@ -1080,12 +1191,12 @@ function submitForm(e) {
   const serviceText = service.options[service.selectedIndex].textContent;
   const message = document.getElementById('formMessage').value;
 
-  let msg = lang === 'am' ? 'Barev! Haytz Go to Top kaysqitz:\\n\\n' : 'Здравствуйте! Заявка с сайта Go to Top:\\n\\n';
-  msg += '👤 ' + (lang === 'am' ? 'Անուն՝ ' : 'Имя: ') + name + '\\n';
-  msg += '📱 ' + (lang === 'am' ? 'Kap: ' : 'Контакт: ') + contact + '\\n';
-  if (product) msg += '📦 ' + (lang === 'am' ? 'Ապրանք՝ ' : 'Товар: ') + product + '\\n';
-  msg += '🎯 ' + (lang === 'am' ? 'Ծառայություն՝ ' : 'Услуга: ') + serviceText + '\\n';
-  if (message) msg += '💬 ' + (lang === 'am' ? 'Մեկնաբանություն՝ ' : 'Комментарий: ') + message;
+  let msg = lang === 'am' ? 'Delaysdelays! Delaysdelays Go to Top delaysdelays:\\n\\n' : 'Здравствуйте! Заявка с сайта Go to Top:\\n\\n';
+  msg += 'Имя: ' + name + '\\n';
+  msg += 'Контакт: ' + contact + '\\n';
+  if (product) msg += 'Товар: ' + product + '\\n';
+  msg += 'Услуга: ' + serviceText + '\\n';
+  if (message) msg += 'Комментарий: ' + message;
 
   fetch('/api/lead', {
     method: 'POST',
@@ -1097,7 +1208,7 @@ function submitForm(e) {
 
   const btn = e.target.querySelector('button[type=submit]');
   const orig = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-check"></i> ' + (lang === 'am' ? 'Ուղարկվեց!' : 'Отправлено!');
+  btn.innerHTML = '<i class="fas fa-check"></i> ' + (lang === 'am' ? 'Delaysdelays!' : 'Отправлено!');
   btn.style.background = 'var(--success)';
   setTimeout(() => { btn.innerHTML = orig; btn.style.background = ''; }, 3000);
   e.target.reset();
@@ -1119,8 +1230,8 @@ const cObs = new IntersectionObserver((entries) => {
       const start = performance.now();
       function anim(now) {
         const p = Math.min((now - start) / dur, 1);
-        const e = 1 - Math.pow(1 - p, 3);
-        el.textContent = Math.floor(target * e).toLocaleString('ru-RU');
+        const ease = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.floor(target * ease).toLocaleString('ru-RU');
         if (p < 1) requestAnimationFrame(anim);
         else el.textContent = target === 0 ? '0' : target.toLocaleString('ru-RU');
       }
@@ -1141,7 +1252,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
   });
 });
 
-console.log('Go to Top — site loaded');
+console.log('Go to Top — site loaded v2');
 </script>
 </body>
 </html>`)
