@@ -141,6 +141,35 @@ img{max-width:100%;height:auto}
 .calc-cta{margin-top:24px;text-align:center}
 .buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
 .buyout-tier-info strong{color:var(--accent)}
+
+/* ===== WHY BUYOUTS + WB OFFICIAL BLOCKS ===== */
+.why-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px;margin-bottom:24px}
+.why-block h3{font-size:1.3rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.why-block h3 i{color:var(--purple);font-size:1.1rem}
+.why-block p{color:var(--text-sec);font-size:0.92rem;line-height:1.8;margin-bottom:16px}
+.why-block p:last-child{margin-bottom:0}
+.why-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px 0}
+.why-step{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;display:flex;gap:14px;align-items:flex-start;transition:var(--t)}
+.why-step:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-2px)}
+.why-step-num{width:36px;height:36px;min-width:36px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--accent));color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem}
+.why-step h4{font-size:0.95rem;font-weight:600;margin-bottom:4px}
+.why-step p{font-size:0.85rem;color:var(--text-sec);line-height:1.6;margin:0}
+.compare-box{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:24px 0}
+.compare-side{padding:24px;border-radius:var(--r);border:1px solid var(--border)}
+.compare-side.bad{background:rgba(239,68,68,0.05);border-color:rgba(239,68,68,0.2)}
+.compare-side.good{background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.3)}
+.compare-side h4{font-size:1rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.compare-side.bad h4{color:#ef4444}
+.compare-side.good h4{color:var(--purple)}
+.compare-side p{font-size:0.88rem;color:var(--text-sec);line-height:1.7;margin:0}
+.compare-side .price-tag{font-size:1.3rem;font-weight:800;margin:8px 0}
+.compare-side.bad .price-tag{color:#ef4444}
+.compare-side.good .price-tag{color:var(--purple)}
+.wb-official-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981;font-weight:600;font-size:0.88rem;margin-bottom:16px}
+.highlight-result{background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(168,85,247,0.08));border:1px solid rgba(139,92,246,0.2);border-radius:var(--r);padding:20px 24px;margin:20px 0;font-size:0.95rem;line-height:1.7}
+.highlight-result i{color:var(--purple);margin-right:8px}
+.highlight-result strong{color:var(--text)}
+@media(max-width:768px){.compare-box{grid-template-columns:1fr}.why-steps{grid-template-columns:1fr}}
 .process-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;position:relative}
 .step{text-align:center;position:relative}
 .step-num{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;margin:0 auto 16px;position:relative;z-index:2}
@@ -659,6 +688,80 @@ img{max-width:100%;height:auto}
         <div style="margin-top:16px;text-align:center"><a href="https://t.me/suport_admin_2" target="_blank" class="btn btn-tg" style="font-size:0.82rem;padding:9px 18px"><i class="fab fa-telegram"></i> <span data-ru="Получить индивидуальный расчёт" data-am="Stanal indiv hashvark">Получить индивидуальный расчёт</span></a></div>
       </div>
     </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ===== WHY BUYOUTS BY KEYWORDS ===== -->
+<section class="section" id="why-buyouts">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աshkh.">Почему это работает</span></div>
+    <h2 class="section-title" data-ru="Почему выкупы по ключевым запросам — самый эффективный способ продвижения" data-am="Ինdelays gnumnere banali hartsumnernov — amenardelays.">Почему выкупы по ключевым запросам — <span class="gr">самый эффективный способ</span> продвижения</h2>
+  </div>
+
+  <div class="why-block fade-up">
+    <h3><i class="fas fa-funnel-dollar"></i> <span data-ru="Мы не просто покупаем ваш товар — мы прокачиваем всю воронку" data-am="Menq voch miayn gnum — menq bardzracnum amboxj dzagulin">Мы не просто покупаем ваш товар — мы прокачиваем всю воронку</span></h3>
+    <p data-ru="Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:" data-am="Yuraqanchur gnumy banali hartsumnov — liarzhek ardelays.">Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:</p>
+    
+    <div class="why-steps">
+      <div class="why-step"><div class="why-step-num">1</div><div><h4 data-ru="Поиск по ключевому запросу" data-am="Vordelays banali hartsumnov">Поиск по ключевому запросу</h4><p data-ru="Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB" data-am="Gtnum enq dzer apranq.">Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB</p></div></div>
+      <div class="why-step"><div class="why-step-num">2</div><div><h4 data-ru="Просмотр карточки" data-am="Qardelays ditsarkum">Просмотр карточки</h4><p data-ru="Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход" data-am="Lriv ditsarkum enq lusankar.">Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход</p></div></div>
+      <div class="why-step"><div class="why-step-num">3</div><div><h4 data-ru="Работа с отзывами" data-am="Ashkhatdelays kartsiqnerov">Работа с отзывами</h4><p data-ru="Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов" data-am="Tertsnum enq kartsiqner.">Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов</p></div></div>
+      <div class="why-step"><div class="why-step-num">4</div><div><h4 data-ru="Добавление конкурентов" data-am="Mrcakitsdelays avelacum">Добавление конкурентов</h4><p data-ru="Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя" data-am="Avelacnum enq mrcakitsdelays.">Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя</p></div></div>
+      <div class="why-step"><div class="why-step-num">5</div><div><h4 data-ru="Удаление конкурентов из корзины" data-am="Mrcakitsdelays heracum">Удаление конкурентов из корзины</h4><p data-ru="В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас" data-am="Patvelirdelays pahin heracnum.">В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас</p></div></div>
+      <div class="why-step"><div class="why-step-num">6</div><div><h4 data-ru="Заказ и получение" data-am="Patver ev stacum">Заказ и получение</h4><p data-ru="Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя" data-am="Dzeradelays enq patver.">Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя</p></div></div>
+    </div>
+
+    <div class="highlight-result" data-ru="В результате повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Ardyunqum bardzranum en bolor konversianere."><i class="fas fa-bolt"></i> <strong>Результат:</strong> повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.</div>
+  </div>
+
+  <div class="why-block fade-up">
+    <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?" data-am="50 000 bloger vs 50 000 gnumner — inch ardelays?">50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?</span></h3>
+    <div class="compare-box">
+      <div class="compare-side bad">
+        <h4><i class="fas fa-dice"></i> Reels у блогера</h4>
+        <div class="price-tag">֏50 000</div>
+        <p data-ru="1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это всегда риск без гарантий результата." data-am="1 tesandelays blogeri mot — lotareia.">1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это <strong>всегда риск</strong> без гарантий результата.</p>
+      </div>
+      <div class="compare-side good">
+        <h4><i class="fas fa-chart-line"></i> 25 выкупов по ключевым</h4>
+        <div class="price-tag">֏50 000</div>
+        <p data-ru="25 выкупов по целевому запросу — это 100% проверенный способ продвижения. Ваш товар быстро поднимается в ТОП выдачи, закрепляется там и начинает привлекать органический трафик. Больше продаж. Больше выручки. Гарантированно." data-am="25 gnumner npatakdelays hartsumnov — 100% stugvats.">25 выкупов по целевому запросу — это <strong>100% проверенный способ</strong> продвижения. Ваш товар быстро поднимается в ТОП выдачи, закрепляется там и начинает привлекать <strong>органический трафик</strong>. Больше продаж. Больше выручки. <strong>Гарантированно.</strong></p>
+      </div>
+    </div>
+    <div class="highlight-result"><i class="fas fa-lightbulb"></i> <strong>Факт:</strong> при выкупах по 1 ключевому запросу уже от <strong>25 штук</strong> товар быстро продвигается в ТОП и закрепляется там надолго — за счёт улучшения всех поведенческих метрик. А органический трафик WB становится вашим основным источником продаж.</div>
+  </div>
+
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы по ключевым" data-am="Sksel gnumner banalov">Начать выкупы по ключевым</span></a>
+  </div>
+</div>
+</section>
+
+<!-- ===== WB OFFICIAL ===== -->
+<section class="section section-dark" id="wb-official">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-gavel"></i> <span data-ru="Официально" data-am="Pasht.">Официально</span></div>
+    <h2 class="section-title" data-ru="Wildberries официально разрешил самовыкупы" data-am="Wildberries-y pashtondelays thuylatrel.">Wildberries <span class="gr">официально разрешил</span> самовыкупы</h2>
+  </div>
+
+  <div class="why-block fade-up">
+    <div class="wb-official-badge"><i class="fas fa-check-circle"></i> Подтверждено в оферте WB</div>
+    
+    <h3><i class="fas fa-shield-alt"></i> <span data-ru="Никаких штрафов. Никаких рисков." data-am="Voch mi tughank. Voch mi risk.">Никаких штрафов. Никаких рисков.</span></h3>
+    <p data-ru="Wildberries официально подтвердил в своей оферте, что самовыкупы не являются нарушением. За это не предусмотрены штрафы или блокировки кабинета. Тысячи успешных продавцов используют этот инструмент каждый день." data-am="Wildberries-y pasht. hastatel ir ofertayum.">Wildberries официально подтвердил в своей оферте, что самовыкупы <strong>не являются нарушением</strong>. За это не предусмотрены штрафы или блокировки кабинета. Тысячи успешных продавцов используют этот инструмент каждый день.</p>
+    
+    <h3><i class="fas fa-arrow-up"></i> <span data-ru="WB вернул приоритет органической выдачи" data-am="WB-y veradardzel organik artadanqi arartorq.">WB вернул приоритет органической выдачи</span></h3>
+    <p data-ru="Wildberries подтвердил в обновлённой оферте: приоритет в поисковой выдаче получают товары с лучшими поведенческими метриками — конверсия, время на карточке, добавления в корзину, заказы. Именно это мы и прокачиваем при каждом выкупе." data-am="WB-y hastatel noracvac ofertayum.">Wildberries подтвердил в обновлённой оферте: приоритет в поисковой выдаче получают товары с лучшими <strong>поведенческими метриками</strong> — конверсия, время на карточке, добавления в корзину, заказы. <strong>Именно это мы и прокачиваем при каждом выкупе.</strong></p>
+
+    <div class="highlight-result"><i class="fas fa-rocket"></i> <strong>Сейчас — лучшее время</strong> для продвижения вашего товара. Пока конкуренты сомневаются — вы уже можете занять ТОП выдачи, привлечь органический трафик и <strong>зарабатывать больше</strong>. Не ждите, пока конкуренты сделают это первыми.</div>
+  </div>
+
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Занять ТОП прямо сейчас" data-am="Zbaghetsnel TOP hima">Занять ТОП прямо сейчас</span></a>
   </div>
 </div>
 </section>
