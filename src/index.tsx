@@ -557,7 +557,7 @@ img{max-width:100%;height:auto}
 <div class="container">
   <div class="about-grid fade-up">
     <div class="about-img">
-      <img src="/static/img/about-hero.jpg" alt="Go to Top — Business Growth">
+      <img src="/static/img/about-hero2.jpg" alt="Go to Top — Business Growth">
     </div>
     <div class="about-text">
       <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
@@ -662,36 +662,6 @@ img{max-width:100%;height:auto}
     </div>
   </div>
 
-  <!-- Reviews under ключ -->
-  <div class="reviews-detail fade-up">
-    <div class="buyout-detail-header">
-      <div class="section-badge"><i class="fas fa-comments"></i> <span data-ru="Отзывы под ключ" data-am="Կարծիքներ աмբоղջակաн">Отзывы под ключ</span></div>
-      <h2 data-ru="Что включает услуга «отзывы под ключ»" data-am="Ինչ է ներառում «կարծիքներ աмբоղջակաн» ծառայությունը">Что включает услуга <span class="gr">«отзывы под ключ»</span></h2>
-      <p data-ru="Рейтинг карточки станет максимальным. Ваши клиенты будут доверять Вам и чаще заказывать." data-am="Քարտի վարկանիշը կդառնա ամենաբարձր: Ձեր հաճախоրդները կվստահեն ձեզ և կպատվիրեն ավեлի հաճախ:">Рейтинг карточки станет максимальным. Ваши клиенты будут доверять Вам и чаще заказывать.</p>
-    </div>
-    <div class="reviews-grid">
-      <div class="review-point">
-        <i class="fas fa-pen-fancy"></i>
-        <h4 data-ru="Написание текста" data-am="Տեքստի գրուм">Написание текста</h4>
-        <p data-ru="Описание всех достоинств товара" data-am="Ապրանքի բолоր առավեлությունների նկարագրоւм">Описание всех достоинств товара</p>
-      </div>
-      <div class="review-point">
-        <i class="fas fa-camera-retro"></i>
-        <h4 data-ru="Фото и видео" data-am="Լուսանկար և տեսանյութ">Фото и видեо</h4>
-        <p data-ru="Показываем все плюсы Вашего товара в разных локациях" data-am="Ցույց ենք տաлիս ձեր ապрանքի բолоր առավեлությունները տարբեր վայրերուм">Показываем все плюсы Вашего товара в разных локациях</p>
-      </div>
-      <div class="review-point">
-        <i class="fas fa-map-marked-alt"></i>
-        <h4 data-ru="Разные локации" data-am="Տարբեր վայրեր">Разные локации</h4>
-        <p data-ru="ПВЗ, кафе, природа, домашний интерьер, предметные фото" data-am="ՊՎԶ, սրճարան, բնություն, տնային ինտերիեր, առարկայակաн лուսանկարներ">ПВЗ, кафе, природа, домашний интерьер, предметные фото</p>
-      </div>
-      <div class="review-point">
-        <i class="fas fa-user-friends"></i>
-        <h4 data-ru="Реальные аккаунты" data-am="Իրակաн հաշիվнեր">Реальные аккаунты</h4>
-        <p data-ru="Все отзывы публикуются с реальных аккаунтов с историей" data-am="Բолоր կարծիքները հրապարակվուм են իրակաн հաշիվներից պատмությաнբ">Все отзывы публикуются с реальных аккаунтов с историей</p>
-      </div>
-    </div>
-  </div>
   <div class="section-cta">
     <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պатвирel hima">Заказать сейчас</span></a>
     <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Skse arajkhagh">Начать продвижение</span></a>
