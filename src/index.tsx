@@ -183,7 +183,7 @@ app.post('/api/generate-pdf', async (c) => {
 
     // Load PDF template
     let tpl = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
-    if (!tpl) tpl = { header_ru: 'Коммерческое предложение', header_am: 'Կomerch առdelays', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
+    if (!tpl) tpl = { header_ru: 'Коммерческое предложение', header_am: 'Առևտրային առաջարկ', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
 
     const isAm = lang === 'am';
     const header = isAm ? tpl.header_am : tpl.header_ru;
@@ -212,10 +212,10 @@ app.post('/api/generate-pdf', async (c) => {
       (tpl.company_address ? '<div>' + tpl.company_address + '</div>' : '') +
       '<div>' + new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU') + '</div></div></div>' +
       '<div class="title">' + (header || '') + '</div>' +
-      (clientName || clientContact ? '<div class="client-info"><strong>' + (isAm ? 'Հdelays:' : 'Клиент:') + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
+      (clientName || clientContact ? '<div class="client-info"><strong>' + (isAm ? 'Հաճախորդ:' : 'Клиент:') + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
       (intro ? '<div class="intro">' + intro + '</div>' : '') +
-      '<table><thead><tr><th>' + (isAm ? 'Ctions' : 'Услуга') + '</th><th style="text-align:center">' + (isAm ? 'Qdelays' : 'Кол-во') + '</th><th style="text-align:right">' + (isAm ? 'Gdelays' : 'Цена') + '</th><th style="text-align:right">' + (isAm ? 'Gdelays' : 'Сумма') + '</th></tr></thead><tbody>' + rows +
-      '<tr class="total-row"><td colspan="3" style="padding:14px 12px;text-align:right">' + (isAm ? 'Idelays:' : 'ИТОГО:') + '</td><td style="padding:14px 12px;text-align:right;color:#8B5CF6;font-size:20px">' + Number(total).toLocaleString('ru-RU') + ' ֏</td></tr></tbody></table>' +
+      '<table><thead><tr><th>' + (isAm ? 'Ծառայություն' : 'Услуга') + '</th><th style="text-align:center">' + (isAm ? 'Քանակ' : 'Кол-во') + '</th><th style="text-align:right">' + (isAm ? 'Գին' : 'Цена') + '</th><th style="text-align:right">' + (isAm ? 'Գումար' : 'Сумма') + '</th></tr></thead><tbody>' + rows +
+      '<tr class="total-row"><td colspan="3" style="padding:14px 12px;text-align:right">' + (isAm ? 'ԸՆԴԱՄԵՆԸ:' : 'ИТОГО:') + '</td><td style="padding:14px 12px;text-align:right;color:#8B5CF6;font-size:20px">' + Number(total).toLocaleString('ru-RU') + ' ֏</td></tr></tbody></table>' +
       (outro ? '<div class="outro">' + outro + '</div>' : '') +
       (footer ? '<div class="footer">' + footer + '</div>' : '') +
       '</body></html>';
@@ -331,7 +331,7 @@ app.get('/', (c) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go to Top — Продвижение на Wildberries | Առաdelays Wildberries-ում</title>
+<title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
 <meta name="description" content="Go to Top — продвижение карточек на Wildberries под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване. Более 1000 аккаунтов.">
@@ -348,7 +348,7 @@ app.get('/', (c) => {
 <link rel="alternate" hreflang="hy" href="https://gototop.win">
 <link rel="alternate" hreflang="x-default" href="https://gototop.win">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Go to Top — Առաdelays Wildberries- delays">
+<meta name="twitter:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta name="twitter:image" content="https://gototop.win/static/img/logo-gototop.png">
 <link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
@@ -941,7 +941,7 @@ img{max-width:100%;height:auto}
   <div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0">
     <div style="display:flex;align-items:center;gap:12px">
       <div style="width:14px;height:14px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>
-      <span id="slotLabel" data-ru="Свободных мест на этой неделе" data-am="Այdelays" style="font-size:1rem;font-weight:600;color:var(--text-secondary)">Свободных мест на этой неделе</span>
+      <span id="slotLabel" data-ru="Свободных мест на этой неделе" data-am="Այս շաբաթի ազատ տեղեր" style="font-size:1rem;font-weight:600;color:var(--text-secondary)">Свободных мест на этой неделе</span>
     </div>
     <div style="display:flex;align-items:center;gap:8px">
       <span id="slotFreeCount" style="font-size:2.2rem;font-weight:900;color:var(--purple)">—</span>
@@ -2364,10 +2364,10 @@ async function checkRefCode() {
       _refDiscount = data.discount_percent || 0;
       _refFreeReviews = data.free_reviews || 0;
       var msg = lang === 'am' 
-        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Պromokод ակdelays!'
+        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Պրոմոկոդը ակտիվացված է!'
         : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Промокод активирован!';
-      if (_refDiscount > 0) msg += (lang === 'am' ? ' Zdelays: ' : ' Скидка: ') + _refDiscount + '%';
-      if (_refFreeReviews > 0) msg += (lang === 'am' ? ' + ' + _refFreeReviews + ' bdelays kdelays' : ' + ' + _refFreeReviews + ' бесплатных отзывов');
+      if (_refDiscount > 0) msg += (lang === 'am' ? ' Զեղճ: ' : ' Скидка: ') + _refDiscount + '%';
+      if (_refFreeReviews > 0) msg += (lang === 'am' ? ' + ' + _refFreeReviews + ' անվճար կարծիքներ' : ' + ' + _refFreeReviews + ' бесплатных отзывов');
       if (data.description) msg += '<br><span style="font-size:0.8rem;color:var(--text-sec)">' + data.description + '</span>';
       result.style.display = 'block';
       result.style.background = 'rgba(16,185,129,0.1)';
@@ -2383,7 +2383,7 @@ async function checkRefCode() {
       result.style.border = '1px solid rgba(239,68,68,0.3)';
       result.style.color = 'var(--danger)';
       result.innerHTML = lang === 'am' 
-        ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>Pdelays kdelays'
+        ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>Պրոմոկոդը չի գտնվել'
         : '<i class="fas fa-times-circle" style="margin-right:6px"></i>Промокод не найден';
       recalcDynamic();
     }
@@ -2420,8 +2420,9 @@ async function checkRefCode() {
   // Create PDF download button
   var pdfBtn = document.createElement('button');
   pdfBtn.className = 'calc-submit-btn';
-  pdfBtn.style.cssText = 'margin-top:12px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center';
-  pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> <span data-ru="Скачать КП (PDF)" data-am="Ներdelays КП (PDF)">Скачать КП (PDF)</span>';
+  pdfBtn.id = 'pdfDownloadBtn';
+  pdfBtn.style.cssText = 'margin-top:12px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center;transition:all 0.3s';
+  pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> <span data-ru="Скачать КП (PDF)" data-am="Ներբեռնել ԿԱ (PDF)">Скачать КП (PDF)</span>';
   
   // Insert after total line
   var totalWrap = totalEl.closest('.calc-total') || totalEl.parentElement;
@@ -2430,39 +2431,50 @@ async function checkRefCode() {
   }
 
   pdfBtn.addEventListener('click', function() {
-    // Collect selected items from calculator
+    // Collect selected items from ALL calc-rows (qty > 0 = selected)
     var items = [];
-    var checkboxes = calcSection.querySelectorAll('.calc-check');
-    checkboxes.forEach(function(cb) {
-      if (cb.checked) {
-        var row = cb.closest('.calc-row');
-        if (!row) return;
-        var nameEl = row.querySelector('.calc-name');
-        var priceEl = row.querySelector('.calc-price');
-        var qtyEl = row.querySelector('.calc-qty');
-        var name = nameEl ? nameEl.textContent.trim() : '';
-        var priceText = priceEl ? priceEl.textContent.replace(/[^0-9]/g, '') : '0';
-        var price = parseInt(priceText) || 0;
-        var qty = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
+    var rows = calcSection.querySelectorAll('.calc-row');
+    rows.forEach(function(row) {
+      var qtyInput = row.querySelector('input[type="number"]');
+      if (!qtyInput) return;
+      var qty = parseInt(qtyInput.value) || 0;
+      if (qty <= 0) return;
+
+      var nameEl = row.querySelector('.calc-label');
+      var name = nameEl ? nameEl.textContent.trim() : '';
+      var dataPrice = row.getAttribute('data-price');
+
+      if (dataPrice === 'buyout') {
+        // Use getBuyoutTotal/getBuyoutPrice for correct progressive pricing
+        var subtotal = getBuyoutTotal(qty);
+        var unitPrice = getBuyoutPrice(qty);
+        items.push({ name: name, price: unitPrice, qty: qty, subtotal: subtotal });
+      } else if (dataPrice === 'tiered') {
+        // Use getTierTotal/getTierPrice for correct tiered pricing
+        try {
+          var tiers = JSON.parse(row.getAttribute('data-tiers'));
+          var tierSubtotal = getTierTotal(tiers, qty);
+          var tierUnitPrice = getTierPrice(tiers, qty);
+          items.push({ name: name, price: tierUnitPrice, qty: qty, subtotal: tierSubtotal });
+        } catch(e) {
+          var priceEl = row.querySelector('.calc-price');
+          var pt = priceEl ? priceEl.textContent.replace(/[^0-9]/g, '') : '0';
+          items.push({ name: name, price: parseInt(pt)||0, qty: qty, subtotal: (parseInt(pt)||0)*qty });
+        }
+      } else {
+        // Normal fixed price row
+        var price = parseInt(dataPrice) || 0;
         items.push({ name: name, price: price, qty: qty, subtotal: price * qty });
       }
     });
-    if (!items.length) { alert(lang === 'am' ? 'Ընdelays ctions!' : 'Выберите услуги!'); return; }
+    
+    if (!items.length) {
+      alert(lang === 'am' ? 'Ընտրեք ծառայություններ!' : 'Выберите услуги (установите количество > 0)!');
+      return;
+    }
     var totalVal = totalEl.textContent.replace(/[^0-9]/g, '');
 
     // Open PDF in new window
-    var form = document.createElement('form');
-    form.method = 'POST';
-    form.action = '/api/generate-pdf';
-    form.target = '_blank';
-    var input = document.createElement('input');
-    input.type = 'hidden';
-    input.name = 'data';
-    input.value = JSON.stringify({ items: items, total: parseInt(totalVal) || 0, lang: lang, clientName: '', clientContact: '' });
-    form.appendChild(input);
-    document.body.appendChild(form);
-
-    // Instead use fetch and open
     fetch('/api/generate-pdf', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
