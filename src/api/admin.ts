@@ -333,4 +333,55 @@ api.delete('/referrals/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== SECTION ORDER =====
+api.get('/section-order', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
+  return c.json(res.results);
+});
+
+api.post('/section-order', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { sections } = await c.req.json();
+  // sections = [{section_id, sort_order, is_visible, label_ru, label_am}]
+  for (const s of sections) {
+    await db.prepare(
+      'INSERT INTO section_order (section_id, sort_order, is_visible, label_ru, label_am) VALUES (?,?,?,?,?) ON CONFLICT(section_id) DO UPDATE SET sort_order=excluded.sort_order, is_visible=excluded.is_visible, label_ru=excluded.label_ru, label_am=excluded.label_am'
+    ).bind(s.section_id, s.sort_order, s.is_visible ?? 1, s.label_ru || '', s.label_am || '').run();
+  }
+  return c.json({ success: true });
+});
+
+api.put('/section-order/seed', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  // Seed default section order
+  const defaults = [
+    { id: 'hero', order: 0, ru: 'Главный экран', am: 'Գլdelays' },
+    { id: 'ticker', order: 1, ru: 'Бегущая строка', am: 'Ընdelays' },
+    { id: 'wb-banner', order: 2, ru: 'WB Баннер', am: 'WB Բdelays' },
+    { id: 'stats-bar', order: 3, ru: 'Статистика', am: ' Delays' },
+    { id: 'about', order: 4, ru: 'О нас', am: 'Մdelays մdelays' },
+    { id: 'services', order: 5, ru: 'Услуги', am: 'Ctions' },
+    { id: 'buyout-detail', order: 6, ru: 'Детали выкупа', am: 'Gdelays' },
+    { id: 'why-buyouts', order: 7, ru: 'Почему выкупы', am: 'Idelays' },
+    { id: 'wb-official', order: 8, ru: 'WB официально', am: 'WB Пdelays' },
+    { id: 'calculator', order: 9, ru: 'Калькулятор', am: 'Hdelays' },
+    { id: 'process', order: 10, ru: 'Как мы работаем', am: 'Idelays' },
+    { id: 'warehouse', order: 11, ru: 'Склад', am: 'Пdelays' },
+    { id: 'guarantee', order: 12, ru: 'Гарантии', am: 'Edelays' },
+    { id: 'comparison', order: 13, ru: 'Сравнение', am: 'Hdelays' },
+    { id: 'important', order: 14, ru: 'Важно знать', am: 'Кdelays' },
+    { id: 'faq', order: 15, ru: 'FAQ', am: 'ՀTdelays' },
+    { id: 'contact', order: 16, ru: 'Контакты', am: 'Кdelays' },
+  ];
+  for (const d of defaults) {
+    const existing = await db.prepare('SELECT id FROM section_order WHERE section_id = ?').bind(d.id).first();
+    if (!existing) {
+      await db.prepare('INSERT INTO section_order (section_id, sort_order, is_visible, label_ru, label_am) VALUES (?,?,1,?,?)')
+        .bind(d.id, d.order, d.ru, d.am).run();
+    }
+  }
+  return c.json({ success: true });
+});
+
 export default api

@@ -53,7 +53,7 @@ export function getAdminHTML(): string {
 // ===== STATE =====
 let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [] };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [] };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -108,8 +108,8 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats, referrals] = await Promise.all([
-    api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals')
+  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder] = await Promise.all([
+    api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -118,6 +118,7 @@ async function loadData() {
   data.scripts = scripts || [];
   data.stats = stats || {};
   data.referrals = referrals || [];
+  data.sectionOrder = sectionOrder || [];
 }
 
 // ===== NAVIGATION =====
@@ -126,6 +127,7 @@ const pages = [
   { id: 'content', icon: 'fa-file-alt', label: 'Тексты сайта' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
   { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
+  { id: 'sections', icon: 'fa-th-list', label: 'Порядок блоков' },
   { id: 'telegram', icon: 'fa-telegram', label: 'Telegram сообщения', fab: true },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
@@ -214,6 +216,7 @@ function renderDashboard() {
         '<li>📝 <strong>Тексты сайта</strong> — редактирование всех текстов на RU и AM</li>' +
         '<li>🧮 <strong>Калькулятор</strong> — управление услугами, ценами и вкладками</li>' +
         '<li>🎁 <strong>Реферальные коды</strong> — кодовые слова для скидок и бесплатных отзывов</li>' +
+        '<li>📦 <strong>Порядок блоков</strong> — перемещайте и скрывайте секции сайта</li>' +
         '<li>💬 <strong>Telegram сообщения</strong> — шаблоны сообщений для каждой кнопки на сайте</li>' +
         '<li>📜 <strong>Скрипты</strong> — добавление аналитики, пикселей, meta-тегов</li>' +
         '<li>⚙️ <strong>Настройки</strong> — смена пароля</li>' +
@@ -361,9 +364,9 @@ function renderCalculator() {
             '<input class="input" type="number" value="' + tiers[ti].min + '" style="padding:6px 8px;font-size:0.85rem;text-align:left" id="tier_min_' + svc.id + '_' + ti + '">' +
             '<span style="font-size:0.8rem;color:#94a3b8;text-align:right;min-width:20px">до</span>' +
             '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem;text-align:right" id="tier_max_' + svc.id + '_' + ti + '">' +
-            '<span style="font-size:0.8rem;color:#94a3b8;white-space:nowrap">= ֏</span>' +
-            '<input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem;text-align:left" id="tier_price_' + svc.id + '_' + ti + '">' +
-            '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.7rem" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-trash"></i></button>' +
+            '<span style="font-size:0.8rem;color:#94a3b8;white-space:nowrap">=</span>' +
+            '<div style="display:flex;align-items:center;gap:4px"><input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem;text-align:left;width:90px" id="tier_price_' + svc.id + '_' + ti + '"><span style="font-size:0.85rem;color:#94a3b8">֏</span></div>' +
+            '<button style="width:24px;height:24px;min-width:24px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:0.65rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;padding:0" onmouseover="this.style.background=\'#EF4444\';this.style.color=\'white\'" onmouseout="this.style.background=\'rgba(239,68,68,0.15)\';this.style.color=\'#f87171\'" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-times"></i></button>' +
           '</div>';
         }
         h += '<div style="margin-top:8px;display:flex;gap:8px">' +
@@ -697,6 +700,73 @@ async function deleteReferral(id) {
   await loadData(); render();
 }
 
+// ===== SECTION ORDER =====
+function renderSections() {
+  var sections = data.sectionOrder;
+  var h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800">Порядок блоков сайта</h1><p style="color:#94a3b8;margin-top:4px">Перемещайте блоки вверх/вниз и скрывайте ненужные</p></div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-outline" onclick="seedSections()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить блоки</button>' +
+      '<button class="btn btn-success" onclick="saveSectionOrder()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить порядок</button>' +
+    '</div>' +
+  '</div>';
+  
+  if (!sections.length) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-th-list" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
+      '<p style="color:#94a3b8">Блоки ещё не загружены. Нажмите \"Загрузить блоки\" для импорта.</p></div>';
+  } else {
+    h += '<div id="sectionList">';
+    for (var i = 0; i < sections.length; i++) {
+      var s = sections[i];
+      h += '<div class="card" style="margin-bottom:8px;padding:14px 20px;display:flex;align-items:center;gap:16px;' + (!s.is_visible ? 'opacity:0.5;' : '') + '" data-section-idx="' + i + '">' +
+        '<div style="display:flex;flex-direction:column;gap:4px">' +
+          '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.7rem;line-height:1" onclick="moveSection(' + i + ',-1)" ' + (i === 0 ? 'disabled style="padding:4px 8px;font-size:0.7rem;line-height:1;opacity:0.3"' : '') + '><i class="fas fa-chevron-up"></i></button>' +
+          '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.7rem;line-height:1" onclick="moveSection(' + i + ',1)" ' + (i === sections.length-1 ? 'disabled style="padding:4px 8px;font-size:0.7rem;line-height:1;opacity:0.3"' : '') + '><i class="fas fa-chevron-down"></i></button>' +
+        '</div>' +
+        '<div style="flex:1"><span style="font-weight:700;font-size:0.95rem">' + escHtml(s.label_ru || s.section_id) + '</span> <span style="color:#64748b;font-size:0.8rem;margin-left:8px">#' + s.section_id + '</span></div>' +
+        '<button class="btn ' + (s.is_visible ? 'btn-success' : 'btn-danger') + '" style="padding:6px 14px;font-size:0.8rem" onclick="toggleSectionVis(' + i + ')">' +
+          (s.is_visible ? '<i class="fas fa-eye"></i> Видим' : '<i class="fas fa-eye-slash"></i> Скрыт') +
+        '</button>' +
+      '</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function moveSection(idx, dir) {
+  var arr = data.sectionOrder;
+  var newIdx = idx + dir;
+  if (newIdx < 0 || newIdx >= arr.length) return;
+  var tmp = arr[idx];
+  arr[idx] = arr[newIdx];
+  arr[newIdx] = tmp;
+  // Update sort_order values
+  for (var i = 0; i < arr.length; i++) arr[i].sort_order = i;
+  render();
+}
+
+function toggleSectionVis(idx) {
+  data.sectionOrder[idx].is_visible = data.sectionOrder[idx].is_visible ? 0 : 1;
+  render();
+}
+
+async function saveSectionOrder() {
+  var sections = data.sectionOrder.map(function(s, i) {
+    return { section_id: s.section_id, sort_order: i, is_visible: s.is_visible, label_ru: s.label_ru, label_am: s.label_am };
+  });
+  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: sections }) });
+  toast('Порядок блоков сохранён! Обновите сайт для проверки.');
+}
+
+async function seedSections() {
+  toast('Загрузка блоков...', 'info');
+  await api('/section-order/seed', { method: 'PUT' });
+  toast('Блоки загружены!');
+  await loadData(); render();
+}
+
 // ===== SETTINGS =====
 function renderSettings() {
   return '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:24px">Настройки</h1>' +
@@ -734,6 +804,7 @@ function render() {
     case 'content': pageHtml = renderContent(); break;
     case 'calculator': pageHtml = renderCalculator(); break;
     case 'referrals': pageHtml = renderReferrals(); break;
+    case 'sections': pageHtml = renderSections(); break;
     case 'telegram': pageHtml = renderTelegram(); break;
     case 'scripts': pageHtml = renderScripts(); break;
     case 'settings': pageHtml = renderSettings(); break;

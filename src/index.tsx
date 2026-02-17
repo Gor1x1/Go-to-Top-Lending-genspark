@@ -66,6 +66,9 @@ app.get('/api/site-data', async (c) => {
       else if (p === 'body_end') scripts.body_end.push(code);
     }
     
+    // Load section order
+    const sectionOrderRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
+    
     // Set Cache-Control to no-cache so edits appear instantly
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
@@ -77,11 +80,12 @@ app.get('/api/site-data', async (c) => {
       services: svcsRes.results,
       telegram,
       scripts,
+      sectionOrder: sectionOrderRes.results,
       _ts: Date.now()
     });
   } catch (e: any) {
     // If DB not initialized yet, return empty — frontend will use hardcoded fallback
-    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, _ts: Date.now() });
+    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], _ts: Date.now() });
   }
 });
 
@@ -202,10 +206,10 @@ app.get('/', (c) => {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Go to Top — Продвижение на Wildberries и Ozon | Առաջխաղացում Wildberries-ի և Ozon-ի վրա</title>
-<meta name="description" content="Go to Top — продвижение карточек на Wildberries и Ozon под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
-<meta property="og:title" content="Go to Top — Продвижение на Wildberries и Ozon">
-<meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване.">
+<title>Go to Top — Продвижение на Wildberries | Առաdelays Wildberries-ում</title>
+<meta name="description" content="Go to Top — продвижение карточек на Wildberries под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
+<meta property="og:title" content="Go to Top — Продвижение на Wildberries">
+<meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gototop.win">
 <meta property="og:image" content="https://gototop.win/static/img/logo-gototop.png">
@@ -215,8 +219,8 @@ app.get('/', (c) => {
 <meta property="og:site_name" content="Go to Top">
 <meta property="og:locale" content="ru_RU">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Go to Top — Продвижение на Wildberries">
-<meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване.">
+<meta name="twitter:title" content="Go to Top — Առաdelays Wildberries- delays">
+<meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta name="twitter:image" content="https://gototop.win/static/img/logo-gototop.png">
 <link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -421,6 +425,9 @@ img{max-width:100%;height:auto}
 .tg-float{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:12px;padding:14px 24px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white;border-radius:50px;box-shadow:0 8px 30px rgba(139,92,246,0.4);transition:var(--t);font-weight:600;font-size:0.88rem}
 .tg-float:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 40px rgba(139,92,246,0.5)}
 .tg-float i{font-size:1.2rem}
+.calc-float{position:fixed;bottom:24px;left:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 22px;background:linear-gradient(135deg,#10B981,#059669);color:white;border-radius:50px;box-shadow:0 8px 30px rgba(16,185,129,0.4);transition:var(--t);font-weight:600;font-size:0.88rem;cursor:pointer}
+.calc-float:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 40px rgba(16,185,129,0.5)}
+.calc-float i{font-size:1.1rem}
 .lightbox{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;padding:40px;cursor:pointer}
 .lightbox.show{display:flex}
 .lightbox img{max-width:90%;max-height:90vh;border-radius:var(--r);object-fit:contain}
@@ -647,6 +654,8 @@ img{max-width:100%;height:auto}
   .footer-bottom{flex-direction:column;gap:8px;text-align:center}
   .tg-float span{display:none}
   .tg-float{padding:16px;border-radius:50%}
+  .calc-float span{display:none}
+  .calc-float{padding:16px;border-radius:50%}
   .popup-card .pf-row{grid-template-columns:1fr}
 }
 @media(max-width:480px){
@@ -678,8 +687,8 @@ img{max-width:100%;height:auto}
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
-      <button class="lang-btn active" data-lang="ru" onclick="switchLang('ru')">RU</button>
-      <button class="lang-btn" data-lang="am" onclick="switchLang('am')">AM</button>
+      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')">RU</button>
+      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')">AM</button>
     </div>
     <a href="https://t.me/goo_to_top" target="_blank" class="nav-cta">
       <i class="fab fa-telegram"></i>
@@ -694,7 +703,7 @@ img{max-width:100%;height:auto}
 </header>
 
 <!-- ===== HERO ===== -->
-<section class="hero" id="hero">
+<section class="hero" id="hero" data-section-id="hero">
 <div class="container">
 <div class="hero-grid">
   <div>
@@ -737,13 +746,13 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== TICKER ===== -->
-<div class="ticker">
+<div class="ticker" data-section-id="ticker">
 <div class="ticker-track" id="tickerTrack"></div>
 </div>
 
 
 <!-- ===== WB BANNER ===== -->
-<div class="wb-banner fade-up">
+<div class="wb-banner fade-up" data-section-id="wb-banner">
 <div class="container">
 <div class="wb-banner-inner">
   <div class="wb-banner-card">
@@ -760,7 +769,7 @@ img{max-width:100%;height:auto}
 </div>
 
 <!-- ===== STATS BAR ===== -->
-<div class="stats-bar fade-up">
+<div class="stats-bar fade-up" data-section-id="stats-bar">
 <div class="container">
   <div class="stats-grid">
     <div class="stat-card">
@@ -784,7 +793,7 @@ img{max-width:100%;height:auto}
 </div>
 
 <!-- ===== ABOUT ===== -->
-<section class="section" id="about">
+<section class="section" id="about" data-section-id="about">
 <div class="container">
   <div class="about-grid fade-up">
     <div class="about-img">
@@ -807,7 +816,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== SERVICES ===== -->
-<section class="section" id="services">
+<section class="section" id="services" data-section-id="services">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">Наши услуги</span></div>
@@ -856,7 +865,7 @@ img{max-width:100%;height:auto}
 
 
 <!-- ===== BUYOUT DETAIL ===== -->
-<section class="section">
+<section class="section" data-section-id="buyout-detail">
 <div class="container">
   <div class="buyout-detail fade-up">
     <div class="buyout-detail-header">
@@ -894,7 +903,7 @@ img{max-width:100%;height:auto}
 
 
 <!-- ===== WHY BUYOUTS BY KEYWORDS ===== -->
-<section class="section" id="why-buyouts">
+<section class="section" id="why-buyouts" data-section-id="why-buyouts">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աշխատում.">Почему это работает</span></div>
@@ -922,12 +931,12 @@ img{max-width:100%;height:auto}
     <div class="compare-box">
       <div class="compare-side bad">
         <h4><i class="fas fa-dice"></i> <span data-ru="Reels у блогера" data-am="Reels բլոգերի մոտ">Reels у блогера</span></h4>
-        <div class="price-tag">֏50 000</div>
+        <div class="price-tag">50 000 ֏</div>
         <p data-ru="1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это всегда риск без гарантий результата. Нету просмотров на Reels соответственно нету продаж на товары. Блогер не ключ к продажам. Инвестируйте в рекламу с умом!" data-am="Բլոգերի 1 տեսանյութը ռիսկ է։ Անկախ նրանից՝ այն կհավագի դիտումներ, թե ոչ՝ ոչ ոք չգիտի։ Եթե ոչ, գումարը կորած է։ Դա միշտ ռիսկ է՝ առանց երաշխավորված արդյունքի։ Չկան դիտումներ չկան նաև վաճառքներ։ Բլոգերը դա վաճառքի բանալի չէ։ Ներդրեք գումարը գովազդի մեջ մտածված։">1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это <strong>всегда риск</strong> без гарантий результата. Нету просмотров на Reels — соответственно нету продаж на товары. Блогер не ключ к продажам. <strong>Инвестируйте в рекламу с умом!</strong></p>
       </div>
       <div class="compare-side good">
         <h4><i class="fas fa-chart-line"></i> <span data-ru="25 выкупов по ключевым" data-am="25 ինքնագնում բանալի բառով">25 выкупов по ключевым</span></h4>
-        <div class="price-tag">֏50 000</div>
+        <div class="price-tag">50 000 ֏</div>
         <p data-ru="25 выкупов по целевому запросу — это 100% проверенный способ продвижения. Ваш товар быстро поднимается в ТОП выдачи зависимо от изначальных позиций, закрепляется там и начинает привлекать органический трафик. Больше продаж. Больше гарантированной выручки." data-am="25 ինքնագնում բանալի բառով 100% ապացուցված առաջխաղացման մեթոդ է: Ձեր ապրանքը արագորեն բարձրանում է որոնման արդյունքների առաջատար դիրքեր, հաստատվում է և սկսում է գրացել օրգանիգ դիտումներ: Շատ դիտում ավելի շատ վաճառք: Երաշխավորված ավելի շատ եկամուտ: ">25 выкупов по целевому запросу — это <strong>100% проверенный способ</strong> продвижения. Ваш товар быстро поднимается в ТОП выдачи зависимо от изначальных позиций, закрепляется там и начинает привлекать <strong>органический трафик</strong>. Больше продаж. Больше гарантированной выручки.</p>
       </div>
     </div>
@@ -941,7 +950,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== WB OFFICIAL ===== -->
-<section class="section section-dark" id="wb-official">
+<section class="section section-dark" id="wb-official" data-section-id="wb-official">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-gavel"></i> <span data-ru="Официально" data-am="Պաշտոնապես">Официально</span></div>
@@ -968,7 +977,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== CALCULATOR ===== -->
-<section class="section section-dark" id="calculator">
+<section class="section section-dark" id="calculator" data-section-id="calculator">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</span></div>
@@ -989,16 +998,16 @@ img{max-width:100%;height:auto}
     <div class="calc-group active" id="cg-buyouts">
       <div class="calc-row" data-price="buyout" id="buyoutRow">
         <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Գնում + ստացում ՊՎԶ-ից">Выкуп + забор из ПВЗ</div>
-        <div class="calc-price" id="buyoutPriceLabel">֏2 000</div>
+        <div class="calc-price" id="buyoutPriceLabel">2 000 ֏</div>
         <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><input type="number" id="buyoutQty" value="0" min="0" max="999" onchange="onBuyoutInput()" oninput="onBuyoutInput()"><button onclick="ccBuyout(1)">+</button></div>
       </div>
       <div class="buyout-tier-info">
         <strong data-ru="Чем больше выкупов — тем дешевле:" data-am="Որքան շատ գնումներ — այնքան էժան:">Чем больше выкупов — тем дешевле:</strong><br>
-        <span data-ru="1-20 шт → ֏2 000 | 21-40 шт → ֏1 700 | 41-60 шт → ֏1 500 | 60+ шт → ֏1 250" data-am="1-20 հատ → ֏2 000 | 21-40 հատ → ֏1 700 | 41-60 հատ → ֏1 500 | 60+ հատ → ֏1 250">1-20 шт → ֏2 000 &nbsp;|&nbsp; 21-40 шт → ֏1 700 &nbsp;|&nbsp; 41-60 шт → ֏1 500 &nbsp;|&nbsp; 60+ шт → ֏1 250</span>
+        <span data-ru="1-20 шт → 2 000 ֏ | 21-40 шт → 1 700 ֏ | 41-60 шт → 1 500 ֏ | 60+ шт → 1 250 ֏" data-am="1-20 հատ → 2 000 ֏ | 21-40 հատ → 1 700 ֏ | 41-60 հատ → 1 500 ֏ | 60+ հատ → 1 250 ֏">1-20 шт → ֏2 000 &nbsp;|&nbsp; 21-40 шт → ֏1 700 &nbsp;|&nbsp; 41-60 шт → ֏1 500 &nbsp;|&nbsp; 60+ шт → ֏1 250</span>
       </div>
       <div class="calc-row" data-price="2500">
         <div class="calc-label" data-ru="Выкуп КГТ + забор из ПВЗ" data-am="Ծանրաքաշ ապրանքի գնում + ստացում ՊՎԶ-ից">Выкуп КГТ + забор из ПВЗ</div>
-        <div class="calc-price">֏2 500</div>
+        <div class="calc-price">2 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
@@ -1007,27 +1016,27 @@ img{max-width:100%;height:auto}
     <div class="calc-group" id="cg-reviews">
       <div class="calc-row" data-price="300">
         <div class="calc-label" data-ru="Оценка" data-am="Գնահատական">Оценка</div>
-        <div class="calc-price">֏300</div>
+        <div class="calc-price">300 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="500">
         <div class="calc-label" data-ru="Оценка + отзыв" data-am="Գնահատական + կարծիք">Оценка + отзыв</div>
-        <div class="calc-price">֏500</div>
+        <div class="calc-price">500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="500">
         <div class="calc-label" data-ru="Вопрос к товару" data-am="Հարց ապրանքի վերաբերյալ">Вопрос к товару</div>
-        <div class="calc-price">֏500</div>
+        <div class="calc-price">500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="250">
         <div class="calc-label" data-ru="Написание текста отзыва" data-am="Կարծիքի տեքստի գրում">Написание текста отзыва</div>
-        <div class="calc-price">֏250</div>
+        <div class="calc-price">250 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="100">
         <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Բրենդի / էջի բաժանորդագրություն">Подписка на бренд / страницу</div>
-        <div class="calc-price">֏100</div>
+        <div class="calc-price">100 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
@@ -1036,32 +1045,32 @@ img{max-width:100%;height:auto}
     <div class="calc-group" id="cg-photo">
       <div class="calc-row" data-price="3500">
         <div class="calc-label" data-ru="Фотосессия в гардеробной WB (жен. модель)" data-am="Լուսանկարահանում WB հագուստապահարանում (կին մոդել)">Фотосессия в гардеробной WB (жен. модель)</div>
-        <div class="calc-price">֏3 500</div>
+        <div class="calc-price">3 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="4500">
         <div class="calc-label" data-ru="Фотосессия в гардеробной WB (муж. модель)" data-am="Լուսանկարահանում WB հագուստապահարանում (տղամարդ մոդել)">Фотосессия в гардеробной WB (муж. модель)</div>
-        <div class="calc-price">֏4 500</div>
+        <div class="calc-price">4 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
         <div class="calc-label" data-ru="Предметная фотосъёмка (3 фото)" data-am="Առարկայական լուսանկարահանում (3 լուսանկար)">Предметная фотосъёмка (3 фото)</div>
-        <div class="calc-price">֏2 500</div>
+        <div class="calc-price">2 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="5000">
         <div class="calc-label" data-ru="Предметная съёмка (крупное / техника, 3 фото)" data-am="Առարկայական լուսանկարահանում (խոշոր / տեխնիկա, 3 լուս.)">Предметная съёмка (крупное / техника, 3 фото)</div>
-        <div class="calc-price">֏5 000</div>
+        <div class="calc-price">5 000 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
         <div class="calc-label" data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">Ребёнок модель (до 14 лет)</div>
-        <div class="calc-price">֏2 500</div>
+        <div class="calc-price">2 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="7000">
         <div class="calc-label" data-ru="Видеообзор товара" data-am="Ապրանքի վիդեոհոլովակ">Видеообзор товара</div>
-        <div class="calc-price">֏7 000</div>
+        <div class="calc-price">7 000 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
@@ -1070,17 +1079,17 @@ img{max-width:100%;height:auto}
     <div class="calc-group" id="cg-ff">
       <div class="calc-row" data-price="100">
         <div class="calc-label" data-ru="Замена штрихкода" data-am="Շտրիխկոդի փոխարինում">Замена штрихкода</div>
-        <div class="calc-price">֏100</div>
+        <div class="calc-price">100 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="200">
         <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Վերափաթեթավորում (մեր փաթեթ)">Переупаковка (наша)</div>
-        <div class="calc-price">֏200</div>
+        <div class="calc-price">200 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="150">
         <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Վերափաթեթավորում (հաճախորդի փաթեթ)">Переупаковка (клиента)</div>
-        <div class="calc-price">֏150</div>
+        <div class="calc-price">150 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
@@ -1089,12 +1098,12 @@ img{max-width:100%;height:auto}
     <div class="calc-group" id="cg-logistics">
       <div class="calc-row" data-price="2000">
         <div class="calc-label" data-ru="Доставка на склад WB (1 коробка 60х40х40)" data-am="Առաքում WB պահեստ (1 տուփ 60x40x40)">Доставка на склад WB (1 коробка 60х40х40)</div>
-        <div class="calc-price">֏2 000</div>
+        <div class="calc-price">2 000 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
         <div class="calc-label" data-ru="Доставка до вашего склада (1 коробка 60х40х40)" data-am="Առաքում ձեր պահեստ (1 տուփ 60x40x40)">Доставка до вашего склада (1 коробка 60х40х40)</div>
-        <div class="calc-price">֏2 500</div>
+        <div class="calc-price">2 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
@@ -1103,28 +1112,28 @@ img{max-width:100%;height:auto}
     <div class="calc-group" id="cg-other">
       <div class="calc-row" data-price="1500">
         <div class="calc-label" data-ru="Глажка одежды (одиночная вещь)" data-am="Հագուստի արդուկում (մեկ իր)">Глажка одежды (одиночная вещь)</div>
-        <div class="calc-price">֏1 500</div>
+        <div class="calc-price">1 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="2500">
         <div class="calc-label" data-ru="Глажка одежды (верхняя одежда)" data-am="Հագուստի արդուկում (վերնահագուստ)">Глажка одежды (верхняя одежда)</div>
-        <div class="calc-price">֏2 500</div>
+        <div class="calc-price">2 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="1500">
         <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Վերցնում ՊՎԶ-ից">Забор из ПВЗ для съёмки</div>
-        <div class="calc-price">֏1 500</div>
+        <div class="calc-price">1 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
       <div class="calc-row" data-price="1500">
         <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Վերցնում ՊՎԶ-ից">Возврат в ПВЗ после съёмки</div>
-        <div class="calc-price">֏1 500</div>
+        <div class="calc-price">1 500 ֏</div>
         <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
       </div>
     </div>
     <div class="calc-total">
       <div class="calc-total-label" data-ru="Итого:" data-am="Ընդամենը:">Итого:</div>
-      <div class="calc-total-value" id="calcTotal">֏0</div>
+      <div class="calc-total-value" id="calcTotal">0 ֏</div>
     </div>
     <!-- Referral code field -->
     <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
@@ -1148,7 +1157,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== PROCESS ===== -->
-<section class="section" id="process">
+<section class="section" id="process" data-section-id="process">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как мы работаем" data-am="Ինչպես ենք աշխատում">Как мы работаем</span></div>
@@ -1168,7 +1177,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== WAREHOUSE ===== -->
-<section class="section section-dark" id="warehouse">
+<section class="section section-dark" id="warehouse" data-section-id="warehouse">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-warehouse"></i> <span data-ru="Наш склад" data-am="Մեր պահեստը">Наш склад</span></div>
@@ -1193,7 +1202,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== GUARANTEE ===== -->
-<section class="section" id="guarantee">
+<section class="section" id="guarantee" data-section-id="guarantee">
 <div class="container">
     <div class="guarantee-card fade-up">
     <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
@@ -1219,7 +1228,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== COMPARISON ===== -->
-<section class="section section-dark">
+<section class="section section-dark" data-section-id="comparison">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-balance-scale"></i> <span data-ru="Сравнение" data-am="Համեմատություն">Сравнение</span></div>
@@ -1248,7 +1257,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== IMPORTANT NOTES ===== -->
-<section class="section">
+<section class="section" data-section-id="important">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="Важно знать" data-am="Կարևոր է իմանալ">Важно знать</span></div>
@@ -1278,7 +1287,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== FAQ ===== -->
-<section class="section section-dark" id="faq">
+<section class="section section-dark" id="faq" data-section-id="faq">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-question-circle"></i> <span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span></div>
@@ -1321,7 +1330,7 @@ img{max-width:100%;height:auto}
 </section>
 
 <!-- ===== CONTACT FORM ===== -->
-<section class="section" id="contact">
+<section class="section" id="contact" data-section-id="contact">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-paper-plane"></i> <span data-ru="Связаться с нами" data-am="Կապվել մեզ">Связаться с нами</span></div>
@@ -1402,6 +1411,12 @@ img{max-width:100%;height:auto}
   <span data-ru="Написать нам" data-am="Գրել մեզ">Написать нам</span>
 </a>
 
+<!-- FLOATING CALC BUTTON -->
+<a href="#calculator" class="calc-float" id="calcFloatBtn">
+  <i class="fas fa-calculator"></i>
+  <span data-ru="Калькулятор" data-am="Հաշվիչ">Հաշվիչ</span>
+</a>
+
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="closeLightbox()">
   <img id="lightboxImg" src="" alt="">
@@ -1446,7 +1461,7 @@ img{max-width:100%;height:auto}
 
 <script>
 /* ===== LANGUAGE ===== */
-let lang = 'ru';
+let lang = localStorage.getItem('gtt_lang') || 'am';
 const AM = {
   "Услуги":"Ծառայություններ",
   "Калькулятор":"Հաշվիչ",
@@ -1462,6 +1477,7 @@ const AM = {
 };
 function switchLang(l) {
   lang = l;
+  localStorage.setItem('gtt_lang', l);
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
   document.querySelectorAll('[data-' + l + ']').forEach(el => {
     const t = el.getAttribute('data-' + l);
@@ -1469,6 +1485,11 @@ function switchLang(l) {
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
 }
+
+/* ===== INIT: apply default language on load ===== */
+(function initLang() {
+  switchLang(lang);
+})();
 
 /* ===== HEADER SCROLL ===== */
 window.addEventListener('scroll', () => {
@@ -1567,7 +1588,7 @@ function ccBuyout(delta) {
   if (v < 0) v = 0; if (v > 999) v = 999;
   inp.value = v;
   const price = getBuyoutPrice(v);
-  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? '֏' + price.toLocaleString('ru-RU') + '/шт' : '֏2 000';
+  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? formatNum(price) + ' ֏/шт' : '2 000 ֏';
   recalc();
 }
 function onBuyoutInput() {
@@ -1576,7 +1597,7 @@ function onBuyoutInput() {
   if (isNaN(v) || v < 0) v = 0; if (v > 999) v = 999;
   inp.value = v;
   const price = getBuyoutPrice(v);
-  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? '֏' + price.toLocaleString('ru-RU') + '/шт' : '֏2 000';
+  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? formatNum(price) + ' ֏/шт' : '2 000 ֏';
   recalc();
 }
 function cc(btn, delta) {
@@ -1590,15 +1611,15 @@ function cc(btn, delta) {
 function recalc() {
   let total = 0; const items = [];
   const buyoutQty = parseInt(document.getElementById('buyoutQty').value || 0);
-  if (buyoutQty > 0) { total += getBuyoutTotal(buyoutQty); items.push('Выкуп + забор: ' + buyoutQty + ' шт (' + getBuyoutPrice(buyoutQty) + '֏/шт)'); }
+  if (buyoutQty > 0) { total += getBuyoutTotal(buyoutQty); items.push('Выкуп + забор: ' + buyoutQty + ' шт (' + getBuyoutPrice(buyoutQty) + ' ֏/шт)'); }
   document.querySelectorAll('.calc-row:not(#buyoutRow)').forEach(row => {
     const price = parseInt(row.dataset.price);
     const inp = row.querySelector('.calc-input input');
     const qty = parseInt(inp ? inp.value : 0);
     if (!isNaN(price) && qty > 0) { total += price * qty; items.push(row.querySelector('.calc-label').textContent + ': ' + qty); }
   });
-  document.getElementById('calcTotal').textContent = '֏' + total.toLocaleString('ru-RU');
-  const msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ֏' + total.toLocaleString('ru-RU');
+  document.getElementById('calcTotal').textContent = total.toLocaleString('ru-RU') + ' ֏';
+  const msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ' + total.toLocaleString('ru-RU') + ' ֏';
   document.getElementById('calcTgBtn').href = 'https://t.me/goo_to_top?text=' + encodeURIComponent(msg);
 }
 
@@ -1814,7 +1835,7 @@ function ccTiered(svcId, delta) {
   try {
     var tiers = JSON.parse(row.getAttribute('data-tiers'));
     var price = getTierPrice(tiers, v);
-    document.getElementById('price_' + svcId).textContent = v > 0 ? '֏' + formatNum(price) + '/шт' : '֏' + formatNum(tiers[0].price);
+    document.getElementById('price_' + svcId).textContent = v > 0 ? formatNum(price) + ' ֏/шт' : formatNum(tiers[0].price) + ' ֏';
   } catch(e) {}
   recalcDynamic();
 }
@@ -1840,7 +1861,7 @@ function recalcDynamic() {
         var label = row.querySelector('.calc-label');
         var labelText = label ? label.textContent : '';
         var pcsWord = lang === 'am' ? 'հատ' : 'шт';
-        items.push(labelText + ': ' + qty + ' ' + pcsWord + ' (' + formatNum(getTierPrice(tiers, qty)) + '֏/' + pcsWord + ')');
+        items.push(labelText + ': ' + qty + ' ' + pcsWord + ' (' + formatNum(getTierPrice(tiers, qty)) + ' ֏/' + pcsWord + ')');
       } catch(e) {}
     }
   });
@@ -1861,19 +1882,19 @@ function recalcDynamic() {
     discountAmount = Math.round(total * _refDiscount / 100);
     total = total - discountAmount;
   }
-  document.getElementById('calcTotal').textContent = '֏' + formatNum(total);
+  document.getElementById('calcTotal').textContent = formatNum(total) + ' ֏';
   var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || 'https://t.me/goo_to_top';
   var greeting = lang === 'am' ? 'Ողջույն! Ուզում եմ պատվիրել:' : 'Здравствуйте! Хочу заказать:';
   var totalLabel = lang === 'am' ? 'Ընդամենը:' : 'Итого:';
   var msg = greeting + '\\n' + items.join('\\n');
   if (discountAmount > 0) {
     var refCode = document.getElementById('refCodeInput') ? document.getElementById('refCodeInput').value : '';
-    msg += '\\n\\n' + (lang === 'am' ? 'Պրոմոկոդ: ' : 'Промокод: ') + refCode + ' (-' + _refDiscount + '%, -֏' + formatNum(discountAmount) + ')';
+    msg += '\\n\\n' + (lang === 'am' ? 'Պրոմոկոդ: ' : 'Промокод: ') + refCode + ' (-' + _refDiscount + '%, -' + formatNum(discountAmount) + ' ֏)';
   }
   if (typeof _refFreeReviews !== 'undefined' && _refFreeReviews > 0) {
     msg += '\\n' + (lang === 'am' ? 'Անվճար կարծիքներ: ' : 'Бесплатных отзывов: ') + _refFreeReviews;
   }
-  msg += '\\n\\n' + totalLabel + ' ֏' + formatNum(total);
+  msg += '\\n\\n' + totalLabel + ' ' + formatNum(total) + ' ֏';
   document.getElementById('calcTgBtn').href = tgUrl + '?text=' + encodeURIComponent(msg);
 }
 
@@ -2010,18 +2031,18 @@ switchLang = function(l) {
               var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;');
               gh += '<div class="calc-row" data-price="tiered" data-tiers=\\''+tiersAttr+'\\' id="row_'+svcId+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang==='am' ? svc.name_am : svc.name_ru) + '</div>';
-              gh += '<div class="calc-price" id="price_'+svcId+'">֏'+formatNum(tiers[0].price)+'</div>';
+              gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ֏</div>';
               gh += '<div class="calc-input"><button onclick="ccTiered(\\''+svcId+'\\',-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(\\''+svcId+'\\')"><button onclick="ccTiered(\\''+svcId+'\\',1)">+</button></div>';
               gh += '</div>';
               gh += '<div class="buyout-tier-info"><strong>'+( lang==='am' ? 'Որքան շատ — այնքան էժան:' : 'Чем больше — тем дешевле:')+'</strong><br>';
               gh += '<span>' + tiers.map(function(t) { 
                 var range = t.max >= 999 ? t.min+'+' : t.min+'-'+t.max;
-                return range + ' → ֏' + formatNum(t.price); 
+                return range + ' → ' + formatNum(t.price) + ' ֏'; 
               }).join(' &nbsp;|&nbsp; ') + '</span></div>';
             } else {
               gh += '<div class="calc-row" data-price="'+svc.price+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">'+(lang==='am' ? svc.name_am : svc.name_ru)+'</div>';
-              gh += '<div class="calc-price">֏'+formatNum(svc.price)+'</div>';
+              gh += '<div class="calc-price">'+formatNum(svc.price)+' ֏</div>';
               gh += '<div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalcDynamic()" oninput="recalcDynamic()"><button onclick="cc(this,1)">+</button></div>';
               gh += '</div>';
             }
@@ -2127,6 +2148,37 @@ switchLang = function(l) {
           div.innerHTML = code;
           document.body.appendChild(div);
         });
+      }
+    }
+    
+    // ===== 5. REORDER SECTIONS =====
+    if (db.sectionOrder && db.sectionOrder.length > 0) {
+      var orderMap = {};
+      db.sectionOrder.forEach(function(s) { orderMap[s.section_id] = s; });
+      var allSections = document.querySelectorAll('[data-section-id]');
+      var parent = allSections.length > 0 ? allSections[0].parentNode : null;
+      if (parent) {
+        var sectionArr = Array.from(allSections);
+        sectionArr.sort(function(a, b) {
+          var oa = orderMap[a.getAttribute('data-section-id')];
+          var ob = orderMap[b.getAttribute('data-section-id')];
+          var sa = oa ? oa.sort_order : 999;
+          var sb = ob ? ob.sort_order : 999;
+          return sa - sb;
+        });
+        // Get footer and floating elements as anchor
+        var footer = document.querySelector('footer');
+        sectionArr.forEach(function(section) {
+          var sid = section.getAttribute('data-section-id');
+          var info = orderMap[sid];
+          if (info && !info.is_visible) {
+            section.style.display = 'none';
+          }
+          if (footer) {
+            parent.insertBefore(section, footer);
+          }
+        });
+        console.log('[DB] Sections reordered:', db.sectionOrder.length);
       }
     }
     
