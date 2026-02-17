@@ -1626,7 +1626,8 @@ document.getElementById('popupForm').addEventListener('submit', function(e) {
     body: JSON.stringify({buyouts:buyouts, reviews:reviews, contact:contact, lang:lang, ts: new Date().toISOString()})
   }).catch(function(){});
   var msg = 'Заявка с сайта Go to Top:\\n\\nВыкупов: ' + buyouts + '\\nОтзывов: ' + reviews + '\\nКонтакт: ' + contact;
-  window.open('https://t.me/suport_admin_2?text=' + encodeURIComponent(msg), '_blank');
+  var popupTgUrl = window._tgPopupUrl || 'https://t.me/suport_admin_2';
+  window.open(popupTgUrl + '?text=' + encodeURIComponent(msg), '_blank');
   document.getElementById('popupFormWrap').style.display = 'none';
   document.getElementById('popupSuccess').style.display = 'block';
   setTimeout(hidePopup, 3000);
@@ -1647,7 +1648,8 @@ function submitForm(e) {
   msg += 'Услуга: ' + serviceText + '\\n';
   if (message) msg += 'Комментарий: ' + message;
   fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, ts: new Date().toISOString()}) }).catch(function(){});
-  window.open('https://t.me/suport_admin_2?text=' + encodeURIComponent(msg), '_blank');
+  var tgUrl = window._tgContactUrl || 'https://t.me/suport_admin_2';
+  window.open(tgUrl + '?text=' + encodeURIComponent(msg), '_blank');
   var btn = e.target.querySelector('button[type=submit]');
   var orig = btn.innerHTML;
   btn.innerHTML = '<i class="fas fa-check"></i> Отправлено!';
@@ -1905,9 +1907,75 @@ switchLang = function(l) {
     // ===== 3. APPLY TELEGRAM LINKS DYNAMICALLY =====
     if (hasTg) {
       window._tgData = db.telegram;
-      // Update all telegram links on the page based on telegram_messages data
-      // The calc order button is handled in recalcDynamic()
-      console.log('[DB] Telegram data loaded:', Object.keys(db.telegram).length, 'messages');
+      
+      // Build a lookup: button_label_ru -> telegram message data
+      var tgByLabel = {};
+      for (var tgKey in db.telegram) {
+        var tgMsg = db.telegram[tgKey];
+        if (tgMsg && tgMsg.button_label_ru) {
+          tgByLabel[tgMsg.button_label_ru.trim()] = tgMsg;
+        }
+      }
+      
+      // Find all <a> tags pointing to t.me/ and update their href with message template
+      document.querySelectorAll('a[href*="t.me/"]').forEach(function(a) {
+        // Skip calculator order button (handled separately in recalcDynamic)
+        if (a.id === 'calcTgBtn') return;
+        
+        // Find button text: look for a span with data-ru inside the link
+        var spanWithDataRu = a.querySelector('span[data-ru]');
+        var buttonText = spanWithDataRu ? spanWithDataRu.getAttribute('data-ru') : null;
+        
+        // If no span, check if the <a> itself has data-ru (for text links)
+        if (!buttonText && a.hasAttribute('data-ru')) {
+          buttonText = a.getAttribute('data-ru');
+        }
+        
+        // If still no text, try the <h4> inside (for contact cards)
+        if (!buttonText) {
+          var h4 = a.querySelector('h4[data-ru]');
+          if (h4) buttonText = h4.getAttribute('data-ru');
+        }
+        
+        if (!buttonText) return;
+        buttonText = buttonText.trim();
+        
+        // Look up this button in telegram_messages
+        var tgMsg = tgByLabel[buttonText];
+        if (!tgMsg) return;
+        
+        // Update the href: use telegram_url + ?text=message_template
+        var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
+        var tgUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+        
+        if (msgTemplate) {
+          a.href = tgUrl + '?text=' + encodeURIComponent(msgTemplate);
+        } else {
+          a.href = tgUrl;
+        }
+        
+        // Also update button label text if it changed
+        if (spanWithDataRu) {
+          var newLabelRu = tgMsg.button_label_ru;
+          var newLabelAm = tgMsg.button_label_am;
+          if (newLabelRu) spanWithDataRu.setAttribute('data-ru', newLabelRu);
+          if (newLabelAm) spanWithDataRu.setAttribute('data-am', newLabelAm);
+          var currentLangText = spanWithDataRu.getAttribute('data-' + lang);
+          if (currentLangText && spanWithDataRu.tagName !== 'INPUT') spanWithDataRu.textContent = currentLangText;
+        }
+      });
+      
+      // Also update the contact form submit handler & popup form to use DB telegram URLs
+      if (db.telegram.contact_form_msg) {
+        window._tgContactUrl = db.telegram.contact_form_msg.telegram_url || 'https://t.me/suport_admin_2';
+        window._tgContactTemplate = db.telegram.contact_form_msg.message_template_ru || '';
+      }
+      if (db.telegram.popup_form_msg) {
+        window._tgPopupUrl = db.telegram.popup_form_msg.telegram_url || 'https://t.me/suport_admin_2';
+        window._tgPopupTemplate = db.telegram.popup_form_msg.message_template_ru || '';
+      }
+      
+      console.log('[DB] Telegram data loaded and applied:', Object.keys(db.telegram).length, 'messages');
     }
     
     // ===== 4. INJECT CUSTOM SCRIPTS =====

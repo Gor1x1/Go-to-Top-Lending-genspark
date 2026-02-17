@@ -309,13 +309,14 @@ function renderCalculator() {
         h += '<div style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
           '<div style="font-size:0.8rem;font-weight:600;color:#a78bfa;margin-bottom:8px"><i class="fas fa-layer-group" style="margin-right:6px"></i>Тарифная шкала (price tiers)</div>';
         for (var ti = 0; ti < tiers.length; ti++) {
-          h += '<div style="display:grid;grid-template-columns:auto 80px auto 80px auto 100px;gap:8px;align-items:center;margin-bottom:6px">' +
+          h += '<div style="display:grid;grid-template-columns:auto 80px auto 80px auto 100px auto;gap:8px;align-items:center;margin-bottom:6px">' +
             '<span style="font-size:0.8rem;color:#94a3b8">от</span>' +
             '<input class="input" type="number" value="' + tiers[ti].min + '" style="padding:6px 8px;font-size:0.85rem" id="tier_min_' + svc.id + '_' + ti + '">' +
             '<span style="font-size:0.8rem;color:#94a3b8">до</span>' +
             '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem" id="tier_max_' + svc.id + '_' + ti + '">' +
             '<span style="font-size:0.8rem;color:#94a3b8">= ֏</span>' +
             '<input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem" id="tier_price_' + svc.id + '_' + ti + '">' +
+            '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.7rem" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-trash"></i></button>' +
           '</div>';
         }
         h += '<div style="margin-top:8px;display:flex;gap:8px">' +
@@ -369,6 +370,20 @@ async function addTier(svcId) {
   tiers.push({ min: lastMax + 1, max: lastMax + 20, price: 1000 });
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers) }) });
   toast('Строка добавлена');
+  await loadData(); render();
+}
+
+async function deleteTier(svcId, tierIndex, totalTiers) {
+  if (totalTiers <= 1) { toast('Нельзя удалить последний тариф. Должна остаться хотя бы 1 строка.', 'error'); return; }
+  if (!confirm('Удалить эту строку тарифа?')) return;
+  var svc = data.calcServices.find(s => s.id === svcId);
+  if (!svc) return;
+  var tiers = [];
+  try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; }
+  if (tierIndex < 0 || tierIndex >= tiers.length) return;
+  tiers.splice(tierIndex, 1);
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
+  toast('Строка тарифа удалена');
   await loadData(); render();
 }
 
