@@ -1,0 +1,260 @@
+/**
+ * Admin API routes — full CRUD for all admin panel sections
+ */
+import { Hono } from 'hono'
+import { verifyToken, hashPassword, verifyPassword, createToken, initDefaultAdmin } from '../lib/auth'
+import { initDatabase } from '../lib/db'
+
+type Bindings = { DB: D1Database }
+const api = new Hono<{ Bindings: Bindings }>()
+
+// ===== AUTH MIDDLEWARE =====
+async function authMiddleware(c: any, next: () => Promise<void>) {
+  const authHeader = c.req.header('Authorization');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+  const token = authHeader.replace('Bearer ', '');
+  const payload = await verifyToken(token);
+  if (!payload) {
+    return c.json({ error: 'Invalid or expired token' }, 401);
+  }
+  c.set('user', payload);
+  await next();
+}
+
+// ===== AUTH =====
+api.post('/login', async (c) => {
+  const { username, password } = await c.req.json();
+  const db = c.env.DB;
+  
+  // Init DB and default admin on first request
+  await initDatabase(db);
+  await initDefaultAdmin(db);
+  
+  const user = await db.prepare('SELECT * FROM users WHERE username = ?').bind(username).first();
+  if (!user) return c.json({ error: 'Invalid credentials' }, 401);
+  
+  const valid = await verifyPassword(password, user.password_hash as string);
+  if (!valid) return c.json({ error: 'Invalid credentials' }, 401);
+  
+  const token = await createToken(user.id as number, user.role as string);
+  return c.json({ token, user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name } });
+});
+
+api.post('/change-password', authMiddleware, async (c) => {
+  const { current_password, new_password } = await c.req.json();
+  const db = c.env.DB;
+  const userId = c.get('user').sub;
+  
+  const user = await db.prepare('SELECT * FROM users WHERE id = ?').bind(userId).first();
+  if (!user) return c.json({ error: 'User not found' }, 404);
+  
+  const valid = await verifyPassword(current_password, user.password_hash as string);
+  if (!valid) return c.json({ error: 'Wrong current password' }, 400);
+  
+  const newHash = await hashPassword(new_password);
+  await db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(newHash, userId).run();
+  return c.json({ success: true });
+});
+
+// ===== INIT DATABASE =====
+api.post('/init-db', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await initDatabase(db);
+  return c.json({ success: true, message: 'Database initialized' });
+});
+
+// ===== SITE CONTENT =====
+api.get('/content', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM site_content ORDER BY sort_order').all();
+  return c.json(res.results);
+});
+
+api.get('/content/:key', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const key = c.req.param('key');
+  const row = await db.prepare('SELECT * FROM site_content WHERE section_key = ?').bind(key).first();
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  return c.json(row);
+});
+
+api.put('/content/:key', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const key = c.req.param('key');
+  const { content_json, section_name } = await c.req.json();
+  
+  const existing = await db.prepare('SELECT id FROM site_content WHERE section_key = ?').bind(key).first();
+  if (existing) {
+    await db.prepare('UPDATE site_content SET content_json = ?, section_name = COALESCE(?, section_name), updated_at = CURRENT_TIMESTAMP WHERE section_key = ?')
+      .bind(JSON.stringify(content_json), section_name || null, key).run();
+  } else {
+    await db.prepare('INSERT INTO site_content (section_key, section_name, content_json) VALUES (?, ?, ?)')
+      .bind(key, section_name || key, JSON.stringify(content_json)).run();
+  }
+  return c.json({ success: true });
+});
+
+// ===== CALCULATOR TABS =====
+api.get('/calc-tabs', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM calculator_tabs ORDER BY sort_order').all();
+  return c.json(res.results);
+});
+
+api.post('/calc-tabs', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { tab_key, name_ru, name_am, sort_order } = await c.req.json();
+  await db.prepare('INSERT INTO calculator_tabs (tab_key, name_ru, name_am, sort_order) VALUES (?, ?, ?, ?)')
+    .bind(tab_key, name_ru, name_am, sort_order || 0).run();
+  return c.json({ success: true });
+});
+
+api.put('/calc-tabs/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { name_ru, name_am, sort_order, is_active } = await c.req.json();
+  await db.prepare('UPDATE calculator_tabs SET name_ru=?, name_am=?, sort_order=?, is_active=? WHERE id=?')
+    .bind(name_ru, name_am, sort_order, is_active, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/calc-tabs/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM calculator_services WHERE tab_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM calculator_tabs WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== CALCULATOR SERVICES =====
+api.get('/calc-services', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare(`
+    SELECT cs.*, ct.tab_key, ct.name_ru as tab_name_ru 
+    FROM calculator_services cs 
+    JOIN calculator_tabs ct ON cs.tab_id = ct.id 
+    ORDER BY cs.tab_id, cs.sort_order
+  `).all();
+  return c.json(res.results);
+});
+
+api.post('/calc-services', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { tab_id, name_ru, name_am, price, price_type, price_tiers_json, tier_desc_ru, tier_desc_am, sort_order } = await c.req.json();
+  await db.prepare(`INSERT INTO calculator_services (tab_id, name_ru, name_am, price, price_type, price_tiers_json, tier_desc_ru, tier_desc_am, sort_order) VALUES (?,?,?,?,?,?,?,?,?)`)
+    .bind(tab_id, name_ru, name_am, price, price_type || 'fixed', price_tiers_json || null, tier_desc_ru || null, tier_desc_am || null, sort_order || 0).run();
+  return c.json({ success: true });
+});
+
+api.put('/calc-services/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { tab_id, name_ru, name_am, price, price_type, price_tiers_json, tier_desc_ru, tier_desc_am, sort_order, is_active } = await c.req.json();
+  await db.prepare(`UPDATE calculator_services SET tab_id=?, name_ru=?, name_am=?, price=?, price_type=?, price_tiers_json=?, tier_desc_ru=?, tier_desc_am=?, sort_order=?, is_active=? WHERE id=?`)
+    .bind(tab_id, name_ru, name_am, price, price_type, price_tiers_json || null, tier_desc_ru || null, tier_desc_am || null, sort_order, is_active, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/calc-services/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM calculator_services WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== TELEGRAM MESSAGES =====
+api.get('/telegram', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM telegram_messages ORDER BY sort_order, id').all();
+  return c.json(res.results);
+});
+
+api.post('/telegram', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { button_key, button_label_ru, button_label_am, telegram_url, message_template_ru, message_template_am, description } = await c.req.json();
+  await db.prepare(`INSERT INTO telegram_messages (button_key, button_label_ru, button_label_am, telegram_url, message_template_ru, message_template_am, description) VALUES (?,?,?,?,?,?,?)`)
+    .bind(button_key, button_label_ru, button_label_am, telegram_url, message_template_ru, message_template_am, description || '').run();
+  return c.json({ success: true });
+});
+
+api.put('/telegram/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { button_label_ru, button_label_am, telegram_url, message_template_ru, message_template_am, description, is_active } = await c.req.json();
+  await db.prepare(`UPDATE telegram_messages SET button_label_ru=?, button_label_am=?, telegram_url=?, message_template_ru=?, message_template_am=?, description=?, is_active=? WHERE id=?`)
+    .bind(button_label_ru, button_label_am, telegram_url, message_template_ru, message_template_am, description, is_active, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/telegram/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM telegram_messages WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== CUSTOM SCRIPTS =====
+api.get('/scripts', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM custom_scripts ORDER BY sort_order').all();
+  return c.json(res.results);
+});
+
+api.post('/scripts', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { name, description, script_type, placement, code } = await c.req.json();
+  await db.prepare('INSERT INTO custom_scripts (name, description, script_type, placement, code) VALUES (?,?,?,?,?)')
+    .bind(name, description || '', script_type || 'js', placement || 'head', code).run();
+  return c.json({ success: true });
+});
+
+api.put('/scripts/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { name, description, script_type, placement, code, is_active } = await c.req.json();
+  await db.prepare('UPDATE custom_scripts SET name=?, description=?, script_type=?, placement=?, code=?, is_active=? WHERE id=?')
+    .bind(name, description, script_type, placement, code, is_active, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/scripts/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM custom_scripts WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== SEED DATA =====
+api.post('/seed', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { data } = await c.req.json();
+  // data is an array of SQL statements or structured data
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      if (item.type === 'content') {
+        await db.prepare('INSERT OR REPLACE INTO site_content (section_key, section_name, content_json, sort_order) VALUES (?,?,?,?)')
+          .bind(item.section_key, item.section_name, JSON.stringify(item.content_json), item.sort_order || 0).run();
+      }
+    }
+  }
+  return c.json({ success: true });
+});
+
+// ===== DASHBOARD STATS =====
+api.get('/stats', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const content = await db.prepare('SELECT COUNT(*) as count FROM site_content').first();
+  const services = await db.prepare('SELECT COUNT(*) as count FROM calculator_services').first();
+  const messages = await db.prepare('SELECT COUNT(*) as count FROM telegram_messages').first();
+  const scripts = await db.prepare('SELECT COUNT(*) as count FROM custom_scripts').first();
+  return c.json({
+    content_sections: content?.count || 0,
+    calculator_services: services?.count || 0,
+    telegram_buttons: messages?.count || 0,
+    custom_scripts: scripts?.count || 0
+  });
+});
+
+export default api
