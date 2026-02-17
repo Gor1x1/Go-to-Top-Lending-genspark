@@ -15,11 +15,27 @@ app.get('/api/site-data', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     
-    // Load all content sections
+    // Load all content sections from DB
     const contentRes = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
-    const content: Record<string, any[]> = {};
+    const dbContent: Record<string, any[]> = {};
     for (const row of contentRes.results) {
-      try { content[row.section_key as string] = JSON.parse(row.content_json as string); } catch { content[row.section_key as string] = []; }
+      try { dbContent[row.section_key as string] = JSON.parse(row.content_json as string); } catch { dbContent[row.section_key as string] = []; }
+    }
+    
+    // Build text_map: original_ru -> {ru, am} using seed data as the source of original keys
+    // The HTML has data-ru="original text" hardcoded. We match by seed items (which mirror the HTML).
+    // If user edited text in admin, db content[section][i].ru != seed[section][i].ru
+    // So we map: seed_item.ru (= HTML data-ru) -> db_item (edited values)
+    const textMap: Record<string, {ru: string, am: string}> = {};
+    for (const seedSection of SEED_CONTENT_SECTIONS) {
+      const dbItems = dbContent[seedSection.key] || [];
+      for (let i = 0; i < seedSection.items.length; i++) {
+        const origRu = seedSection.items[i].ru; // this matches data-ru in HTML
+        const dbItem = dbItems[i]; // edited version (if any)
+        if (dbItem && (dbItem.ru !== origRu || dbItem.am !== seedSection.items[i].am)) {
+          textMap[origRu] = { ru: dbItem.ru, am: dbItem.am };
+        }
+      }
     }
     
     // Load calculator tabs
@@ -52,8 +68,11 @@ app.get('/api/site-data', async (c) => {
     
     // Set Cache-Control to no-cache so edits appear instantly
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
     return c.json({
-      content,
+      content: dbContent,
+      textMap, // original_ru -> {ru, am} for changed texts only
       tabs: tabsRes.results,
       services: svcsRes.results,
       telegram,
@@ -62,7 +81,7 @@ app.get('/api/site-data', async (c) => {
     });
   } catch (e: any) {
     // If DB not initialized yet, return empty — frontend will use hardcoded fallback
-    return c.json({ content: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, _ts: Date.now() });
+    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, _ts: Date.now() });
   }
 });
 
@@ -1695,162 +1714,8 @@ document.querySelectorAll('a[href^="#"]').forEach(function(a) {
 
 console.log('Go to Top — site loaded v6 - CTA buttons + team photo moved');
 
-/* ===== DYNAMIC DATA FROM D1 DATABASE ===== */
-(async function loadSiteData() {
-  try {
-    const res = await fetch('/api/site-data');
-    if (!res.ok) { console.log('[DB] API unavailable, using hardcoded data'); return; }
-    const db = await res.json();
-    if (!db || !db.content || Object.keys(db.content).length === 0) {
-      console.log('[DB] No data in DB yet, using hardcoded data');
-      return;
-    }
-    console.log('[DB] Loaded site data from D1, sections:', Object.keys(db.content).length, 'services:', db.services?.length);
-    
-    // Store DB data globally for language switching
-    window._dbData = db;
-    
-    // ===== 1. APPLY CONTENT TEXTS =====
-    // Build flat lookup: for each section, items are [{ru, am}, ...]
-    // We match by the CURRENT textContent of [data-ru] elements
-    const allTexts = {};
-    for (const [sectionKey, items] of Object.entries(db.content)) {
-      if (!Array.isArray(items)) continue;
-      for (const item of items) {
-        if (item.ru) allTexts[item.ru.trim()] = item;
-      }
-    }
-    
-    // Update all elements with data-ru/data-am attributes
-    document.querySelectorAll('[data-ru]').forEach(function(el) {
-      const origRu = el.getAttribute('data-ru');
-      if (!origRu) return;
-      const match = allTexts[origRu.trim()];
-      if (match) {
-        if (match.ru) el.setAttribute('data-ru', match.ru);
-        if (match.am) el.setAttribute('data-am', match.am);
-        // Update visible text based on current language
-        var t = el.getAttribute('data-' + lang);
-        if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
-      }
-    });
-    
-    // ===== 2. REBUILD CALCULATOR FROM DB =====
-    if (db.tabs && db.tabs.length && db.services && db.services.length) {
-      var calcWrap = document.querySelector('.calc-wrap');
-      if (calcWrap) {
-        // Store tiers data globally for dynamic price calculation
-        window._calcServices = db.services;
-        window._calcTabs = db.tabs;
-        
-        // Rebuild tabs
-        var tabsDiv = calcWrap.querySelector('.calc-tabs');
-        if (tabsDiv) {
-          var th = '';
-          db.tabs.forEach(function(tab, idx) {
-            th += '<div class="calc-tab' + (idx === 0 ? ' active' : '') + '" onclick="showCalcTab(\\''+tab.tab_key+'\\',this)" data-ru="'+escCalc(tab.name_ru)+'" data-am="'+escCalc(tab.name_am)+'">' + (lang === 'am' ? tab.name_am : tab.name_ru) + '</div>';
-          });
-          tabsDiv.innerHTML = th;
-        }
-        
-        // Remove old calc groups
-        calcWrap.querySelectorAll('.calc-group').forEach(function(g) { g.remove(); });
-        // Remove old tier info
-        calcWrap.querySelectorAll('.buyout-tier-info').forEach(function(g) { g.remove(); });
-        
-        // Insert new calc groups before .calc-total
-        var calcTotal = calcWrap.querySelector('.calc-total');
-        
-        // Group services by tab_key
-        var byTab = {};
-        db.services.forEach(function(svc) {
-          if (!byTab[svc.tab_key]) byTab[svc.tab_key] = [];
-          byTab[svc.tab_key].push(svc);
-        });
-        
-        db.tabs.forEach(function(tab, tabIdx) {
-          var group = document.createElement('div');
-          group.className = 'calc-group' + (tabIdx === 0 ? ' active' : '');
-          group.id = 'cg-' + tab.tab_key;
-          
-          var svcs = byTab[tab.tab_key] || [];
-          var gh = '';
-          
-          svcs.forEach(function(svc) {
-            var hasTiers = svc.price_type === 'tiered' && svc.price_tiers_json;
-            var tiers = null;
-            if (hasTiers) {
-              try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = null; hasTiers = false; }
-            }
-            
-            if (hasTiers && tiers && tiers.length > 0) {
-              // TIERED pricing (like Выкуп + забор из ПВЗ)
-              var svcId = 'tiered_' + svc.id;
-              gh += '<div class="calc-row" data-price="tiered" data-tiers=\\''+escCalc(svc.price_tiers_json)+'\\' id="row_' + svcId + '">';
-              gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang === 'am' ? svc.name_am : svc.name_ru) + '</div>';
-              gh += '<div class="calc-price" id="price_' + svcId + '">֏' + formatNum(tiers[0].price) + '</div>';
-              gh += '<div class="calc-input"><button onclick="ccTiered(\\''+svcId+'\\',-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(\\''+svcId+'\\')"><button onclick="ccTiered(\\''+svcId+'\\',1)">+</button></div>';
-              gh += '</div>';
-              // Tier info block
-              gh += '<div class="buyout-tier-info">';
-              gh += '<strong data-ru="Чем больше — тем дешевле:" data-am="Որքան շատ — այնdelays էdelay:">Чем больше — тем дешевле:</strong><br>';
-              var tierTexts = tiers.map(function(t) { return t.min + '-' + (t.max >= 999 ? '+' : t.max) + ' → ֏' + formatNum(t.price); });
-              gh += '<span>' + tierTexts.join(' &nbsp;|&nbsp; ') + '</span>';
-              gh += '</div>';
-            } else {
-              // FIXED pricing
-              gh += '<div class="calc-row" data-price="'+svc.price+'">';
-              gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang === 'am' ? svc.name_am : svc.name_ru) + '</div>';
-              gh += '<div class="calc-price">֏' + formatNum(svc.price) + '</div>';
-              gh += '<div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalcDynamic()" oninput="recalcDynamic()"><button onclick="cc(this,1)">+</button></div>';
-              gh += '</div>';
-            }
-          });
-          
-          group.innerHTML = gh;
-          calcTotal.parentNode.insertBefore(group, calcTotal);
-        });
-        
-        console.log('[DB] Calculator rebuilt with', db.services.length, 'services in', db.tabs.length, 'tabs');
-      }
-    }
-    
-    // ===== 3. INJECT CUSTOM SCRIPTS =====
-    if (db.scripts) {
-      if (db.scripts.head && db.scripts.head.length) {
-        db.scripts.head.forEach(function(code) {
-          var div = document.createElement('div');
-          div.innerHTML = code;
-          var scripts = div.querySelectorAll('script');
-          scripts.forEach(function(s) {
-            var ns = document.createElement('script');
-            if (s.src) ns.src = s.src;
-            else ns.textContent = s.textContent;
-            document.head.appendChild(ns);
-          });
-          // Non-script elements (meta, link, etc.)
-          div.querySelectorAll(':not(script)').forEach(function(el) {
-            document.head.appendChild(el.cloneNode(true));
-          });
-        });
-      }
-      if (db.scripts.body_end && db.scripts.body_end.length) {
-        db.scripts.body_end.forEach(function(code) {
-          var div = document.createElement('div');
-          div.innerHTML = code;
-          document.body.appendChild(div);
-        });
-      }
-    }
-    
-    console.log('[DB] Dynamic data applied successfully');
-    
-  } catch(e) {
-    console.log('[DB] Error loading site data:', e.message || e);
-  }
-})();
-
-// Helper functions for dynamic calculator
+/* ===== DYNAMIC DATA FROM D1 DATABASE v2 ===== */
+// Helper functions
 function escCalc(s) { return s ? String(s).replace(/'/g, "\\\\'").replace(/"/g, '&quot;') : ''; }
 function formatNum(n) { return Number(n).toLocaleString('ru-RU'); }
 
@@ -1864,11 +1729,9 @@ function getTierPrice(tiers, qty) {
 
 function getTierTotal(tiers, qty) {
   if (qty <= 0) return 0;
-  var total = 0;
-  var remaining = qty;
+  var total = 0, remaining = qty;
   for (var i = 0; i < tiers.length && remaining > 0; i++) {
-    var tierRange = tiers[i].max - tiers[i].min + 1;
-    if (tiers[i].max >= 999) tierRange = remaining; // last tier = unlimited
+    var tierRange = tiers[i].max >= 999 ? remaining : (tiers[i].max - tiers[i].min + 1);
     var inTier = Math.min(remaining, tierRange);
     total += inTier * tiers[i].price;
     remaining -= inTier;
@@ -1882,9 +1745,8 @@ function ccTiered(svcId, delta) {
   if (v < 0) v = 0; if (v > 999) v = 999;
   inp.value = v;
   var row = document.getElementById('row_' + svcId);
-  var tiersJson = row.getAttribute('data-tiers');
   try {
-    var tiers = JSON.parse(tiersJson);
+    var tiers = JSON.parse(row.getAttribute('data-tiers'));
     var price = getTierPrice(tiers, v);
     document.getElementById('price_' + svcId).textContent = v > 0 ? '֏' + formatNum(price) + '/шт' : '֏' + formatNum(tiers[0].price);
   } catch(e) {}
@@ -1896,36 +1758,24 @@ function onTieredInput(svcId) {
   var v = parseInt(inp.value || 0);
   if (isNaN(v) || v < 0) v = 0; if (v > 999) v = 999;
   inp.value = v;
-  var row = document.getElementById('row_' + svcId);
-  var tiersJson = row.getAttribute('data-tiers');
-  try {
-    var tiers = JSON.parse(tiersJson);
-    var price = getTierPrice(tiers, v);
-    document.getElementById('price_' + svcId).textContent = v > 0 ? '֏' + formatNum(price) + '/шт' : '֏' + formatNum(tiers[0].price);
-  } catch(e) {}
-  recalcDynamic();
+  ccTiered(svcId, 0);
 }
 
 function recalcDynamic() {
-  var total = 0;
-  var items = [];
-  
-  // Process tiered rows
-  document.querySelectorAll('.calc-group.active .calc-row[data-price="tiered"]').forEach(function(row) {
+  var total = 0, items = [];
+  // ALL calc groups (not just active) — collect from all
+  document.querySelectorAll('.calc-row[data-price="tiered"]').forEach(function(row) {
     var inp = row.querySelector('.calc-input input');
     var qty = parseInt(inp ? inp.value : 0);
     if (qty > 0) {
       try {
         var tiers = JSON.parse(row.getAttribute('data-tiers'));
         total += getTierTotal(tiers, qty);
-        var label = row.querySelector('.calc-label').textContent;
-        items.push(label + ': ' + qty + ' шт (' + formatNum(getTierPrice(tiers, qty)) + '֏/шт)');
+        items.push(row.querySelector('.calc-label').textContent + ': ' + qty + ' шт (' + formatNum(getTierPrice(tiers, qty)) + '֏/шт)');
       } catch(e) {}
     }
   });
-  
-  // Process fixed-price rows
-  document.querySelectorAll('.calc-group.active .calc-row:not([data-price="tiered"])').forEach(function(row) {
+  document.querySelectorAll('.calc-row:not([data-price="tiered"])').forEach(function(row) {
     var price = parseInt(row.getAttribute('data-price'));
     var inp = row.querySelector('.calc-input input');
     var qty = parseInt(inp ? inp.value : 0);
@@ -1934,21 +1784,17 @@ function recalcDynamic() {
       items.push(row.querySelector('.calc-label').textContent + ': ' + qty);
     }
   });
-  
   document.getElementById('calcTotal').textContent = '֏' + formatNum(total);
+  var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || 'https://t.me/goo_to_top';
   var msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ֏' + formatNum(total);
-  document.getElementById('calcTgBtn').href = 'https://t.me/goo_to_top?text=' + encodeURIComponent(msg);
+  document.getElementById('calcTgBtn').href = tgUrl + '?text=' + encodeURIComponent(msg);
 }
 
-// Override original recalc to use dynamic version when DB data is loaded
+// Override recalc
 var _origRecalc = recalc;
-recalc = function() {
-  if (window._calcServices) { recalcDynamic(); }
-  else { _origRecalc(); }
-};
+recalc = function() { if (window._calcServices) recalcDynamic(); else _origRecalc(); };
 
-// Override switchLang to use DB data
-var _origSwitchLang = switchLang;
+// Override switchLang to always use latest data-ru/data-am
 switchLang = function(l) {
   lang = l;
   document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.lang === l); });
@@ -1958,6 +1804,140 @@ switchLang = function(l) {
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
 };
+
+(async function loadSiteData() {
+  try {
+    var res = await fetch('/api/site-data?_=' + Date.now());
+    if (!res.ok) { console.log('[DB] API unavailable'); return; }
+    var db = await res.json();
+    
+    var hasContent = db.textMap && Object.keys(db.textMap).length > 0;
+    var hasCalc = db.tabs && db.tabs.length && db.services && db.services.length;
+    var hasTg = db.telegram && Object.keys(db.telegram).length > 0;
+    
+    console.log('[DB] Loaded data. Changed texts:', Object.keys(db.textMap || {}).length, ', services:', (db.services || []).length);
+    
+    // ===== 1. APPLY CHANGED TEXTS =====
+    // textMap: { original_ru: {ru, am} } — only for CHANGED texts
+    if (hasContent) {
+      document.querySelectorAll('[data-ru]').forEach(function(el) {
+        var origRu = el.getAttribute('data-ru');
+        if (!origRu) return;
+        var changed = db.textMap[origRu.trim()];
+        if (changed) {
+          // Update data attributes with new values
+          el.setAttribute('data-ru', changed.ru);
+          el.setAttribute('data-am', changed.am);
+          // Update visible text
+          var t = el.getAttribute('data-' + lang);
+          if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+        }
+      });
+      console.log('[DB] Texts applied');
+    }
+    
+    // ===== 2. REBUILD CALCULATOR FROM DB =====
+    if (hasCalc) {
+      var calcWrap = document.querySelector('.calc-wrap');
+      if (calcWrap) {
+        window._calcServices = db.services;
+        window._calcTabs = db.tabs;
+        
+        var tabsDiv = calcWrap.querySelector('.calc-tabs');
+        if (tabsDiv) {
+          var th = '';
+          db.tabs.forEach(function(tab, idx) {
+            th += '<div class="calc-tab' + (idx === 0 ? ' active' : '') + '" onclick="showCalcTab(\\''+tab.tab_key+'\\',this)" data-ru="'+escCalc(tab.name_ru)+'" data-am="'+escCalc(tab.name_am)+'">' + (lang === 'am' ? tab.name_am : tab.name_ru) + '</div>';
+          });
+          tabsDiv.innerHTML = th;
+        }
+        
+        calcWrap.querySelectorAll('.calc-group').forEach(function(g) { g.remove(); });
+        calcWrap.querySelectorAll('.buyout-tier-info').forEach(function(g) { g.remove(); });
+        
+        var calcTotal = calcWrap.querySelector('.calc-total');
+        var byTab = {};
+        db.services.forEach(function(svc) {
+          if (!byTab[svc.tab_key]) byTab[svc.tab_key] = [];
+          byTab[svc.tab_key].push(svc);
+        });
+        
+        db.tabs.forEach(function(tab, tabIdx) {
+          var group = document.createElement('div');
+          group.className = 'calc-group' + (tabIdx === 0 ? ' active' : '');
+          group.id = 'cg-' + tab.tab_key;
+          var svcs = byTab[tab.tab_key] || [];
+          var gh = '';
+          
+          svcs.forEach(function(svc) {
+            var hasTiers = svc.price_type === 'tiered' && svc.price_tiers_json;
+            var tiers = null;
+            if (hasTiers) { try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = null; hasTiers = false; } }
+            
+            if (hasTiers && tiers && tiers.length > 0) {
+              var svcId = 'tiered_' + svc.id;
+              var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;');
+              gh += '<div class="calc-row" data-price="tiered" data-tiers=\\''+tiersAttr+'\\' id="row_'+svcId+'">';
+              gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang==='am' ? svc.name_am : svc.name_ru) + '</div>';
+              gh += '<div class="calc-price" id="price_'+svcId+'">֏'+formatNum(tiers[0].price)+'</div>';
+              gh += '<div class="calc-input"><button onclick="ccTiered(\\''+svcId+'\\',-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(\\''+svcId+'\\')"><button onclick="ccTiered(\\''+svcId+'\\',1)">+</button></div>';
+              gh += '</div>';
+              gh += '<div class="buyout-tier-info"><strong>'+( lang==='am' ? 'Որքան շատ — այնքան էdelay:' : 'Чем больше — тем дешевле:')+'</strong><br>';
+              gh += '<span>' + tiers.map(function(t) { 
+                var range = t.max >= 999 ? t.min+'+' : t.min+'-'+t.max;
+                return range + ' → ֏' + formatNum(t.price); 
+              }).join(' &nbsp;|&nbsp; ') + '</span></div>';
+            } else {
+              gh += '<div class="calc-row" data-price="'+svc.price+'">';
+              gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">'+(lang==='am' ? svc.name_am : svc.name_ru)+'</div>';
+              gh += '<div class="calc-price">֏'+formatNum(svc.price)+'</div>';
+              gh += '<div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalcDynamic()" oninput="recalcDynamic()"><button onclick="cc(this,1)">+</button></div>';
+              gh += '</div>';
+            }
+          });
+          group.innerHTML = gh;
+          calcTotal.parentNode.insertBefore(group, calcTotal);
+        });
+        console.log('[DB] Calculator rebuilt:', db.services.length, 'services,', db.tabs.length, 'tabs');
+      }
+    }
+    
+    // ===== 3. APPLY TELEGRAM LINKS DYNAMICALLY =====
+    if (hasTg) {
+      window._tgData = db.telegram;
+      // Update all telegram links on the page based on telegram_messages data
+      // The calc order button is handled in recalcDynamic()
+      console.log('[DB] Telegram data loaded:', Object.keys(db.telegram).length, 'messages');
+    }
+    
+    // ===== 4. INJECT CUSTOM SCRIPTS =====
+    if (db.scripts) {
+      if (db.scripts.head && db.scripts.head.length) {
+        db.scripts.head.forEach(function(code) {
+          var div = document.createElement('div');
+          div.innerHTML = code;
+          div.querySelectorAll('script').forEach(function(s) {
+            var ns = document.createElement('script');
+            if (s.src) ns.src = s.src; else ns.textContent = s.textContent;
+            document.head.appendChild(ns);
+          });
+          div.querySelectorAll(':not(script)').forEach(function(el) { document.head.appendChild(el.cloneNode(true)); });
+        });
+      }
+      if (db.scripts.body_end && db.scripts.body_end.length) {
+        db.scripts.body_end.forEach(function(code) {
+          var div = document.createElement('div');
+          div.innerHTML = code;
+          document.body.appendChild(div);
+        });
+      }
+    }
+    
+    console.log('[DB] All dynamic data applied v2');
+  } catch(e) {
+    console.log('[DB] Error:', e.message || e);
+  }
+})();
 </script>
 </body>
 </html>`)

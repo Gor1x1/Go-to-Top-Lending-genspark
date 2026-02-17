@@ -140,12 +140,17 @@ function renderSidebar() {
   h += '</div><div style="padding:16px;border-top:1px solid #334155">' +
     '<div class="nav-item" onclick="doLogout()"><i class="fas fa-sign-out-alt"></i><span>Выйти</span></div>' +
     '<a href="/" target="_blank" class="nav-item" style="color:#10B981"><i class="fas fa-external-link-alt"></i><span>Открыть сайт</span></a>' +
+    '<div class="nav-item" style="color:#f59e0b;cursor:pointer" onclick="previewSite()"><i class="fas fa-sync-alt"></i><span>Обновить сайт</span></div>' +
   '</div></div>';
   return h;
 }
 
 function navigate(page) { currentPage = page; render(); }
 function doLogout() { token = ''; localStorage.removeItem('gtt_token'); render(); }
+function previewSite() {
+  toast('Изменения применены! Сайт обновляется автоматически при каждой загрузке страницы.', 'success');
+  window.open('/?_nocache=' + Date.now(), '_blank');
+}
 
 // ===== DASHBOARD =====
 function renderDashboard() {
@@ -286,13 +291,39 @@ function renderCalculator() {
     const tab = data.calcTabs.find(t => t.tab_key === tabKey);
     h += '<div style="margin-bottom:20px"><h4 style="color:#a78bfa;font-weight:600;margin-bottom:8px">' + (tab ? tab.name_ru : tabKey) + '</h4>';
     for (const svc of svcs) {
-      h += '<div class="section-edit-row" style="display:grid;grid-template-columns:1fr 1fr auto auto auto;gap:12px;align-items:center">' +
-        '<div><div style="font-size:0.7rem;color:#64748b">RU</div><input class="input" value="' + escHtml(svc.name_ru) + '" id="svc_ru_' + svc.id + '"></div>' +
-        '<div><div style="font-size:0.7rem;color:#64748b">AM</div><input class="input" value="' + escHtml(svc.name_am) + '" id="svc_am_' + svc.id + '"></div>' +
-        '<div><div style="font-size:0.7rem;color:#64748b">Цена (֏)</div><input class="input" type="number" value="' + svc.price + '" style="width:100px" id="svc_price_' + svc.id + '"></div>' +
-        '<button class="btn btn-success" style="padding:8px 12px" onclick="saveCalcService(' + svc.id + ')"><i class="fas fa-save"></i></button>' +
-        '<button class="btn btn-danger" style="padding:8px 12px" onclick="deleteCalcService(' + svc.id + ')"><i class="fas fa-trash"></i></button>' +
-      '</div>';
+      var isTiered = svc.price_type === 'tiered' && svc.price_tiers_json;
+      var tiers = [];
+      if (isTiered) { try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; } }
+      
+      h += '<div class="section-edit-row" style="margin-bottom:12px">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr auto auto auto;gap:12px;align-items:center">' +
+          '<div><div style="font-size:0.7rem;color:#64748b">RU</div><input class="input" value="' + escHtml(svc.name_ru) + '" id="svc_ru_' + svc.id + '"></div>' +
+          '<div><div style="font-size:0.7rem;color:#64748b">AM</div><input class="input" value="' + escHtml(svc.name_am) + '" id="svc_am_' + svc.id + '"></div>' +
+          '<div><div style="font-size:0.7rem;color:#64748b">Цена (֏)</div><input class="input" type="number" value="' + svc.price + '" style="width:100px" id="svc_price_' + svc.id + '"></div>' +
+          '<button class="btn btn-success" style="padding:8px 12px" onclick="saveCalcService(' + svc.id + ')"><i class="fas fa-save"></i></button>' +
+          '<button class="btn btn-danger" style="padding:8px 12px" onclick="deleteCalcService(' + svc.id + ')"><i class="fas fa-trash"></i></button>' +
+        '</div>';
+      
+      // Tier editor for tiered services
+      if (isTiered && tiers.length > 0) {
+        h += '<div style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
+          '<div style="font-size:0.8rem;font-weight:600;color:#a78bfa;margin-bottom:8px"><i class="fas fa-layer-group" style="margin-right:6px"></i>Тарифная шкала (price tiers)</div>';
+        for (var ti = 0; ti < tiers.length; ti++) {
+          h += '<div style="display:grid;grid-template-columns:auto 80px auto 80px auto 100px;gap:8px;align-items:center;margin-bottom:6px">' +
+            '<span style="font-size:0.8rem;color:#94a3b8">от</span>' +
+            '<input class="input" type="number" value="' + tiers[ti].min + '" style="padding:6px 8px;font-size:0.85rem" id="tier_min_' + svc.id + '_' + ti + '">' +
+            '<span style="font-size:0.8rem;color:#94a3b8">до</span>' +
+            '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem" id="tier_max_' + svc.id + '_' + ti + '">' +
+            '<span style="font-size:0.8rem;color:#94a3b8">= ֏</span>' +
+            '<input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem" id="tier_price_' + svc.id + '_' + ti + '">' +
+          '</div>';
+        }
+        h += '<div style="margin-top:8px;display:flex;gap:8px">' +
+          '<button class="btn btn-success" style="padding:6px 14px;font-size:0.8rem" onclick="saveTiers(' + svc.id + ',' + tiers.length + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить тарифы</button>' +
+          '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="addTier(' + svc.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить строку</button>' +
+        '</div></div>';
+      }
+      h += '</div>';
     }
     h += '</div>';
   }
@@ -308,6 +339,36 @@ async function saveCalcService(id) {
   const price = parseInt(document.getElementById('svc_price_' + id).value);
   await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price }) });
   toast('Услуга сохранена');
+  await loadData(); render();
+}
+
+async function saveTiers(svcId, count) {
+  var tiers = [];
+  for (var i = 0; i < count; i++) {
+    var min = parseInt(document.getElementById('tier_min_' + svcId + '_' + i).value);
+    var max = parseInt(document.getElementById('tier_max_' + svcId + '_' + i).value);
+    var price = parseInt(document.getElementById('tier_price_' + svcId + '_' + i).value);
+    if (!isNaN(min) && !isNaN(max) && !isNaN(price)) {
+      tiers.push({ min: min, max: max, price: price });
+    }
+  }
+  if (!tiers.length) { toast('Заполните хотя бы один тариф', 'error'); return; }
+  var svc = data.calcServices.find(s => s.id === svcId);
+  if (!svc) return;
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
+  toast('Тарифы сохранены! Обновите сайт для проверки.');
+  await loadData(); render();
+}
+
+async function addTier(svcId) {
+  var svc = data.calcServices.find(s => s.id === svcId);
+  if (!svc) return;
+  var tiers = [];
+  try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; }
+  var lastMax = tiers.length ? tiers[tiers.length-1].max : 0;
+  tiers.push({ min: lastMax + 1, max: lastMax + 20, price: 1000 });
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers) }) });
+  toast('Строка добавлена');
   await loadData(); render();
 }
 
