@@ -249,12 +249,88 @@ api.get('/stats', authMiddleware, async (c) => {
   const services = await db.prepare('SELECT COUNT(*) as count FROM calculator_services').first();
   const messages = await db.prepare('SELECT COUNT(*) as count FROM telegram_messages').first();
   const scripts = await db.prepare('SELECT COUNT(*) as count FROM custom_scripts').first();
+  
+  // Analytics data
+  const todayViews = await db.prepare("SELECT COUNT(*) as count FROM page_views WHERE date(created_at) = date('now')").first().catch(() => ({ count: 0 }));
+  const weekViews = await db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-7 days')").first().catch(() => ({ count: 0 }));
+  const monthViews = await db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-30 days')").first().catch(() => ({ count: 0 }));
+  const totalViews = await db.prepare("SELECT COUNT(*) as count FROM page_views").first().catch(() => ({ count: 0 }));
+  
+  // Views by day (last 7 days)
+  const dailyViews = await db.prepare(`
+    SELECT date(created_at) as day, COUNT(*) as count 
+    FROM page_views 
+    WHERE created_at >= datetime('now', '-7 days') 
+    GROUP BY date(created_at) 
+    ORDER BY day DESC
+  `).all().catch(() => ({ results: [] }));
+  
+  // Top referrers
+  const topReferrers = await db.prepare(`
+    SELECT referrer, COUNT(*) as count 
+    FROM page_views 
+    WHERE referrer != '' AND created_at >= datetime('now', '-30 days')
+    GROUP BY referrer ORDER BY count DESC LIMIT 10
+  `).all().catch(() => ({ results: [] }));
+  
+  // Language stats
+  const langStats = await db.prepare(`
+    SELECT lang, COUNT(*) as count 
+    FROM page_views 
+    WHERE created_at >= datetime('now', '-30 days')
+    GROUP BY lang ORDER BY count DESC
+  `).all().catch(() => ({ results: [] }));
+  
+  // Active referral codes
+  const refCodes = await db.prepare("SELECT COUNT(*) as count FROM referral_codes WHERE is_active = 1").first().catch(() => ({ count: 0 }));
+  
   return c.json({
     content_sections: content?.count || 0,
     calculator_services: services?.count || 0,
     telegram_buttons: messages?.count || 0,
-    custom_scripts: scripts?.count || 0
+    custom_scripts: scripts?.count || 0,
+    referral_codes: refCodes?.count || 0,
+    analytics: {
+      today: todayViews?.count || 0,
+      week: weekViews?.count || 0,
+      month: monthViews?.count || 0,
+      total: totalViews?.count || 0,
+      daily: dailyViews?.results || [],
+      referrers: topReferrers?.results || [],
+      languages: langStats?.results || []
+    }
   });
+});
+
+// ===== REFERRAL CODES =====
+api.get('/referrals', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM referral_codes ORDER BY created_at DESC').all();
+  return c.json(res.results);
+});
+
+api.post('/referrals', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { code, description, discount_percent, free_reviews } = await c.req.json();
+  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, free_reviews) VALUES (?,?,?,?)')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0).run();
+  return c.json({ success: true });
+});
+
+api.put('/referrals/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { code, description, discount_percent, free_reviews, is_active } = await c.req.json();
+  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, free_reviews=?, is_active=? WHERE id=?')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, is_active ?? 1, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/referrals/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM referral_codes WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
 });
 
 export default api

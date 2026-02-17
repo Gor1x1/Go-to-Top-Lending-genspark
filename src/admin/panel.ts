@@ -53,7 +53,7 @@ export function getAdminHTML(): string {
 // ===== STATE =====
 let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {} };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [] };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -108,8 +108,8 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats] = await Promise.all([
-    api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats')
+  const [content, tabs, services, telegram, scripts, stats, referrals] = await Promise.all([
+    api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -117,6 +117,7 @@ async function loadData() {
   data.telegram = telegram || [];
   data.scripts = scripts || [];
   data.stats = stats || {};
+  data.referrals = referrals || [];
 }
 
 // ===== NAVIGATION =====
@@ -124,6 +125,7 @@ const pages = [
   { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Дашборд' },
   { id: 'content', icon: 'fa-file-alt', label: 'Тексты сайта' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
+  { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
   { id: 'telegram', icon: 'fa-telegram', label: 'Telegram сообщения', fab: true },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
@@ -155,18 +157,63 @@ function previewSite() {
 // ===== DASHBOARD =====
 function renderDashboard() {
   const s = data.stats;
+  const a = s.analytics || {};
+  const daily = a.daily || [];
+  const refs = a.referrers || [];
+  const langs = a.languages || [];
+  
   return '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Дашборд</h1>' +
     '<p style="color:#94a3b8;margin-bottom:32px">Обзор управления сайтом Go to Top</p>' +
-    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:20px;margin-bottom:32px">' +
+    
+    // Content stats
+    '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-database" style="margin-right:8px"></i>Контент</h3>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px">' +
       '<div class="stat-card"><div class="stat-num">' + (s.content_sections || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Секций контента</div></div>' +
       '<div class="stat-card"><div class="stat-num">' + (s.calculator_services || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Услуг в калькуляторе</div></div>' +
       '<div class="stat-card"><div class="stat-num">' + (s.telegram_buttons || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Telegram кнопок</div></div>' +
       '<div class="stat-card"><div class="stat-num">' + (s.custom_scripts || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Скриптов</div></div>' +
+      '<div class="stat-card"><div class="stat-num">' + (s.referral_codes || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Реф. кодов</div></div>' +
     '</div>' +
+    
+    // Analytics
+    '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-chart-line" style="margin-right:8px"></i>Аналитика посещений</h3>' +
+    '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px">' +
+      '<div class="stat-card" style="background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)"><div class="stat-num" style="color:#10B981">' + (a.today || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Сегодня</div></div>' +
+      '<div class="stat-card" style="background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));border-color:rgba(59,130,246,0.3)"><div class="stat-num" style="color:#3B82F6">' + (a.week || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">За 7 дней</div></div>' +
+      '<div class="stat-card" style="background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(245,158,11,0.05));border-color:rgba(245,158,11,0.3)"><div class="stat-num" style="color:#F59E0B">' + (a.month || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">За 30 дней</div></div>' +
+      '<div class="stat-card"><div class="stat-num">' + (a.total || 0) + '</div><div style="color:#94a3b8;font-size:0.85rem;margin-top:4px">Всего</div></div>' +
+    '</div>' +
+    
+    // Daily chart (simple bar)
+    (daily.length > 0 ? '<div class="card" style="margin-bottom:24px"><h4 style="font-weight:600;margin-bottom:12px">Посещения по дням</h4>' +
+      '<div style="display:flex;gap:8px;align-items:flex-end;height:120px">' +
+      daily.slice(0,7).reverse().map(function(d) {
+        var maxV = Math.max.apply(null, daily.map(function(x){return x.count || 1}));
+        var h = Math.max(10, Math.round((d.count / maxV) * 100));
+        return '<div style="flex:1;text-align:center"><div style="background:linear-gradient(to top,#8B5CF6,#a78bfa);height:'+h+'px;border-radius:6px 6px 0 0;margin-bottom:4px"></div><div style="font-size:0.7rem;color:#94a3b8">' + (d.day || '').slice(5) + '</div><div style="font-size:0.75rem;font-weight:600;color:#e2e8f0">' + d.count + '</div></div>';
+      }).join('') +
+      '</div></div>' : '') +
+    
+    // Top referrers
+    (refs.length > 0 ? '<div class="card" style="margin-bottom:24px"><h4 style="font-weight:600;margin-bottom:12px">Источники трафика (30 дней)</h4>' +
+      refs.map(function(r) {
+        return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #334155;font-size:0.85rem"><span style="color:#94a3b8;overflow:hidden;text-overflow:ellipsis;max-width:80%">' + escHtml(r.referrer) + '</span><span style="font-weight:600">' + r.count + '</span></div>';
+      }).join('') +
+    '</div>' : '') +
+    
+    // Language stats
+    (langs.length > 0 ? '<div class="card" style="margin-bottom:24px"><h4 style="font-weight:600;margin-bottom:12px">Языки пользователей</h4>' +
+      langs.map(function(l) {
+        return '<div style="display:flex;justify-content:space-between;padding:6px 0;font-size:0.85rem"><span style="color:#94a3b8">' + (l.lang === 'am' ? '🇦🇲 Армянский' : l.lang === 'ru' ? '🇷🇺 Русский' : l.lang || 'Н/Д') + '</span><span style="font-weight:600">' + l.count + '</span></div>';
+      }).join('') +
+    '</div>' : '') +
+    
+    // How to use
     '<div class="card"><h3 style="font-weight:700;margin-bottom:12px"><i class="fas fa-info-circle" style="color:#8B5CF6;margin-right:8px"></i>Как пользоваться</h3>' +
       '<ul style="color:#94a3b8;font-size:0.9rem;line-height:2">' +
         '<li>📝 <strong>Тексты сайта</strong> — редактирование всех текстов на RU и AM</li>' +
         '<li>🧮 <strong>Калькулятор</strong> — управление услугами, ценами и вкладками</li>' +
+        '<li>🎁 <strong>Реферальные коды</strong> — кодовые слова для скидок и бесплатных отзывов</li>' +
         '<li>💬 <strong>Telegram сообщения</strong> — шаблоны сообщений для каждой кнопки на сайте</li>' +
         '<li>📜 <strong>Скрипты</strong> — добавление аналитики, пикселей, meta-тегов</li>' +
         '<li>⚙️ <strong>Настройки</strong> — смена пароля</li>' +
@@ -309,13 +356,13 @@ function renderCalculator() {
         h += '<div style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
           '<div style="font-size:0.8rem;font-weight:600;color:#a78bfa;margin-bottom:8px"><i class="fas fa-layer-group" style="margin-right:6px"></i>Тарифная шкала (price tiers)</div>';
         for (var ti = 0; ti < tiers.length; ti++) {
-          h += '<div style="display:grid;grid-template-columns:auto 80px auto 80px auto 100px auto;gap:8px;align-items:center;margin-bottom:6px">' +
-            '<span style="font-size:0.8rem;color:#94a3b8">от</span>' +
-            '<input class="input" type="number" value="' + tiers[ti].min + '" style="padding:6px 8px;font-size:0.85rem" id="tier_min_' + svc.id + '_' + ti + '">' +
-            '<span style="font-size:0.8rem;color:#94a3b8">до</span>' +
-            '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem" id="tier_max_' + svc.id + '_' + ti + '">' +
-            '<span style="font-size:0.8rem;color:#94a3b8">= ֏</span>' +
-            '<input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem" id="tier_price_' + svc.id + '_' + ti + '">' +
+          h += '<div style="display:grid;grid-template-columns:auto 80px auto 80px auto 100px auto;gap:6px;align-items:center;margin-bottom:6px">' +
+            '<span style="font-size:0.8rem;color:#94a3b8;text-align:right;min-width:20px">от</span>' +
+            '<input class="input" type="number" value="' + tiers[ti].min + '" style="padding:6px 8px;font-size:0.85rem;text-align:left" id="tier_min_' + svc.id + '_' + ti + '">' +
+            '<span style="font-size:0.8rem;color:#94a3b8;text-align:right;min-width:20px">до</span>' +
+            '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem;text-align:right" id="tier_max_' + svc.id + '_' + ti + '">' +
+            '<span style="font-size:0.8rem;color:#94a3b8;white-space:nowrap">= ֏</span>' +
+            '<input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem;text-align:left" id="tier_price_' + svc.id + '_' + ti + '">' +
             '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.7rem" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-trash"></i></button>' +
           '</div>';
         }
@@ -573,6 +620,83 @@ async function toggleScript(id, active) {
   await loadData(); render();
 }
 
+// ===== REFERRAL CODES =====
+function renderReferrals() {
+  let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Реферальные коды</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Кодовые слова для скидок и бесплатных отзывов. Пользователь вводит код в калькуляторе и получает скидку.</p>' +
+    '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить код</button>';
+  
+  for (const ref of data.referrals) {
+    h += '<div class="card" style="margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+        '<div><span class="badge badge-green" style="font-size:0.9rem;padding:6px 14px">' + escHtml(ref.code) + '</span>' +
+          (ref.is_active ? ' <span class="badge badge-green">Активен</span>' : ' <span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171">Выкл</span>') +
+          ' <span style="color:#64748b;font-size:0.8rem;margin-left:8px">Использований: ' + (ref.uses_count || 0) + '</span>' +
+        '</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-success" style="padding:6px 12px;font-size:0.8rem" onclick="saveReferral(' + ref.id + ')"><i class="fas fa-save"></i></button>' +
+          '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="toggleReferral(' + ref.id + ',' + (ref.is_active ? 0 : 1) + ')">' + (ref.is_active ? '<i class="fas fa-pause"></i>' : '<i class="fas fa-play"></i>') + '</button>' +
+          '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deleteReferral(' + ref.id + ')"><i class="fas fa-trash"></i></button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Код (слово)</label><input class="input" value="' + escHtml(ref.code) + '" id="ref_code_' + ref.id + '"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Скидка (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" value="' + (ref.free_reviews || 0) + '" id="ref_free_' + ref.id + '" min="0"></div>' +
+      '</div>' +
+      '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>' +
+    '</div>';
+  }
+  
+  if (!data.referrals.length) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-gift" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
+      '<p style="color:#94a3b8">Реферальных кодов пока нет. Создайте первый код для предоставления скидок клиентам.</p></div>';
+  }
+  
+  h += '</div>';
+  return h;
+}
+
+async function addReferral() {
+  const code = prompt('Кодовое слово (латиница, будет в верхнем регистре):');
+  if (!code) return;
+  const desc = prompt('Описание (для кого этот код):') || '';
+  const disc = parseInt(prompt('Скидка в процентах (0-100):') || '0');
+  const free = parseInt(prompt('Количество бесплатных отзывов (0 = нет):') || '0');
+  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free }) });
+  toast('Код добавлен');
+  await loadData(); render();
+}
+
+async function saveReferral(id) {
+  var ref = data.referrals.find(function(r) { return r.id === id; });
+  if (!ref) return;
+  await api('/referrals/' + id, { method: 'PUT', body: JSON.stringify({
+    code: document.getElementById('ref_code_' + id).value,
+    description: document.getElementById('ref_desc_' + id).value,
+    discount_percent: parseInt(document.getElementById('ref_disc_' + id).value) || 0,
+    free_reviews: parseInt(document.getElementById('ref_free_' + id).value) || 0,
+    is_active: ref.is_active
+  }) });
+  toast('Код сохранён');
+  await loadData(); render();
+}
+
+async function toggleReferral(id, active) {
+  var ref = data.referrals.find(function(r) { return r.id === id; });
+  if (!ref) return;
+  await api('/referrals/' + id, { method: 'PUT', body: JSON.stringify({ ...ref, is_active: active }) });
+  toast(active ? 'Код активирован' : 'Код деактивирован');
+  await loadData(); render();
+}
+
+async function deleteReferral(id) {
+  if (!confirm('Удалить этот код?')) return;
+  await api('/referrals/' + id, { method: 'DELETE' });
+  toast('Код удалён');
+  await loadData(); render();
+}
+
 // ===== SETTINGS =====
 function renderSettings() {
   return '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:24px">Настройки</h1>' +
@@ -609,6 +733,7 @@ function render() {
     case 'dashboard': pageHtml = renderDashboard(); break;
     case 'content': pageHtml = renderContent(); break;
     case 'calculator': pageHtml = renderCalculator(); break;
+    case 'referrals': pageHtml = renderReferrals(); break;
     case 'telegram': pageHtml = renderTelegram(); break;
     case 'scripts': pageHtml = renderScripts(); break;
     case 'settings': pageHtml = renderSettings(); break;

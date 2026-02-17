@@ -103,6 +103,38 @@ app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
+// ===== PAGE VIEW TRACKING =====
+app.post('/api/track', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const body = await c.req.json();
+    await db.prepare('INSERT INTO page_views (page, referrer, user_agent, lang, country) VALUES (?,?,?,?,?)')
+      .bind(body.page || '/', body.referrer || '', body.ua || '', body.lang || 'ru', body.country || '').run();
+    return c.json({ ok: true });
+  } catch { return c.json({ ok: true }); }
+})
+
+// ===== REFERRAL CODE VALIDATION =====
+app.post('/api/referral/check', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const { code } = await c.req.json();
+    if (!code) return c.json({ valid: false });
+    const row = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(code.trim().toUpperCase()).first();
+    if (!row) return c.json({ valid: false });
+    // Increment uses count
+    await db.prepare('UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?').bind(row.id).run();
+    return c.json({
+      valid: true,
+      discount_percent: row.discount_percent,
+      free_reviews: row.free_reviews,
+      description: row.description
+    });
+  } catch { return c.json({ valid: false }); }
+})
+
 // ===== ADMIN API =====
 app.route('/api/admin', adminApi)
 
@@ -175,7 +207,17 @@ app.get('/', (c) => {
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries и Ozon">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване.">
 <meta property="og:type" content="website">
-<meta property="og:image" content="/static/img/logo-gototop.png">
+<meta property="og:url" content="https://gototop.win">
+<meta property="og:image" content="https://gototop.win/static/img/logo-gototop.png">
+<meta property="og:image:width" content="512">
+<meta property="og:image:height" content="512">
+<meta property="og:image:alt" content="Go to Top - логотип">
+<meta property="og:site_name" content="Go to Top">
+<meta property="og:locale" content="ru_RU">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Go to Top — Продвижение на Wildberries">
+<meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване.">
+<meta name="twitter:image" content="https://gototop.win/static/img/logo-gototop.png">
 <link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
@@ -274,9 +316,9 @@ img{max-width:100%;height:auto}
 .calc-label{font-size:0.92rem;font-weight:500}
 .calc-price{font-size:0.82rem;color:var(--text-muted);white-space:nowrap}
 .calc-input{display:flex;align-items:center;gap:8px}
-.calc-input button{width:36px;height:36px;border-radius:8px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:1.1rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
+.calc-input button{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.95rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
 .calc-input button:hover{border-color:var(--purple);background:rgba(139,92,246,0.1)}
-.calc-input input[type="number"]{width:56px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:6px 4px;-moz-appearance:textfield;outline:none;transition:var(--t)}
+.calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:0.92rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none;transition:var(--t)}
 .calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
 .calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .calc-total{display:flex;justify-content:space-between;align-items:center;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple)}
@@ -1084,6 +1126,17 @@ img{max-width:100%;height:auto}
       <div class="calc-total-label" data-ru="Итого:" data-am="Ընդամենը:">Итого:</div>
       <div class="calc-total-value" id="calcTotal">֏0</div>
     </div>
+    <!-- Referral code field -->
+    <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div style="flex:1;min-width:200px">
+          <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:6px"><i class="fas fa-gift" style="margin-right:6px"></i><span data-ru="Есть промокод?" data-am="Պրոմоկոդ ունեք?">Есть промокод?</span></label>
+          <input type="text" id="refCodeInput" placeholder="PROMO2026" style="width:100%;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;font-family:inherit;text-transform:uppercase;outline:none;transition:var(--t)" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor='var(--border)'">
+        </div>
+        <button onclick="checkRefCode()" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;white-space:nowrap"><i class="fas fa-check-circle" style="margin-right:6px"></i><span data-ru="Применить" data-am="Կիրառեл">Применить</span></button>
+      </div>
+      <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
+    </div>
     <div class="calc-cta">
       <a href="https://t.me/goo_to_top" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
         <i class="fab fa-telegram"></i>
@@ -1625,7 +1678,9 @@ document.getElementById('popupForm').addEventListener('submit', function(e) {
     method: 'POST', headers: {'Content-Type':'application/json'},
     body: JSON.stringify({buyouts:buyouts, reviews:reviews, contact:contact, lang:lang, ts: new Date().toISOString()})
   }).catch(function(){});
-  var msg = 'Заявка с сайта Go to Top:\\n\\nВыкупов: ' + buyouts + '\\nОтзывов: ' + reviews + '\\nКонтакт: ' + contact;
+  var msg = lang === 'am' 
+    ? 'Հայտ Go to Top կայքից:\\n\\nԳնումներ: ' + buyouts + '\\nԿարծիքներ: ' + reviews + '\\nԿապ: ' + contact
+    : 'Заявка с сайта Go to Top:\\n\\nВыкупов: ' + buyouts + '\\nОтзывов: ' + reviews + '\\nКонтакт: ' + contact;
   var popupTgUrl = window._tgPopupUrl || 'https://t.me/suport_admin_2';
   window.open(popupTgUrl + '?text=' + encodeURIComponent(msg), '_blank');
   document.getElementById('popupFormWrap').style.display = 'none';
@@ -1642,11 +1697,20 @@ function submitForm(e) {
   var service = document.getElementById('formService');
   var serviceText = service.options[service.selectedIndex].textContent;
   var message = document.getElementById('formMessage').value;
-  var msg = 'Здравствуйте! Заявка с сайта Go to Top:\\n\\n';
-  msg += 'Имя: ' + name + '\\nКонтакт: ' + contact + '\\n';
-  if (product) msg += 'Товар: ' + product + '\\n';
-  msg += 'Услуга: ' + serviceText + '\\n';
-  if (message) msg += 'Комментарий: ' + message;
+  var msg = '';
+  if (lang === 'am') {
+    msg = 'Ողջույն! Հայտ Go to Top կայքից:\\n\\n';
+    msg += 'Անուն: ' + name + '\\nԿապ: ' + contact + '\\n';
+    if (product) msg += 'Ապրանք: ' + product + '\\n';
+    msg += 'Ծառայություն: ' + serviceText + '\\n';
+    if (message) msg += 'Մեկնաբանություն: ' + message;
+  } else {
+    msg = 'Здравствуйте! Заявка с сайта Go to Top:\\n\\n';
+    msg += 'Имя: ' + name + '\\nКонтакт: ' + contact + '\\n';
+    if (product) msg += 'Товар: ' + product + '\\n';
+    msg += 'Услуга: ' + serviceText + '\\n';
+    if (message) msg += 'Комментарий: ' + message;
+  }
   fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, ts: new Date().toISOString()}) }).catch(function(){});
   var tgUrl = window._tgContactUrl || 'https://t.me/suport_admin_2';
   window.open(tgUrl + '?text=' + encodeURIComponent(msg), '_blank');
@@ -1773,7 +1837,10 @@ function recalcDynamic() {
       try {
         var tiers = JSON.parse(row.getAttribute('data-tiers'));
         total += getTierTotal(tiers, qty);
-        items.push(row.querySelector('.calc-label').textContent + ': ' + qty + ' шт (' + formatNum(getTierPrice(tiers, qty)) + '֏/шт)');
+        var label = row.querySelector('.calc-label');
+        var labelText = label ? label.textContent : '';
+        var pcsWord = lang === 'am' ? 'հատ' : 'шт';
+        items.push(labelText + ': ' + qty + ' ' + pcsWord + ' (' + formatNum(getTierPrice(tiers, qty)) + '֏/' + pcsWord + ')');
       } catch(e) {}
     }
   });
@@ -1783,12 +1850,30 @@ function recalcDynamic() {
     var qty = parseInt(inp ? inp.value : 0);
     if (!isNaN(price) && qty > 0) {
       total += price * qty;
-      items.push(row.querySelector('.calc-label').textContent + ': ' + qty);
+      var label = row.querySelector('.calc-label');
+      var labelText = label ? label.textContent : '';
+      items.push(labelText + ': ' + qty);
     }
   });
+  // Apply referral discount
+  var discountAmount = 0;
+  if (typeof _refDiscount !== 'undefined' && _refDiscount > 0 && total > 0) {
+    discountAmount = Math.round(total * _refDiscount / 100);
+    total = total - discountAmount;
+  }
   document.getElementById('calcTotal').textContent = '֏' + formatNum(total);
   var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || 'https://t.me/goo_to_top';
-  var msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ֏' + formatNum(total);
+  var greeting = lang === 'am' ? 'Ողջույն! Ուզում եմ պատվիրել:' : 'Здравствуйте! Хочу заказать:';
+  var totalLabel = lang === 'am' ? 'Ընդամենը:' : 'Итого:';
+  var msg = greeting + '\\n' + items.join('\\n');
+  if (discountAmount > 0) {
+    var refCode = document.getElementById('refCodeInput') ? document.getElementById('refCodeInput').value : '';
+    msg += '\\n\\n' + (lang === 'am' ? 'Պրոմոկոդ: ' : 'Промокод: ') + refCode + ' (-' + _refDiscount + '%, -֏' + formatNum(discountAmount) + ')';
+  }
+  if (typeof _refFreeReviews !== 'undefined' && _refFreeReviews > 0) {
+    msg += '\\n' + (lang === 'am' ? 'Անվճար կարծիքներ: ' : 'Бесплатных отзывов: ') + _refFreeReviews;
+  }
+  msg += '\\n\\n' + totalLabel + ' ֏' + formatNum(total);
   document.getElementById('calcTgBtn').href = tgUrl + '?text=' + encodeURIComponent(msg);
 }
 
@@ -1796,7 +1881,49 @@ function recalcDynamic() {
 var _origRecalc = recalc;
 recalc = function() { if (window._calcServices) recalcDynamic(); else _origRecalc(); };
 
-// Override switchLang to always use latest data-ru/data-am
+// Update all Telegram links to match current language
+function updateTelegramLinks() {
+  if (!window._tgData) return;
+  var tgByLabel = {};
+  for (var tgKey in window._tgData) {
+    var tgMsg = window._tgData[tgKey];
+    if (tgMsg && tgMsg.button_label_ru) {
+      tgByLabel[tgMsg.button_label_ru.trim()] = tgMsg;
+      // Also index by AM label so we find buttons even after AM text was applied
+      if (tgMsg.button_label_am) tgByLabel[tgMsg.button_label_am.trim()] = tgMsg;
+    }
+  }
+  document.querySelectorAll('a[href*="t.me/"]').forEach(function(a) {
+    if (a.id === 'calcTgBtn') return;
+    var spanWithDataRu = a.querySelector('span[data-ru]');
+    var buttonText = null;
+    if (spanWithDataRu) {
+      buttonText = spanWithDataRu.getAttribute('data-ru');
+    }
+    if (!buttonText && a.hasAttribute('data-ru')) {
+      buttonText = a.getAttribute('data-ru');
+    }
+    if (!buttonText) {
+      var h4 = a.querySelector('h4[data-ru]');
+      if (h4) buttonText = h4.getAttribute('data-ru');
+    }
+    if (!buttonText) return;
+    buttonText = buttonText.trim();
+    var tgMsg = tgByLabel[buttonText];
+    if (!tgMsg) return;
+    var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
+    var tgUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+    if (msgTemplate) {
+      a.href = tgUrl + '?text=' + encodeURIComponent(msgTemplate);
+    } else {
+      a.href = tgUrl;
+    }
+  });
+  // Update calc button message for current language
+  if (typeof recalcDynamic === 'function') recalcDynamic();
+}
+
+// Override switchLang to always use latest data-ru/data-am and update Telegram links
 switchLang = function(l) {
   lang = l;
   document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.lang === l); });
@@ -1805,6 +1932,8 @@ switchLang = function(l) {
     if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
+  // Re-apply Telegram links with correct language message templates
+  updateTelegramLinks();
 };
 
 (async function loadSiteData() {
@@ -1884,7 +2013,7 @@ switchLang = function(l) {
               gh += '<div class="calc-price" id="price_'+svcId+'">֏'+formatNum(tiers[0].price)+'</div>';
               gh += '<div class="calc-input"><button onclick="ccTiered(\\''+svcId+'\\',-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(\\''+svcId+'\\')"><button onclick="ccTiered(\\''+svcId+'\\',1)">+</button></div>';
               gh += '</div>';
-              gh += '<div class="buyout-tier-info"><strong>'+( lang==='am' ? 'Որքան շատ — այնքան էdelay:' : 'Чем больше — тем дешевле:')+'</strong><br>';
+              gh += '<div class="buyout-tier-info"><strong>'+( lang==='am' ? 'Որքան շատ — այնքան էժան:' : 'Чем больше — тем дешевле:')+'</strong><br>';
               gh += '<span>' + tiers.map(function(t) { 
                 var range = t.max >= 999 ? t.min+'+' : t.min+'-'+t.max;
                 return range + ' → ֏' + formatNum(t.price); 
@@ -2005,6 +2134,64 @@ switchLang = function(l) {
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
   }
+})();
+
+/* ===== REFERRAL CODE CHECK ===== */
+var _refDiscount = 0;
+var _refFreeReviews = 0;
+async function checkRefCode() {
+  var code = document.getElementById('refCodeInput').value.trim();
+  var result = document.getElementById('refResult');
+  if (!code) { result.style.display = 'none'; return; }
+  try {
+    var res = await fetch('/api/referral/check', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code:code}) });
+    var data = await res.json();
+    if (data.valid) {
+      _refDiscount = data.discount_percent || 0;
+      _refFreeReviews = data.free_reviews || 0;
+      var msg = lang === 'am' 
+        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Պromokод ակdelays!'
+        : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Промокод активирован!';
+      if (_refDiscount > 0) msg += (lang === 'am' ? ' Zdelays: ' : ' Скидка: ') + _refDiscount + '%';
+      if (_refFreeReviews > 0) msg += (lang === 'am' ? ' + ' + _refFreeReviews + ' bdelays kdelays' : ' + ' + _refFreeReviews + ' бесплатных отзывов');
+      if (data.description) msg += '<br><span style="font-size:0.8rem;color:var(--text-sec)">' + data.description + '</span>';
+      result.style.display = 'block';
+      result.style.background = 'rgba(16,185,129,0.1)';
+      result.style.border = '1px solid rgba(16,185,129,0.3)';
+      result.style.color = 'var(--success)';
+      result.innerHTML = msg;
+      recalcDynamic();
+    } else {
+      _refDiscount = 0;
+      _refFreeReviews = 0;
+      result.style.display = 'block';
+      result.style.background = 'rgba(239,68,68,0.1)';
+      result.style.border = '1px solid rgba(239,68,68,0.3)';
+      result.style.color = 'var(--danger)';
+      result.innerHTML = lang === 'am' 
+        ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>Pdelays kdelays'
+        : '<i class="fas fa-times-circle" style="margin-right:6px"></i>Промокод не найден';
+      recalcDynamic();
+    }
+  } catch(e) {
+    console.log('Ref check error:', e);
+  }
+}
+
+/* ===== PAGE VIEW TRACKING ===== */
+(function() {
+  try {
+    fetch('/api/track', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({
+        page: window.location.pathname,
+        referrer: document.referrer || '',
+        ua: navigator.userAgent ? navigator.userAgent.substring(0, 200) : '',
+        lang: lang || 'ru'
+      })
+    }).catch(function(){});
+  } catch(e) {}
 })();
 </script>
 </body>

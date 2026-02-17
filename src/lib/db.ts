@@ -69,6 +69,27 @@ CREATE TABLE IF NOT EXISTS custom_scripts (
   is_active INTEGER DEFAULT 1,
   sort_order INTEGER DEFAULT 0
 );
+
+CREATE TABLE IF NOT EXISTS page_views (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  page TEXT NOT NULL DEFAULT '/',
+  referrer TEXT DEFAULT '',
+  user_agent TEXT DEFAULT '',
+  lang TEXT DEFAULT 'ru',
+  country TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS referral_codes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  code TEXT UNIQUE NOT NULL,
+  description TEXT DEFAULT '',
+  discount_percent INTEGER DEFAULT 0,
+  free_reviews INTEGER DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
+  uses_count INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 export async function initDatabase(db: D1Database): Promise<void> {
