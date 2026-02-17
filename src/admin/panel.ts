@@ -45,6 +45,8 @@ export function getAdminHTML(): string {
   .stat-num { font-size: 2rem; font-weight: 800; color: #8B5CF6; }
   .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  .tier-del-btn { width:24px;height:24px;min-width:24px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:0.65rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;padding:0; }
+  .tier-del-btn:hover { background:#EF4444;color:white; }
 </style>
 </head>
 <body>
@@ -53,7 +55,7 @@ export function getAdminHTML(): string {
 // ===== STATE =====
 let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [] };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounter: {}, settings: {} };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -108,8 +110,9 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder] = await Promise.all([
-    api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order')
+  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings] = await Promise.all([
+    api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order'),
+    api('/leads?limit=50'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -119,16 +122,25 @@ async function loadData() {
   data.stats = stats || {};
   data.referrals = referrals || [];
   data.sectionOrder = sectionOrder || [];
+  data.leads = leads || { leads: [], total: 0 };
+  data.telegramBot = telegramBot || [];
+  data.pdfTemplate = pdfTemplate || {};
+  data.slotCounter = slotCounter || {};
+  data.settings = settings || {};
 }
 
 // ===== NAVIGATION =====
 const pages = [
   { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Дашборд' },
+  { id: 'leads', icon: 'fa-users', label: 'Лиды / CRM' },
   { id: 'content', icon: 'fa-file-alt', label: 'Тексты сайта' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
+  { id: 'pdf', icon: 'fa-file-pdf', label: 'PDF шаблон' },
   { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
   { id: 'sections', icon: 'fa-th-list', label: 'Порядок блоков' },
-  { id: 'telegram', icon: 'fa-telegram', label: 'Telegram сообщения', fab: true },
+  { id: 'slots', icon: 'fa-clock', label: 'Счётчик слотов' },
+  { id: 'telegram', icon: 'fa-telegram', label: 'TG сообщения', fab: true },
+  { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
 ];
@@ -138,7 +150,7 @@ function renderSidebar() {
     '<div style="font-size:1.3rem;font-weight:800;color:#a78bfa">Go to Top</div>' +
     '<div style="font-size:0.8rem;color:#64748b;margin-top:4px">Админ-панель</div></div><div style="padding:8px 0;flex:1">';
   for (const p of pages) {
-    h += '<div class="nav-item' + (currentPage === p.id ? ' active' : '') + '" onclick="navigate(\\'' + p.id + '\\')">' +
+    h += '<div class="nav-item' + (currentPage === p.id ? ' active' : '') + '" onclick="navigate(&apos;' + p.id + '&apos;)">' +
       '<i class="' + (p.fab ? 'fab' : 'fas') + ' ' + p.icon + '"></i><span>' + p.label + '</span></div>';
   }
   h += '</div><div style="padding:16px;border-top:1px solid #334155">' +
@@ -163,10 +175,14 @@ function renderDashboard() {
   const daily = a.daily || [];
   const refs = a.referrers || [];
   const langs = a.languages || [];
+  const ld = s.leads || {};
   
   return '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Дашборд</h1>' +
     '<p style="color:#94a3b8;margin-bottom:32px">Обзор управления сайтом Go to Top</p>' +
     
+    // Leads alert
+    (ld.new > 0 ? '<div style="background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px 24px;margin-bottom:24px;display:flex;align-items:center;gap:12px;cursor:pointer" onclick="navigate(&apos;leads&apos;)"><i class="fas fa-bell" style="color:#EF4444;font-size:1.2rem"></i><div><strong style="color:#f87171">' + ld.new + ' новых заявок!</strong><span style="color:#94a3b8;font-size:0.85rem;margin-left:8px">Нажмите для просмотра</span></div></div>' : '') +
+
     // Content stats
     '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-database" style="margin-right:8px"></i>Контент</h3>' +
     '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px">' +
@@ -213,11 +229,15 @@ function renderDashboard() {
     // How to use
     '<div class="card"><h3 style="font-weight:700;margin-bottom:12px"><i class="fas fa-info-circle" style="color:#8B5CF6;margin-right:8px"></i>Как пользоваться</h3>' +
       '<ul style="color:#94a3b8;font-size:0.9rem;line-height:2">' +
+        '<li>📋 <strong>Лиды / CRM</strong> — все заявки с сайта, статусы, экспорт в CSV</li>' +
         '<li>📝 <strong>Тексты сайта</strong> — редактирование всех текстов на RU и AM</li>' +
         '<li>🧮 <strong>Калькулятор</strong> — управление услугами, ценами и вкладками</li>' +
+        '<li>📄 <strong>PDF шаблон</strong> — тексты для автоматического коммерческого предложения</li>' +
         '<li>🎁 <strong>Реферальные коды</strong> — кодовые слова для скидок и бесплатных отзывов</li>' +
         '<li>📦 <strong>Порядок блоков</strong> — перемещайте и скрывайте секции сайта</li>' +
-        '<li>💬 <strong>Telegram сообщения</strong> — шаблоны сообщений для каждой кнопки на сайте</li>' +
+        '<li>⏱ <strong>Счётчик слотов</strong> — показ свободных мест на сайте</li>' +
+        '<li>💬 <strong>TG сообщения</strong> — шаблоны сообщений для каждой кнопки на сайте</li>' +
+        '<li>🤖 <strong>TG Бот</strong> — автоматические уведомления о заявках в Telegram</li>' +
         '<li>📜 <strong>Скрипты</strong> — добавление аналитики, пикселей, meta-тегов</li>' +
         '<li>⚙️ <strong>Настройки</strong> — смена пароля</li>' +
       '</ul>' +
@@ -261,7 +281,7 @@ function renderContent() {
         '</div>';
       }
       
-      h += '<div style="text-align:right;margin-top:12px"><button class="btn btn-success" onclick="saveSection(\\'' + section.section_key + '\\')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить секцию</button></div>';
+      h += '<div style="text-align:right;margin-top:12px"><button class="btn btn-success" onclick="saveSection(&apos;' + section.section_key + '&apos;)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить секцию</button></div>';
       h += '</div></div>';
     }
   }
@@ -366,7 +386,7 @@ function renderCalculator() {
             '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem;text-align:right" id="tier_max_' + svc.id + '_' + ti + '">' +
             '<span style="font-size:0.8rem;color:#94a3b8;white-space:nowrap">=</span>' +
             '<div style="display:flex;align-items:center;gap:4px"><input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem;text-align:left;width:90px" id="tier_price_' + svc.id + '_' + ti + '"><span style="font-size:0.85rem;color:#94a3b8">֏</span></div>' +
-            '<button style="width:24px;height:24px;min-width:24px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:0.65rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;padding:0" onmouseover="this.style.background=\'#EF4444\';this.style.color=\'white\'" onmouseout="this.style.background=\'rgba(239,68,68,0.15)\';this.style.color=\'#f87171\'" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-times"></i></button>' +
+            '<button class="tier-del-btn" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-times"></i></button>' +
           '</div>';
         }
         h += '<div style="margin-top:8px;display:flex;gap:8px">' +
@@ -788,6 +808,230 @@ async function changePassword() {
   if (res && res.success) { toast('Пароль изменён'); } else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
+// ===== LEADS / CRM =====
+function renderLeads() {
+  var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
+  var total = (data.leads && data.leads.total) ? data.leads.total : 0;
+  var statusColors = { 'new': 'badge-green', 'contacted': 'badge-purple', 'in_progress': 'badge-amber', 'done': 'badge-green', 'rejected': '' };
+  var statusLabels = { 'new': 'Новый', 'contacted': 'Связались', 'in_progress': 'В работе', 'done': 'Завершён', 'rejected': 'Отклонён' };
+  var h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800">Лиды / CRM</h1><p style="color:#94a3b8;margin-top:4px">Все заявки с сайта. Всего: ' + total + '</p></div>' +
+    '<a href="/api/admin/leads/export" target="_blank" class="btn btn-success" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>Экспорт CSV</a>' +
+  '</div>';
+
+  if (!leads.length) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i><p style="color:#94a3b8">Заявок пока нет.</p></div>';
+  } else {
+    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
+      '<thead><tr style="border-bottom:2px solid #334155">' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">ID</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Источник</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Имя</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Контакт</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Услуга</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Статус</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Дата</th>' +
+      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Действия</th>' +
+      '</tr></thead><tbody>';
+    for (var i = 0; i < leads.length; i++) {
+      var l = leads[i];
+      var sc = statusColors[l.status] || '';
+      h += '<tr style="border-bottom:1px solid #1e293b">' +
+        '<td style="padding:10px;font-size:0.85rem">#' + l.id + '</td>' +
+        '<td style="padding:10px;font-size:0.85rem"><span class="badge badge-purple">' + (l.source || 'form') + '</span></td>' +
+        '<td style="padding:10px;font-size:0.85rem;font-weight:600">' + escHtml(l.name) + '</td>' +
+        '<td style="padding:10px;font-size:0.85rem;color:#a78bfa">' + escHtml(l.contact) + '</td>' +
+        '<td style="padding:10px;font-size:0.85rem">' + escHtml(l.service || l.product || l.message || '').substring(0, 40) + '</td>' +
+        '<td style="padding:10px"><select class="input" style="width:130px;padding:4px 8px;font-size:0.8rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
+        '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новый</option>' +
+        '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 Связались</option>' +
+        '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
+        '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option>' +
+        '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option></select></td>' +
+        '<td style="padding:10px;font-size:0.8rem;color:#64748b">' + (l.created_at || '').substring(0, 16) + '</td>' +
+        '<td style="padding:10px"><button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button></td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+async function updateLeadStatus(id, status) {
+  await api('/leads/' + id, { method: 'PUT', body: JSON.stringify({ status: status, notes: '' }) });
+  toast('Статус обновлён');
+}
+
+async function deleteLead(id) {
+  if (!confirm('Удалить эту заявку?')) return;
+  await api('/leads/' + id, { method: 'DELETE' });
+  toast('Заявка удалена');
+  await loadData(); render();
+}
+
+// ===== TELEGRAM BOT =====
+function renderTelegramBot() {
+  var bots = data.telegramBot || [];
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Telegram Бот / Уведомления</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Настройка бота для автоматических уведомлений о новых заявках</p>' +
+    '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addTgBot()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить получателя</button>';
+
+  for (var i = 0; i < bots.length; i++) {
+    var b = bots[i];
+    h += '<div class="card" style="margin-bottom:16px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+        '<div><strong>' + escHtml(b.chat_name || 'Chat ' + b.chat_id) + '</strong>' +
+          (b.is_active ? ' <span class="badge badge-green">Активен</span>' : ' <span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171">Выкл</span>') +
+        '</div>' +
+        '<div style="display:flex;gap:8px">' +
+          '<button class="btn btn-success" style="padding:6px 12px;font-size:0.8rem" onclick="saveTgBot(' + b.id + ')"><i class="fas fa-save"></i></button>' +
+          '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="testTgBot(' + b.id + ')"><i class="fas fa-paper-plane"></i> Тест</button>' +
+          '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deleteTgBot(' + b.id + ')"><i class="fas fa-trash"></i></button>' +
+        '</div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Bot Token</label><input class="input" value="' + escHtml(b.bot_token) + '" id="tgb_token_' + b.id + '" type="password"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Chat ID</label><input class="input" value="' + escHtml(b.chat_id) + '" id="tgb_chat_' + b.id + '"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Название чата</label><input class="input" value="' + escHtml(b.chat_name) + '" id="tgb_name_' + b.id + '"></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;padding-top:18px"><input type="checkbox" id="tgb_leads_' + b.id + '"' + (b.notify_leads ? ' checked' : '') + '><label style="font-size:0.85rem;color:#94a3b8">Уведомлять о лидах</label></div>' +
+        '<div style="display:flex;align-items:center;gap:8px;padding-top:18px"><input type="checkbox" id="tgb_calc_' + b.id + '"' + (b.notify_calc ? ' checked' : '') + '><label style="font-size:0.85rem;color:#94a3b8">Уведомлять о PDF</label></div>' +
+      '</div>' +
+    '</div>';
+  }
+
+  if (!bots.length) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-robot" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
+      '<p style="color:#94a3b8">Получатели уведомлений не настроены. Добавьте бота и Chat ID для получения уведомлений о заявках.</p></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+async function addTgBot() {
+  await api('/telegram-bot', { method: 'POST', body: JSON.stringify({ bot_token: '8168691099:AAEdDYZ2RPCM99QWsgRKu_dcHsne2c4Sd_U', chat_id: '', chat_name: 'Новый получатель', notify_leads: 1, notify_calc: 0 }) });
+  toast('Получатель добавлен');
+  await loadData(); render();
+}
+
+async function saveTgBot(id) {
+  await api('/telegram-bot/' + id, { method: 'PUT', body: JSON.stringify({
+    bot_token: document.getElementById('tgb_token_' + id).value,
+    chat_id: document.getElementById('tgb_chat_' + id).value,
+    chat_name: document.getElementById('tgb_name_' + id).value,
+    notify_leads: document.getElementById('tgb_leads_' + id).checked ? 1 : 0,
+    notify_calc: document.getElementById('tgb_calc_' + id).checked ? 1 : 0,
+    is_active: 1
+  }) });
+  toast('Сохранено');
+  await loadData(); render();
+}
+
+async function testTgBot(id) {
+  var token = document.getElementById('tgb_token_' + id).value;
+  var chatId = document.getElementById('tgb_chat_' + id).value;
+  if (!token || !chatId) { toast('Заполните Token и Chat ID', 'error'); return; }
+  var res = await api('/telegram-bot/test', { method: 'POST', body: JSON.stringify({ bot_token: token, chat_id: chatId, message: '✅ Тестовое сообщение от Go to Top admin panel!' }) });
+  if (res && res.success) toast('Сообщение отправлено!');
+  else toast('Ошибка: ' + (res?.error || 'unknown'), 'error');
+}
+
+async function deleteTgBot(id) {
+  if (!confirm('Удалить этого получателя?')) return;
+  await api('/telegram-bot/' + id, { method: 'DELETE' });
+  toast('Удалён');
+  await loadData(); render();
+}
+
+// ===== PDF TEMPLATE =====
+function renderPdfTemplate() {
+  var t = data.pdfTemplate || {};
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Шаблон PDF (Коммерческое предложение)</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Тексты для автоматически генерируемого PDF-файла калькулятора</p>' +
+    '<div class="card">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Заголовок (RU)</label><input class="input" id="pdf_header_ru" value="' + escHtml(t.header_ru) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Заголовок (AM)</label><input class="input" id="pdf_header_am" value="' + escHtml(t.header_am) + '"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Вступление (RU)</label><textarea class="input" id="pdf_intro_ru">' + escHtml(t.intro_ru) + '</textarea></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Вступление (AM)</label><textarea class="input" id="pdf_intro_am">' + escHtml(t.intro_am) + '</textarea></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Завершение (RU)</label><textarea class="input" id="pdf_outro_ru">' + escHtml(t.outro_ru) + '</textarea></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Завершение (AM)</label><textarea class="input" id="pdf_outro_am">' + escHtml(t.outro_am) + '</textarea></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Подпись/Footer (RU)</label><input class="input" id="pdf_footer_ru" value="' + escHtml(t.footer_ru) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Подпись/Footer (AM)</label><input class="input" id="pdf_footer_am" value="' + escHtml(t.footer_am) + '"></div>' +
+    '</div>' +
+    '<h3 style="font-weight:700;margin:20px 0 12px;color:#a78bfa"><i class="fas fa-building" style="margin-right:8px"></i>Данные компании</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Название компании</label><input class="input" id="pdf_company" value="' + escHtml(t.company_name) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Телефон</label><input class="input" id="pdf_phone" value="' + escHtml(t.company_phone) + '"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Email</label><input class="input" id="pdf_email" value="' + escHtml(t.company_email) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Адрес</label><input class="input" id="pdf_address" value="' + escHtml(t.company_address) + '"></div>' +
+    '</div>' +
+    '<button class="btn btn-success" onclick="savePdfTemplate()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить шаблон</button>' +
+    '</div></div>';
+  return h;
+}
+
+async function savePdfTemplate() {
+  await api('/pdf-template', { method: 'PUT', body: JSON.stringify({
+    header_ru: document.getElementById('pdf_header_ru').value,
+    header_am: document.getElementById('pdf_header_am').value,
+    intro_ru: document.getElementById('pdf_intro_ru').value,
+    intro_am: document.getElementById('pdf_intro_am').value,
+    outro_ru: document.getElementById('pdf_outro_ru').value,
+    outro_am: document.getElementById('pdf_outro_am').value,
+    footer_ru: document.getElementById('pdf_footer_ru').value,
+    footer_am: document.getElementById('pdf_footer_am').value,
+    company_name: document.getElementById('pdf_company').value,
+    company_phone: document.getElementById('pdf_phone').value,
+    company_email: document.getElementById('pdf_email').value,
+    company_address: document.getElementById('pdf_address').value
+  }) });
+  toast('Шаблон PDF сохранён');
+}
+
+// ===== SLOT COUNTER =====
+function renderSlotCounter() {
+  var s = data.slotCounter || {};
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Счётчик свободных слотов</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Интерактивный счётчик на сайте — показывает клиентам оставшиеся места</p>' +
+    '<div class="card">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Всего мест</label><input class="input" type="number" id="slot_total" value="' + (s.total_slots || 10) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Занято мест</label><input class="input" type="number" id="slot_booked" value="' + (s.booked_slots || 0) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Свободно</label><div style="font-size:2rem;font-weight:800;color:#10B981;padding:6px 0">' + Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0)) + '</div></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Надпись (RU)</label><input class="input" id="slot_label_ru" value="' + escHtml(s.label_ru) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Надпись (AM)</label><input class="input" id="slot_label_am" value="' + escHtml(s.label_am) + '"></div>' +
+    '</div>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><input type="checkbox" id="slot_show"' + (s.show_timer ? ' checked' : '') + '><label style="font-size:0.9rem;color:#94a3b8">Показывать счётчик на сайте</label></div>' +
+    '<button class="btn btn-success" onclick="saveSlotCounter()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>' +
+    '</div></div>';
+  return h;
+}
+
+async function saveSlotCounter() {
+  await api('/slot-counter', { method: 'PUT', body: JSON.stringify({
+    total_slots: parseInt(document.getElementById('slot_total').value) || 10,
+    booked_slots: parseInt(document.getElementById('slot_booked').value) || 0,
+    label_ru: document.getElementById('slot_label_ru').value,
+    label_am: document.getElementById('slot_label_am').value,
+    show_timer: document.getElementById('slot_show').checked ? 1 : 0,
+    reset_day: 'monday'
+  }) });
+  toast('Счётчик обновлён');
+  await loadData(); render();
+}
+
 // ===== RENDER =====
 function escHtml(s) {
   if (!s) return '';
@@ -801,11 +1045,15 @@ function render() {
   let pageHtml = '';
   switch (currentPage) {
     case 'dashboard': pageHtml = renderDashboard(); break;
+    case 'leads': pageHtml = renderLeads(); break;
     case 'content': pageHtml = renderContent(); break;
     case 'calculator': pageHtml = renderCalculator(); break;
+    case 'pdf': pageHtml = renderPdfTemplate(); break;
     case 'referrals': pageHtml = renderReferrals(); break;
     case 'sections': pageHtml = renderSections(); break;
+    case 'slots': pageHtml = renderSlotCounter(); break;
     case 'telegram': pageHtml = renderTelegram(); break;
+    case 'tgbot': pageHtml = renderTelegramBot(); break;
     case 'scripts': pageHtml = renderScripts(); break;
     case 'settings': pageHtml = renderSettings(); break;
   }

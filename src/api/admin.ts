@@ -250,6 +250,11 @@ api.get('/stats', authMiddleware, async (c) => {
   const messages = await db.prepare('SELECT COUNT(*) as count FROM telegram_messages').first();
   const scripts = await db.prepare('SELECT COUNT(*) as count FROM custom_scripts').first();
   
+  // Leads stats
+  const totalLeads = await db.prepare('SELECT COUNT(*) as count FROM leads').first().catch(() => ({ count: 0 }));
+  const newLeads = await db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'new'").first().catch(() => ({ count: 0 }));
+  const todayLeads = await db.prepare("SELECT COUNT(*) as count FROM leads WHERE date(created_at) = date('now')").first().catch(() => ({ count: 0 }));
+  
   // Analytics data
   const todayViews = await db.prepare("SELECT COUNT(*) as count FROM page_views WHERE date(created_at) = date('now')").first().catch(() => ({ count: 0 }));
   const weekViews = await db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-7 days')").first().catch(() => ({ count: 0 }));
@@ -290,6 +295,11 @@ api.get('/stats', authMiddleware, async (c) => {
     telegram_buttons: messages?.count || 0,
     custom_scripts: scripts?.count || 0,
     referral_codes: refCodes?.count || 0,
+    leads: {
+      total: totalLeads?.count || 0,
+      new: newLeads?.count || 0,
+      today: todayLeads?.count || 0
+    },
     analytics: {
       today: todayViews?.count || 0,
       week: weekViews?.count || 0,
@@ -381,6 +391,165 @@ api.put('/section-order/seed', authMiddleware, async (c) => {
         .bind(d.id, d.order, d.ru, d.am).run();
     }
   }
+  return c.json({ success: true });
+});
+
+// ===== LEADS CRM =====
+api.get('/leads', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const status = c.req.query('status');
+  const limit = parseInt(c.req.query('limit') || '100');
+  const offset = parseInt(c.req.query('offset') || '0');
+  let sql = 'SELECT * FROM leads';
+  const params: any[] = [];
+  if (status && status !== 'all') {
+    sql += ' WHERE status = ?';
+    params.push(status);
+  }
+  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  params.push(limit, offset);
+  const res = await db.prepare(sql).bind(...params).all();
+  const total = await db.prepare('SELECT COUNT(*) as count FROM leads').first();
+  return c.json({ leads: res.results, total: total?.count || 0 });
+});
+
+api.put('/leads/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { status, notes } = await c.req.json();
+  await db.prepare('UPDATE leads SET status=?, notes=? WHERE id=?').bind(status, notes || '', id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/leads/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM leads WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+api.get('/leads/export', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
+  const leads = res.results;
+  let csv = 'ID,Source,Name,Contact,Product,Service,Message,Language,Status,Notes,Referral,Created\n';
+  for (const l of leads) {
+    csv += [l.id, l.source, `"${(l.name as string || '').replace(/"/g, '""')}"`, `"${(l.contact as string || '').replace(/"/g, '""')}"`,
+      `"${(l.product as string || '').replace(/"/g, '""')}"`, `"${(l.service as string || '').replace(/"/g, '""')}"`,
+      `"${(l.message as string || '').replace(/"/g, '""')}"`, l.lang, l.status,
+      `"${(l.notes as string || '').replace(/"/g, '""')}"`, l.referral_code, l.created_at].join(',') + '\n';
+  }
+  return new Response(csv, {
+    headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=leads_export.csv' }
+  });
+});
+
+// ===== SITE SETTINGS (webhook URLs, bot token, slot counter, etc.) =====
+api.get('/settings', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM site_settings').all();
+  const settings: Record<string, string> = {};
+  for (const row of res.results) {
+    settings[row.key as string] = row.value as string;
+  }
+  return c.json(settings);
+});
+
+api.put('/settings', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const data = await c.req.json();
+  for (const [key, value] of Object.entries(data)) {
+    await db.prepare('INSERT INTO site_settings (key, value) VALUES (?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP')
+      .bind(key, value as string).run();
+  }
+  return c.json({ success: true });
+});
+
+// ===== TELEGRAM BOT CONFIG =====
+api.get('/telegram-bot', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM telegram_bot_config ORDER BY id').all();
+  return c.json(res.results);
+});
+
+api.post('/telegram-bot', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { bot_token, chat_id, chat_name, notify_leads, notify_calc } = await c.req.json();
+  await db.prepare('INSERT INTO telegram_bot_config (bot_token, chat_id, chat_name, notify_leads, notify_calc) VALUES (?,?,?,?,?)')
+    .bind(bot_token, chat_id, chat_name || '', notify_leads ?? 1, notify_calc ?? 0).run();
+  return c.json({ success: true });
+});
+
+api.put('/telegram-bot/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const { bot_token, chat_id, chat_name, notify_leads, notify_calc, is_active } = await c.req.json();
+  await db.prepare('UPDATE telegram_bot_config SET bot_token=?, chat_id=?, chat_name=?, notify_leads=?, notify_calc=?, is_active=? WHERE id=?')
+    .bind(bot_token, chat_id, chat_name || '', notify_leads ?? 1, notify_calc ?? 0, is_active ?? 1, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/telegram-bot/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM telegram_bot_config WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+api.post('/telegram-bot/test', authMiddleware, async (c) => {
+  const { bot_token, chat_id, message } = await c.req.json();
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${bot_token}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id, text: message || 'Test from Go to Top admin panel', parse_mode: 'HTML' })
+    });
+    const data = await res.json() as any;
+    if (data.ok) {
+      return c.json({ success: true, message: 'Message sent successfully' });
+    } else {
+      return c.json({ success: false, error: data.description || 'Telegram API error' }, 400);
+    }
+  } catch (e: any) {
+    return c.json({ success: false, error: e.message }, 500);
+  }
+});
+
+// ===== PDF TEMPLATE =====
+api.get('/pdf-template', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  let row = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+  if (!row) {
+    await db.prepare("INSERT INTO pdf_templates (template_key) VALUES ('default')").run();
+    row = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+  }
+  return c.json(row);
+});
+
+api.put('/pdf-template', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare(`UPDATE pdf_templates SET header_ru=?, header_am=?, footer_ru=?, footer_am=?, intro_ru=?, intro_am=?, outro_ru=?, outro_am=?, company_name=?, company_phone=?, company_email=?, company_address=?, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`)
+    .bind(d.header_ru||'', d.header_am||'', d.footer_ru||'', d.footer_am||'', d.intro_ru||'', d.intro_am||'', d.outro_ru||'', d.outro_am||'', d.company_name||'', d.company_phone||'', d.company_email||'', d.company_address||'').run();
+  return c.json({ success: true });
+});
+
+// ===== SLOT COUNTER =====
+api.get('/slot-counter', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  let row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
+  if (!row) {
+    await db.prepare("INSERT INTO slot_counter (total_slots, booked_slots) VALUES (10, 0)").run();
+    row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
+  }
+  return c.json(row);
+});
+
+api.put('/slot-counter', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('UPDATE slot_counter SET total_slots=?, booked_slots=?, label_ru=?, label_am=?, show_timer=?, reset_day=?, updated_at=CURRENT_TIMESTAMP WHERE id=1')
+    .bind(d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday').run();
   return c.json({ success: true });
 });
 

@@ -90,21 +90,146 @@ app.get('/api/site-data', async (c) => {
 });
 
 // API endpoint for lead form submission
+// ===== Helper: send Telegram notification =====
+async function notifyTelegram(db: D1Database, leadData: any) {
+  try {
+    const configs = await db.prepare('SELECT * FROM telegram_bot_config WHERE is_active = 1 AND notify_leads = 1').all();
+    for (const cfg of configs.results) {
+      const token = cfg.bot_token as string;
+      const chatId = cfg.chat_id as string;
+      if (!token || !chatId) continue;
+      const text = `🔔 <b>Новая заявка!</b>\n\n` +
+        `👤 <b>Имя:</b> ${leadData.name || '—'}\n` +
+        `📱 <b>Контакт:</b> ${leadData.contact || '—'}\n` +
+        `📦 <b>Продукт:</b> ${leadData.product || '—'}\n` +
+        `🛠 <b>Услуга:</b> ${leadData.service || '—'}\n` +
+        `💬 <b>Сообщение:</b> ${leadData.message || '—'}\n` +
+        `🌐 <b>Язык:</b> ${leadData.lang || '—'}\n` +
+        `📋 <b>Источник:</b> ${leadData.source || 'form'}\n` +
+        (leadData.referral_code ? `🎁 <b>Реф. код:</b> ${leadData.referral_code}\n` : '') +
+        `🕐 ${new Date().toLocaleString('ru-RU', { timeZone: 'Asia/Yerevan' })}`;
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' })
+      }).catch(() => {});
+    }
+  } catch {}
+}
+
 app.post('/api/lead', async (c) => {
-  const body = await c.req.json()
-  console.log('New lead:', body)
-  return c.json({ success: true, message: 'Lead received' })
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const body = await c.req.json();
+    const ua = c.req.header('User-Agent') || '';
+    await db.prepare('INSERT INTO leads (source, name, contact, product, service, message, lang, referral_code, user_agent) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind('form', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200)).run();
+    notifyTelegram(db, { ...body, source: 'form' });
+    return c.json({ success: true, message: 'Lead received' });
+  } catch (e) {
+    console.error('Lead error:', e);
+    return c.json({ success: true, message: 'Lead received' });
+  }
 })
 
-// API endpoint for popup form -> Telegram bot
+// API endpoint for popup form -> save + notify
 app.post('/api/popup-lead', async (c) => {
-  const body = await c.req.json()
-  console.log('Popup lead:', body)
-  return c.json({ success: true, message: 'Lead received' })
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const body = await c.req.json();
+    const ua = c.req.header('User-Agent') || '';
+    await db.prepare('INSERT INTO leads (source, name, contact, product, service, message, lang, user_agent) VALUES (?,?,?,?,?,?,?,?)')
+      .bind('popup', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200)).run();
+    notifyTelegram(db, { ...body, source: 'popup' });
+    return c.json({ success: true, message: 'Lead received' });
+  } catch (e) {
+    console.error('Popup lead error:', e);
+    return c.json({ success: true, message: 'Lead received' });
+  }
 })
 
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
+})
+
+// ===== PUBLIC SLOT COUNTER =====
+app.get('/api/slots', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    let row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
+    if (!row) return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 1 });
+    return c.json({
+      total: row.total_slots, booked: row.booked_slots,
+      free: Math.max(0, (row.total_slots as number) - (row.booked_slots as number)),
+      label_ru: row.label_ru, label_am: row.label_am, show_timer: row.show_timer
+    });
+  } catch { return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 0 }); }
+})
+
+// ===== PDF GENERATION (HTML-based, returns HTML for print/save) =====
+app.post('/api/generate-pdf', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const body = await c.req.json();
+    const lang = body.lang || 'ru';
+    const items = body.items || [];
+    const total = body.total || 0;
+    const clientName = body.clientName || '';
+    const clientContact = body.clientContact || '';
+
+    // Load PDF template
+    let tpl = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+    if (!tpl) tpl = { header_ru: 'Коммерческое предложение', header_am: 'Կomerch առdelays', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
+
+    const isAm = lang === 'am';
+    const header = isAm ? tpl.header_am : tpl.header_ru;
+    const intro = isAm ? tpl.intro_am : tpl.intro_ru;
+    const outro = isAm ? tpl.outro_am : tpl.outro_ru;
+    const footer = isAm ? tpl.footer_am : tpl.footer_ru;
+
+    // Build rows
+    let rows = '';
+    for (const item of items) {
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right">' + Number(item.price || 0).toLocaleString('ru-RU') + ' ֏</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + ' ֏</td></tr>';
+    }
+
+    const pdfHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1f2937;padding:40px}' +
+      '.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #8B5CF6}' +
+      '.logo{font-size:28px;font-weight:800;color:#8B5CF6}.company-info{text-align:right;font-size:12px;color:#6b7280}' +
+      '.title{font-size:22px;font-weight:700;color:#1f2937;margin-bottom:20px}.client-info{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:24px}' +
+      '.intro{margin-bottom:24px;line-height:1.6;color:#4b5563}table{width:100%;border-collapse:collapse;margin-bottom:24px;border:1px solid #e5e7eb}' +
+      'th{background:#8B5CF6;color:white;padding:12px;text-align:left;font-weight:600;font-size:13px}' +
+      '.total-row{background:#f3f0ff;font-weight:700;font-size:18px}.outro{margin-top:24px;line-height:1.6;color:#4b5563}' +
+      '.footer{margin-top:40px;padding-top:20px;border-top:2px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center}' +
+      '@media print{body{padding:20px}}</style></head><body>' +
+      '<div class="header"><div class="logo">' + (tpl.company_name || 'Go to Top') + '</div><div class="company-info">' +
+      (tpl.company_phone ? '<div>' + tpl.company_phone + '</div>' : '') +
+      (tpl.company_email ? '<div>' + tpl.company_email + '</div>' : '') +
+      (tpl.company_address ? '<div>' + tpl.company_address + '</div>' : '') +
+      '<div>' + new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU') + '</div></div></div>' +
+      '<div class="title">' + (header || '') + '</div>' +
+      (clientName || clientContact ? '<div class="client-info"><strong>' + (isAm ? 'Հdelays:' : 'Клиент:') + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
+      (intro ? '<div class="intro">' + intro + '</div>' : '') +
+      '<table><thead><tr><th>' + (isAm ? 'Ctions' : 'Услуга') + '</th><th style="text-align:center">' + (isAm ? 'Qdelays' : 'Кол-во') + '</th><th style="text-align:right">' + (isAm ? 'Gdelays' : 'Цена') + '</th><th style="text-align:right">' + (isAm ? 'Gdelays' : 'Сумма') + '</th></tr></thead><tbody>' + rows +
+      '<tr class="total-row"><td colspan="3" style="padding:14px 12px;text-align:right">' + (isAm ? 'Idelays:' : 'ИТОГО:') + '</td><td style="padding:14px 12px;text-align:right;color:#8B5CF6;font-size:20px">' + Number(total).toLocaleString('ru-RU') + ' ֏</td></tr></tbody></table>' +
+      (outro ? '<div class="outro">' + outro + '</div>' : '') +
+      (footer ? '<div class="footer">' + footer + '</div>' : '') +
+      '</body></html>';
+
+    // Also save as lead with calc data
+    const ua = c.req.header('User-Agent') || '';
+    await db.prepare('INSERT INTO leads (source, name, contact, calc_data, lang, user_agent) VALUES (?,?,?,?,?,?)')
+      .bind('calculator_pdf', clientName, clientContact, JSON.stringify({ items, total }), lang, ua.substring(0,200)).run();
+    notifyTelegram(db, { name: clientName, contact: clientContact, source: 'calculator_pdf', message: 'PDF generated: ' + total + ' ֏', lang });
+
+    return c.html(pdfHtml);
+  } catch (e: any) {
+    return c.json({ error: e.message }, 500);
+  }
 })
 
 // ===== PAGE VIEW TRACKING =====
@@ -218,6 +343,10 @@ app.get('/', (c) => {
 <meta property="og:image:alt" content="Go to Top - логотип">
 <meta property="og:site_name" content="Go to Top">
 <meta property="og:locale" content="ru_RU">
+<meta property="og:locale:alternate" content="hy_AM">
+<link rel="alternate" hreflang="ru" href="https://gototop.win">
+<link rel="alternate" hreflang="hy" href="https://gototop.win">
+<link rel="alternate" hreflang="x-default" href="https://gototop.win">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Go to Top — Առաdelays Wildberries- delays">
 <meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
@@ -443,7 +572,7 @@ img{max-width:100%;height:auto}
 .btn-tg{background:linear-gradient(135deg,#0088cc,#0077b5);color:white;box-shadow:0 4px 15px rgba(0,136,204,0.3)}
 .btn-tg:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,136,204,0.5)}
 
-/* ===== POPUP - GUARANTEED VISIBLE ===== */
+/* ===== POPUP - Mobile-friendly slide-up ===== */
 .popup-overlay{
   display:none;
   position:fixed;top:0;left:0;right:0;bottom:0;
@@ -474,6 +603,18 @@ img{max-width:100%;height:auto}
   transform:scale(1);
 }
 @keyframes popIn{0%{transform:scale(0.7) translateY(30px);opacity:0}100%{transform:scale(1) translateY(0);opacity:1}}
+@keyframes slideUpMobile{0%{transform:translateY(100%)}100%{transform:translateY(0)}}
+@media(max-width:640px){
+  .popup-overlay{align-items:flex-end;padding:0}
+  .popup-card{
+    border-radius:20px 20px 0 0;
+    max-width:100%;
+    animation:slideUpMobile 0.4s ease forwards;
+    padding:28px 20px;
+    max-height:90vh;
+    overflow-y:auto;
+  }
+}
 .popup-card .popup-close{
   position:absolute;top:14px;right:14px;
   width:34px;height:34px;border-radius:50%;
@@ -553,6 +694,8 @@ img{max-width:100%;height:auto}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
 .stat-card .stat-big{font-size:2.8rem;font-weight:900;color:var(--purple);line-height:1}
 .stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
+.slot-counter-bar{padding:0;background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(139,92,246,0.05));border-bottom:1px solid var(--border)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
 
 /* ===== WB BANNER ===== */
@@ -787,6 +930,25 @@ img{max-width:100%;height:auto}
     <div class="stat-card">
       <div class="stat-big" data-count-s="200">0+</div>
       <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">выкупов каждый день</div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===== SLOT COUNTER ===== -->
+<div class="slot-counter-bar fade-up" data-section-id="slot-counter" id="slotCounterSection" style="display:none">
+<div class="container">
+  <div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="width:14px;height:14px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>
+      <span id="slotLabel" data-ru="Свободных мест на этой неделе" data-am="Այdelays" style="font-size:1rem;font-weight:600;color:var(--text-secondary)">Свободных мест на этой неделе</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="slotFreeCount" style="font-size:2.2rem;font-weight:900;color:var(--purple)">—</span>
+      <span style="font-size:0.85rem;color:var(--text-muted)">/ <span id="slotTotalCount">—</span></span>
+    </div>
+    <div id="slotProgress" style="width:200px;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden">
+      <div id="slotProgressBar" style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;transition:width 1s ease;width:0%"></div>
     </div>
   </div>
 </div>
@@ -2229,6 +2391,94 @@ async function checkRefCode() {
     console.log('Ref check error:', e);
   }
 }
+
+/* ===== SLOT COUNTER ===== */
+(function() {
+  fetch('/api/slots').then(function(r){return r.json()}).then(function(d) {
+    if (!d || !d.show_timer) return;
+    var section = document.getElementById('slotCounterSection');
+    if (section) section.style.display = 'block';
+    var freeEl = document.getElementById('slotFreeCount');
+    var totalEl = document.getElementById('slotTotalCount');
+    var barEl = document.getElementById('slotProgressBar');
+    var labelEl = document.getElementById('slotLabel');
+    if (freeEl) freeEl.textContent = d.free;
+    if (totalEl) totalEl.textContent = d.total;
+    if (barEl) barEl.style.width = Math.round(((d.total - d.free) / d.total) * 100) + '%';
+    if (labelEl && lang === 'am' && d.label_am) labelEl.textContent = d.label_am;
+    else if (labelEl && d.label_ru) labelEl.textContent = d.label_ru;
+  }).catch(function(){});
+})();
+
+/* ===== PDF DOWNLOAD BUTTON ===== */
+(function() {
+  var calcSection = document.getElementById('calculator');
+  if (!calcSection) return;
+  var totalEl = document.getElementById('calcTotal');
+  if (!totalEl) return;
+
+  // Create PDF download button
+  var pdfBtn = document.createElement('button');
+  pdfBtn.className = 'calc-submit-btn';
+  pdfBtn.style.cssText = 'margin-top:12px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center';
+  pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> <span data-ru="Скачать КП (PDF)" data-am="Ներdelays КП (PDF)">Скачать КП (PDF)</span>';
+  
+  // Insert after total line
+  var totalWrap = totalEl.closest('.calc-total') || totalEl.parentElement;
+  if (totalWrap && totalWrap.parentElement) {
+    totalWrap.parentElement.insertBefore(pdfBtn, totalWrap.nextSibling);
+  }
+
+  pdfBtn.addEventListener('click', function() {
+    // Collect selected items from calculator
+    var items = [];
+    var checkboxes = calcSection.querySelectorAll('.calc-check');
+    checkboxes.forEach(function(cb) {
+      if (cb.checked) {
+        var row = cb.closest('.calc-row');
+        if (!row) return;
+        var nameEl = row.querySelector('.calc-name');
+        var priceEl = row.querySelector('.calc-price');
+        var qtyEl = row.querySelector('.calc-qty');
+        var name = nameEl ? nameEl.textContent.trim() : '';
+        var priceText = priceEl ? priceEl.textContent.replace(/[^0-9]/g, '') : '0';
+        var price = parseInt(priceText) || 0;
+        var qty = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
+        items.push({ name: name, price: price, qty: qty, subtotal: price * qty });
+      }
+    });
+    if (!items.length) { alert(lang === 'am' ? 'Ընdelays ctions!' : 'Выберите услуги!'); return; }
+    var totalVal = totalEl.textContent.replace(/[^0-9]/g, '');
+
+    // Open PDF in new window
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/api/generate-pdf';
+    form.target = '_blank';
+    var input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'data';
+    input.value = JSON.stringify({ items: items, total: parseInt(totalVal) || 0, lang: lang, clientName: '', clientContact: '' });
+    form.appendChild(input);
+    document.body.appendChild(form);
+
+    // Instead use fetch and open
+    fetch('/api/generate-pdf', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ items: items, total: parseInt(totalVal) || 0, lang: lang, clientName: '', clientContact: '' })
+    }).then(function(r){return r.text()}).then(function(html) {
+      var w = window.open('', '_blank');
+      if (w) { w.document.write(html); w.document.close(); }
+    }).catch(function(e){ console.error('PDF error:', e); });
+  });
+
+  // Apply language to PDF button
+  if (lang === 'am') {
+    var span = pdfBtn.querySelector('span[data-am]');
+    if (span) span.textContent = span.getAttribute('data-am');
+  }
+})();
 
 /* ===== PAGE VIEW TRACKING ===== */
 (function() {
