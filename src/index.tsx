@@ -351,9 +351,9 @@ img{max-width:100%;height:auto}
 .buyout-card:hover{border-color:rgba(139,92,246,0.3)}
 .buyout-card h4{font-size:1rem;font-weight:700;margin-bottom:12px;text-transform:uppercase;color:var(--accent)}
 .buyout-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7}
-.buyout-card ul{list-style:none;margin-top:12px}
-.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec)}
-.buyout-card ul li::before{content:"•";color:var(--purple);margin-right:8px}
+.buyout-card ul{list-style:none;margin-top:12px;counter-reset:buyout-step}
+.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec);counter-increment:buyout-step}
+.buyout-card ul li::before{content:counter(buyout-step);color:var(--purple);margin-right:8px;font-weight:700}
 .buyout-cta{text-align:right;margin-top:24px}
 
 /* ===== STATS BAR ===== */
@@ -397,9 +397,9 @@ img{max-width:100%;height:auto}
 .buyout-card:hover{border-color:rgba(139,92,246,0.3)}
 .buyout-card h4{font-size:1rem;font-weight:700;margin-bottom:12px;text-transform:uppercase;color:var(--accent)}
 .buyout-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7}
-.buyout-card ul{list-style:none;margin-top:12px}
-.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec)}
-.buyout-card ul li::before{content:"\2022";color:var(--purple);margin-right:8px}
+.buyout-card ul{list-style:none;margin-top:12px;counter-reset:buyout-step}
+.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec);counter-increment:buyout-step}
+.buyout-card ul li::before{content:counter(buyout-step);color:var(--purple);margin-right:8px;font-weight:700}
 .buyout-cta{text-align:right;margin-top:24px}
 
 /* ===== REVIEWS DETAIL ===== */
