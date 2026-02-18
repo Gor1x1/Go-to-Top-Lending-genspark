@@ -333,137 +333,183 @@ async function seedContent() {
 // ===== CALCULATOR =====
 function renderCalculator() {
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:10px"></i>Калькулятор услуг</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Управление вкладками и услугами. Перетаскивайте для изменения порядка.</p>';
+    '<p style="color:#94a3b8;margin-bottom:24px">Управление разделами и услугами. Каждый раздел = вкладка на сайте.</p>';
   
-  // ===== TABS MANAGEMENT (with inline edit, drag, reorder) =====
-  h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-folder" style="color:#8B5CF6;margin-right:8px"></i>Вкладки калькулятора</h3>';
-  h += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">';
-  for (var ti = 0; ti < data.calcTabs.length; ti++) {
-    var tab = data.calcTabs[ti];
-    h += '<div class="section-edit-row" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:grab" draggable="true" ondragstart="dragTab(event,' + tab.id + ',' + ti + ')" ondragover="event.preventDefault()" ondrop="dropTab(event,' + ti + ')">' +
-      '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab"></i>' +
-      '<span style="font-size:0.8rem;color:#64748b;min-width:20px">#' + (ti+1) + '</span>' +
-      '<input class="input" value="' + escHtml(tab.name_ru) + '" style="flex:1;padding:6px 10px;font-size:0.85rem" id="tab_ru_' + tab.id + '" placeholder="Название RU">' +
-      '<input class="input" value="' + escHtml(tab.name_am || '') + '" style="flex:1;padding:6px 10px;font-size:0.85rem" id="tab_am_' + tab.id + '" placeholder="Название AM">' +
-      '<input class="input" value="' + escHtml(tab.tab_key) + '" style="width:100px;padding:6px 10px;font-size:0.8rem;color:#64748b" id="tab_key_' + tab.id + '" placeholder="key">' +
-      '<button class="btn btn-success" style="padding:6px 10px;font-size:0.8rem" onclick="saveCalcTab(' + tab.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
-      '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="deleteCalcTab(' + tab.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
-    '</div>';
-  }
-  h += '</div>';
-  h += '<button class="btn btn-outline" style="font-size:0.85rem" onclick="addCalcTab()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить вкладку</button>';
-  h += '</div>';
-  
-  // ===== SERVICES (with tab selection, drag reorder) =====
-  h += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<h3 style="font-weight:700"><i class="fas fa-list" style="color:#8B5CF6;margin-right:8px"></i>Услуги</h3>' +
-    '<button class="btn btn-primary" style="font-size:0.85rem" onclick="addCalcService()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить услугу</button>' +
+  h += '<div style="display:flex;gap:10px;margin-bottom:24px">' +
+    '<button class="btn btn-primary" onclick="addNewSection()"><i class="fas fa-folder-plus" style="margin-right:6px"></i>Создать новый раздел</button>' +
+    '<a href="/?_nocache=' + Date.now() + '" target="_blank" class="btn btn-outline" style="text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть сайт</a>' +
   '</div>';
   
-  // Group by tab
+  // Group services by tab
   var byTab = {};
   for (var si = 0; si < data.calcServices.length; si++) {
     var svc = data.calcServices[si];
-    var tabKey = svc.tab_key || 'unknown';
-    if (!byTab[tabKey]) byTab[tabKey] = [];
-    byTab[tabKey].push(svc);
+    var tabId = svc.tab_id || 0;
+    if (!byTab[tabId]) byTab[tabId] = [];
+    byTab[tabId].push(svc);
   }
   
-  for (var tabKey in byTab) {
-    if (!byTab.hasOwnProperty(tabKey)) continue;
-    var svcs = byTab[tabKey];
-    var tab = data.calcTabs.find(function(t){ return t.tab_key === tabKey; });
-    h += '<div style="margin-bottom:24px">' +
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(139,92,246,0.1);border-radius:8px">' +
-        '<i class="fas fa-folder-open" style="color:#a78bfa"></i>' +
-        '<span style="color:#a78bfa;font-weight:700;font-size:0.95rem">' + (tab ? tab.name_ru : tabKey) + '</span>' +
-        '<span class="badge badge-purple" style="margin-left:auto">' + svcs.length + ' услуг</span>' +
-      '</div>';
+  // Render each tab as a folder section
+  for (var ti = 0; ti < data.calcTabs.length; ti++) {
+    var tab = data.calcTabs[ti];
+    var svcs = byTab[tab.id] || [];
     
+    h += '<div class="card" style="margin-bottom:20px">';
+    
+    // Folder header — editable inline
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #334155">' +
+      '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:1rem" title="Перетащите для перемещения"></i>' +
+      '<i class="fas fa-folder-open" style="color:#a78bfa;font-size:1.1rem"></i>' +
+      '<div style="flex:1;display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+        '<input class="input" value="' + escHtml(tab.name_ru) + '" style="flex:1;min-width:120px;padding:6px 10px;font-size:0.9rem;font-weight:700" id="tab_ru_' + tab.id + '" placeholder="Название RU">' +
+        '<input class="input" value="' + escHtml(tab.name_am || '') + '" style="flex:1;min-width:120px;padding:6px 10px;font-size:0.9rem" id="tab_am_' + tab.id + '" placeholder="Название AM">' +
+        '<input class="input" value="' + escHtml(tab.tab_key) + '" style="width:90px;padding:6px 10px;font-size:0.8rem;color:#64748b" id="tab_key_' + tab.id + '" placeholder="key" title="Ключ вкладки (англ)">' +
+      '</div>' +
+      '<span class="badge badge-purple">' + svcs.length + '</span>' +
+      '<button class="btn btn-success" style="padding:6px 10px;font-size:0.8rem" onclick="saveCalcTab(' + tab.id + ')" title="Сохранить раздел"><i class="fas fa-save"></i></button>' +
+      '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="deleteCalcTab(' + tab.id + ')" title="Удалить раздел"><i class="fas fa-trash"></i></button>' +
+    '</div>';
+    
+    // Services inside this folder
     for (var si2 = 0; si2 < svcs.length; si2++) {
       var svc2 = svcs[si2];
       var isTiered = svc2.price_type === 'tiered' && svc2.price_tiers_json;
       var tiers = [];
       if (isTiered) { try { tiers = JSON.parse(svc2.price_tiers_json); } catch(e) { tiers = []; } }
       
-      h += '<div class="section-edit-row" style="margin-bottom:10px" draggable="true" ondragstart="dragSvc(event,' + svc2.id + ',' + si2 + ')" ondragover="event.preventDefault()" ondrop="dropSvc(event,' + si2 + ',\\'' + tabKey + '\\')">' +
-        '<div style="display:grid;grid-template-columns:20px 1fr 1fr 100px 80px auto auto auto;gap:8px;align-items:center">' +
-          '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:0.8rem"></i>' +
-          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">RU</div><input class="input" value="' + escHtml(svc2.name_ru) + '" id="svc_ru_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
-          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">AM</div><input class="input" value="' + escHtml(svc2.name_am || '') + '" id="svc_am_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
-          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Цена ֏</div><input class="input" type="number" value="' + svc2.price + '" id="svc_price_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
-          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Раздел</div><select class="input" id="svc_tab_' + svc2.id + '" style="padding:6px 8px;font-size:0.8rem">';
-      
-      for (var tabi = 0; tabi < data.calcTabs.length; tabi++) {
-        var t = data.calcTabs[tabi];
-        h += '<option value="' + t.id + '"' + (svc2.tab_id === t.id ? ' selected' : '') + '>' + escHtml(t.name_ru) + '</option>';
-      }
-      h += '</select></div>' +
-          '<button class="btn btn-success" style="padding:6px 10px" onclick="saveCalcService(' + svc2.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
-          '<button class="btn btn-danger" style="padding:6px 10px" onclick="deleteCalcService(' + svc2.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
+      h += '<div class="section-edit-row" style="margin-bottom:8px">' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 100px auto auto;gap:8px;align-items:center">' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название RU</div><input class="input" value="' + escHtml(svc2.name_ru) + '" id="svc_ru_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название AM</div><input class="input" value="' + escHtml(svc2.name_am || '') + '" id="svc_am_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">\u0426\u0435\u043d\u0430 \u058f</div><input class="input" type="number" value="' + svc2.price + '" id="svc_price_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<button class="btn btn-success" style="padding:6px 10px;margin-top:14px" onclick="saveCalcService(' + svc2.id + ',' + tab.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
+          '<button class="btn btn-danger" style="padding:6px 10px;margin-top:14px" onclick="deleteCalcService(' + svc2.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
         '</div>';
       
       // Tier editor
       if (isTiered && tiers.length > 0) {
         h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
-          '<div style="font-size:0.78rem;font-weight:600;color:#a78bfa;margin-bottom:6px"><i class="fas fa-layer-group" style="margin-right:4px"></i>Тарифная шкала</div>';
+          '<div style="font-size:0.78rem;font-weight:600;color:#a78bfa;margin-bottom:6px"><i class="fas fa-layer-group" style="margin-right:4px"></i>\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430</div>';
         for (var tii = 0; tii < tiers.length; tii++) {
           h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">' +
-            '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">от</span>' +
+            '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">\u043e\u0442</span>' +
             '<input class="input" type="number" value="' + tiers[tii].min + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_min_' + svc2.id + '_' + tii + '">' +
-            '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">до</span>' +
+            '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">\u0434\u043e</span>' +
             '<input class="input" type="number" value="' + tiers[tii].max + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_max_' + svc2.id + '_' + tii + '">' +
             '<span style="font-size:0.75rem;color:#94a3b8">=</span>' +
-            '<input class="input" type="number" value="' + tiers[tii].price + '" style="width:80px;padding:4px 6px;font-size:0.8rem" id="tier_price_' + svc2.id + '_' + tii + '"><span style="font-size:0.8rem;color:#94a3b8">֏</span>' +
+            '<input class="input" type="number" value="' + tiers[tii].price + '" style="width:80px;padding:4px 6px;font-size:0.8rem" id="tier_price_' + svc2.id + '_' + tii + '"><span style="font-size:0.8rem;color:#94a3b8">\u058f</span>' +
             '<button class="tier-del-btn" onclick="deleteTier(' + svc2.id + ',' + tii + ',' + tiers.length + ')"><i class="fas fa-times"></i></button>' +
           '</div>';
         }
         h += '<div style="margin-top:6px;display:flex;gap:6px">' +
-          '<button class="btn btn-success" style="padding:4px 10px;font-size:0.75rem" onclick="saveTiers(' + svc2.id + ',' + tiers.length + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить</button>' +
-          '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="addTier(' + svc2.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Строка</button>' +
+          '<button class="btn btn-success" style="padding:4px 10px;font-size:0.75rem" onclick="saveTiers(' + svc2.id + ',' + tiers.length + ')"><i class="fas fa-save" style="margin-right:4px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>' +
+          '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="addTier(' + svc2.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>\u0421\u0442\u0440\u043e\u043a\u0430</button>' +
         '</div></div>';
       }
       h += '</div>';
     }
+    
+    // Add service button inside folder
+    h += '<button class="btn btn-outline" style="width:100%;margin-top:8px;padding:10px;font-size:0.85rem;border-style:dashed" onclick="addServiceToTab(' + tab.id + ',\'' + escHtml(tab.name_ru) + '\')">' +
+      '<i class="fas fa-plus" style="margin-right:6px;color:#a78bfa"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u0443\u0433\u0443 \u0432 \u00ab' + escHtml(tab.name_ru) + '\u00bb</button>';
+    
     h += '</div>';
   }
-  h += '</div></div>';
+  
+  if (!data.calcTabs.length) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-folder-open" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
+      '<p style="color:#94a3b8;margin-bottom:16px">\u0420\u0430\u0437\u0434\u0435\u043b\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442. \u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u0440\u0430\u0437\u0434\u0435\u043b.</p>' +
+      '<button class="btn btn-primary" onclick="addNewSection()"><i class="fas fa-folder-plus" style="margin-right:6px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b</button></div>';
+  }
+  
+  h += '</div>';
   return h;
 }
 
-// ===== Tab drag-reorder =====
-var _dragTabId = null, _dragTabIdx = null;
-function dragTab(e, id, idx) { _dragTabId = id; _dragTabIdx = idx; e.dataTransfer.effectAllowed = 'move'; }
-async function dropTab(e, targetIdx) {
-  e.preventDefault();
-  if (_dragTabIdx === null || _dragTabIdx === targetIdx) return;
-  // Reorder tabs
-  var tabs = data.calcTabs.slice();
-  var moved = tabs.splice(_dragTabIdx, 1)[0];
-  tabs.splice(targetIdx, 0, moved);
-  // Save new order
-  for (var i = 0; i < tabs.length; i++) {
-    await api('/calc-tabs/' + tabs[i].id, { method: 'PUT', body: JSON.stringify({ name_ru: tabs[i].name_ru, name_am: tabs[i].name_am, sort_order: i + 1, is_active: tabs[i].is_active ?? 1 }) });
+// ===== CREATE NEW SECTION (tab + folder in one action) =====
+async function addNewSection() {
+  // Insert inline form at top of page
+  var existing = document.getElementById('newSectionForm');
+  if (existing) { existing.remove(); return; }
+  
+  var formHtml = '<div id="newSectionForm" class="card" style="margin-bottom:20px;border:2px solid #8B5CF6;animation:slideUp 0.3s ease">' +
+    '<h4 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-folder-plus" style="margin-right:6px"></i>\u041d\u043e\u0432\u044b\u0439 \u0440\u0430\u0437\u0434\u0435\u043b (\u0432\u043a\u043b\u0430\u0434\u043a\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0435)</h4>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 150px;gap:10px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.75rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 (RU) *</label><input class="input" id="newSec_ru" placeholder="\u043d\u0430\u043f\u0440: \u0414\u043e\u0441\u0442\u0430\u0432\u043a\u0430"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 (AM)</label><input class="input" id="newSec_am" placeholder="\u043e\u043f\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b">\u041a\u043b\u044e\u0447 (\u0430\u043d\u0433\u043b)</label><input class="input" id="newSec_key" placeholder="delivery"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px">' +
+      '<button class="btn btn-primary" onclick="submitNewSection()"><i class="fas fa-check" style="margin-right:4px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c</button>' +
+      '<button class="btn btn-outline" onclick="document.getElementById(\'newSectionForm\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
+    '</div></div>';
+  
+  // Insert after the heading
+  var content = document.getElementById('content');
+  var firstCard = content ? content.querySelector('.card') : null;
+  if (firstCard) { firstCard.insertAdjacentHTML('beforebegin', formHtml); }
+  else if (content) { content.insertAdjacentHTML('afterbegin', formHtml); }
+  
+  var ruInput = document.getElementById('newSec_ru');
+  if (ruInput) ruInput.focus();
+}
+
+async function submitNewSection() {
+  var ru = document.getElementById('newSec_ru').value.trim();
+  if (!ru) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0440\u0430\u0437\u0434\u0435\u043b\u0430', 'error'); return; }
+  var am = document.getElementById('newSec_am').value.trim() || ru;
+  var key = document.getElementById('newSec_key').value.trim();
+  // Auto-generate key from RU name if not provided
+  if (!key) {
+    key = ru.toLowerCase().replace(/[^a-z0-9\u0430-\u044f]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
+    // Transliterate simple RU chars
+    var tbl = {'\u0430':'a','\u0431':'b','\u0432':'v','\u0433':'g','\u0434':'d','\u0435':'e','\u0436':'zh','\u0437':'z','\u0438':'i','\u0439':'y','\u043a':'k','\u043b':'l','\u043c':'m','\u043d':'n','\u043e':'o','\u043f':'p','\u0440':'r','\u0441':'s','\u0442':'t','\u0443':'u','\u0444':'f','\u0445':'h','\u0446':'ts','\u0447':'ch','\u0448':'sh','\u0449':'shch','\u044b':'y','\u044d':'e','\u044e':'yu','\u044f':'ya'};
+    key = ru.toLowerCase().split('').map(function(c) { return tbl[c] || c; }).join('').replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '');
   }
-  toast('Порядок вкладок обновлён');
+  
+  await api('/calc-tabs', { method: 'POST', body: JSON.stringify({ tab_key: key, name_ru: ru, name_am: am, sort_order: data.calcTabs.length + 1 }) });
+  toast('\u0420\u0430\u0437\u0434\u0435\u043b \u00ab' + ru + '\u00bb \u0441\u043e\u0437\u0434\u0430\u043d! \u0422\u0435\u043f\u0435\u0440\u044c \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0438.');
   await loadData(); render();
 }
 
-// ===== Service drag-reorder =====
-var _dragSvcId = null, _dragSvcIdx = null;
-function dragSvc(e, id, idx) { _dragSvcId = id; _dragSvcIdx = idx; e.dataTransfer.effectAllowed = 'move'; }
-async function dropSvc(e, targetIdx, tabKey) {
-  e.preventDefault();
-  if (_dragSvcId === null) return;
-  var svcs = data.calcServices.filter(function(s){ return s.tab_key === tabKey; });
-  var fromIdx = svcs.findIndex(function(s){ return s.id === _dragSvcId; });
-  if (fromIdx < 0 || fromIdx === targetIdx) return;
-  var moved = svcs.splice(fromIdx, 1)[0];
-  svcs.splice(targetIdx, 0, moved);
-  for (var i = 0; i < svcs.length; i++) {
-    await api('/calc-services/' + svcs[i].id, { method: 'PUT', body: JSON.stringify({ ...svcs[i], sort_order: i + 1 }) });
-  }
-  toast('Порядок услуг обновлён');
+// ===== ADD SERVICE TO SPECIFIC TAB =====
+async function addServiceToTab(tabId, tabName) {
+  var formId = 'addSvcForm_' + tabId;
+  var existing = document.getElementById(formId);
+  if (existing) { existing.remove(); return; }
+  
+  var formHtml = '<div id="' + formId + '" style="margin-top:8px;padding:14px;background:#0f172a;border:2px dashed #8B5CF6;border-radius:8px;animation:slideUp 0.3s ease">' +
+    '<div style="font-size:0.85rem;font-weight:700;color:#a78bfa;margin-bottom:10px"><i class="fas fa-plus-circle" style="margin-right:4px"></i>\u041d\u043e\u0432\u0430\u044f \u0443\u0441\u043b\u0443\u0433\u0430 \u0432 \u00ab' + escHtml(tabName) + '\u00bb</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 100px 130px;gap:8px;margin-bottom:10px">' +
+      '<input class="input" id="nsvc_ru_' + tabId + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU" style="padding:6px 10px;font-size:0.85rem">' +
+      '<input class="input" id="nsvc_am_' + tabId + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 AM" style="padding:6px 10px;font-size:0.85rem">' +
+      '<input class="input" type="number" id="nsvc_price_' + tabId + '" placeholder="\u0426\u0435\u043d\u0430 \u058f" value="0" style="padding:6px 10px;font-size:0.85rem">' +
+      '<select class="input" id="nsvc_type_' + tabId + '" style="padding:6px 8px;font-size:0.82rem">' +
+        '<option value="fixed">\u0424\u0438\u043a\u0441. \u0446\u0435\u043d\u0430</option>' +
+        '<option value="tiered">\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430</option>' +
+      '</select>' +
+    '</div>' +
+    '<div style="display:flex;gap:8px">' +
+      '<button class="btn btn-primary" style="font-size:0.85rem" onclick="submitSvcToTab(' + tabId + ')"><i class="fas fa-check" style="margin-right:4px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>' +
+      '<button class="btn btn-outline" style="font-size:0.85rem" onclick="document.getElementById(\'' + formId + '\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
+    '</div></div>';
+  
+  // Find the "add service" button for this tab and insert form before it
+  event.target.closest('.card').querySelector('button[onclick*="addServiceToTab"]').insertAdjacentHTML('beforebegin', formHtml);
+  var ruInput = document.getElementById('nsvc_ru_' + tabId);
+  if (ruInput) ruInput.focus();
+}
+
+async function submitSvcToTab(tabId) {
+  var ru = document.getElementById('nsvc_ru_' + tabId).value.trim();
+  if (!ru) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435', 'error'); return; }
+  var am = document.getElementById('nsvc_am_' + tabId).value.trim() || ru;
+  var price = parseInt(document.getElementById('nsvc_price_' + tabId).value) || 0;
+  var pType = document.getElementById('nsvc_type_' + tabId).value;
+  var tiersJson = null;
+  if (pType === 'tiered') { tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]); }
+  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_type: pType, price_tiers_json: tiersJson, sort_order: data.calcServices.length + 1 }) });
+  toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u00ab' + ru + '\u00bb \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430!');
   await loadData(); render();
 }
 
@@ -474,19 +520,18 @@ async function saveCalcTab(id) {
   var tab = data.calcTabs.find(function(t){ return t.id === id; });
   if (!tab) return;
   await api('/calc-tabs/' + id, { method: 'PUT', body: JSON.stringify({ name_ru: ru, name_am: am, sort_order: tab.sort_order, is_active: tab.is_active ?? 1 }) });
-  toast('Вкладка сохранена');
+  toast('\u0420\u0430\u0437\u0434\u0435\u043b \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
   await loadData(); render();
 }
 
-async function saveCalcService(id) {
+async function saveCalcService(id, tabId) {
   var svc = data.calcServices.find(function(s){ return s.id === id; });
   if (!svc) return;
   var ru = document.getElementById('svc_ru_' + id).value;
   var am = document.getElementById('svc_am_' + id).value;
   var price = parseInt(document.getElementById('svc_price_' + id).value) || 0;
-  var tabId = parseInt(document.getElementById('svc_tab_' + id).value) || svc.tab_id;
-  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, tab_id: tabId }) });
-  toast('Услуга сохранена');
+  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, tab_id: tabId || svc.tab_id }) });
+  toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0430');
   await loadData(); render();
 }
 
@@ -500,11 +545,11 @@ async function saveTiers(svcId, count) {
       tiers.push({ min: min, max: max, price: price });
     }
   }
-  if (!tiers.length) { toast('Заполните хотя бы один тариф', 'error'); return; }
+  if (!tiers.length) { toast('\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b \u043e\u0434\u0438\u043d \u0442\u0430\u0440\u0438\u0444', 'error'); return; }
   var svc = data.calcServices.find(s => s.id === svcId);
   if (!svc) return;
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
-  toast('Тарифы сохранены! Обновите сайт для проверки.');
+  toast('\u0422\u0430\u0440\u0438\u0444\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b! \u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 \u0441\u0430\u0439\u0442 \u0434\u043b\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438.');
   await loadData(); render();
 }
 
@@ -516,13 +561,13 @@ async function addTier(svcId) {
   var lastMax = tiers.length ? tiers[tiers.length-1].max : 0;
   tiers.push({ min: lastMax + 1, max: lastMax + 20, price: 1000 });
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers) }) });
-  toast('Строка добавлена');
+  toast('\u0421\u0442\u0440\u043e\u043a\u0430 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430');
   await loadData(); render();
 }
 
 async function deleteTier(svcId, tierIndex, totalTiers) {
-  if (totalTiers <= 1) { toast('Нельзя удалить последний тариф. Должна остаться хотя бы 1 строка.', 'error'); return; }
-  if (!confirm('Удалить эту строку тарифа?')) return;
+  if (totalTiers <= 1) { toast('\u041d\u0435\u043b\u044c\u0437\u044f \u0443\u0434\u0430\u043b\u0438\u0442\u044c \u043f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0439 \u0442\u0430\u0440\u0438\u0444.', 'error'); return; }
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0443 \u0441\u0442\u0440\u043e\u043a\u0443 \u0442\u0430\u0440\u0438\u0444\u0430?')) return;
   var svc = data.calcServices.find(s => s.id === svcId);
   if (!svc) return;
   var tiers = [];
@@ -530,75 +575,21 @@ async function deleteTier(svcId, tierIndex, totalTiers) {
   if (tierIndex < 0 || tierIndex >= tiers.length) return;
   tiers.splice(tierIndex, 1);
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
-  toast('Строка тарифа удалена');
+  toast('\u0421\u0442\u0440\u043e\u043a\u0430 \u0442\u0430\u0440\u0438\u0444\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
   await loadData(); render();
 }
 
 async function deleteCalcService(id) {
-  if (!confirm('Удалить эту услугу?')) return;
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0443 \u0443\u0441\u043b\u0443\u0433\u0443?')) return;
   await api('/calc-services/' + id, { method: 'DELETE' });
-  toast('Услуга удалена');
-  await loadData(); render();
-}
-
-async function addCalcService() {
-  if (!data.calcTabs.length) { toast('Сначала создайте вкладку', 'error'); return; }
-  // Build tab options
-  var tabOpts = '';
-  for (var i = 0; i < data.calcTabs.length; i++) {
-    tabOpts += '<option value="' + data.calcTabs[i].id + '">' + escHtml(data.calcTabs[i].name_ru) + '</option>';
-  }
-  // Show inline form
-  var formHtml = '<div id="addSvcForm" class="card" style="margin-bottom:16px;border-color:#8B5CF6">' +
-    '<h4 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-plus-circle" style="margin-right:6px"></i>Новая услуга</h4>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:10px;margin-bottom:10px">' +
-      '<input class="input" id="new_svc_ru" placeholder="Название (RU)">' +
-      '<input class="input" id="new_svc_am" placeholder="Название (AM)">' +
-      '<input class="input" type="number" id="new_svc_price" placeholder="Цена ֏" value="0">' +
-    '</div>' +
-    '<div style="display:flex;gap:10px;align-items:center">' +
-      '<select class="input" id="new_svc_tab" style="max-width:200px">' + tabOpts + '</select>' +
-      '<select class="input" id="new_svc_type" style="max-width:150px">' +
-        '<option value="fixed">Фикс. цена</option>' +
-        '<option value="tiered">Тарифная шкала</option>' +
-      '</select>' +
-      '<button class="btn btn-primary" onclick="submitNewService()"><i class="fas fa-check" style="margin-right:4px"></i>Добавить</button>' +
-      '<button class="btn btn-outline" onclick="document.getElementById(\\\'addSvcForm\\\').remove()">Отмена</button>' +
-    '</div></div>';
-  // Insert at top of services card
-  var svcCard = document.querySelector('#content .card:last-of-type');
-  if (svcCard) svcCard.insertAdjacentHTML('afterbegin', formHtml);
-}
-
-async function submitNewService() {
-  var ru = document.getElementById('new_svc_ru').value.trim();
-  if (!ru) { toast('Введите название', 'error'); return; }
-  var am = document.getElementById('new_svc_am').value.trim() || ru;
-  var price = parseInt(document.getElementById('new_svc_price').value) || 0;
-  var tabId = parseInt(document.getElementById('new_svc_tab').value);
-  var pType = document.getElementById('new_svc_type').value;
-  var tiersJson = null;
-  if (pType === 'tiered') { tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]); }
-  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_type: pType, price_tiers_json: tiersJson, sort_order: data.calcServices.length + 1 }) });
-  toast('Услуга добавлена!');
-  await loadData(); render();
-}
-
-async function addCalcTab() {
-  var key = prompt('Ключ вкладки (англ, напр: delivery):');
-  if (!key) return;
-  var ru = prompt('Название (RU):');
-  if (!ru) return;
-  var am = prompt('Название (AM):') || ru;
-  await api('/calc-tabs', { method: 'POST', body: JSON.stringify({ tab_key: key, name_ru: ru, name_am: am, sort_order: data.calcTabs.length + 1 }) });
-  toast('Вкладка добавлена!');
+  toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
   await loadData(); render();
 }
 
 async function deleteCalcTab(id) {
-  if (!confirm('Удалить вкладку и все её услуги?')) return;
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b \u0438 \u0432\u0441\u0435 \u0435\u0433\u043e \u0443\u0441\u043b\u0443\u0433\u0438?')) return;
   await api('/calc-tabs/' + id, { method: 'DELETE' });
-  toast('Вкладка удалена');
+  toast('\u0420\u0430\u0437\u0434\u0435\u043b \u0443\u0434\u0430\u043b\u0451\u043d');
   await loadData(); render();
 }
 

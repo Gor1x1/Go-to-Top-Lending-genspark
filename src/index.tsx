@@ -298,44 +298,98 @@ app.get('/pdf/:id', async (c) => {
       ? { svc: 'Ծառայություն', qty: 'Քանակ', price: 'Գին', sum: 'Գումար', total: 'ԸՆԴԱՄԵՆԸ:', client: 'Հաճախորդ:', date: 'Ամսաթիվ:', id: 'Հայտ №', dl: '📥 Ներբեռնել PDF', share: '📤 Կիսել' }
       : { svc: 'Услуга', qty: 'Кол-во', price: 'Цена', sum: 'Сумма', total: 'ИТОГО:', client: 'Клиент:', date: 'Дата:', id: 'Заявка №', dl: '📥 Скачать PDF', share: '📤 Поделиться' };
     
-    const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
-      '*{margin:0;padding:0;box-sizing:border-box}' +
-      'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;padding:24px;max-width:800px;margin:0 auto;background:#fff}' +
-      '.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}' +
-      '.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}' +
-      '.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}' +
-      '.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}' +
-      '.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}' +
-      '.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}' +
-      'table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}' +
-      'th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}' +
-      'td{padding:10px 12px;border-bottom:1px solid #e5e7eb}' +
-      '.tr{background:#f3f0ff;font-weight:700;font-size:16px}' +
-      '.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}' +
-      '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}' +
-      '.dlbar{background:#8B5CF6;color:white;text-align:center;padding:14px;border-radius:12px;margin-top:16px;cursor:pointer;font-weight:700;font-size:15px;box-shadow:0 4px 20px rgba(139,92,246,0.4);text-decoration:none;display:block;border:none;width:100%}' +
-      '.dlbar:hover{background:#7C3AED}' +
-      '.actions{position:sticky;bottom:8px;display:flex;gap:8px;margin-top:24px}' +
-      '.actions .dlbar{flex:1}' +
-      '@media print{.actions{display:none!important}body{padding:16px}}' +
-      '@media(max-width:600px){body{padding:16px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}.actions{flex-direction:column}}' +
-      '</style></head><body>' +
-      '<div class="hdr"><div class="logo">' + ((tpl.company_name as string) || 'Go to Top') + '</div><div class="ci">' +
-      (tpl.company_phone ? '<div>' + tpl.company_phone + '</div>' : '') +
-      (tpl.company_email ? '<div>' + tpl.company_email + '</div>' : '') +
-      (tpl.company_address ? '<div>' + tpl.company_address + '</div>' : '') +
-      '</div></div>' +
-      '<div class="ttl">' + (header || '') + '</div>' +
-      '<div class="meta"><span>' + L.date + ' ' + new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU') + '</span><span>' + L.id + id + '</span></div>' +
-      (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
-      (intro ? '<div class="intro">' + intro + '</div>' : '') +
-      '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows +
-      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + Number(total).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr></tbody></table>' +
-      (outro ? '<div class="outro">' + outro + '</div>' : '') +
-      (footer ? '<div class="ftr">' + footer + '</div>' : '') +
-      '<div class="actions"><button class="dlbar" onclick="window.print()">' + L.dl + '</button>' +
-      '<button class="dlbar" style="background:#334155" onclick="history.back()">' + (isAm ? '\u2190 \u054e\u0565\u0580\u0561\u0564\u0561\u057c\u0576\u0561\u056c' : '\u2190 \u041d\u0430\u0437\u0430\u0434 \u043d\u0430 \u0441\u0430\u0439\u0442') + '</button></div>' +
-      '</body></html>';
+    // Sanitize template fields — strip opposite language characters
+    const cleanHeader = String(header || '').replace(/[\u0400-\u04FF]/g, isAm ? '' : '$&').replace(/[\u0530-\u058F\u0561-\u0587]/g, isAm ? '$&' : '').trim() || (isAm ? '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f' : '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
+    const cleanIntro = isAm ? String(intro || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(intro || '').replace(/[\u0530-\u058F]/g, '').trim();
+    const cleanOutro = isAm ? String(outro || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(outro || '').replace(/[\u0530-\u058F]/g, '').trim();
+    const cleanFooter = isAm ? String(footer || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(footer || '').replace(/[\u0530-\u058F]/g, '').trim();
+
+    const dlBtnLabel = L.dl;
+    const saveBtnLabel = isAm ? '\ud83d\udcf7 \u054a\u0561\u0570\u0565\u056c \u0576\u056f\u0561\u0580' : '\ud83d\udcf7 \u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043a\u0430\u043a \u0444\u043e\u0442\u043e';
+    const backBtnLabel = isAm ? '\u2190 \u054e\u0565\u0580\u0561\u0564\u0561\u057c\u0576\u0561\u056c' : '\u2190 \u041d\u0430\u0437\u0430\u0434 \u043d\u0430 \u0441\u0430\u0439\u0442';
+
+    const pdfHtml = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#fff}
+#pdfContent{padding:24px;max-width:800px;margin:0 auto}
+.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}
+.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}
+.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}
+.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}
+.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}
+.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}
+table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}
+th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}
+td{padding:10px 12px;border-bottom:1px solid #e5e7eb}
+.tr{background:#f3f0ff;font-weight:700;font-size:16px}
+.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}
+.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}
+.actions{position:sticky;bottom:0;background:#fff;padding:12px 0;display:flex;gap:8px;flex-direction:column}
+.dlbar{background:#8B5CF6;color:white;text-align:center;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-size:15px;box-shadow:0 4px 20px rgba(139,92,246,0.4);text-decoration:none;display:block;border:none;width:100%}
+.dlbar:hover{background:#7C3AED}
+.dlbar.sec{background:#334155}
+.dlbar.sec:hover{background:#475569}
+#savingMsg{display:none;text-align:center;padding:10px;color:#8B5CF6;font-weight:600}
+@media print{.actions{display:none!important}body{padding:16px}}
+@media(max-width:600px){#pdfContent{padding:16px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}}
+</style></head><body>
+<div id="pdfContent">
+<div class="hdr"><div class="logo">${(tpl.company_name as string) || 'Go to Top'}</div><div class="ci">${tpl.company_phone ? '<div>' + tpl.company_phone + '</div>' : ''}${tpl.company_email ? '<div>' + tpl.company_email + '</div>' : ''}${tpl.company_address ? '<div>' + tpl.company_address + '</div>' : ''}</div></div>
+<div class="ttl">${cleanHeader}</div>
+<div class="meta"><span>${L.date} ${new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU')}</span><span>${L.id}${id}</span></div>
+${clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : ''}
+${cleanIntro ? '<div class="intro">' + cleanIntro + '</div>' : ''}
+<table><thead><tr><th>${L.svc}</th><th style="text-align:center">${L.qty}</th><th style="text-align:right">${L.price}</th><th style="text-align:right">${L.sum}</th></tr></thead><tbody>${rows}
+<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">${L.total}</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">${Number(total).toLocaleString('ru-RU')}\u00a0\u058f</td></tr></tbody></table>
+${cleanOutro ? '<div class="outro">' + cleanOutro + '</div>' : ''}
+${cleanFooter ? '<div class="ftr">' + cleanFooter + '</div>' : ''}
+</div>
+<div class="actions" style="padding:0 16px 16px">
+<button class="dlbar" id="saveBtn" onclick="saveAsImage()">${saveBtnLabel}</button>
+<button class="dlbar" id="printBtn" onclick="window.print()">${dlBtnLabel}</button>
+<button class="dlbar sec" onclick="history.back()">${backBtnLabel}</button>
+<div id="savingMsg">\u2699\ufe0f ${isAm ? '\u054a\u0561\u0570\u0565\u056c...' : '\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c...'}</div>
+</div>
+<script>
+function saveAsImage(){
+  var btn=document.getElementById('saveBtn');
+  var msg=document.getElementById('savingMsg');
+  btn.style.display='none';
+  msg.style.display='block';
+  document.querySelector('.actions').style.position='static';
+  html2canvas(document.getElementById('pdfContent'),{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}).then(function(canvas){
+    msg.style.display='none';
+    btn.style.display='block';
+    document.querySelector('.actions').style.position='sticky';
+    /* Try download — works on most mobile browsers */
+    try{
+      canvas.toBlob(function(blob){
+        if(!blob) throw new Error('no blob');
+        var url=URL.createObjectURL(blob);
+        var a=document.createElement('a');
+        a.href=url;
+        a.download='GoToTop_KP_${id}_${new Date().toISOString().slice(0,10)}.png';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);
+      },'image/png');
+    }catch(e){
+      /* Fallback: open image in new tab — user can long-press to save */
+      var dataUrl=canvas.toDataURL('image/png');
+      var w=window.open('');
+      if(w){w.document.write('<img src="'+dataUrl+'" style="width:100%">');}
+      else{window.location.href=dataUrl;}
+    }
+  }).catch(function(err){
+    msg.textContent='${isAm ? '\u054d\u056d\u0561\u056c' : '\u041e\u0448\u0438\u0431\u043a\u0430'}: '+err.message;
+    btn.style.display='block';
+  });
+}
+<\/script>
+</body></html>`;
+
     
     return c.html(pdfHtml);
   } catch (e: any) {
