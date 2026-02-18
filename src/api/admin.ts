@@ -548,8 +548,8 @@ api.get('/slot-counter', authMiddleware, async (c) => {
 api.put('/slot-counter', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('UPDATE slot_counter SET total_slots=?, booked_slots=?, label_ru=?, label_am=?, show_timer=?, reset_day=?, updated_at=CURRENT_TIMESTAMP WHERE id=1')
-    .bind(d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday').run();
+  await db.prepare('UPDATE slot_counter SET total_slots=?, booked_slots=?, label_ru=?, label_am=?, show_timer=?, reset_day=?, position=?, updated_at=CURRENT_TIMESTAMP WHERE id=1')
+    .bind(d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday', d.position || 'after-hero').run();
   return c.json({ success: true });
 });
 

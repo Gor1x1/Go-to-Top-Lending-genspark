@@ -410,7 +410,7 @@ function renderCalculator() {
     }
     
     // Add service button inside folder
-    h += '<button class="btn btn-outline" style="width:100%;margin-top:8px;padding:10px;font-size:0.85rem;border-style:dashed" onclick="addServiceToTab(' + tab.id + ',\'' + escHtml(tab.name_ru) + '\')">' +
+    h += '<button class="btn btn-outline" style="width:100%;margin-top:8px;padding:10px;font-size:0.85rem;border-style:dashed" onclick="addServiceToTab(' + tab.id + ')" data-tab-name="' + escHtml(tab.name_ru) + '">' +
       '<i class="fas fa-plus" style="margin-right:6px;color:#a78bfa"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u0443\u0433\u0443 \u0432 \u00ab' + escHtml(tab.name_ru) + '\u00bb</button>';
     
     h += '</div>';
@@ -441,14 +441,14 @@ async function addNewSection() {
     '</div>' +
     '<div style="display:flex;gap:10px">' +
       '<button class="btn btn-primary" onclick="submitNewSection()"><i class="fas fa-check" style="margin-right:4px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c</button>' +
-      '<button class="btn btn-outline" onclick="document.getElementById(\'newSectionForm\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
+      '<button class="btn btn-outline" onclick="cancelNewSection()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
     '</div></div>';
   
   // Insert after the heading
-  var content = document.getElementById('content');
-  var firstCard = content ? content.querySelector('.card') : null;
+  var mainEl = document.querySelector('.main');
+  var firstCard = mainEl ? mainEl.querySelector('.card') : null;
   if (firstCard) { firstCard.insertAdjacentHTML('beforebegin', formHtml); }
-  else if (content) { content.insertAdjacentHTML('afterbegin', formHtml); }
+  else if (mainEl) { mainEl.insertAdjacentHTML('beforeend', formHtml); }
   
   var ruInput = document.getElementById('newSec_ru');
   if (ruInput) ruInput.focus();
@@ -472,8 +472,20 @@ async function submitNewSection() {
   await loadData(); render();
 }
 
+function cancelNewSection() {
+  var el = document.getElementById('newSectionForm');
+  if (el) el.remove();
+}
+
+function cancelAddSvc(tabId) {
+  var el = document.getElementById('addSvcForm_' + tabId);
+  if (el) el.remove();
+}
+
 // ===== ADD SERVICE TO SPECIFIC TAB =====
-async function addServiceToTab(tabId, tabName) {
+async function addServiceToTab(tabId) {
+  var tab = data.calcTabs.find(function(t){ return t.id === tabId; });
+  var tabName = tab ? tab.name_ru : '';
   var formId = 'addSvcForm_' + tabId;
   var existing = document.getElementById(formId);
   if (existing) { existing.remove(); return; }
@@ -491,11 +503,12 @@ async function addServiceToTab(tabId, tabName) {
     '</div>' +
     '<div style="display:flex;gap:8px">' +
       '<button class="btn btn-primary" style="font-size:0.85rem" onclick="submitSvcToTab(' + tabId + ')"><i class="fas fa-check" style="margin-right:4px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>' +
-      '<button class="btn btn-outline" style="font-size:0.85rem" onclick="document.getElementById(\'' + formId + '\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
+      '<button class="btn btn-outline" style="font-size:0.85rem" onclick="cancelAddSvc(' + tabId + ')">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
     '</div></div>';
   
   // Find the "add service" button for this tab and insert form before it
-  event.target.closest('.card').querySelector('button[onclick*="addServiceToTab"]').insertAdjacentHTML('beforebegin', formHtml);
+  var addBtn = document.querySelector('button[onclick="addServiceToTab(' + tabId + ')"]');
+  if (addBtn) addBtn.insertAdjacentHTML('beforebegin', formHtml);
   var ruInput = document.getElementById('nsvc_ru_' + tabId);
   if (ruInput) ruInput.focus();
 }
@@ -1128,20 +1141,48 @@ async function savePdfTemplate() {
 // ===== SLOT COUNTER =====
 function renderSlotCounter() {
   var s = data.slotCounter || {};
-  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Счётчик свободных слотов</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Интерактивный счётчик на сайте — показывает клиентам оставшиеся места</p>' +
-    '<div class="card">' +
+  var pos = s.position || 'after-hero';
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">\u0421\u0447\u0451\u0442\u0447\u0438\u043a \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u044b\u0445 \u0441\u043b\u043e\u0442\u043e\u0432</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">\u0418\u043d\u0442\u0435\u0440\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0439 \u0441\u0447\u0451\u0442\u0447\u0438\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435 \u2014 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u043a\u043b\u0438\u0435\u043d\u0442\u0430\u043c \u043e\u0441\u0442\u0430\u0432\u0448\u0438\u0435\u0441\u044f \u043c\u0435\u0441\u0442\u0430</p>' +
+    '<div class="card" style="margin-bottom:20px">' +
+    '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-sliders-h" style="color:#8B5CF6;margin-right:8px"></i>\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438</h3>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Всего мест</label><input class="input" type="number" id="slot_total" value="' + (s.total_slots || 10) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Занято мест</label><input class="input" type="number" id="slot_booked" value="' + (s.booked_slots || 0) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Свободно</label><div style="font-size:2rem;font-weight:800;color:#10B981;padding:6px 0">' + Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0)) + '</div></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0412\u0441\u0435\u0433\u043e \u043c\u0435\u0441\u0442</label><input class="input" type="number" id="slot_total" value="' + (s.total_slots || 10) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0417\u0430\u043d\u044f\u0442\u043e \u043c\u0435\u0441\u0442</label><input class="input" type="number" id="slot_booked" value="' + (s.booked_slots || 0) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0421\u0432\u043e\u0431\u043e\u0434\u043d\u043e</label><div style="font-size:2rem;font-weight:800;color:#10B981;padding:6px 0">' + Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0)) + '</div></div>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Надпись (RU)</label><input class="input" id="slot_label_ru" value="' + escHtml(s.label_ru) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Надпись (AM)</label><input class="input" id="slot_label_am" value="' + escHtml(s.label_am) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">\u041d\u0430\u0434\u043f\u0438\u0441\u044c (RU)</label><input class="input" id="slot_label_ru" value="' + escHtml(s.label_ru) + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">\u041d\u0430\u0434\u043f\u0438\u0441\u044c (AM)</label><input class="input" id="slot_label_am" value="' + escHtml(s.label_am) + '"></div>' +
     '</div>' +
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><input type="checkbox" id="slot_show"' + (s.show_timer ? ' checked' : '') + '><label style="font-size:0.9rem;color:#94a3b8">Показывать счётчик на сайте</label></div>' +
-    '<button class="btn btn-success" onclick="saveSlotCounter()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><input type="checkbox" id="slot_show"' + (s.show_timer ? ' checked' : '') + '><label style="font-size:0.9rem;color:#94a3b8">\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u0441\u0447\u0451\u0442\u0447\u0438\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435</label></div>' +
+    '<button class="btn btn-success" onclick="saveSlotCounter()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>' +
+    '</div>';
+
+  // Position control
+  var positions = [
+    { id: 'in-header', label: '\ud83d\udccd \u0412 \u0448\u0430\u043f\u043a\u0435 \u0441\u0430\u0439\u0442\u0430 (\u043f\u043e\u0434 \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u0435\u0439)', desc: '\u041f\u043e\u044f\u0432\u043b\u044f\u0435\u0442\u0441\u044f \u0441\u0440\u0430\u0437\u0443 \u043f\u043e\u0434 \u043c\u0435\u043d\u044e' },
+    { id: 'after-hero', label: '\u2b50 \u041f\u043e\u0441\u043b\u0435 \u0433\u043b\u0430\u0432\u043d\u043e\u0433\u043e \u0431\u043b\u043e\u043a\u0430 (Hero)', desc: '\u041c\u0435\u0436\u0434\u0443 Hero \u0438 \u0443\u0441\u043b\u0443\u0433\u0430\u043c\u0438' },
+    { id: 'before-calc', label: '\ud83e\uddee \u041f\u0435\u0440\u0435\u0434 \u043a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440\u043e\u043c', desc: '\u041f\u0440\u044f\u043c\u043e \u043d\u0430\u0434 \u043a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440\u043e\u043c \u0443\u0441\u043b\u0443\u0433' },
+    { id: 'before-contact', label: '\ud83d\udcde \u041f\u0435\u0440\u0435\u0434 \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u0430\u043c\u0438', desc: '\u0412\u043d\u0438\u0437\u0443 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u044b, \u043f\u0435\u0440\u0435\u0434 \u0444\u0443\u0442\u0435\u0440\u043e\u043c' },
+    { id: 'after-ticker', label: '\ud83c\udfc3 \u041f\u043e\u0441\u043b\u0435 \u0431\u0435\u0433\u0443\u0449\u0435\u0439 \u0441\u0442\u0440\u043e\u043a\u0438', desc: '\u041c\u0435\u0436\u0434\u0443 \u0442\u0438\u043a\u0435\u0440\u043e\u043c \u0438 \u0443\u0441\u043b\u0443\u0433\u0430\u043c\u0438' }
+  ];
+
+  h += '<div class="card">' +
+    '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-arrows-alt-v" style="color:#8B5CF6;margin-right:8px"></i>\u041f\u043e\u0437\u0438\u0446\u0438\u044f \u043d\u0430 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435</h3>' +
+    '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435, \u0433\u0434\u0435 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u0441\u0447\u0451\u0442\u0447\u0438\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435:</p>';
+
+  for (var pi = 0; pi < positions.length; pi++) {
+    var p = positions[pi];
+    var isActive = pos === p.id;
+    h += '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:8px;border-radius:10px;cursor:pointer;border:2px solid ' + (isActive ? '#8B5CF6' : '#334155') + ';background:' + (isActive ? 'rgba(139,92,246,0.1)' : 'transparent') + '" onclick="selectSlotPos(this,&quot;' + p.id + '&quot;)">' +
+      '<input type="radio" name="slot_pos" value="' + p.id + '"' + (isActive ? ' checked' : '') + ' style="accent-color:#8B5CF6">' +
+      '<div><div style="font-weight:700;font-size:0.9rem;color:' + (isActive ? '#a78bfa' : '#e2e8f0') + '">' + p.label + '</div>' +
+      '<div style="font-size:0.78rem;color:#64748b">' + p.desc + '</div></div>' +
+    '</div>';
+  }
+
+  h += '<button class="btn btn-success" style="margin-top:12px" onclick="saveSlotPosition()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043f\u043e\u0437\u0438\u0446\u0438\u044e</button>' +
     '</div></div>';
   return h;
 }
@@ -1153,9 +1194,38 @@ async function saveSlotCounter() {
     label_ru: document.getElementById('slot_label_ru').value,
     label_am: document.getElementById('slot_label_am').value,
     show_timer: document.getElementById('slot_show').checked ? 1 : 0,
-    reset_day: 'monday'
+    reset_day: 'monday',
+    position: data.slotCounter.position || 'after-hero'
   }) });
   toast('Счётчик обновлён');
+  await loadData(); render();
+}
+
+function selectSlotPos(el, posId) {
+  var all = el.parentNode.querySelectorAll('[onclick*="selectSlotPos"]');
+  for (var i = 0; i < all.length; i++) {
+    all[i].style.borderColor = '#334155';
+    all[i].style.background = 'transparent';
+    var r = all[i].querySelector('input[type=radio]');
+    if (r) r.checked = false;
+  }
+  el.style.borderColor = '#8B5CF6';
+  el.style.background = 'rgba(139,92,246,0.1)';
+  var r2 = el.querySelector('input[type=radio]');
+  if (r2) r2.checked = true;
+}
+
+async function saveSlotPosition() {
+  var radios = document.querySelectorAll('input[name="slot_pos"]');
+  var pos = 'after-hero';
+  for (var i = 0; i < radios.length; i++) {
+    if (radios[i].checked) { pos = radios[i].value; break; }
+  }
+  await api('/slot-counter', { method: 'PUT', body: JSON.stringify({
+    ...data.slotCounter,
+    position: pos
+  }) });
+  toast('Позиция сохранена! Обновите сайт.');
   await loadData(); render();
 }
 

@@ -160,11 +160,12 @@ app.get('/api/slots', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     let row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
-    if (!row) return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 1 });
+    if (!row) return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 1, position: 'after-hero' });
     return c.json({
       total: row.total_slots, booked: row.booked_slots,
       free: Math.max(0, (row.total_slots as number) - (row.booked_slots as number)),
-      label_ru: row.label_ru, label_am: row.label_am, show_timer: row.show_timer
+      label_ru: row.label_ru, label_am: row.label_am, show_timer: row.show_timer,
+      position: row.position || 'after-hero'
     });
   } catch { return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 0 }); }
 })
@@ -2607,7 +2608,8 @@ async function checkRefCode() {
   fetch('/api/slots').then(function(r){return r.json()}).then(function(d) {
     if (!d || !d.show_timer) return;
     var section = document.getElementById('slotCounterSection');
-    if (section) section.style.display = 'block';
+    if (!section) return;
+    section.style.display = 'block';
     var freeEl = document.getElementById('slotFreeCount');
     var totalEl = document.getElementById('slotTotalCount');
     var barEl = document.getElementById('slotProgressBar');
@@ -2617,6 +2619,26 @@ async function checkRefCode() {
     if (barEl) barEl.style.width = Math.round(((d.total - d.free) / d.total) * 100) + '%';
     if (labelEl && lang === 'am' && d.label_am) labelEl.textContent = d.label_am;
     else if (labelEl && d.label_ru) labelEl.textContent = d.label_ru;
+
+    /* Move slot counter to selected position */
+    var pos = d.position || 'after-hero';
+    var target = null;
+    if (pos === 'in-header') {
+      target = document.querySelector('header, nav');
+      if (target) target.parentNode.insertBefore(section, target.nextSibling);
+    } else if (pos === 'after-hero') {
+      target = document.getElementById('hero') || document.querySelector('.hero');
+      if (target) target.parentNode.insertBefore(section, target.nextSibling);
+    } else if (pos === 'before-calc') {
+      target = document.getElementById('calculator');
+      if (target) target.parentNode.insertBefore(section, target);
+    } else if (pos === 'before-contact') {
+      target = document.getElementById('contact') || document.querySelector('.contact');
+      if (target) target.parentNode.insertBefore(section, target);
+    } else if (pos === 'after-ticker') {
+      target = document.querySelector('.ticker');
+      if (target) target.parentNode.insertBefore(section, target.nextSibling);
+    }
   }).catch(function(){});
 })();
 

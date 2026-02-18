@@ -160,9 +160,10 @@ CREATE TABLE IF NOT EXISTS slot_counter (
   total_slots INTEGER DEFAULT 10,
   booked_slots INTEGER DEFAULT 0,
   label_ru TEXT DEFAULT 'Свободных мест на этой неделе',
-  label_am TEXT DEFAULT 'Այdelays',
+  label_am TEXT DEFAULT '',
   show_timer INTEGER DEFAULT 1,
   reset_day TEXT DEFAULT 'monday',
+  position TEXT DEFAULT 'after-hero',
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 `;
@@ -172,6 +173,8 @@ export async function initDatabase(db: D1Database): Promise<void> {
   for (const stmt of statements) {
     await db.prepare(stmt + ';').run();
   }
+  // Migration: add position column if missing
+  try { await db.prepare("ALTER TABLE slot_counter ADD COLUMN position TEXT DEFAULT 'after-hero'").run(); } catch {}
 }
 
 export async function getAllContent(db: D1Database): Promise<Record<string, any>> {
