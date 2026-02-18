@@ -534,22 +534,93 @@ api.put('/pdf-template', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-// ===== SLOT COUNTER =====
+// ===== SLOT COUNTER (multiple) =====
 api.get('/slot-counter', authMiddleware, async (c) => {
   const db = c.env.DB;
-  let row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
+  const rows = await db.prepare('SELECT * FROM slot_counter ORDER BY id').all();
+  return c.json({ counters: rows.results || [] });
+});
+
+api.post('/slot-counter', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  // Check limit: max 2 counters
+  const cnt = await db.prepare('SELECT COUNT(*) as c FROM slot_counter').first() as any;
+  if (cnt && cnt.c >= 2) return c.json({ error: 'Maximum 2 counters allowed' }, 400);
+  await db.prepare('INSERT INTO slot_counter (counter_name, total_slots, booked_slots, label_ru, label_am, show_timer, reset_day, position) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(d.counter_name || 'new', d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday', d.position || 'after-hero').run();
+  return c.json({ success: true });
+});
+
+api.put('/slot-counter/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  await db.prepare('UPDATE slot_counter SET counter_name=?, total_slots=?, booked_slots=?, label_ru=?, label_am=?, show_timer=?, reset_day=?, position=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+    .bind(d.counter_name || 'main', d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday', d.position || 'after-hero', id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/slot-counter/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM slot_counter WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== FOOTER SETTINGS =====
+api.get('/footer', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  let row = await db.prepare('SELECT * FROM footer_settings LIMIT 1').first();
   if (!row) {
-    await db.prepare("INSERT INTO slot_counter (total_slots, booked_slots) VALUES (10, 0)").run();
-    row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
+    await db.prepare("INSERT INTO footer_settings (brand_text_ru, copyright_ru, location_ru) VALUES ('Безопасное продвижение товаров на Wildberries в Армении.', '© 2026 Go to Top. Все права защищены', 'Ереван, Армения')").run();
+    row = await db.prepare('SELECT * FROM footer_settings LIMIT 1').first();
   }
   return c.json(row);
 });
 
-api.put('/slot-counter', authMiddleware, async (c) => {
+api.put('/footer', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('UPDATE slot_counter SET total_slots=?, booked_slots=?, label_ru=?, label_am=?, show_timer=?, reset_day=?, position=?, updated_at=CURRENT_TIMESTAMP WHERE id=1')
-    .bind(d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday', d.position || 'after-hero').run();
+  const exists = await db.prepare('SELECT id FROM footer_settings LIMIT 1').first();
+  if (exists) {
+    await db.prepare('UPDATE footer_settings SET brand_text_ru=?, brand_text_am=?, contacts_json=?, socials_json=?, nav_links_json=?, custom_html=?, copyright_ru=?, copyright_am=?, location_ru=?, location_am=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+      .bind(d.brand_text_ru||'', d.brand_text_am||'', d.contacts_json||'[]', d.socials_json||'[]', d.nav_links_json||'[]', d.custom_html||'', d.copyright_ru||'', d.copyright_am||'', d.location_ru||'', d.location_am||'', exists.id).run();
+  } else {
+    await db.prepare('INSERT INTO footer_settings (brand_text_ru, brand_text_am, contacts_json, socials_json, nav_links_json, custom_html, copyright_ru, copyright_am, location_ru, location_am) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(d.brand_text_ru||'', d.brand_text_am||'', d.contacts_json||'[]', d.socials_json||'[]', d.nav_links_json||'[]', d.custom_html||'', d.copyright_ru||'', d.copyright_am||'', d.location_ru||'', d.location_am||'').run();
+  }
+  return c.json({ success: true });
+});
+
+// ===== PHOTO BLOCKS =====
+api.get('/photo-blocks', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const rows = await db.prepare('SELECT * FROM photo_blocks ORDER BY sort_order').all();
+  return c.json({ blocks: rows.results || [] });
+});
+
+api.post('/photo-blocks', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO photo_blocks (block_name, description_ru, description_am, photos_json, position, sort_order, is_visible) VALUES (?,?,?,?,?,?,?)')
+    .bind(d.block_name||'', d.description_ru||'', d.description_am||'', d.photos_json||'[]', d.position||'after-services', d.sort_order||0, d.is_visible??1).run();
+  return c.json({ success: true });
+});
+
+api.put('/photo-blocks/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  await db.prepare('UPDATE photo_blocks SET block_name=?, description_ru=?, description_am=?, photos_json=?, position=?, sort_order=?, is_visible=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+    .bind(d.block_name||'', d.description_ru||'', d.description_am||'', d.photos_json||'[]', d.position||'after-services', d.sort_order||0, d.is_visible??1, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/photo-blocks/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM photo_blocks WHERE id = ?').bind(id).run();
   return c.json({ success: true });
 });
 

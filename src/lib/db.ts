@@ -162,6 +162,7 @@ CREATE TABLE IF NOT EXISTS pdf_templates (
 
 CREATE TABLE IF NOT EXISTS slot_counter (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  counter_name TEXT DEFAULT 'main',
   total_slots INTEGER DEFAULT 10,
   booked_slots INTEGER DEFAULT 0,
   label_ru TEXT DEFAULT 'Свободных мест на этой неделе',
@@ -169,6 +170,34 @@ CREATE TABLE IF NOT EXISTS slot_counter (
   show_timer INTEGER DEFAULT 1,
   reset_day TEXT DEFAULT 'monday',
   position TEXT DEFAULT 'after-hero',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS footer_settings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  brand_text_ru TEXT DEFAULT '',
+  brand_text_am TEXT DEFAULT '',
+  contacts_json TEXT DEFAULT '[]',
+  socials_json TEXT DEFAULT '[]',
+  nav_links_json TEXT DEFAULT '[]',
+  custom_html TEXT DEFAULT '',
+  copyright_ru TEXT DEFAULT '',
+  copyright_am TEXT DEFAULT '',
+  location_ru TEXT DEFAULT '',
+  location_am TEXT DEFAULT '',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS photo_blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  block_name TEXT DEFAULT '',
+  description_ru TEXT DEFAULT '',
+  description_am TEXT DEFAULT '',
+  photos_json TEXT DEFAULT '[]',
+  position TEXT DEFAULT 'after-services',
+  sort_order INTEGER DEFAULT 0,
+  is_visible INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 `;
@@ -180,10 +209,11 @@ export async function initDatabase(db: D1Database): Promise<void> {
   }
   // Migrations
   try { await db.prepare("ALTER TABLE slot_counter ADD COLUMN position TEXT DEFAULT 'after-hero'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE slot_counter ADD COLUMN counter_name TEXT DEFAULT 'main'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_order_ru TEXT DEFAULT 'Заказать сейчас'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_order_am TEXT DEFAULT 'Պատվիրել հիմա'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_ru TEXT DEFAULT 'Скачать'").run(); } catch {}
-  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_am TEXT DEFAULT ' Delays'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_am TEXT DEFAULT 'Ներբեռնdelays'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_telegram_url TEXT DEFAULT 'https://t.me/goo_to_top'").run(); } catch {}
 }
 

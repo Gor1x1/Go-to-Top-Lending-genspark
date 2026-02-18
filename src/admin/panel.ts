@@ -55,7 +55,7 @@ export function getAdminHTML(): string {
 // ===== STATE =====
 let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounter: {}, settings: {} };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [] };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -110,9 +110,9 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings] = await Promise.all([
+  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData] = await Promise.all([
     api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order'),
-    api('/leads?limit=50'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings')
+    api('/leads?limit=50'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings'), api('/footer'), api('/photo-blocks')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -125,8 +125,10 @@ async function loadData() {
   data.leads = leads || { leads: [], total: 0 };
   data.telegramBot = telegramBot || [];
   data.pdfTemplate = pdfTemplate || {};
-  data.slotCounter = slotCounter || {};
+  data.slotCounters = (slotCounterRes && slotCounterRes.counters) || [];
   data.settings = settings || {};
+  data.footer = footerData || {};
+  data.photoBlocks = (photoBlocksData && photoBlocksData.blocks) || [];
 }
 
 // ===== NAVIGATION =====
@@ -139,6 +141,8 @@ const pages = [
   { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
   { id: 'sections', icon: 'fa-th-list', label: 'Порядок блоков' },
   { id: 'slots', icon: 'fa-clock', label: 'Счётчик слотов' },
+  { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер сайта' },
+  { id: 'photos', icon: 'fa-images', label: 'Фото блоки' },
   { id: 'telegram', icon: 'fa-telegram', label: 'TG сообщения', fab: true },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
@@ -1156,92 +1160,332 @@ async function savePdfTemplate() {
 
 // ===== SLOT COUNTER =====
 function renderSlotCounter() {
-  var s = data.slotCounter || {};
-  var pos = s.position || 'after-hero';
-  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">\u0421\u0447\u0451\u0442\u0447\u0438\u043a \u0441\u0432\u043e\u0431\u043e\u0434\u043d\u044b\u0445 \u0441\u043b\u043e\u0442\u043e\u0432</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">\u0418\u043d\u0442\u0435\u0440\u0430\u043a\u0442\u0438\u0432\u043d\u044b\u0439 \u0441\u0447\u0451\u0442\u0447\u0438\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435 \u2014 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0435\u0442 \u043a\u043b\u0438\u0435\u043d\u0442\u0430\u043c \u043e\u0441\u0442\u0430\u0432\u0448\u0438\u0435\u0441\u044f \u043c\u0435\u0441\u0442\u0430</p>' +
-    '<div class="card" style="margin-bottom:20px">' +
-    '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-sliders-h" style="color:#8B5CF6;margin-right:8px"></i>\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438</h3>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0412\u0441\u0435\u0433\u043e \u043c\u0435\u0441\u0442</label><input class="input" type="number" id="slot_total" value="' + (s.total_slots || 10) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0417\u0430\u043d\u044f\u0442\u043e \u043c\u0435\u0441\u0442</label><input class="input" type="number" id="slot_booked" value="' + (s.booked_slots || 0) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0421\u0432\u043e\u0431\u043e\u0434\u043d\u043e</label><div style="font-size:2rem;font-weight:800;color:#10B981;padding:6px 0">' + Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0)) + '</div></div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">\u041d\u0430\u0434\u043f\u0438\u0441\u044c (RU)</label><input class="input" id="slot_label_ru" value="' + escHtml(s.label_ru) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">\u041d\u0430\u0434\u043f\u0438\u0441\u044c (AM)</label><input class="input" id="slot_label_am" value="' + escHtml(s.label_am) + '"></div>' +
-    '</div>' +
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:16px"><input type="checkbox" id="slot_show"' + (s.show_timer ? ' checked' : '') + '><label style="font-size:0.9rem;color:#94a3b8">\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u0441\u0447\u0451\u0442\u0447\u0438\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435</label></div>' +
-    '<button class="btn btn-success" onclick="saveSlotCounter()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>' +
-    '</div>';
-
-  // Position control
+  var counters = data.slotCounters || [];
   var positions = [
-    { id: 'in-header', label: '\ud83d\udccd \u0412 \u0448\u0430\u043f\u043a\u0435 \u0441\u0430\u0439\u0442\u0430 (\u043f\u043e\u0434 \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u0435\u0439)', desc: '\u041f\u043e\u044f\u0432\u043b\u044f\u0435\u0442\u0441\u044f \u0441\u0440\u0430\u0437\u0443 \u043f\u043e\u0434 \u043c\u0435\u043d\u044e' },
-    { id: 'after-hero', label: '\u2b50 \u041f\u043e\u0441\u043b\u0435 \u0433\u043b\u0430\u0432\u043d\u043e\u0433\u043e \u0431\u043b\u043e\u043a\u0430 (Hero)', desc: '\u041c\u0435\u0436\u0434\u0443 Hero \u0438 \u0443\u0441\u043b\u0443\u0433\u0430\u043c\u0438' },
-    { id: 'before-calc', label: '\ud83e\uddee \u041f\u0435\u0440\u0435\u0434 \u043a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440\u043e\u043c', desc: '\u041f\u0440\u044f\u043c\u043e \u043d\u0430\u0434 \u043a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440\u043e\u043c \u0443\u0441\u043b\u0443\u0433' },
-    { id: 'before-contact', label: '\ud83d\udcde \u041f\u0435\u0440\u0435\u0434 \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u0430\u043c\u0438', desc: '\u0412\u043d\u0438\u0437\u0443 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u044b, \u043f\u0435\u0440\u0435\u0434 \u0444\u0443\u0442\u0435\u0440\u043e\u043c' },
-    { id: 'after-ticker', label: '\ud83c\udfc3 \u041f\u043e\u0441\u043b\u0435 \u0431\u0435\u0433\u0443\u0449\u0435\u0439 \u0441\u0442\u0440\u043e\u043a\u0438', desc: '\u041c\u0435\u0436\u0434\u0443 \u0442\u0438\u043a\u0435\u0440\u043e\u043c \u0438 \u0443\u0441\u043b\u0443\u0433\u0430\u043c\u0438' }
+    { id: 'in-header', label: '📍 В шапке сайта', desc: 'Под навигацией' },
+    { id: 'after-hero', label: '⭐ После Hero', desc: 'Между Hero и услугами' },
+    { id: 'before-calc', label: '🧮 Перед калькулятором', desc: 'Над калькулятором' },
+    { id: 'before-contact', label: '📞 Перед контактами', desc: 'Перед футером' },
+    { id: 'after-ticker', label: '🏃 После бегущей строки', desc: 'Между тикером и услугами' }
   ];
 
-  h += '<div class="card">' +
-    '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-arrows-alt-v" style="color:#8B5CF6;margin-right:8px"></i>\u041f\u043e\u0437\u0438\u0446\u0438\u044f \u043d\u0430 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435</h3>' +
-    '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435, \u0433\u0434\u0435 \u043f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c \u0441\u0447\u0451\u0442\u0447\u0438\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435:</p>';
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Счётчики свободных мест</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">До 2 счётчиков с отдельными именами и позициями</p>';
 
-  for (var pi = 0; pi < positions.length; pi++) {
-    var p = positions[pi];
-    var isActive = pos === p.id;
-    h += '<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;margin-bottom:8px;border-radius:10px;cursor:pointer;border:2px solid ' + (isActive ? '#8B5CF6' : '#334155') + ';background:' + (isActive ? 'rgba(139,92,246,0.1)' : 'transparent') + '" onclick="selectSlotPos(this,&quot;' + p.id + '&quot;)">' +
-      '<input type="radio" name="slot_pos" value="' + p.id + '"' + (isActive ? ' checked' : '') + ' style="accent-color:#8B5CF6">' +
-      '<div><div style="font-weight:700;font-size:0.9rem;color:' + (isActive ? '#a78bfa' : '#e2e8f0') + '">' + p.label + '</div>' +
-      '<div style="font-size:0.78rem;color:#64748b">' + p.desc + '</div></div>' +
+  if (counters.length < 2) {
+    h += '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addSlotCounter()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить счётчик</button>';
+  }
+
+  for (var ci = 0; ci < counters.length; ci++) {
+    var s = counters[ci];
+    var cid = s.id;
+    var pos = s.position || 'after-hero';
+    h += '<div class="card" style="margin-bottom:20px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+      '<h3 style="font-weight:700"><i class="fas fa-hashtag" style="color:#8B5CF6;margin-right:8px"></i>Счётчик #' + (ci+1) + ' — <span style="color:#a78bfa">' + escHtml(s.counter_name || 'main') + '</span></h3>' +
+      '<button class="btn btn-danger" style="font-size:0.8rem;padding:6px 14px" onclick="deleteSlotCounter('+cid+')"><i class="fas fa-trash"></i></button>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Имя</label><input class="input" id="sc_name_'+cid+'" value="' + escHtml(s.counter_name) + '"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Всего мест</label><input class="input" type="number" id="sc_total_'+cid+'" value="' + (s.total_slots || 10) + '"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Занято</label><input class="input" type="number" id="sc_booked_'+cid+'" value="' + (s.booked_slots || 0) + '"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Свободно</label><div style="font-size:1.8rem;font-weight:800;color:#10B981;padding:6px 0">' + Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0)) + '</div></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+        '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Надпись (RU)</label><input class="input" id="sc_lru_'+cid+'" value="' + escHtml(s.label_ru) + '"></div>' +
+        '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Надпись (AM)</label><input class="input" id="sc_lam_'+cid+'" value="' + escHtml(s.label_am) + '"></div>' +
+      '</div>' +
+      '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><input type="checkbox" id="sc_show_'+cid+'"' + (s.show_timer ? ' checked' : '') + '><label style="font-size:0.9rem;color:#94a3b8">Показывать на сайте</label></div>' +
+      '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:8px;display:block">Позиция на странице</label><select class="input" id="sc_pos_'+cid+'" style="cursor:pointer">';
+    for (var pi = 0; pi < positions.length; pi++) {
+      h += '<option value="'+positions[pi].id+'"'+(pos===positions[pi].id?' selected':'')+'>'+positions[pi].label+' — '+positions[pi].desc+'</option>';
+    }
+    h += '</select></div>' +
+      '<button class="btn btn-success" onclick="saveSlotCounter('+cid+')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>' +
     '</div>';
   }
 
-  h += '<button class="btn btn-success" style="margin-top:12px" onclick="saveSlotPosition()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043f\u043e\u0437\u0438\u0446\u0438\u044e</button>' +
-    '</div></div>';
+  if (counters.length === 0) {
+    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-clock" style="font-size:3rem;color:#334155;margin-bottom:12px;display:block"></i>Нет счётчиков. Нажмите «Добавить счётчик» чтобы создать.</div>';
+  }
+
+  h += '</div>';
   return h;
 }
 
-async function saveSlotCounter() {
-  await api('/slot-counter', { method: 'PUT', body: JSON.stringify({
-    total_slots: parseInt(document.getElementById('slot_total').value) || 10,
-    booked_slots: parseInt(document.getElementById('slot_booked').value) || 0,
-    label_ru: document.getElementById('slot_label_ru').value,
-    label_am: document.getElementById('slot_label_am').value,
-    show_timer: document.getElementById('slot_show').checked ? 1 : 0,
-    reset_day: 'monday',
-    position: data.slotCounter.position || 'after-hero'
+async function addSlotCounter() {
+  await api('/slot-counter', { method: 'POST', body: JSON.stringify({ counter_name: 'Счётчик ' + ((data.slotCounters || []).length + 1), total_slots: 10, booked_slots: 0, show_timer: 1, position: 'after-hero' }) });
+  toast('Счётчик создан');
+  await loadData(); render();
+}
+
+async function saveSlotCounter(id) {
+  await api('/slot-counter/' + id, { method: 'PUT', body: JSON.stringify({
+    counter_name: document.getElementById('sc_name_'+id).value,
+    total_slots: parseInt(document.getElementById('sc_total_'+id).value) || 10,
+    booked_slots: parseInt(document.getElementById('sc_booked_'+id).value) || 0,
+    label_ru: document.getElementById('sc_lru_'+id).value,
+    label_am: document.getElementById('sc_lam_'+id).value,
+    show_timer: document.getElementById('sc_show_'+id).checked ? 1 : 0,
+    position: document.getElementById('sc_pos_'+id).value
   }) });
   toast('Счётчик обновлён');
   await loadData(); render();
 }
 
-function selectSlotPos(el, posId) {
-  var all = el.parentNode.querySelectorAll('[onclick*="selectSlotPos"]');
-  for (var i = 0; i < all.length; i++) {
-    all[i].style.borderColor = '#334155';
-    all[i].style.background = 'transparent';
-    var r = all[i].querySelector('input[type=radio]');
-    if (r) r.checked = false;
-  }
-  el.style.borderColor = '#8B5CF6';
-  el.style.background = 'rgba(139,92,246,0.1)';
-  var r2 = el.querySelector('input[type=radio]');
-  if (r2) r2.checked = true;
+async function deleteSlotCounter(id) {
+  if (!confirm('Удалить счётчик?')) return;
+  await api('/slot-counter/' + id, { method: 'DELETE' });
+  toast('Счётчик удалён');
+  await loadData(); render();
 }
 
-async function saveSlotPosition() {
-  var radios = document.querySelectorAll('input[name="slot_pos"]');
-  var pos = 'after-hero';
-  for (var i = 0; i < radios.length; i++) {
-    if (radios[i].checked) { pos = radios[i].value; break; }
+// ===== FOOTER =====
+function renderFooter() {
+  var f = data.footer || {};
+  var contacts = [];
+  try { contacts = JSON.parse(f.contacts_json || '[]'); } catch { contacts = []; }
+  var socials = [];
+  try { socials = JSON.parse(f.socials_json || '[]'); } catch { socials = []; }
+
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Футер сайта</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Редактирование контактов, соцсетей и содержимого подвала</p>';
+
+  // Brand text
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-building" style="color:#8B5CF6;margin-right:8px"></i>Описание компании</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Текст (RU)</label><textarea class="input" id="ft_brand_ru" rows="3">' + escHtml(f.brand_text_ru) + '</textarea></div>' +
+    '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Текст (AM)</label><textarea class="input" id="ft_brand_am" rows="3">' + escHtml(f.brand_text_am) + '</textarea></div>' +
+    '</div></div>';
+
+  // Contacts
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-address-book" style="color:#10B981;margin-right:8px"></i>Контакты <button class="btn btn-outline" style="font-size:0.75rem;padding:4px 12px;margin-left:12px" onclick="addFooterContact()"><i class="fas fa-plus"></i> Добавить</button></h3>';
+  h += '<div id="footerContactsList">';
+  for (var ci = 0; ci < contacts.length; ci++) {
+    var ct = contacts[ci];
+    h += '<div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:10px;background:#0f172a;border-radius:8px">' +
+      '<select class="input" style="width:140px" id="fc_icon_'+ci+'"><option value="fab fa-telegram"'+(ct.icon==='fab fa-telegram'?' selected':'')+'>Telegram</option><option value="fab fa-whatsapp"'+(ct.icon==='fab fa-whatsapp'?' selected':'')+'>WhatsApp</option><option value="fas fa-phone"'+(ct.icon==='fas fa-phone'?' selected':'')+'>Телефон</option><option value="fas fa-envelope"'+(ct.icon==='fas fa-envelope'?' selected':'')+'>Email</option><option value="fab fa-instagram"'+(ct.icon==='fab fa-instagram'?' selected':'')+'>Instagram</option></select>' +
+      '<input class="input" placeholder="Название (RU)" id="fc_name_'+ci+'" value="'+escHtml(ct.name_ru)+'">' +
+      '<input class="input" placeholder="Ссылка/URL" id="fc_url_'+ci+'" value="'+escHtml(ct.url)+'">' +
+      '<button class="tier-del-btn" onclick="removeFooterContact('+ci+')"><i class="fas fa-times"></i></button>' +
+    '</div>';
   }
-  await api('/slot-counter', { method: 'PUT', body: JSON.stringify({
-    ...data.slotCounter,
-    position: pos
+  h += '</div></div>';
+
+  // Social links
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-share-alt" style="color:#F59E0B;margin-right:8px"></i>Соцсети <button class="btn btn-outline" style="font-size:0.75rem;padding:4px 12px;margin-left:12px" onclick="addFooterSocial()"><i class="fas fa-plus"></i> Добавить</button></h3>';
+  h += '<div id="footerSocialsList">';
+  for (var si = 0; si < socials.length; si++) {
+    var sc = socials[si];
+    h += '<div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:10px;background:#0f172a;border-radius:8px">' +
+      '<select class="input" style="width:140px" id="fs_icon_'+si+'"><option value="fab fa-telegram"'+(sc.icon==='fab fa-telegram'?' selected':'')+'>Telegram</option><option value="fab fa-whatsapp"'+(sc.icon==='fab fa-whatsapp'?' selected':'')+'>WhatsApp</option><option value="fab fa-instagram"'+(sc.icon==='fab fa-instagram'?' selected':'')+'>Instagram</option><option value="fab fa-facebook"'+(sc.icon==='fab fa-facebook'?' selected':'')+'>Facebook</option><option value="fab fa-youtube"'+(sc.icon==='fab fa-youtube'?' selected':'')+'>YouTube</option><option value="fab fa-tiktok"'+(sc.icon==='fab fa-tiktok'?' selected':'')+'>TikTok</option></select>' +
+      '<input class="input" placeholder="Название" id="fs_name_'+si+'" value="'+escHtml(sc.name)+'">' +
+      '<input class="input" placeholder="URL" id="fs_url_'+si+'" value="'+escHtml(sc.url)+'">' +
+      '<button class="tier-del-btn" onclick="removeFooterSocial('+si+')"><i class="fas fa-times"></i></button>' +
+    '</div>';
+  }
+  h += '</div></div>';
+
+  // Copyright + location
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-copyright" style="color:#94a3b8;margin-right:8px"></i>Копирайт</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Копирайт (RU)</label><input class="input" id="ft_copy_ru" value="'+escHtml(f.copyright_ru)+'"></div>' +
+    '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Копирайт (AM)</label><input class="input" id="ft_copy_am" value="'+escHtml(f.copyright_am)+'"></div>' +
+    '</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Локация (RU)</label><input class="input" id="ft_loc_ru" value="'+escHtml(f.location_ru)+'"></div>' +
+    '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Локация (AM)</label><input class="input" id="ft_loc_am" value="'+escHtml(f.location_am)+'"></div>' +
+    '</div></div>';
+
+  // Custom HTML
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-code" style="color:#EF4444;margin-right:8px"></i>Произвольный HTML</h3>' +
+    '<textarea class="input" id="ft_html" rows="4" placeholder="Дополнительный HTML для футера">' + escHtml(f.custom_html) + '</textarea></div>';
+
+  h += '<button class="btn btn-success" onclick="saveFooter()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить футер</button></div>';
+  return h;
+}
+
+var _footerContacts = [];
+var _footerSocials = [];
+function initFooterData() {
+  try { _footerContacts = JSON.parse(data.footer.contacts_json || '[]'); } catch { _footerContacts = []; }
+  try { _footerSocials = JSON.parse(data.footer.socials_json || '[]'); } catch { _footerSocials = []; }
+}
+
+function addFooterContact() {
+  initFooterData();
+  _footerContacts.push({ icon: 'fab fa-telegram', name_ru: '', name_am: '', url: '' });
+  data.footer.contacts_json = JSON.stringify(_footerContacts);
+  render();
+}
+function removeFooterContact(idx) {
+  initFooterData();
+  _footerContacts.splice(idx, 1);
+  data.footer.contacts_json = JSON.stringify(_footerContacts);
+  render();
+}
+function addFooterSocial() {
+  initFooterData();
+  _footerSocials.push({ icon: 'fab fa-telegram', name: '', url: '' });
+  data.footer.socials_json = JSON.stringify(_footerSocials);
+  render();
+}
+function removeFooterSocial(idx) {
+  initFooterData();
+  _footerSocials.splice(idx, 1);
+  data.footer.socials_json = JSON.stringify(_footerSocials);
+  render();
+}
+
+function collectFooterContacts() {
+  var arr = [];
+  for (var i = 0; ; i++) {
+    var iconEl = document.getElementById('fc_icon_'+i);
+    if (!iconEl) break;
+    arr.push({ icon: iconEl.value, name_ru: document.getElementById('fc_name_'+i).value, url: document.getElementById('fc_url_'+i).value });
+  }
+  return arr;
+}
+function collectFooterSocials() {
+  var arr = [];
+  for (var i = 0; ; i++) {
+    var iconEl = document.getElementById('fs_icon_'+i);
+    if (!iconEl) break;
+    arr.push({ icon: iconEl.value, name: document.getElementById('fs_name_'+i).value, url: document.getElementById('fs_url_'+i).value });
+  }
+  return arr;
+}
+
+async function saveFooter() {
+  await api('/footer', { method: 'PUT', body: JSON.stringify({
+    brand_text_ru: document.getElementById('ft_brand_ru').value,
+    brand_text_am: document.getElementById('ft_brand_am').value,
+    contacts_json: JSON.stringify(collectFooterContacts()),
+    socials_json: JSON.stringify(collectFooterSocials()),
+    copyright_ru: document.getElementById('ft_copy_ru').value,
+    copyright_am: document.getElementById('ft_copy_am').value,
+    location_ru: document.getElementById('ft_loc_ru').value,
+    location_am: document.getElementById('ft_loc_am').value,
+    custom_html: document.getElementById('ft_html').value
   }) });
-  toast('Позиция сохранена! Обновите сайт.');
+  toast('Футер сохранён');
+  await loadData(); render();
+}
+
+// ===== PHOTO BLOCKS =====
+function renderPhotos() {
+  var blocks = data.photoBlocks || [];
+  var positions = [
+    { id: 'after-hero', label: 'После Hero' },
+    { id: 'after-services', label: 'После услуг' },
+    { id: 'before-calc', label: 'Перед калькулятором' },
+    { id: 'after-about', label: 'После «О нас»' },
+    { id: 'before-contact', label: 'Перед контактами' },
+    { id: 'after-guarantee', label: 'После гарантий' }
+  ];
+
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Фото блоки</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Создавайте фото-блоки с описаниями и размещайте их на сайте</p>' +
+    '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addPhotoBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить фото-блок</button>';
+
+  for (var bi = 0; bi < blocks.length; bi++) {
+    var b = blocks[bi];
+    var photos = [];
+    try { photos = JSON.parse(b.photos_json || '[]'); } catch { photos = []; }
+    h += '<div class="card" style="margin-bottom:20px">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+      '<h3 style="font-weight:700"><i class="fas fa-images" style="color:#8B5CF6;margin-right:8px"></i>' + escHtml(b.block_name || 'Блок #'+(bi+1)) + '</h3>' +
+      '<div style="display:flex;gap:8px"><label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#94a3b8"><input type="checkbox" id="pb_vis_'+b.id+'"'+(b.is_visible?' checked':'')+'>Видимый</label>' +
+      '<button class="btn btn-danger" style="font-size:0.8rem;padding:6px 14px" onclick="deletePhotoBlock('+b.id+')"><i class="fas fa-trash"></i></button></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Имя блока</label><input class="input" id="pb_name_'+b.id+'" value="'+escHtml(b.block_name)+'"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Позиция</label><select class="input" id="pb_pos_'+b.id+'">';
+    for (var pi = 0; pi < positions.length; pi++) {
+      h += '<option value="'+positions[pi].id+'"'+(b.position===positions[pi].id?' selected':'')+'>'+positions[pi].label+'</option>';
+    }
+    h += '</select></div><div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Порядок</label><input class="input" type="number" id="pb_order_'+b.id+'" value="'+(b.sort_order||0)+'"></div></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Описание (RU)</label><textarea class="input" id="pb_desc_ru_'+b.id+'" rows="2">'+escHtml(b.description_ru)+'</textarea></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Описание (AM)</label><textarea class="input" id="pb_desc_am_'+b.id+'" rows="2">'+escHtml(b.description_am)+'</textarea></div>' +
+      '</div>';
+
+    // Photo URLs list
+    h += '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:8px;display:block">Фотографии (URL)</label>';
+    for (var phi = 0; phi < photos.length; phi++) {
+      h += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">' +
+        '<input class="input" id="pb_photo_'+b.id+'_'+phi+'" value="'+escHtml(photos[phi].url)+'" placeholder="URL фотографии">' +
+        '<input class="input" style="width:200px" id="pb_pcap_'+b.id+'_'+phi+'" value="'+escHtml(photos[phi].caption||'')+'" placeholder="Подпись">' +
+        '<button class="tier-del-btn" onclick="removePhotoFromBlock('+b.id+','+phi+')"><i class="fas fa-times"></i></button>' +
+      '</div>';
+    }
+    h += '<button class="btn btn-outline" style="font-size:0.8rem;padding:6px 14px" onclick="addPhotoToBlock('+b.id+')"><i class="fas fa-plus" style="margin-right:4px"></i>Фото</button></div>';
+
+    h += '<button class="btn btn-success" onclick="savePhotoBlock('+b.id+')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button></div>';
+  }
+
+  if (blocks.length === 0) {
+    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-images" style="font-size:3rem;color:#334155;margin-bottom:12px;display:block"></i>Нет фото-блоков. Нажмите «Добавить» чтобы создать.</div>';
+  }
+
+  h += '</div>';
+  return h;
+}
+
+async function addPhotoBlock() {
+  await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: 'Фото блок ' + ((data.photoBlocks||[]).length+1), position: 'after-services', is_visible: 1, photos_json: '[]' }) });
+  toast('Блок создан');
+  await loadData(); render();
+}
+
+async function deletePhotoBlock(id) {
+  if (!confirm('Удалить фото-блок?')) return;
+  await api('/photo-blocks/' + id, { method: 'DELETE' });
+  toast('Блок удалён');
+  await loadData(); render();
+}
+
+function addPhotoToBlock(blockId) {
+  var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
+  if (!block) return;
+  var photos = [];
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+  photos.push({ url: '', caption: '' });
+  block.photos_json = JSON.stringify(photos);
+  render();
+}
+
+function removePhotoFromBlock(blockId, photoIdx) {
+  var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
+  if (!block) return;
+  var photos = [];
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+  photos.splice(photoIdx, 1);
+  block.photos_json = JSON.stringify(photos);
+  render();
+}
+
+function collectPhotos(blockId) {
+  var arr = [];
+  for (var i = 0; ; i++) {
+    var urlEl = document.getElementById('pb_photo_'+blockId+'_'+i);
+    if (!urlEl) break;
+    var capEl = document.getElementById('pb_pcap_'+blockId+'_'+i);
+    arr.push({ url: urlEl.value, caption: capEl ? capEl.value : '' });
+  }
+  return arr;
+}
+
+async function savePhotoBlock(id) {
+  await api('/photo-blocks/' + id, { method: 'PUT', body: JSON.stringify({
+    block_name: document.getElementById('pb_name_'+id).value,
+    description_ru: document.getElementById('pb_desc_ru_'+id).value,
+    description_am: document.getElementById('pb_desc_am_'+id).value,
+    photos_json: JSON.stringify(collectPhotos(id)),
+    position: document.getElementById('pb_pos_'+id).value,
+    sort_order: parseInt(document.getElementById('pb_order_'+id).value) || 0,
+    is_visible: document.getElementById('pb_vis_'+id).checked ? 1 : 0
+  }) });
+  toast('Фото-блок сохранён');
   await loadData(); render();
 }
 
@@ -1265,6 +1509,8 @@ function render() {
     case 'referrals': pageHtml = renderReferrals(); break;
     case 'sections': pageHtml = renderSections(); break;
     case 'slots': pageHtml = renderSlotCounter(); break;
+    case 'footer': pageHtml = renderFooter(); break;
+    case 'photos': pageHtml = renderPhotos(); break;
     case 'telegram': pageHtml = renderTelegram(); break;
     case 'tgbot': pageHtml = renderTelegramBot(); break;
     case 'scripts': pageHtml = renderScripts(); break;

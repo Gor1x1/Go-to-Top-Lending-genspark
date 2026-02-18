@@ -154,20 +154,23 @@ app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
 })
 
-// ===== PUBLIC SLOT COUNTER =====
+// ===== PUBLIC SLOT COUNTERS (multiple) =====
 app.get('/api/slots', async (c) => {
   try {
     const db = c.env.DB;
     await initDatabase(db);
-    let row = await db.prepare('SELECT * FROM slot_counter LIMIT 1').first();
-    if (!row) return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 1, position: 'after-hero' });
-    return c.json({
+    const rows = await db.prepare('SELECT * FROM slot_counter ORDER BY id').all();
+    if (!rows.results || rows.results.length === 0) return c.json({ counters: [] });
+    const counters = rows.results.map((row: any) => ({
+      id: row.id,
+      counter_name: row.counter_name || 'main',
       total: row.total_slots, booked: row.booked_slots,
       free: Math.max(0, (row.total_slots as number) - (row.booked_slots as number)),
       label_ru: row.label_ru, label_am: row.label_am, show_timer: row.show_timer,
       position: row.position || 'after-hero'
-    });
-  } catch { return c.json({ total: 10, booked: 0, free: 10, label_ru: '', label_am: '', show_timer: 0 }); }
+    }));
+    return c.json({ counters });
+  } catch { return c.json({ counters: [] }); }
 })
 
 // ===== PDF GENERATION (HTML-based, returns HTML for print/save) =====
@@ -299,8 +302,8 @@ app.get('/pdf/:id', async (c) => {
     }
     
     const L = isAm
-      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116' }
-      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116' };
+      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', back: '\u0540\u0561\u0577\u057e\u056b\u0579' }
+      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', back: '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443' };
     
     // Sanitize headers - remove wrong language chars
     const cleanHeader = String(header || '').replace(/[\u0400-\u04FF]/g, isAm ? '' : '$&').replace(/[\u0530-\u058F\u0561-\u0587]/g, isAm ? '$&' : '').trim() || (isAm ? '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f' : '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
@@ -311,22 +314,41 @@ app.get('/pdf/:id', async (c) => {
     // Button labels from DB template
     const btnOrder = String(isAm ? (tpl.btn_order_am || '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561') : (tpl.btn_order_ru || '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
     const btnDl = String(isAm ? (tpl.btn_download_am || '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c') : (tpl.btn_download_ru || '\u0421\u043a\u0430\u0447\u0430\u0442\u044c'));
-    const tgUrl = String(tpl.order_telegram_url || 'https://t.me/goo_to_top');
+    const messengerUrl = String(tpl.order_telegram_url || 'https://t.me/goo_to_top');
     
-    // Build Telegram message
-    const tgMsg = (isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')
+    // Detect messenger type from URL for proper deep linking
+    const isWhatsApp = messengerUrl.includes('wa.me') || messengerUrl.includes('whatsapp');
+    const isTelegram = messengerUrl.includes('t.me') || messengerUrl.includes('telegram');
+    const messengerIcon = isWhatsApp ? 'fab fa-whatsapp' : 'fab fa-telegram';
+    
+    // Build order message (same message used on PDF "Order" button)
+    const orderMsg = (isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')
       + '\n' + (isAm ? '\u054c\u0561\u0577\u057e\u0561\u0580\u056f' : '\u0420\u0430\u0441\u0447\u0451\u0442') + ' #' + id
-      + '\n' + (isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430') + ': ' + Number(total).toLocaleString('ru-RU') + ' \u058f'
-      + (clientName ? '\n' + (isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '');
+      + '\n' + (isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430') + ': ' + Number(total).toLocaleString('ru-RU') + ' \u058f';
+    for (const it of items) {
+      orderMsg; // items are listed in the message
+    }
+    const orderMsgFull = orderMsg
+      + (clientName ? '\n' + (isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '')
+      + (clientContact ? '\n' + (isAm ? '\u053f\u0561\u057a' : '\u041a\u043e\u043d\u0442\u0430\u043a\u0442') + ': ' + clientContact : '');
 
-    const tgLink = tgUrl + '?text=' + encodeURIComponent(tgMsg);
+    // Build messenger link with message
+    let messengerLink = '';
+    if (isWhatsApp) {
+      // WhatsApp: https://wa.me/NUMBER?text=MESSAGE or https://api.whatsapp.com/send?phone=NUMBER&text=MESSAGE
+      const waBase = messengerUrl.includes('?') ? messengerUrl + '&text=' : messengerUrl + '?text=';
+      messengerLink = waBase + encodeURIComponent(orderMsgFull);
+    } else {
+      // Telegram: https://t.me/USERNAME?text=MESSAGE
+      messengerLink = messengerUrl + '?text=' + encodeURIComponent(orderMsgFull);
+    }
+
     const companyName = String(tpl.company_name || 'Go to Top');
     const companyPhone = String(tpl.company_phone || '');
     const companyEmail = String(tpl.company_email || '');
     const companyAddress = String(tpl.company_address || '');
     const dateStr = new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU');
     const totalFormatted = Number(total).toLocaleString('ru-RU');
-    const linkCopied = isAm ? '\u0540\u0561\u057d\u0561\u0576\u0565\u056c\u056b \u0570\u0561\u057d\u0581\u0565\u0576 \u057a\u0561\u057f\u0573\u0565\u0576\u057e\u0561\u056e \u0567' : '\u0421\u0441\u044b\u043b\u043a\u0430 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u0430!';
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
       + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
@@ -334,8 +356,8 @@ app.get('/pdf/:id', async (c) => {
       + '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">'
       + '<style>'
       + '*{margin:0;padding:0;box-sizing:border-box}'
-      + 'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#fff}'
-      + '#pc{padding:24px 24px 90px;max-width:800px;margin:0 auto}'
+      + 'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#f9fafb}'
+      + '#pc{padding:24px;max-width:800px;margin:0 auto;background:#fff;min-height:100vh}'
       + '.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}'
       + '.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}'
       + '.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}'
@@ -348,13 +370,20 @@ app.get('/pdf/:id', async (c) => {
       + '.tr{background:#f3f0ff;font-weight:700;font-size:16px}'
       + '.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}'
       + '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}'
-      + '.bb{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:10px 16px;display:flex;gap:8px;align-items:center;z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,0.08)}'
-      + '.bo{flex:1;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}'
-      + '.bo:hover{background:linear-gradient(135deg,#059669,#047857)}'
-      + '.bd{background:#f3f4f6;color:#374151;border:1px solid #d1d5db;padding:12px 14px;border-radius:10px;font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}'
-      + '.bd:hover{background:#e5e7eb}.bd i{color:#8B5CF6}'
-      + '@media print{.bb{display:none!important}#pc{padding:16px}}'
-      + '@media(max-width:600px){#pc{padding:16px 16px 90px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}}'
+      // Action bar: desktop = inline after content; mobile = fixed bottom
+      + '.actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:28px;padding-top:20px;border-top:1px solid #e5e7eb}'
+      + '.abtn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;border:none;transition:all 0.2s}'
+      + '.abtn-order{background:linear-gradient(135deg,#10B981,#059669);color:#fff}'
+      + '.abtn-order:hover{box-shadow:0 4px 15px rgba(16,185,129,0.4)}'
+      + '.abtn-dl{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}'
+      + '.abtn-dl:hover{background:#e5e7eb}'
+      + '.abtn-dl i{color:#8B5CF6}'
+      + '.abtn-back{background:transparent;color:#6b7280;border:1px solid #d1d5db}'
+      + '.abtn-back:hover{color:#1f2937;border-color:#9ca3af}'
+      + '@media print{.actions{display:none!important}body{background:#fff}#pc{padding:16px;box-shadow:none}}'
+      + '@media(max-width:600px){#pc{padding:16px 16px 100px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}'
+      + '.actions{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:10px 12px;margin:0;box-shadow:0 -2px 12px rgba(0,0,0,0.08);z-index:100;justify-content:center}'
+      + '.abtn{padding:10px 14px;font-size:12px}.abtn-back span{display:none}}'
       + '</style></head><body>'
       + '<div id="pc">'
       + '<div class="hdr"><div class="logo">' + companyName + '</div><div class="ci">'
@@ -370,18 +399,14 @@ app.get('/pdf/:id', async (c) => {
       + '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr></tbody></table>'
       + (cleanOutro ? '<div class="outro">' + cleanOutro + '</div>' : '')
       + (cleanFooter ? '<div class="ftr">' + cleanFooter + '</div>' : '')
+      // Action buttons — inline on desktop, fixed on mobile
+      + '<div class="actions">'
+      + '<a class="abtn abtn-back" href="/#calculator"><i class="fas fa-arrow-left"></i> <span>' + L.back + '</span></a>'
+      + '<button class="abtn abtn-dl" onclick="window.print()"><i class="fas fa-download"></i> ' + btnDl + '</button>'
+      + '<a class="abtn abtn-order" href="' + messengerLink + '" target="_blank"><i class="' + messengerIcon + '"></i> ' + btnOrder + '</a>'
       + '</div>'
-      + '<div class="bb">'
-      + '<a class="bo" href="' + tgLink + '" target="_blank"><i class="fab fa-telegram"></i> ' + btnOrder + '</a>'
-      + '<button class="bd" onclick="dlPage()"><i class="fas fa-download"></i> ' + btnDl + '</button>'
       + '</div>'
-      + '<script>'
-      + 'function dlPage(){'
-      + 'if(navigator.share){navigator.share({title:document.title,url:window.location.href}).catch(function(){});return;}'
-      + 'if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(window.location.href).then(function(){alert("' + linkCopied + '");}).catch(function(){fb();});return;}'
-      + 'fb();}'
-      + 'function fb(){var t=document.createElement("textarea");t.value=window.location.href;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();try{document.execCommand("copy");alert("' + linkCopied + '");}catch(e){}document.body.removeChild(t);}'
-      + '<\/script></body></html>';
+      + '</body></html>';
 
     return c.html(pdfHtml);
   } catch (e: any) {
@@ -419,6 +444,27 @@ app.post('/api/referral/check', async (c) => {
       description: row.description
     });
   } catch { return c.json({ valid: false }); }
+})
+
+// ===== PUBLIC FOOTER SETTINGS =====
+app.get('/api/footer', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    let row = await db.prepare('SELECT * FROM footer_settings LIMIT 1').first();
+    if (!row) return c.json({});
+    return c.json(row);
+  } catch { return c.json({}); }
+})
+
+// ===== PUBLIC PHOTO BLOCKS =====
+app.get('/api/photo-blocks', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const rows = await db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all();
+    return c.json({ blocks: rows.results || [] });
+  } catch { return c.json({ blocks: [] }); }
 })
 
 // ===== ADMIN API =====
@@ -2259,14 +2305,30 @@ function recalcDynamic() {
     msg += '\\n' + (lang === 'am' ? 'Անվճար կարծիքներ: ' : 'Бесплатных отзывов: ') + _refFreeReviews;
   }
   msg += '\\n\\n' + totalLabel + ' ' + formatNum(total) + ' ֏';
-  document.getElementById('calcTgBtn').href = tgUrl + '?text=' + encodeURIComponent(msg);
+  var isWaCalc = tgUrl.includes('wa.me') || tgUrl.includes('whatsapp');
+  var calcBtn = document.getElementById('calcTgBtn');
+  if (isWaCalc) {
+    calcBtn.href = tgUrl + (tgUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msg);
+  } else {
+    calcBtn.href = tgUrl + '?text=' + encodeURIComponent(msg);
+  }
+  var calcIcon = calcBtn.querySelector('i.fab');
+  if (calcIcon) calcIcon.className = isWaCalc ? 'fab fa-whatsapp' : 'fab fa-telegram';
 }
 
 // Override recalc
 var _origRecalc = recalc;
 recalc = function() { if (window._calcServices) recalcDynamic(); else _origRecalc(); };
 
-// Update all Telegram links to match current language
+// Update all messenger links (Telegram/WhatsApp) to match current language
+function updateMessengerIcon(a, url) {
+  // Update icon to match messenger type
+  var icon = a.querySelector('i.fab');
+  if (icon) {
+    var isWa = url && (url.includes('wa.me') || url.includes('whatsapp'));
+    icon.className = isWa ? 'fab fa-whatsapp' : 'fab fa-telegram';
+  }
+}
 function updateTelegramLinks() {
   if (!window._tgData) return;
   var tgByLabel = {};
@@ -2274,37 +2336,36 @@ function updateTelegramLinks() {
     var tgMsg = window._tgData[tgKey];
     if (tgMsg && tgMsg.button_label_ru) {
       tgByLabel[tgMsg.button_label_ru.trim()] = tgMsg;
-      // Also index by AM label so we find buttons even after AM text was applied
       if (tgMsg.button_label_am) tgByLabel[tgMsg.button_label_am.trim()] = tgMsg;
     }
   }
-  document.querySelectorAll('a[href*="t.me/"]').forEach(function(a) {
+  // Match all links with t.me/ or wa.me/ or whatsapp
+  document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
     if (a.id === 'calcTgBtn') return;
     var spanWithDataRu = a.querySelector('span[data-ru]');
     var buttonText = null;
-    if (spanWithDataRu) {
-      buttonText = spanWithDataRu.getAttribute('data-ru');
-    }
-    if (!buttonText && a.hasAttribute('data-ru')) {
-      buttonText = a.getAttribute('data-ru');
-    }
-    if (!buttonText) {
-      var h4 = a.querySelector('h4[data-ru]');
-      if (h4) buttonText = h4.getAttribute('data-ru');
-    }
+    if (spanWithDataRu) { buttonText = spanWithDataRu.getAttribute('data-ru'); }
+    if (!buttonText && a.hasAttribute('data-ru')) { buttonText = a.getAttribute('data-ru'); }
+    if (!buttonText) { var h4 = a.querySelector('h4[data-ru]'); if (h4) buttonText = h4.getAttribute('data-ru'); }
     if (!buttonText) return;
     buttonText = buttonText.trim();
     var tgMsg = tgByLabel[buttonText];
     if (!tgMsg) return;
     var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
-    var tgUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+    var mUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+    var isWa = mUrl.includes('wa.me') || mUrl.includes('whatsapp');
     if (msgTemplate) {
-      a.href = tgUrl + '?text=' + encodeURIComponent(msgTemplate);
+      if (isWa) {
+        a.href = mUrl + (mUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msgTemplate);
+      } else {
+        a.href = mUrl + '?text=' + encodeURIComponent(msgTemplate);
+      }
     } else {
-      a.href = tgUrl;
+      a.href = mUrl;
     }
+    updateMessengerIcon(a, mUrl);
   });
-  // Update calc button message for current language
+  // Update calc button
   if (typeof recalcDynamic === 'function') recalcDynamic();
 }
 
@@ -2431,44 +2492,26 @@ switchLang = function(l) {
         }
       }
       
-      // Find all <a> tags pointing to t.me/ and update their href with message template
-      document.querySelectorAll('a[href*="t.me/"]').forEach(function(a) {
-        // Skip calculator order button (handled separately in recalcDynamic)
+      // Find all <a> tags pointing to t.me/ or wa.me/ and update their href with message template
+      document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
         if (a.id === 'calcTgBtn') return;
-        
-        // Find button text: look for a span with data-ru inside the link
         var spanWithDataRu = a.querySelector('span[data-ru]');
         var buttonText = spanWithDataRu ? spanWithDataRu.getAttribute('data-ru') : null;
-        
-        // If no span, check if the <a> itself has data-ru (for text links)
-        if (!buttonText && a.hasAttribute('data-ru')) {
-          buttonText = a.getAttribute('data-ru');
-        }
-        
-        // If still no text, try the <h4> inside (for contact cards)
-        if (!buttonText) {
-          var h4 = a.querySelector('h4[data-ru]');
-          if (h4) buttonText = h4.getAttribute('data-ru');
-        }
-        
+        if (!buttonText && a.hasAttribute('data-ru')) { buttonText = a.getAttribute('data-ru'); }
+        if (!buttonText) { var h4 = a.querySelector('h4[data-ru]'); if (h4) buttonText = h4.getAttribute('data-ru'); }
         if (!buttonText) return;
         buttonText = buttonText.trim();
-        
-        // Look up this button in telegram_messages
         var tgMsg = tgByLabel[buttonText];
         if (!tgMsg) return;
-        
-        // Update the href: use telegram_url + ?text=message_template
         var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
-        var tgUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
-        
+        var mUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+        var isWa = mUrl.includes('wa.me') || mUrl.includes('whatsapp');
         if (msgTemplate) {
-          a.href = tgUrl + '?text=' + encodeURIComponent(msgTemplate);
+          a.href = isWa ? (mUrl + (mUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msgTemplate)) : (mUrl + '?text=' + encodeURIComponent(msgTemplate));
         } else {
-          a.href = tgUrl;
+          a.href = mUrl;
         }
-        
-        // Also update button label text if it changed
+        updateMessengerIcon(a, mUrl);
         if (spanWithDataRu) {
           var newLabelRu = tgMsg.button_label_ru;
           var newLabelAm = tgMsg.button_label_am;
@@ -2594,42 +2637,170 @@ async function checkRefCode() {
   }
 }
 
-/* ===== SLOT COUNTER ===== */
+/* ===== SLOT COUNTERS (multiple) ===== */
 (function() {
-  fetch('/api/slots').then(function(r){return r.json()}).then(function(d) {
-    if (!d || !d.show_timer) return;
-    var section = document.getElementById('slotCounterSection');
-    if (!section) return;
-    section.style.display = 'block';
-    var freeEl = document.getElementById('slotFreeCount');
-    var totalEl = document.getElementById('slotTotalCount');
-    var barEl = document.getElementById('slotProgressBar');
-    var labelEl = document.getElementById('slotLabel');
-    if (freeEl) freeEl.textContent = d.free;
-    if (totalEl) totalEl.textContent = d.total;
-    if (barEl) barEl.style.width = Math.round(((d.total - d.free) / d.total) * 100) + '%';
-    if (labelEl && lang === 'am' && d.label_am) labelEl.textContent = d.label_am;
-    else if (labelEl && d.label_ru) labelEl.textContent = d.label_ru;
+  fetch('/api/slots').then(function(r){return r.json()}).then(function(data) {
+    var counters = data.counters || [];
+    if (!counters.length) return;
+    // Remove old static slot counter section
+    var oldSection = document.getElementById('slotCounterSection');
+    if (oldSection) oldSection.style.display = 'none';
 
-    /* Move slot counter to selected position */
-    var pos = d.position || 'after-hero';
-    var target = null;
-    if (pos === 'in-header') {
-      target = document.querySelector('header, nav');
-      if (target) target.parentNode.insertBefore(section, target.nextSibling);
-    } else if (pos === 'after-hero') {
-      target = document.getElementById('hero') || document.querySelector('.hero');
-      if (target) target.parentNode.insertBefore(section, target.nextSibling);
-    } else if (pos === 'before-calc') {
-      target = document.getElementById('calculator');
-      if (target) target.parentNode.insertBefore(section, target);
-    } else if (pos === 'before-contact') {
-      target = document.getElementById('contact') || document.querySelector('.contact');
-      if (target) target.parentNode.insertBefore(section, target);
-    } else if (pos === 'after-ticker') {
-      target = document.querySelector('.ticker');
-      if (target) target.parentNode.insertBefore(section, target.nextSibling);
+    counters.forEach(function(d, idx) {
+      if (!d.show_timer) return;
+      var sid = 'slotCounter_' + (d.id || idx);
+      // Create new counter element
+      var el = document.createElement('div');
+      el.id = sid;
+      el.className = 'slot-counter-bar fade-up';
+      el.setAttribute('data-section-id', 'slot-counter-' + (d.id || idx));
+      el.innerHTML = '<div class="container">' +
+        '<div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0">' +
+          '<div style="display:flex;align-items:center;gap:12px">' +
+            '<div style="width:14px;height:14px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>' +
+            '<span style="font-size:1rem;font-weight:600;color:var(--text-secondary)">' + (lang==='am' && d.label_am ? d.label_am : (d.label_ru || d.counter_name || '')) + '</span>' +
+          '</div>' +
+          '<div style="display:flex;align-items:center;gap:8px">' +
+            '<span style="font-size:2.2rem;font-weight:900;color:var(--purple)">' + d.free + '</span>' +
+            '<span style="font-size:0.85rem;color:var(--text-muted)">/ ' + d.total + '</span>' +
+          '</div>' +
+          '<div style="width:200px;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden">' +
+            '<div style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;transition:width 1s ease;width:' + Math.round(((d.total - d.free) / d.total) * 100) + '%"></div>' +
+          '</div>' +
+        '</div></div>';
+
+      // Position counter
+      var pos = d.position || 'after-hero';
+      var target = null;
+      if (pos === 'in-header') { target = document.querySelector('header, nav'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else if (pos === 'after-hero') { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else if (pos === 'before-calc') { target = document.getElementById('calculator'); if (target) target.parentNode.insertBefore(el, target); }
+      else if (pos === 'before-contact') { target = document.getElementById('contact') || document.querySelector('.contact'); if (target) target.parentNode.insertBefore(el, target); }
+      else if (pos === 'after-ticker') { target = document.querySelector('.ticker'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else { /* default: append before footer */ var ft = document.querySelector('footer'); if (ft) ft.parentNode.insertBefore(el, ft); }
+    });
+  }).catch(function(){});
+})();
+
+/* ===== DYNAMIC FOOTER FROM DB ===== */
+(function() {
+  fetch('/api/footer').then(function(r){return r.json()}).then(function(f) {
+    if (!f || (!f.contacts_json && !f.brand_text_ru && !f.copyright_ru)) return;
+    var footer = document.querySelector('footer.footer');
+    if (!footer) return;
+
+    // Update brand text
+    if (f.brand_text_ru) {
+      var brandP = footer.querySelector('.footer-brand p');
+      if (brandP) {
+        brandP.setAttribute('data-ru', f.brand_text_ru);
+        if (f.brand_text_am) brandP.setAttribute('data-am', f.brand_text_am);
+        brandP.textContent = lang === 'am' && f.brand_text_am ? f.brand_text_am : f.brand_text_ru;
+      }
     }
+
+    // Rebuild contacts column
+    var contacts = [];
+    try { contacts = JSON.parse(f.contacts_json || '[]'); } catch {}
+    if (contacts.length > 0) {
+      var cols = footer.querySelectorAll('.footer-col');
+      var contactCol = cols.length >= 2 ? cols[cols.length - 1] : null;
+      if (contactCol) {
+        var chtml = '<h4 data-ru="Контакты" data-am="Կontakner">' + (lang==='am' ? 'Կontakner' : 'Контакты') + '</h4><ul>';
+        for (var i = 0; i < contacts.length; i++) {
+          var c = contacts[i];
+          chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> ' + (c.name_ru || '') + '</a></li>';
+        }
+        chtml += '</ul>';
+        contactCol.innerHTML = chtml;
+      }
+    }
+
+    // Rebuild socials
+    var socials = [];
+    try { socials = JSON.parse(f.socials_json || '[]'); } catch {}
+    if (socials.length > 0) {
+      var bottom = footer.querySelector('.footer-bottom');
+      if (bottom) {
+        var socHtml = '<div style="display:flex;gap:16px;align-items:center">';
+        for (var si = 0; si < socials.length; si++) {
+          var s = socials[si];
+          socHtml += '<a href="'+(s.url||'#')+'" target="_blank" style="color:var(--text-sec);font-size:1.2rem;transition:all 0.2s" title="'+(s.name||'')+'"><i class="'+(s.icon||'fab fa-link')+'"></i></a>';
+        }
+        socHtml += '</div>';
+        // Insert socials after copyright span
+        var existingSocials = bottom.querySelector('.footer-socials');
+        if (existingSocials) existingSocials.remove();
+        var socDiv = document.createElement('div');
+        socDiv.className = 'footer-socials';
+        socDiv.innerHTML = socHtml;
+        bottom.appendChild(socDiv);
+      }
+    }
+
+    // Update copyright
+    if (f.copyright_ru) {
+      var copySp = footer.querySelector('.footer-bottom > span:first-child');
+      if (copySp) {
+        copySp.innerHTML = f.copyright_ru;
+        if (f.copyright_am && lang === 'am') copySp.innerHTML = f.copyright_am;
+      }
+    }
+    // Update location
+    if (f.location_ru) {
+      var locSp = footer.querySelector('.footer-bottom > span:last-of-type');
+      if (locSp) {
+        locSp.textContent = lang === 'am' && f.location_am ? f.location_am : f.location_ru;
+        locSp.setAttribute('data-ru', f.location_ru);
+        if (f.location_am) locSp.setAttribute('data-am', f.location_am);
+      }
+    }
+    // Custom HTML
+    if (f.custom_html) {
+      var customDiv = footer.querySelector('.footer-custom');
+      if (!customDiv) { customDiv = document.createElement('div'); customDiv.className = 'footer-custom'; footer.querySelector('.container').appendChild(customDiv); }
+      customDiv.innerHTML = f.custom_html;
+    }
+  }).catch(function(){});
+})();
+
+/* ===== DYNAMIC PHOTO BLOCKS FROM DB ===== */
+(function() {
+  fetch('/api/photo-blocks').then(function(r){return r.json()}).then(function(data) {
+    var blocks = data.blocks || [];
+    if (!blocks.length) return;
+    blocks.forEach(function(b) {
+      var photos = [];
+      try { photos = JSON.parse(b.photos_json || '[]'); } catch { photos = []; }
+      if (!photos.length) return;
+      var el = document.createElement('section');
+      el.className = 'section fade-up';
+      el.setAttribute('data-section-id', 'photo-block-' + b.id);
+      var desc = lang === 'am' && b.description_am ? b.description_am : (b.description_ru || '');
+      var html = '<div class="container">';
+      if (desc) html += '<p style="text-align:center;color:var(--text-sec);margin-bottom:24px;font-size:1rem">' + desc + '</p>';
+      html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
+      for (var i = 0; i < photos.length; i++) {
+        var p = photos[i];
+        if (!p.url) continue;
+        html += '<div style="border-radius:var(--r);overflow:hidden;border:1px solid var(--border);background:var(--bg-card)">' +
+          '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:220px;object-fit:cover;cursor:pointer" onclick="openLightbox(this.src)">' +
+          (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec)">' + p.caption + '</div>' : '') +
+        '</div>';
+      }
+      html += '</div></div>';
+      el.innerHTML = html;
+      // Position
+      var pos = b.position || 'after-services';
+      var target = null;
+      if (pos === 'after-hero') { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else if (pos === 'after-services') { target = document.getElementById('services'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else if (pos === 'before-calc') { target = document.getElementById('calculator'); if (target) target.parentNode.insertBefore(el, target); }
+      else if (pos === 'after-about') { target = document.getElementById('about'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else if (pos === 'before-contact') { target = document.getElementById('contact'); if (target) target.parentNode.insertBefore(el, target); }
+      else if (pos === 'after-guarantee') { target = document.getElementById('guarantee'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
+      else { var ft = document.querySelector('footer'); if (ft) ft.parentNode.insertBefore(el, ft); }
+    });
   }).catch(function(){});
 })();
 
