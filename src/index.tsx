@@ -180,51 +180,80 @@ app.post('/api/generate-pdf', async (c) => {
     const total = body.total || 0;
     const clientName = body.clientName || '';
     const clientContact = body.clientContact || '';
+    const referralCode = body.referralCode || '';
 
-    // Load PDF template
     let tpl = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
-    if (!tpl) tpl = { header_ru: 'Коммерческое предложение', header_am: 'Առևտրային առաջարկ', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
+    if (!tpl) tpl = { header_ru: '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435', header_am: '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
 
     const isAm = lang === 'am';
-    const header = isAm ? tpl.header_am : tpl.header_ru;
+    const header = isAm ? (tpl.header_am || '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f') : (tpl.header_ru || '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
     const intro = isAm ? tpl.intro_am : tpl.intro_ru;
     const outro = isAm ? tpl.outro_am : tpl.outro_ru;
     const footer = isAm ? tpl.footer_am : tpl.footer_ru;
 
-    // Build rows
     let rows = '';
     for (const item of items) {
-      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right">' + Number(item.price || 0).toLocaleString('ru-RU') + ' ֏</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + ' ֏</td></tr>';
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right">' + Number(item.price || 0).toLocaleString('ru-RU') + ' \u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + ' \u058f</td></tr>';
     }
 
-    const pdfHtml = '<!DOCTYPE html><html><head><meta charset="UTF-8"><style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Arial,sans-serif;color:#1f2937;padding:40px}' +
-      '.header{display:flex;justify-content:space-between;align-items:center;margin-bottom:30px;padding-bottom:20px;border-bottom:3px solid #8B5CF6}' +
-      '.logo{font-size:28px;font-weight:800;color:#8B5CF6}.company-info{text-align:right;font-size:12px;color:#6b7280}' +
-      '.title{font-size:22px;font-weight:700;color:#1f2937;margin-bottom:20px}.client-info{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:24px}' +
-      '.intro{margin-bottom:24px;line-height:1.6;color:#4b5563}table{width:100%;border-collapse:collapse;margin-bottom:24px;border:1px solid #e5e7eb}' +
-      'th{background:#8B5CF6;color:white;padding:12px;text-align:left;font-weight:600;font-size:13px}' +
-      '.total-row{background:#f3f0ff;font-weight:700;font-size:18px}.outro{margin-top:24px;line-height:1.6;color:#4b5563}' +
-      '.footer{margin-top:40px;padding-top:20px;border-top:2px solid #e5e7eb;font-size:11px;color:#9ca3af;text-align:center}' +
-      '@media print{body{padding:20px}}</style></head><body>' +
-      '<div class="header"><div class="logo">' + (tpl.company_name || 'Go to Top') + '</div><div class="company-info">' +
+    // Save lead with unique ID
+    const ua = c.req.header('User-Agent') || '';
+    const leadResult = await db.prepare('INSERT INTO leads (source, name, contact, calc_data, lang, referral_code, user_agent) VALUES (?,?,?,?,?,?,?)')
+      .bind('calculator_pdf', clientName, clientContact, JSON.stringify({ items, total, referralCode }), lang, referralCode, ua.substring(0,200)).run();
+    const leadId = leadResult.meta?.last_row_id || 0;
+
+    // Notify via Telegram with detailed info
+    const tgLines = [
+      '\ud83d\udccb ' + (isAm ? '\u0546\u0578\u0580 \u0570\u0561\u0575\u057f #' : '\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430 #') + leadId,
+      '\ud83d\udc64 ' + (clientName || '-'),
+      '\ud83d\udcde ' + (clientContact || '-'),
+      '\ud83d\udcb0 ' + Number(total).toLocaleString('ru-RU') + ' \u058f'
+    ];
+    if (referralCode) tgLines.push('\ud83c\udff7 ' + (isAm ? '\u054a\u0580\u0578\u0574\u0578: ' : '\u041f\u0440\u043e\u043c\u043e: ') + referralCode);
+    tgLines.push((isAm ? '\ud83d\udcc4 \u0550\u0561\u0577\u057e\u0561\u0580\u056f:' : '\ud83d\udcc4 \u0420\u0430\u0441\u0447\u0451\u0442:'));
+    for (const it of items) { tgLines.push('  \u2022 ' + it.name + ' \u00d7 ' + it.qty + ' = ' + Number(it.subtotal).toLocaleString('ru-RU') + ' \u058f'); }
+    notifyTelegram(db, { name: clientName, contact: clientContact, source: 'calculator_pdf', message: tgLines.join('\n'), lang });
+
+    // Build labels ONLY in current language (no mixing)
+    const L = isAm
+      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', dl: '\ud83d\udce5 \u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c PDF' }
+      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', dl: '\ud83d\udce5 \u0421\u043a\u0430\u0447\u0430\u0442\u044c PDF' };
+
+    const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+      '*{margin:0;padding:0;box-sizing:border-box}' +
+      'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;padding:24px;max-width:800px;margin:0 auto;background:#fff}' +
+      '.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}' +
+      '.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}' +
+      '.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}' +
+      '.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}' +
+      '.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}' +
+      '.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}' +
+      'table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}' +
+      'th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}' +
+      'td{padding:10px 12px;border-bottom:1px solid #e5e7eb}' +
+      '.tr{background:#f3f0ff;font-weight:700;font-size:16px}' +
+      '.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}' +
+      '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}' +
+      '.dlbar{position:sticky;bottom:8px;background:#8B5CF6;color:white;text-align:center;padding:14px;border-radius:12px;margin-top:24px;cursor:pointer;font-weight:700;font-size:16px;box-shadow:0 4px 20px rgba(139,92,246,0.4);text-decoration:none;display:block}' +
+      '.dlbar:hover{background:#7C3AED}' +
+      '@media print{.dlbar{display:none!important}body{padding:16px}}' +
+      '@media(max-width:600px){body{padding:16px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}}' +
+      '</style></head><body>' +
+      '<div class="hdr"><div class="logo">' + (tpl.company_name || 'Go to Top') + '</div><div class="ci">' +
       (tpl.company_phone ? '<div>' + tpl.company_phone + '</div>' : '') +
       (tpl.company_email ? '<div>' + tpl.company_email + '</div>' : '') +
       (tpl.company_address ? '<div>' + tpl.company_address + '</div>' : '') +
-      '<div>' + new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU') + '</div></div></div>' +
-      '<div class="title">' + (header || '') + '</div>' +
-      (clientName || clientContact ? '<div class="client-info"><strong>' + (isAm ? 'Հաճախորդ:' : 'Клиент:') + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
+      '</div></div>' +
+      '<div class="ttl">' + (header || '') + '</div>' +
+      '<div class="meta"><span>' + L.date + ' ' + new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU') + '</span><span>' + L.id + leadId + '</span></div>' +
+      (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
       (intro ? '<div class="intro">' + intro + '</div>' : '') +
-      '<table><thead><tr><th>' + (isAm ? 'Ծառայություն' : 'Услуга') + '</th><th style="text-align:center">' + (isAm ? 'Քանակ' : 'Кол-во') + '</th><th style="text-align:right">' + (isAm ? 'Գին' : 'Цена') + '</th><th style="text-align:right">' + (isAm ? 'Գումար' : 'Сумма') + '</th></tr></thead><tbody>' + rows +
-      '<tr class="total-row"><td colspan="3" style="padding:14px 12px;text-align:right">' + (isAm ? 'ԸՆԴԱՄԵՆԸ:' : 'ИТОГО:') + '</td><td style="padding:14px 12px;text-align:right;color:#8B5CF6;font-size:20px">' + Number(total).toLocaleString('ru-RU') + ' ֏</td></tr></tbody></table>' +
+      '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows +
+      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px">' + Number(total).toLocaleString('ru-RU') + ' \u058f</td></tr></tbody></table>' +
       (outro ? '<div class="outro">' + outro + '</div>' : '') +
-      (footer ? '<div class="footer">' + footer + '</div>' : '') +
+      (footer ? '<div class="ftr">' + footer + '</div>' : '') +
+      '<a class="dlbar" onclick="window.print()">' + L.dl + '</a>' +
       '</body></html>';
-
-    // Also save as lead with calc data
-    const ua = c.req.header('User-Agent') || '';
-    await db.prepare('INSERT INTO leads (source, name, contact, calc_data, lang, user_agent) VALUES (?,?,?,?,?,?)')
-      .bind('calculator_pdf', clientName, clientContact, JSON.stringify({ items, total }), lang, ua.substring(0,200)).run();
-    notifyTelegram(db, { name: clientName, contact: clientContact, source: 'calculator_pdf', message: 'PDF generated: ' + total + ' ֏', lang });
 
     return c.html(pdfHtml);
   } catch (e: any) {
@@ -330,7 +359,7 @@ app.get('/', (c) => {
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
 <meta name="description" content="Go to Top — продвижение карточек на Wildberries под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
 <meta property="og:title" content="Go to Top — Продвижение на Wildberries">
@@ -366,12 +395,13 @@ app.get('/', (c) => {
   --r:16px;--r-sm:10px;--r-lg:24px;
   --t:all 0.3s cubic-bezier(0.4,0,0.2,1);
 }
-html{scroll-behavior:smooth;font-size:16px}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden}
-.container{max-width:1200px;margin:0 auto;padding:0 24px}
+html{scroll-behavior:smooth;font-size:16px;overflow-x:hidden;width:100%;max-width:100vw;-webkit-text-size-adjust:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;width:100%;max-width:100vw;min-height:100vh;min-height:100dvh;-webkit-overflow-scrolling:touch}
+*,*::before,*::after{box-sizing:border-box}
+.container{max-width:1200px;margin:0 auto;padding:0 24px;overflow-x:hidden;width:100%;box-sizing:border-box}
 a{text-decoration:none;color:inherit}
 img{max-width:100%;height:auto}
-.header{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 0;transition:var(--t);background:rgba(15,10,26,0.8);backdrop-filter:blur(20px);border-bottom:1px solid transparent}
+.header{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 0;transition:var(--t);background:rgba(15,10,26,0.8);backdrop-filter:blur(20px);border-bottom:1px solid transparent;width:100%}
 .header.scrolled{border-bottom:1px solid var(--border);background:rgba(15,10,26,0.95)}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .logo{display:flex;align-items:center;gap:12px}
@@ -451,7 +481,7 @@ img{max-width:100%;height:auto}
 .calc-input{display:flex;align-items:center;gap:8px}
 .calc-input button{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.95rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
 .calc-input button:hover{border-color:var(--purple);background:rgba(139,92,246,0.1)}
-.calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:0.92rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none;transition:var(--t)}
+.calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none;transition:var(--t)}
 .calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
 .calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .calc-total{display:flex;justify-content:space-between;align-items:center;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple)}
@@ -512,7 +542,8 @@ img{max-width:100%;height:auto}
 .g-list li{display:flex;align-items:flex-start;gap:12px;padding:8px 0;font-size:0.92rem}
 .g-list li i{color:var(--success);margin-top:4px}
 .g-badge{display:inline-flex;align-items:center;gap:10px;padding:12px 20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.2);border-radius:var(--r-sm);color:var(--success);font-weight:600;margin-top:16px}
-.cmp-table{width:100%;border-collapse:collapse;background:var(--bg-card);border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
+.cmp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r);margin:0;padding:0;max-width:100%;display:block}
+.cmp-table{width:100%;min-width:500px;border-collapse:collapse;background:var(--bg-card);border-radius:var(--r);overflow:hidden;border:1px solid var(--border)}
 .cmp-table th{padding:16px 20px;font-size:0.82rem;text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
 .cmp-table th:first-child{text-align:left;color:var(--text-muted)}
 .cmp-table th:nth-child(2){background:rgba(139,92,246,0.1);color:var(--purple)}
@@ -532,7 +563,7 @@ img{max-width:100%;height:auto}
 .form-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;max-width:600px;margin:0 auto}
 .form-group{margin-bottom:20px}
 .form-group label{display:block;font-size:0.82rem;font-weight:600;margin-bottom:8px;color:var(--text-sec)}
-.form-group input,.form-group textarea,.form-group select{width:100%;padding:12px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:0.92rem;font-family:inherit;transition:var(--t)}
+.form-group input,.form-group textarea,.form-group select{width:100%;padding:12px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:1rem;font-family:inherit;transition:var(--t)}
 .form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
 .form-group textarea{resize:vertical;min-height:100px}
 .form-group select option{background:var(--bg-card)}
@@ -608,12 +639,17 @@ img{max-width:100%;height:auto}
   .popup-overlay{align-items:flex-end;padding:0}
   .popup-card{
     border-radius:20px 20px 0 0;
-    max-width:100%;
+    max-width:100%;width:100%;
     animation:slideUpMobile 0.4s ease forwards;
-    padding:28px 20px;
-    max-height:90vh;
+    padding:28px 16px;
+    max-height:85vh;
     overflow-y:auto;
+    margin:0;
   }
+  .popup-card h3{font-size:1.2rem}
+  .popup-card .pf-row{grid-template-columns:1fr}
+  .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
+  .slot-counter-bar #slotProgress{width:100%;max-width:280px}
 }
 .popup-card .popup-close{
   position:absolute;top:14px;right:14px;
@@ -638,7 +674,7 @@ img{max-width:100%;height:auto}
   width:100%;padding:12px 14px;
   background:rgba(15,10,26,0.6);
   border:1px solid rgba(139,92,246,0.35);
-  border-radius:10px;color:#fff;font-size:0.92rem;
+  border-radius:10px;color:#fff;font-size:1rem;
   font-family:inherit;transition:var(--t);
 }
 .popup-card .pf-input:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.25)}
@@ -694,7 +730,7 @@ img{max-width:100%;height:auto}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
 .stat-card .stat-big{font-size:2.8rem;font-weight:900;color:var(--purple);line-height:1}
 .stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
-.slot-counter-bar{padding:0;background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(139,92,246,0.05));border-bottom:1px solid var(--border)}
+.slot-counter-bar{padding:0;background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(139,92,246,0.05));border-bottom:1px solid var(--border);width:100%;overflow:hidden}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
 
@@ -786,8 +822,8 @@ img{max-width:100%;height:auto}
   .buyout-grid{grid-template-columns:1fr}
   .stats-grid{grid-template-columns:repeat(2,1fr);gap:20px}
   .process-grid{grid-template-columns:1fr 1fr}
-  .cmp-table{font-size:0.78rem}
-  .cmp-table td,.cmp-table th{padding:10px 12px}
+  .cmp-table{font-size:0.78rem;min-width:420px}
+  .cmp-table td,.cmp-table th{padding:10px 8px}
   .calc-row{grid-template-columns:1fr;gap:8px}
   .calc-wrap{padding:24px}
   .calc-tabs{gap:6px}
@@ -800,11 +836,37 @@ img{max-width:100%;height:auto}
   .calc-float span{display:none}
   .calc-float{padding:16px;border-radius:50%}
   .popup-card .pf-row{grid-template-columns:1fr}
+  .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
+  .slot-counter-bar #slotProgress{width:100%;max-width:280px}
 }
 @media(max-width:480px){
   .hero h1{font-size:1.6rem}
   .section{padding:44px 0}
   .section-title{font-size:1.4rem}
+  .container{padding:0 16px}
+  .calc-wrap{padding:16px}
+  .svc-card{padding:20px}
+  .buyout-detail{padding:24px}
+  .reviews-detail{padding:24px}
+  .guarantee-card{padding:24px}
+  .form-card{padding:20px}
+  .wb-banner-card{min-width:0;padding:12px 16px}
+  .wb-banner-right{min-width:0;padding:12px 16px;flex-wrap:wrap}
+  .wb-banner-right .btn{margin-left:0;margin-top:8px;width:100%}
+  .cmp-table{min-width:380px}
+}
+
+/* ===== MOBILE FULL-WIDTH FIXES ===== */
+@media(max-width:768px){
+  .slot-counter-bar,.ticker,.stats-bar,.wb-banner,.footer,.section-dark{width:100vw;margin-left:calc(-50vw + 50%);margin-left:0;box-sizing:border-box}
+  .popup-overlay{-webkit-tap-highlight-color:transparent}
+  input,textarea,select,button{font-size:16px!important;-webkit-appearance:none;border-radius:0;border-radius:10px}
+}
+@media(max-width:360px){
+  .container{padding:0 12px}
+  .hero{padding:100px 0 50px}
+  .hero h1{font-size:1.4rem}
+  .calc-tab{padding:6px 12px;font-size:0.75rem}
 }
 </style>
 </head>
@@ -1396,7 +1458,7 @@ img{max-width:100%;height:auto}
     <div class="section-badge"><i class="fas fa-balance-scale"></i> <span data-ru="Сравнение" data-am="Համեմատություն">Сравнение</span></div>
     <h2 class="section-title" data-ru="Go to Top vs Другие агентства" data-am="Go to Top vs Այլ գործակալություններ">Go to Top vs Другие агентства</h2>
   </div>
-  <div class="fade-up" style="overflow-x:auto">
+  <div class="fade-up"><div class="cmp-table-wrap">
   <table class="cmp-table">
     <thead><tr>
       <th data-ru="Критерий" data-am="Չափանիշ">Критерий</th>
@@ -1411,7 +1473,7 @@ img{max-width:100%;height:auto}
       <tr><td data-ru="Прозрачная отчётность" data-am="Թափանցիկ հաշվետվություն">Прозрачная отчётность</td><td><i class="fas fa-check-circle chk"></i> <span data-ru="Ежедневно" data-am="Ամենօր">Ежедневно</span></td><td><i class="fas fa-times-circle crs"></i> <span data-ru="Раз в неделю" data-am="Շաբաթը մեկ անգամ">Раз в неделю</span></td></tr>
     </tbody>
   </table>
-  </div>
+  </div></div>
   <div class="section-cta">
     <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Убедитесь сами — начните сейчас" data-am="Սկսել գնումները հիմա">Начать выкупы сейчас</span></a>
   </div>
@@ -1805,18 +1867,30 @@ function showPopup() {
   if (sessionStorage.getItem('popupDone')) return;
   var ov = document.getElementById('popupOverlay');
   if (!ov) return;
-  /* Force every possible style to guarantee visibility on ALL screens */
-  ov.setAttribute('style','display:flex!important;visibility:visible!important;opacity:1!important;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100%;background:rgba(0,0,0,0.85);z-index:100000;justify-content:center;align-items:center;padding:20px;overflow-y:auto;');
+  var isMobile = window.innerWidth <= 640;
+  /* Force visibility — mobile: slide-up from bottom; desktop: centered */
+  ov.setAttribute('style',
+    'display:flex!important;visibility:visible!important;opacity:1!important;' +
+    'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;' +
+    'background:rgba(0,0,0,0.85);z-index:100000;overflow-y:auto;' +
+    (isMobile
+      ? 'justify-content:center;align-items:flex-end;padding:0;'
+      : 'justify-content:center;align-items:center;padding:20px;')
+  );
   ov.classList.add('show');
   var card = ov.querySelector('.popup-card');
   if (card) {
     card.style.opacity = '1';
     card.style.visibility = 'visible';
-    card.style.transform = 'scale(1) translateY(0)';
     card.style.display = 'block';
+    if (isMobile) {
+      card.style.cssText += 'max-width:100%;width:100%;margin:0;border-radius:20px 20px 0 0;max-height:90vh;max-height:90dvh;overflow-y:auto;padding:28px 16px;animation:slideUpMobile 0.4s ease forwards;';
+    } else {
+      card.style.transform = 'scale(1) translateY(0)';
+    }
   }
   document.body.style.overflow = 'hidden';
-  console.log('[Popup] Shown on ' + (window.innerWidth > 768 ? 'desktop' : 'mobile') + ', w=' + window.innerWidth);
+  console.log('[Popup] Shown on ' + (isMobile ? 'mobile' : 'desktop') + ', w=' + window.innerWidth);
 }
 
 function hidePopup() {
@@ -2410,86 +2484,116 @@ async function checkRefCode() {
   }).catch(function(){});
 })();
 
-/* ===== PDF DOWNLOAD BUTTON ===== */
+/* ===== PDF DOWNLOAD — FORM + BUTTON ===== */
 (function() {
   var calcSection = document.getElementById('calculator');
   if (!calcSection) return;
   var totalEl = document.getElementById('calcTotal');
   if (!totalEl) return;
-
-  // Create PDF download button
-  var pdfBtn = document.createElement('button');
-  pdfBtn.className = 'calc-submit-btn';
-  pdfBtn.id = 'pdfDownloadBtn';
-  pdfBtn.style.cssText = 'margin-top:12px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center;transition:all 0.3s';
-  pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> <span data-ru="Скачать КП (PDF)" data-am="Ներբեռնել ԿԱ (PDF)">Скачать КП (PDF)</span>';
-  
-  // Insert after total line
   var totalWrap = totalEl.closest('.calc-total') || totalEl.parentElement;
-  if (totalWrap && totalWrap.parentElement) {
-    totalWrap.parentElement.insertBefore(pdfBtn, totalWrap.nextSibling);
-  }
+  if (!totalWrap || !totalWrap.parentElement) return;
+
+  // Create contact form + PDF button container
+  var formDiv = document.createElement('div');
+  formDiv.id = 'pdfFormWrap';
+  formDiv.style.cssText = 'margin-top:20px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.2);border-radius:16px;padding:20px;';
+  formDiv.innerHTML =
+    '<div style="font-size:0.95rem;font-weight:700;margin-bottom:14px;color:var(--text)">' +
+      '<i class="fas fa-file-pdf" style="color:#F59E0B;margin-right:8px"></i>' +
+      '<span data-ru="Скачать расчёт (PDF)" data-am="Ներբեռնել հաշվարկ (PDF)">Скачать расчёт (PDF)</span>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px" class="pdf-form-row">' +
+      '<input type="text" id="pdfClientName" placeholder="' + (lang==='am' ? 'Անուն *' : 'Имя *') + '" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.9rem;outline:none;width:100%">' +
+      '<input type="tel" id="pdfClientPhone" placeholder="' + (lang==='am' ? 'Հեռախոս *' : 'Телефон *') + '" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.9rem;outline:none;width:100%">' +
+    '</div>' +
+    '<div id="pdfFormError" style="display:none;color:#EF4444;font-size:0.82rem;margin-bottom:8px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:8px"></div>' +
+    '<button type="button" id="pdfDownloadBtn" style="margin-top:4px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center;transition:all 0.3s">' +
+      '<i class="fas fa-file-pdf"></i> <span data-ru="Скачать КП (PDF)" data-am="Ներբեռնել ԿԱ (PDF)">Скачать КП (PDF)</span>' +
+    '</button>';
+
+  totalWrap.parentElement.insertBefore(formDiv, totalWrap.nextSibling);
+  var pdfBtn = document.getElementById('pdfDownloadBtn');
 
   pdfBtn.addEventListener('click', function() {
-    // Collect selected items from ALL calc-rows (qty > 0 = selected)
+    var nameInput = document.getElementById('pdfClientName');
+    var phoneInput = document.getElementById('pdfClientPhone');
+    var errDiv = document.getElementById('pdfFormError');
+    var clientName = (nameInput.value || '').trim();
+    var clientPhone = (phoneInput.value || '').trim();
+
+    if (!clientName || !clientPhone) {
+      errDiv.style.display = 'block';
+      errDiv.textContent = lang === 'am' ? 'Լրացրեք անունը և հեռախոսը' : 'Укажите имя и телефон';
+      if (!clientName) nameInput.style.borderColor = '#EF4444';
+      if (!clientPhone) phoneInput.style.borderColor = '#EF4444';
+      return;
+    }
+    errDiv.style.display = 'none';
+    nameInput.style.borderColor = '';
+    phoneInput.style.borderColor = '';
+
     var items = [];
-    var rows = calcSection.querySelectorAll('.calc-row');
-    rows.forEach(function(row) {
+    calcSection.querySelectorAll('.calc-row').forEach(function(row) {
       var qtyInput = row.querySelector('input[type="number"]');
       if (!qtyInput) return;
       var qty = parseInt(qtyInput.value) || 0;
       if (qty <= 0) return;
-
       var nameEl = row.querySelector('.calc-label');
       var name = nameEl ? nameEl.textContent.trim() : '';
-      var dataPrice = row.getAttribute('data-price');
-
-      if (dataPrice === 'buyout') {
-        // Use getBuyoutTotal/getBuyoutPrice for correct progressive pricing
-        var subtotal = getBuyoutTotal(qty);
-        var unitPrice = getBuyoutPrice(qty);
-        items.push({ name: name, price: unitPrice, qty: qty, subtotal: subtotal });
-      } else if (dataPrice === 'tiered') {
-        // Use getTierTotal/getTierPrice for correct tiered pricing
-        try {
-          var tiers = JSON.parse(row.getAttribute('data-tiers'));
-          var tierSubtotal = getTierTotal(tiers, qty);
-          var tierUnitPrice = getTierPrice(tiers, qty);
-          items.push({ name: name, price: tierUnitPrice, qty: qty, subtotal: tierSubtotal });
-        } catch(e) {
-          var priceEl = row.querySelector('.calc-price');
-          var pt = priceEl ? priceEl.textContent.replace(/[^0-9]/g, '') : '0';
-          items.push({ name: name, price: parseInt(pt)||0, qty: qty, subtotal: (parseInt(pt)||0)*qty });
-        }
+      var dp = row.getAttribute('data-price');
+      if (dp === 'buyout') {
+        items.push({ name: name, price: getBuyoutPrice(qty), qty: qty, subtotal: getBuyoutTotal(qty) });
+      } else if (dp === 'tiered') {
+        try { var t = JSON.parse(row.getAttribute('data-tiers')); items.push({ name: name, price: getTierPrice(t,qty), qty: qty, subtotal: getTierTotal(t,qty) }); }
+        catch(e) { var pe=row.querySelector('.calc-price'); var pp=pe?parseInt(pe.textContent.replace(/[^0-9]/g,''))||0:0; items.push({name:name,price:pp,qty:qty,subtotal:pp*qty}); }
       } else {
-        // Normal fixed price row
-        var price = parseInt(dataPrice) || 0;
-        items.push({ name: name, price: price, qty: qty, subtotal: price * qty });
+        var p = parseInt(dp) || 0;
+        items.push({ name: name, price: p, qty: qty, subtotal: p * qty });
       }
     });
-    
+
     if (!items.length) {
-      alert(lang === 'am' ? 'Ընտրեք ծառայություններ!' : 'Выберите услуги (установите количество > 0)!');
+      errDiv.style.display = 'block';
+      errDiv.textContent = lang === 'am' ? 'Ընտրեք ծառայություններ (քանակ > 0)' : 'Выберите услуги (количество > 0)';
       return;
     }
-    var totalVal = totalEl.textContent.replace(/[^0-9]/g, '');
 
-    // Open PDF in new window
+    var totalVal = totalEl.textContent.replace(/[^0-9]/g, '');
+    var refCode = '';
+    var refInput = document.getElementById('refCodeInput');
+    if (refInput) refCode = refInput.value || '';
+
+    pdfBtn.disabled = true;
+    pdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Загрузка...');
+
     fetch('/api/generate-pdf', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ items: items, total: parseInt(totalVal) || 0, lang: lang, clientName: '', clientContact: '' })
-    }).then(function(r){return r.text()}).then(function(html) {
-      var w = window.open('', '_blank');
-      if (w) { w.document.write(html); w.document.close(); }
-    }).catch(function(e){ console.error('PDF error:', e); });
+      body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, clientName: clientName, clientContact: clientPhone, referralCode: refCode })
+    }).then(function(r){ return r.text(); }).then(function(html) {
+      pdfBtn.disabled = false;
+      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? 'Ներբեռնել ԿԱ (PDF)' : 'Скачать КП (PDF)');
+      /* iPhone Safari: always use blob download */
+      var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a'); a.href = url;
+      a.download = 'GoToTop_KP_' + new Date().toISOString().slice(0,10) + '.html';
+      a.style.display = 'none';
+      document.body.appendChild(a); a.click();
+      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+    }).catch(function(e){
+      console.error('PDF error:', e);
+      pdfBtn.disabled = false;
+      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? 'Ներբեռնել ԿԱ (PDF)' : 'Скачать КП (PDF)');
+    });
   });
 
-  // Apply language to PDF button
   if (lang === 'am') {
-    var span = pdfBtn.querySelector('span[data-am]');
-    if (span) span.textContent = span.getAttribute('data-am');
+    formDiv.querySelectorAll('[data-am]').forEach(function(el) { el.textContent = el.getAttribute('data-am'); });
   }
+  var _s = document.createElement('style');
+  _s.textContent = '@media(max-width:640px){.pdf-form-row{grid-template-columns:1fr!important}}';
+  document.head.appendChild(_s);
 })();
 
 /* ===== PAGE VIEW TRACKING ===== */
