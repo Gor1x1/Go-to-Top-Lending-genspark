@@ -263,7 +263,8 @@ app.post('/api/generate-pdf', async (c) => {
   }
 })
 
-// ===== PDF VIEW — GET /pdf/:id (works on ALL devices including Android WebView) =====
+
+// ===== PDF VIEW - GET /pdf/:id (works on ALL devices including iOS WebView) =====
 app.get('/pdf/:id', async (c) => {
   try {
     const db = c.env.DB;
@@ -280,118 +281,108 @@ app.get('/pdf/:id', async (c) => {
     const total = calcData.total || 0;
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
-    const referralCode = calcData.referralCode || '';
     
-    let tpl = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
-    if (!tpl) tpl = { header_ru: 'Коммерческое предложение', header_am: 'Առևտրային առաջարկ', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
+    let tpl: any = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+    if (!tpl) tpl = {};
     
-    const header = isAm ? (tpl.header_am || '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f') : (tpl.header_ru || 'Коммерческое предложение');
+    const header = isAm ? (tpl.header_am || '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f') : (tpl.header_ru || '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
     const intro = isAm ? tpl.intro_am : tpl.intro_ru;
     const outro = isAm ? tpl.outro_am : tpl.outro_ru;
     const footer = isAm ? tpl.footer_am : tpl.footer_ru;
     
     let rows = '';
     for (const item of items) {
-      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
     
     const L = isAm
-      ? { svc: 'Ծառայություն', qty: 'Քանակ', price: 'Գին', sum: 'Գումար', total: 'ԸՆԴԱՄԵՆԸ:', client: 'Հաճախորդ:', date: 'Ամսաթիվ:', id: 'Հայտ №', dl: '📥 Ներբեռնել PDF', share: '📤 Կիսել' }
-      : { svc: 'Услуга', qty: 'Кол-во', price: 'Цена', sum: 'Сумма', total: 'ИТОГО:', client: 'Клиент:', date: 'Дата:', id: 'Заявка №', dl: '📥 Скачать PDF', share: '📤 Поделиться' };
+      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116' }
+      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116' };
     
-    // Sanitize template fields — strip opposite language characters
+    // Sanitize headers - remove wrong language chars
     const cleanHeader = String(header || '').replace(/[\u0400-\u04FF]/g, isAm ? '' : '$&').replace(/[\u0530-\u058F\u0561-\u0587]/g, isAm ? '$&' : '').trim() || (isAm ? '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f' : '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
     const cleanIntro = isAm ? String(intro || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(intro || '').replace(/[\u0530-\u058F]/g, '').trim();
     const cleanOutro = isAm ? String(outro || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(outro || '').replace(/[\u0530-\u058F]/g, '').trim();
     const cleanFooter = isAm ? String(footer || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(footer || '').replace(/[\u0530-\u058F]/g, '').trim();
 
-    const dlBtnLabel = L.dl;
-    const saveBtnLabel = isAm ? '\ud83d\udcf7 \u054a\u0561\u0570\u0565\u056c \u0576\u056f\u0561\u0580' : '\ud83d\udcf7 \u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043a\u0430\u043a \u0444\u043e\u0442\u043e';
-    const backBtnLabel = isAm ? '\u2190 \u054e\u0565\u0580\u0561\u0564\u0561\u057c\u0576\u0561\u056c' : '\u2190 \u041d\u0430\u0437\u0430\u0434 \u043d\u0430 \u0441\u0430\u0439\u0442';
-
-    const pdfHtml = `<!DOCTYPE html><html lang="${lang}"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
-<style>
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#fff}
-#pdfContent{padding:24px;max-width:800px;margin:0 auto}
-.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}
-.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}
-.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}
-.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}
-.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}
-.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}
-table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}
-th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}
-td{padding:10px 12px;border-bottom:1px solid #e5e7eb}
-.tr{background:#f3f0ff;font-weight:700;font-size:16px}
-.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}
-.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}
-.actions{position:sticky;bottom:0;background:#fff;padding:12px 0;display:flex;gap:8px;flex-direction:column}
-.dlbar{background:#8B5CF6;color:white;text-align:center;padding:14px;border-radius:12px;cursor:pointer;font-weight:700;font-size:15px;box-shadow:0 4px 20px rgba(139,92,246,0.4);text-decoration:none;display:block;border:none;width:100%}
-.dlbar:hover{background:#7C3AED}
-.dlbar.sec{background:#334155}
-.dlbar.sec:hover{background:#475569}
-#savingMsg{display:none;text-align:center;padding:10px;color:#8B5CF6;font-weight:600}
-@media print{.actions{display:none!important}body{padding:16px}}
-@media(max-width:600px){#pdfContent{padding:16px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}}
-</style></head><body>
-<div id="pdfContent">
-<div class="hdr"><div class="logo">${(tpl.company_name as string) || 'Go to Top'}</div><div class="ci">${tpl.company_phone ? '<div>' + tpl.company_phone + '</div>' : ''}${tpl.company_email ? '<div>' + tpl.company_email + '</div>' : ''}${tpl.company_address ? '<div>' + tpl.company_address + '</div>' : ''}</div></div>
-<div class="ttl">${cleanHeader}</div>
-<div class="meta"><span>${L.date} ${new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU')}</span><span>${L.id}${id}</span></div>
-${clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : ''}
-${cleanIntro ? '<div class="intro">' + cleanIntro + '</div>' : ''}
-<table><thead><tr><th>${L.svc}</th><th style="text-align:center">${L.qty}</th><th style="text-align:right">${L.price}</th><th style="text-align:right">${L.sum}</th></tr></thead><tbody>${rows}
-<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">${L.total}</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">${Number(total).toLocaleString('ru-RU')}\u00a0\u058f</td></tr></tbody></table>
-${cleanOutro ? '<div class="outro">' + cleanOutro + '</div>' : ''}
-${cleanFooter ? '<div class="ftr">' + cleanFooter + '</div>' : ''}
-</div>
-<div class="actions" style="padding:0 16px 16px">
-<button class="dlbar" id="saveBtn" onclick="saveAsImage()">${saveBtnLabel}</button>
-<button class="dlbar" id="printBtn" onclick="window.print()">${dlBtnLabel}</button>
-<button class="dlbar sec" onclick="history.back()">${backBtnLabel}</button>
-<div id="savingMsg">\u2699\ufe0f ${isAm ? '\u054a\u0561\u0570\u0565\u056c...' : '\u0421\u043e\u0445\u0440\u0430\u043d\u044f\u0435\u043c...'}</div>
-</div>
-<script>
-function saveAsImage(){
-  var btn=document.getElementById('saveBtn');
-  var msg=document.getElementById('savingMsg');
-  btn.style.display='none';
-  msg.style.display='block';
-  document.querySelector('.actions').style.position='static';
-  html2canvas(document.getElementById('pdfContent'),{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false}).then(function(canvas){
-    msg.style.display='none';
-    btn.style.display='block';
-    document.querySelector('.actions').style.position='sticky';
-    /* Try download — works on most mobile browsers */
-    try{
-      canvas.toBlob(function(blob){
-        if(!blob) throw new Error('no blob');
-        var url=URL.createObjectURL(blob);
-        var a=document.createElement('a');
-        a.href=url;
-        a.download='GoToTop_KP_${id}_${new Date().toISOString().slice(0,10)}.png';
-        document.body.appendChild(a);
-        a.click();
-        setTimeout(function(){document.body.removeChild(a);URL.revokeObjectURL(url);},500);
-      },'image/png');
-    }catch(e){
-      /* Fallback: open image in new tab — user can long-press to save */
-      var dataUrl=canvas.toDataURL('image/png');
-      var w=window.open('');
-      if(w){w.document.write('<img src="'+dataUrl+'" style="width:100%">');}
-      else{window.location.href=dataUrl;}
-    }
-  }).catch(function(err){
-    msg.textContent='${isAm ? '\u054d\u056d\u0561\u056c' : '\u041e\u0448\u0438\u0431\u043a\u0430'}: '+err.message;
-    btn.style.display='block';
-  });
-}
-<\/script>
-</body></html>`;
-
+    // Button labels from DB template
+    const btnOrder = String(isAm ? (tpl.btn_order_am || '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561') : (tpl.btn_order_ru || '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
+    const btnDl = String(isAm ? (tpl.btn_download_am || '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c') : (tpl.btn_download_ru || '\u0421\u043a\u0430\u0447\u0430\u0442\u044c'));
+    const tgUrl = String(tpl.order_telegram_url || 'https://t.me/goo_to_top');
     
+    // Build Telegram message
+    const tgMsg = (isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')
+      + '\n' + (isAm ? '\u054c\u0561\u0577\u057e\u0561\u0580\u056f' : '\u0420\u0430\u0441\u0447\u0451\u0442') + ' #' + id
+      + '\n' + (isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430') + ': ' + Number(total).toLocaleString('ru-RU') + ' \u058f'
+      + (clientName ? '\n' + (isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '');
+
+    const tgLink = tgUrl + '?text=' + encodeURIComponent(tgMsg);
+    const companyName = String(tpl.company_name || 'Go to Top');
+    const companyPhone = String(tpl.company_phone || '');
+    const companyEmail = String(tpl.company_email || '');
+    const companyAddress = String(tpl.company_address || '');
+    const dateStr = new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU');
+    const totalFormatted = Number(total).toLocaleString('ru-RU');
+    const linkCopied = isAm ? '\u0540\u0561\u057d\u0561\u0576\u0565\u056c\u056b \u0570\u0561\u057d\u0581\u0565\u0576 \u057a\u0561\u057f\u0573\u0565\u0576\u057e\u0561\u056e \u0567' : '\u0421\u0441\u044b\u043b\u043a\u0430 \u0441\u043a\u043e\u043f\u0438\u0440\u043e\u0432\u0430\u043d\u0430!';
+
+    const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
+      + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
+      + '<title>' + cleanHeader + ' #' + id + '</title>'
+      + '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">'
+      + '<style>'
+      + '*{margin:0;padding:0;box-sizing:border-box}'
+      + 'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#fff}'
+      + '#pc{padding:24px 24px 90px;max-width:800px;margin:0 auto}'
+      + '.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}'
+      + '.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}'
+      + '.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}'
+      + '.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}'
+      + '.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}'
+      + '.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}'
+      + 'table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}'
+      + 'th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}'
+      + 'td{padding:10px 12px;border-bottom:1px solid #e5e7eb}'
+      + '.tr{background:#f3f0ff;font-weight:700;font-size:16px}'
+      + '.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}'
+      + '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}'
+      + '.bb{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:10px 16px;display:flex;gap:8px;align-items:center;z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,0.08)}'
+      + '.bo{flex:1;background:linear-gradient(135deg,#10B981,#059669);color:#fff;border:none;padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;text-decoration:none}'
+      + '.bo:hover{background:linear-gradient(135deg,#059669,#047857)}'
+      + '.bd{background:#f3f4f6;color:#374151;border:1px solid #d1d5db;padding:12px 14px;border-radius:10px;font-weight:600;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap}'
+      + '.bd:hover{background:#e5e7eb}.bd i{color:#8B5CF6}'
+      + '@media print{.bb{display:none!important}#pc{padding:16px}}'
+      + '@media(max-width:600px){#pc{padding:16px 16px 90px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}}'
+      + '</style></head><body>'
+      + '<div id="pc">'
+      + '<div class="hdr"><div class="logo">' + companyName + '</div><div class="ci">'
+      + (companyPhone ? '<div>' + companyPhone + '</div>' : '')
+      + (companyEmail ? '<div>' + companyEmail + '</div>' : '')
+      + (companyAddress ? '<div>' + companyAddress + '</div>' : '')
+      + '</div></div>'
+      + '<div class="ttl">' + cleanHeader + '</div>'
+      + '<div class="meta"><span>' + L.date + ' ' + dateStr + '</span><span>' + L.id + id + '</span></div>'
+      + (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '')
+      + (cleanIntro ? '<div class="intro">' + cleanIntro + '</div>' : '')
+      + '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
+      + '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr></tbody></table>'
+      + (cleanOutro ? '<div class="outro">' + cleanOutro + '</div>' : '')
+      + (cleanFooter ? '<div class="ftr">' + cleanFooter + '</div>' : '')
+      + '</div>'
+      + '<div class="bb">'
+      + '<a class="bo" href="' + tgLink + '" target="_blank"><i class="fab fa-telegram"></i> ' + btnOrder + '</a>'
+      + '<button class="bd" onclick="dlPage()"><i class="fas fa-download"></i> ' + btnDl + '</button>'
+      + '</div>'
+      + '<script>'
+      + 'function dlPage(){'
+      + 'if(navigator.share){navigator.share({title:document.title,url:window.location.href}).catch(function(){});return;}'
+      + 'if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(window.location.href).then(function(){alert("' + linkCopied + '");}).catch(function(){fb();});return;}'
+      + 'fb();}'
+      + 'function fb(){var t=document.createElement("textarea");t.value=window.location.href;t.style.position="fixed";t.style.opacity="0";document.body.appendChild(t);t.select();try{document.execCommand("copy");alert("' + linkCopied + '");}catch(e){}document.body.removeChild(t);}'
+      + '<\/script></body></html>';
+
     return c.html(pdfHtml);
   } catch (e: any) {
     return c.text('Error: ' + e.message, 500);

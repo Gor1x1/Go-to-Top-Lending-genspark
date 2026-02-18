@@ -1115,6 +1115,17 @@ function renderPdfTemplate() {
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Email</label><input class="input" id="pdf_email" value="' + escHtml(t.company_email) + '"></div>' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Адрес</label><input class="input" id="pdf_address" value="' + escHtml(t.company_address) + '"></div>' +
     '</div>' +
+    '<h3 style="font-weight:700;margin:20px 0 12px;color:#a78bfa"><i class="fas fa-hand-pointer" style="margin-right:8px"></i>Кнопки на странице КП</h3>' +
+    '<p style="color:#94a3b8;font-size:0.82rem;margin-bottom:12px">Настройте названия кнопок на странице расчёта</p>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#10B981;font-weight:600">Кнопка «Заказать» (RU)</label><input class="input" id="pdf_btn_order_ru" value="' + escHtml(t.btn_order_ru || 'Заказать сейчас') + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Кнопка «Заказать» (AM)</label><input class="input" id="pdf_btn_order_am" value="' + escHtml(t.btn_order_am || 'Պատվիրել հիմա') + '"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Кнопка «Скачать» (RU)</label><input class="input" id="pdf_btn_dl_ru" value="' + escHtml(t.btn_download_ru || 'Скачать') + '"></div>' +
+      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Кнопка «Скачать» (AM)</label><input class="input" id="pdf_btn_dl_am" value="' + escHtml(t.btn_download_am || 'Ներбেறնел') + '"></div>' +
+    '</div>' +
+    '<div style="margin-bottom:20px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Telegram URL менеджера (для кнопки «Заказать»)</label><input class="input" id="pdf_order_tg" value="' + escHtml(t.order_telegram_url || 'https://t.me/goo_to_top') + '" placeholder="https://t.me/your_username"></div>' +
     '<button class="btn btn-success" onclick="savePdfTemplate()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить шаблон</button>' +
     '</div></div>';
   return h;
@@ -1133,7 +1144,12 @@ async function savePdfTemplate() {
     company_name: document.getElementById('pdf_company').value,
     company_phone: document.getElementById('pdf_phone').value,
     company_email: document.getElementById('pdf_email').value,
-    company_address: document.getElementById('pdf_address').value
+    company_address: document.getElementById('pdf_address').value,
+    btn_order_ru: document.getElementById('pdf_btn_order_ru').value,
+    btn_order_am: document.getElementById('pdf_btn_order_am').value,
+    btn_download_ru: document.getElementById('pdf_btn_dl_ru').value,
+    btn_download_am: document.getElementById('pdf_btn_dl_am').value,
+    order_telegram_url: document.getElementById('pdf_order_tg').value
   }) });
   toast('Шаблон PDF сохранён');
 }

@@ -148,6 +148,11 @@ CREATE TABLE IF NOT EXISTS pdf_templates (
   outro_am TEXT DEFAULT '',
   button_label_ru TEXT DEFAULT 'Скачать КП (PDF)',
   button_label_am TEXT DEFAULT 'Ներdelays КП (PDF)',
+  btn_order_ru TEXT DEFAULT 'Заказать сейчас',
+  btn_order_am TEXT DEFAULT 'Պատվիրել հիմա',
+  btn_download_ru TEXT DEFAULT 'Скачать',
+  btn_download_am TEXT DEFAULT 'Ներբեռնել',
+  order_telegram_url TEXT DEFAULT 'https://t.me/goo_to_top',
   company_name TEXT DEFAULT 'Go to Top',
   company_phone TEXT DEFAULT '',
   company_email TEXT DEFAULT '',
@@ -173,8 +178,13 @@ export async function initDatabase(db: D1Database): Promise<void> {
   for (const stmt of statements) {
     await db.prepare(stmt + ';').run();
   }
-  // Migration: add position column if missing
+  // Migrations
   try { await db.prepare("ALTER TABLE slot_counter ADD COLUMN position TEXT DEFAULT 'after-hero'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_order_ru TEXT DEFAULT 'Заказать сейчас'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_order_am TEXT DEFAULT 'Պատվիրել հիմա'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_ru TEXT DEFAULT 'Скачать'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_am TEXT DEFAULT ' Delays'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_telegram_url TEXT DEFAULT 'https://t.me/goo_to_top'").run(); } catch {}
 }
 
 export async function getAllContent(db: D1Database): Promise<Record<string, any>> {
