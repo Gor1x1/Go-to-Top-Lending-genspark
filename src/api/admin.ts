@@ -96,6 +96,30 @@ api.put('/content/:key', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// Create new content section (duplicate/new block)
+api.post('/content', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { section_key, section_name, content_json, sort_order } = await c.req.json();
+  if (!section_key) return c.json({ error: 'section_key required' }, 400);
+  const existing = await db.prepare('SELECT id FROM site_content WHERE section_key = ?').bind(section_key).first();
+  if (existing) return c.json({ error: 'Section key already exists' }, 400);
+  await db.prepare('INSERT INTO site_content (section_key, section_name, content_json, sort_order) VALUES (?,?,?,?)')
+    .bind(section_key, section_name || section_key, JSON.stringify(content_json || []), sort_order || 999).run();
+  // Also add to section_order
+  await db.prepare('INSERT OR IGNORE INTO section_order (section_id, sort_order, is_visible, label_ru, label_am) VALUES (?,?,1,?,?)')
+    .bind(section_key, sort_order || 999, section_name || section_key, '').run();
+  return c.json({ success: true });
+});
+
+// Delete content section completely
+api.delete('/content/:key', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const key = c.req.param('key');
+  await db.prepare('DELETE FROM site_content WHERE section_key = ?').bind(key).run();
+  await db.prepare('DELETE FROM section_order WHERE section_id = ?').bind(key).run();
+  return c.json({ success: true });
+});
+
 // ===== CALCULATOR TABS =====
 api.get('/calc-tabs', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -544,9 +568,7 @@ api.get('/slot-counter', authMiddleware, async (c) => {
 api.post('/slot-counter', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  // Check limit: max 2 counters
-  const cnt = await db.prepare('SELECT COUNT(*) as c FROM slot_counter').first() as any;
-  if (cnt && cnt.c >= 2) return c.json({ error: 'Maximum 2 counters allowed' }, 400);
+  // No limit on number of counters
   await db.prepare('INSERT INTO slot_counter (counter_name, total_slots, booked_slots, label_ru, label_am, show_timer, reset_day, position) VALUES (?,?,?,?,?,?,?,?)')
     .bind(d.counter_name || 'new', d.total_slots ?? 10, d.booked_slots ?? 0, d.label_ru || '', d.label_am || '', d.show_timer ?? 1, d.reset_day || 'monday', d.position || 'after-hero').run();
   return c.json({ success: true });

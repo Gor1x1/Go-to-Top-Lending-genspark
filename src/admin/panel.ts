@@ -135,14 +135,12 @@ async function loadData() {
 const pages = [
   { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Дашборд' },
   { id: 'leads', icon: 'fa-users', label: 'Лиды / CRM' },
-  { id: 'content', icon: 'fa-file-alt', label: 'Тексты сайта' },
+  { id: 'blocks', icon: 'fa-cubes', label: 'Конструктор блоков' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
   { id: 'pdf', icon: 'fa-file-pdf', label: 'PDF шаблон' },
   { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
-  { id: 'sections', icon: 'fa-th-list', label: 'Порядок блоков' },
-  { id: 'slots', icon: 'fa-clock', label: 'Счётчик слотов' },
+  { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов' },
   { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер сайта' },
-  { id: 'photos', icon: 'fa-images', label: 'Фото блоки' },
   { id: 'telegram', icon: 'fa-telegram', label: 'TG сообщения', fab: true },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
@@ -234,12 +232,12 @@ function renderDashboard() {
     '<div class="card"><h3 style="font-weight:700;margin-bottom:12px"><i class="fas fa-info-circle" style="color:#8B5CF6;margin-right:8px"></i>Как пользоваться</h3>' +
       '<ul style="color:#94a3b8;font-size:0.9rem;line-height:2">' +
         '<li>📋 <strong>Лиды / CRM</strong> — все заявки с сайта, статусы, экспорт в CSV</li>' +
-        '<li>📝 <strong>Тексты сайта</strong> — редактирование всех текстов на RU и AM</li>' +
+        '<li>🧊 <strong>Конструктор блоков</strong> — порядок, тексты, фото, видимость — всё в одном месте. Создавайте, копируйте и удаляйте блоки</li>' +
         '<li>🧮 <strong>Калькулятор</strong> — управление услугами, ценами и вкладками</li>' +
         '<li>📄 <strong>PDF шаблон</strong> — тексты для автоматического коммерческого предложения</li>' +
         '<li>🎁 <strong>Реферальные коды</strong> — кодовые слова для скидок и бесплатных отзывов</li>' +
-        '<li>📦 <strong>Порядок блоков</strong> — перемещайте и скрывайте секции сайта</li>' +
-        '<li>⏱ <strong>Счётчик слотов</strong> — показ свободных мест на сайте</li>' +
+        '<li>⏱ <strong>Счётчики слотов</strong> — неограниченное количество, привязка к любому блоку</li>' +
+        '<li>👟 <strong>Футер сайта</strong> — контакты, соцсети, копирайт</li>' +
         '<li>💬 <strong>TG сообщения</strong> — шаблоны сообщений для каждой кнопки на сайте</li>' +
         '<li>🤖 <strong>TG Бот</strong> — автоматические уведомления о заявках в Telegram</li>' +
         '<li>📜 <strong>Скрипты</strong> — добавление аналитики, пикселей, meta-тегов</li>' +
@@ -249,86 +247,513 @@ function renderDashboard() {
   '</div>';
 }
 
-// ===== CONTENT EDITOR =====
-function renderContent() {
-  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800">Тексты сайта</h1><p style="color:#94a3b8;margin-top:4px">Редактирование текстов на русском и армянском</p></div>' +
-    '<button class="btn btn-primary" onclick="seedContent()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить тексты с сайта</button>' +
+// ===== UNIFIED BLOCK CONSTRUCTOR =====
+// Merges: Content editor + Section order + Photo blocks into one visual editor
+function getBlockContent(sectionId) {
+  return data.content.find(function(c) { return c.section_key === sectionId; });
+}
+function getBlockPhotos(sectionId) {
+  return (data.photoBlocks || []).filter(function(p) { return p.position === sectionId || p.position === 'in-' + sectionId; });
+}
+function getBlockCounters(sectionId) {
+  return (data.slotCounters || []).filter(function(c) { return c.position === sectionId || c.position === 'after-' + sectionId || c.position === 'before-' + sectionId || c.position === 'in-' + sectionId; });
+}
+// Which sections typically have photos
+var photoSections = ['hero', 'about', 'services', 'warehouse', 'wb-banner', 'wb-official'];
+
+function renderBlocks() {
+  var sections = data.sectionOrder || [];
+  var h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-cubes" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков</h1>' +
+    '<p style="color:#94a3b8;margin-top:4px">Порядок, тексты, фото и видимость — всё в одном месте</p></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-primary" onclick="showCreateBlockModal()"><i class="fas fa-plus" style="margin-right:6px"></i>Новый блок</button>' +
+      '<button class="btn btn-outline" onclick="seedSections()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить стандартные</button>' +
+      '<button class="btn btn-outline" onclick="seedContent()"><i class="fas fa-file-import" style="margin-right:6px"></i>Импорт текстов с сайта</button>' +
+      '<button class="btn btn-success" onclick="saveAllBlocks()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить порядок</button>' +
+    '</div>' +
   '</div>';
-  
-  if (!data.content.length) {
+
+  if (!sections.length && !data.content.length) {
     h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
-      '<p style="color:#94a3b8">Контент ещё не загружен. Нажмите "Загрузить тексты с сайта" для импорта всех текущих текстов.</p></div>';
-  } else {
-    for (const section of data.content) {
-      let items = [];
-      try { items = JSON.parse(section.content_json); } catch {}
-      h += '<div class="card" style="margin-bottom:16px">' +
-        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;cursor:pointer" onclick="toggleSection(this)">' +
-          '<div><span class="badge badge-purple">' + section.section_key + '</span> <strong style="margin-left:8px">' + section.section_name + '</strong> <span style="color:#64748b;font-size:0.8rem">(' + items.length + ' текстов)</span></div>' +
-          '<i class="fas fa-chevron-down" style="color:#64748b;transition:transform 0.2s"></i>' +
-        '</div>' +
-        '<div class="section-items" style="display:none">';
-      
-      for (let i = 0; i < items.length; i++) {
-        const item = items[i];
-        h += '<div class="section-edit-row">' +
-          '<div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start">' +
-            '<span style="color:#64748b;font-size:0.8rem;padding-top:10px">#' + (i+1) + '</span>' +
-            '<div>' +
-              '<div style="margin-bottom:8px"><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">RU</label>' +
-                '<textarea class="input" style="min-height:40px;margin-top:4px" data-section="' + section.section_key + '" data-idx="' + i + '" data-lang="ru">' + escHtml(item.ru) + '</textarea></div>' +
-              '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">AM</label>' +
-                '<textarea class="input" style="min-height:40px;margin-top:4px" data-section="' + section.section_key + '" data-idx="' + i + '" data-lang="am">' + escHtml(item.am) + '</textarea></div>' +
-            '</div>' +
-          '</div>' +
+      '<p style="color:#94a3b8;margin-bottom:16px">Блоки ещё не настроены. Нажмите «Загрузить стандартные» или «Импорт текстов с сайта» для начала.</p></div>';
+    h += '</div>';
+    return h;
+  }
+
+  // If sections are empty but content exists, build sections from content
+  if (!sections.length && data.content.length) {
+    sections = data.content.map(function(c, i) {
+      return { section_id: c.section_key, sort_order: i, is_visible: 1, label_ru: c.section_name, label_am: '' };
+    });
+    data.sectionOrder = sections;
+  }
+
+  // Render each block
+  for (var i = 0; i < sections.length; i++) {
+    var sec = sections[i];
+    var content = getBlockContent(sec.section_id);
+    var photos = getBlockPhotos(sec.section_id);
+    var counters = getBlockCounters(sec.section_id);
+    var items = [];
+    if (content) { try { items = JSON.parse(content.content_json); } catch { items = []; } }
+    var hasPhotos = photos.length > 0 || photoSections.indexOf(sec.section_id) >= 0;
+    var isExpanded = sec._expanded || false;
+
+    h += '<div class="card" style="margin-bottom:10px;padding:0;overflow:hidden;border:1px solid ' + (sec.is_visible ? '#334155' : 'rgba(239,68,68,0.3)') + ';' + (!sec.is_visible ? 'opacity:0.55;' : '') + '" data-block-idx="' + i + '">';
+
+    // ===== BLOCK HEADER =====
+    h += '<div style="display:flex;align-items:center;gap:12px;padding:14px 20px;background:' + (sec.is_visible ? '#1e293b' : 'rgba(239,68,68,0.05)') + ';cursor:pointer" onclick="toggleBlockExpand(' + i + ')">';
+
+    // Move arrows
+    h += '<div style="display:flex;flex-direction:column;gap:2px" onclick="event.stopPropagation()">' +
+      '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.65rem;line-height:1" onclick="moveSection(' + i + ',-1)" ' + (i === 0 ? 'disabled style="padding:2px 6px;font-size:0.65rem;line-height:1;opacity:0.3"' : '') + '><i class="fas fa-chevron-up"></i></button>' +
+      '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.65rem;line-height:1" onclick="moveSection(' + i + ',1)" ' + (i === sections.length-1 ? 'disabled style="padding:2px 6px;font-size:0.65rem;line-height:1;opacity:0.3"' : '') + '><i class="fas fa-chevron-down"></i></button>' +
+    '</div>';
+
+    // Block number
+    h += '<span style="color:#475569;font-size:0.8rem;font-weight:700;min-width:28px">#' + (i+1) + '</span>';
+
+    // Badges
+    h += '<div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+    h += '<span style="font-weight:700;font-size:0.95rem;color:' + (sec.is_visible ? '#e2e8f0' : '#f87171') + '">' + escHtml(sec.label_ru || sec.section_id) + '</span>';
+    h += '<span class="badge badge-purple" style="font-size:0.7rem">' + sec.section_id + '</span>';
+    if (items.length > 0) h += '<span class="badge badge-green" style="font-size:0.7rem">' + items.length + ' текст' + (items.length > 1 ? 'ов' : '') + '</span>';
+    if (hasPhotos) h += '<span class="badge badge-amber" style="font-size:0.7rem"><i class="fas fa-image" style="margin-right:3px"></i>' + (photos.length > 0 ? photos.length + ' фото' : 'фото') + '</span>';
+    if (counters.length > 0) h += '<span class="badge" style="font-size:0.7rem;background:rgba(59,130,246,0.2);color:#60a5fa"><i class="fas fa-clock" style="margin-right:3px"></i>' + counters.length + '</span>';
+    h += '</div>';
+
+    // Visibility toggle + actions
+    h += '<div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">';
+    h += '<button class="btn ' + (sec.is_visible ? 'btn-success' : 'btn-danger') + '" style="padding:5px 10px;font-size:0.75rem" onclick="toggleSectionVis(' + i + ')" title="' + (sec.is_visible ? 'Скрыть' : 'Показать') + '">' +
+      '<i class="fas ' + (sec.is_visible ? 'fa-eye' : 'fa-eye-slash') + '"></i></button>';
+    h += '<button class="btn btn-outline" style="padding:5px 10px;font-size:0.75rem" onclick="duplicateBlock(' + i + ')" title="Копировать блок"><i class="fas fa-copy"></i></button>';
+    h += '<button class="btn btn-danger" style="padding:5px 10px;font-size:0.75rem" onclick="deleteBlock(' + i + ')" title="Удалить блок"><i class="fas fa-trash"></i></button>';
+    h += '</div>';
+
+    // Expand/collapse arrow
+    h += '<i class="fas fa-chevron-' + (isExpanded ? 'up' : 'down') + '" style="color:#64748b;font-size:0.8rem;transition:transform 0.2s"></i>';
+    h += '</div>';
+
+    // ===== BLOCK BODY (expanded) =====
+    h += '<div style="display:' + (isExpanded ? 'block' : 'none') + ';padding:16px 20px;border-top:1px solid #334155;background:#0f172a">';
+
+    // Block meta editing
+    h += '<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:10px;margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #1e293b">' +
+      '<div><label style="font-size:0.7rem;color:#64748b">ID блока</label><input class="input" value="' + escHtml(sec.section_id) + '" style="padding:6px 10px;font-size:0.82rem;color:#64748b" disabled></div>' +
+      '<div><label style="font-size:0.7rem;color:#8B5CF6">Название (RU)</label><input class="input" value="' + escHtml(sec.label_ru) + '" style="padding:6px 10px;font-size:0.85rem" data-block-label-ru="' + i + '"></div>' +
+      '<div><label style="font-size:0.7rem;color:#F59E0B">Название (AM)</label><input class="input" value="' + escHtml(sec.label_am || '') + '" style="padding:6px 10px;font-size:0.85rem" data-block-label-am="' + i + '"></div>' +
+    '</div>';
+
+    // ===== TEXT ITEMS =====
+    if (items.length > 0) {
+      h += '<div style="margin-bottom:12px"><div style="font-size:0.8rem;font-weight:700;color:#a78bfa;margin-bottom:8px"><i class="fas fa-align-left" style="margin-right:6px"></i>Тексты блока (' + items.length + ')</div>';
+      for (var ti = 0; ti < items.length; ti++) {
+        var item = items[ti];
+        h += '<div class="section-edit-row" style="margin-bottom:6px;padding:10px 12px">' +
+          '<div style="display:grid;grid-template-columns:28px 1fr 1fr 28px;gap:8px;align-items:start">' +
+            '<span style="color:#475569;font-size:0.75rem;padding-top:8px;text-align:center">' + (ti+1) + '</span>' +
+            '<div><label style="font-size:0.65rem;color:#8B5CF6;font-weight:600">RU</label>' +
+              '<textarea class="input" style="min-height:36px;margin-top:2px;font-size:0.85rem;padding:6px 10px" data-section="' + sec.section_id + '" data-idx="' + ti + '" data-lang="ru">' + escHtml(item.ru) + '</textarea></div>' +
+            '<div><label style="font-size:0.65rem;color:#F59E0B;font-weight:600">AM</label>' +
+              '<textarea class="input" style="min-height:36px;margin-top:2px;font-size:0.85rem;padding:6px 10px" data-section="' + sec.section_id + '" data-idx="' + ti + '" data-lang="am">' + escHtml(item.am) + '</textarea></div>' +
+            '<button class="tier-del-btn" style="margin-top:16px" onclick="removeTextItem(&apos;' + sec.section_id + '&apos;,' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>' +
+          '</div></div>';
+      }
+      h += '<div style="display:flex;gap:8px;margin-top:6px">' +
+        '<button class="btn btn-outline" style="font-size:0.78rem;padding:6px 14px" onclick="addTextItem(&apos;' + sec.section_id + '&apos;)"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
+        '<button class="btn btn-success" style="font-size:0.78rem;padding:6px 14px" onclick="saveBlockTexts(&apos;' + sec.section_id + '&apos;)"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить тексты</button>' +
+      '</div></div>';
+    } else if (content) {
+      h += '<div style="margin-bottom:12px;padding:12px;background:#1e293b;border-radius:8px;text-align:center"><span style="color:#64748b;font-size:0.85rem">Нет текстов в этом блоке</span> ' +
+        '<button class="btn btn-outline" style="font-size:0.75rem;padding:4px 12px;margin-left:8px" onclick="addTextItem(&apos;' + sec.section_id + '&apos;)"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button></div>';
+    } else {
+      // No content record yet — offer to create
+      h += '<div style="margin-bottom:12px;padding:12px;background:#1e293b;border-radius:8px;display:flex;justify-content:space-between;align-items:center">' +
+        '<span style="color:#64748b;font-size:0.85rem"><i class="fas fa-info-circle" style="margin-right:6px;color:#8B5CF6"></i>Тексты не привязаны</span>' +
+        '<button class="btn btn-primary" style="font-size:0.75rem;padding:4px 12px" onclick="createBlockContent(&apos;' + sec.section_id + '&apos;,&apos;' + escHtml(sec.label_ru) + '&apos;)"><i class="fas fa-plus" style="margin-right:4px"></i>Создать тексты</button></div>';
+    }
+
+    // ===== PHOTO BLOCKS attached to this section =====
+    if (photos.length > 0) {
+      h += '<div style="margin-bottom:12px"><div style="font-size:0.8rem;font-weight:700;color:#F59E0B;margin-bottom:8px"><i class="fas fa-images" style="margin-right:6px"></i>Фотографии (' + photos.length + ' блок' + (photos.length > 1 ? 'ов' : '') + ')</div>';
+      for (var phi = 0; phi < photos.length; phi++) {
+        var pb = photos[phi];
+        var pbPhotos = [];
+        try { pbPhotos = JSON.parse(pb.photos_json || '[]'); } catch { pbPhotos = []; }
+        h += '<div style="padding:10px;background:#1e293b;border-radius:8px;margin-bottom:6px">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+          '<span style="font-size:0.82rem;font-weight:600;color:#e2e8f0">' + escHtml(pb.block_name) + ' <span style="color:#64748b;font-size:0.75rem">(' + pbPhotos.length + ' фото)</span></span>' +
+          '<div style="display:flex;gap:4px"><button class="btn btn-outline" style="font-size:0.7rem;padding:3px 8px" onclick="navigate(&apos;photos_edit&apos;);_editPhotoBlockId=' + pb.id + '">Редактировать</button></div></div>';
+        // Show thumbnails
+        if (pbPhotos.length > 0) {
+          h += '<div style="display:flex;gap:6px;flex-wrap:wrap">';
+          for (var thi = 0; thi < Math.min(pbPhotos.length, 4); thi++) {
+            h += '<div style="width:60px;height:60px;border-radius:6px;background:#0f172a;border:1px solid #334155;overflow:hidden"><img src="' + escHtml(pbPhotos[thi].url) + '" style="width:100%;height:100%;object-fit:cover" onerror="this.style.display=&apos;none&apos;"></div>';
+          }
+          if (pbPhotos.length > 4) h += '<div style="width:60px;height:60px;border-radius:6px;background:#0f172a;border:1px solid #334155;display:flex;align-items:center;justify-content:center;color:#64748b;font-size:0.8rem">+' + (pbPhotos.length - 4) + '</div>';
+          h += '</div>';
+        }
+        h += '</div>';
+      }
+      h += '</div>';
+    }
+
+    // ===== SLOT COUNTERS attached to this section =====
+    if (counters.length > 0) {
+      h += '<div style="margin-bottom:8px"><div style="font-size:0.8rem;font-weight:700;color:#3B82F6;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:6px"></i>Счётчики слотов</div>';
+      for (var sci = 0; sci < counters.length; sci++) {
+        var sc = counters[sci];
+        var free = Math.max(0, (sc.total_slots || 10) - (sc.booked_slots || 0));
+        h += '<div style="padding:8px 12px;background:#1e293b;border-radius:8px;margin-bottom:4px;display:flex;align-items:center;gap:12px">' +
+          '<span style="color:#10B981;font-weight:800;font-size:1.1rem">' + free + '/' + sc.total_slots + '</span>' +
+          '<span style="flex:1;color:#94a3b8;font-size:0.82rem">' + escHtml(sc.counter_name) + ' — ' + escHtml(sc.label_ru) + '</span>' +
+          '<span style="font-size:0.7rem;color:#64748b">' + (sc.show_timer ? '👁 Видим' : '👁‍🗨 Скрыт') + '</span>' +
         '</div>';
       }
-      
-      h += '<div style="text-align:right;margin-top:12px"><button class="btn btn-success" onclick="saveSection(&apos;' + section.section_key + '&apos;)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить секцию</button></div>';
-      h += '</div></div>';
+      h += '</div>';
     }
+
+    h += '</div>'; // end body
+    h += '</div>'; // end card
   }
+
   h += '</div>';
   return h;
 }
 
-function toggleSection(el) {
-  const items = el.nextElementSibling;
-  const icon = el.querySelector('i');
-  if (items.style.display === 'none') {
-    items.style.display = 'block';
-    icon.style.transform = 'rotate(180deg)';
-  } else {
-    items.style.display = 'none';
-    icon.style.transform = '';
-  }
+// Toggle block expansion
+function toggleBlockExpand(idx) {
+  if (!data.sectionOrder[idx]) return;
+  data.sectionOrder[idx]._expanded = !data.sectionOrder[idx]._expanded;
+  render();
 }
 
-async function saveSection(key) {
-  const section = data.content.find(s => s.section_key === key);
-  if (!section) return;
-  let items = [];
-  try { items = JSON.parse(section.content_json); } catch {}
-  
-  document.querySelectorAll('[data-section="' + key + '"]').forEach(el => {
-    const idx = parseInt(el.dataset.idx);
-    const lang = el.dataset.lang;
+// Add text item to block
+function addTextItem(sectionKey) {
+  var content = data.content.find(function(c) { return c.section_key === sectionKey; });
+  if (!content) return;
+  var items = [];
+  try { items = JSON.parse(content.content_json); } catch { items = []; }
+  items.push({ ru: '', am: '' });
+  content.content_json = JSON.stringify(items);
+  // Keep block expanded
+  var sec = data.sectionOrder.find(function(s) { return s.section_id === sectionKey; });
+  if (sec) sec._expanded = true;
+  render();
+}
+
+// Remove text item
+function removeTextItem(sectionKey, idx) {
+  var content = data.content.find(function(c) { return c.section_key === sectionKey; });
+  if (!content) return;
+  var items = [];
+  try { items = JSON.parse(content.content_json); } catch { items = []; }
+  items.splice(idx, 1);
+  content.content_json = JSON.stringify(items);
+  var sec = data.sectionOrder.find(function(s) { return s.section_id === sectionKey; });
+  if (sec) sec._expanded = true;
+  render();
+}
+
+// Save block texts (collect from DOM and save)
+async function saveBlockTexts(sectionKey) {
+  var content = data.content.find(function(c) { return c.section_key === sectionKey; });
+  if (!content) return;
+  var items = [];
+  try { items = JSON.parse(content.content_json); } catch { items = []; }
+  document.querySelectorAll('[data-section="' + sectionKey + '"]').forEach(function(el) {
+    var idx = parseInt(el.dataset.idx);
+    var lang = el.dataset.lang;
     if (items[idx]) items[idx][lang] = el.value;
   });
-  
-  await api('/content/' + key, { method: 'PUT', body: JSON.stringify({ content_json: items }) });
-  section.content_json = JSON.stringify(items);
-  toast('Секция "' + key + '" сохранена');
+  // Also save block labels
+  var sec = data.sectionOrder.find(function(s) { return s.section_id === sectionKey; });
+  if (sec) {
+    var secIdx = data.sectionOrder.indexOf(sec);
+    var lruEl = document.querySelector('[data-block-label-ru="' + secIdx + '"]');
+    var lamEl = document.querySelector('[data-block-label-am="' + secIdx + '"]');
+    if (lruEl) sec.label_ru = lruEl.value;
+    if (lamEl) sec.label_am = lamEl.value;
+  }
+  await api('/content/' + sectionKey, { method: 'PUT', body: JSON.stringify({ content_json: items, section_name: sec ? sec.label_ru : null }) });
+  content.content_json = JSON.stringify(items);
+  toast('Тексты блока "' + sectionKey + '" сохранены');
 }
 
+// Create block content record
+async function createBlockContent(sectionKey, sectionName) {
+  await api('/content', { method: 'POST', body: JSON.stringify({ section_key: sectionKey, section_name: sectionName, content_json: [{ ru: '', am: '' }] }) });
+  toast('Текстовый блок создан');
+  await loadData();
+  var sec = data.sectionOrder.find(function(s) { return s.section_id === sectionKey; });
+  if (sec) sec._expanded = true;
+  render();
+}
+
+// Save all block order + visibility
+async function saveAllBlocks() {
+  // Collect labels from DOM
+  for (var i = 0; i < data.sectionOrder.length; i++) {
+    var lruEl = document.querySelector('[data-block-label-ru="' + i + '"]');
+    var lamEl = document.querySelector('[data-block-label-am="' + i + '"]');
+    if (lruEl) data.sectionOrder[i].label_ru = lruEl.value;
+    if (lamEl) data.sectionOrder[i].label_am = lamEl.value;
+  }
+  var sections = data.sectionOrder.map(function(s, i) {
+    return { section_id: s.section_id, sort_order: i, is_visible: s.is_visible, label_ru: s.label_ru, label_am: s.label_am };
+  });
+  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: sections }) });
+  toast('Порядок блоков сохранён! Изменения отразятся на сайте.');
+}
+
+// ===== CREATE NEW BLOCK (from template or blank) =====
+function showCreateBlockModal() {
+  var existingModal = document.getElementById('createBlockModal');
+  if (existingModal) { existingModal.remove(); return; }
+
+  var templates = data.sectionOrder.map(function(s) {
+    return '<option value="' + s.section_id + '">' + escHtml(s.label_ru || s.section_id) + '</option>';
+  }).join('');
+
+  var modalHtml = '<div id="createBlockModal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9998;display:flex;align-items:center;justify-content:center" onclick="if(event.target===this)this.remove()">' +
+    '<div class="card" style="width:550px;max-width:90vw;max-height:90vh;overflow-y:auto;animation:slideUp 0.3s ease;border:2px solid #8B5CF6">' +
+      '<h3 style="font-size:1.2rem;font-weight:800;margin-bottom:16px;color:#a78bfa"><i class="fas fa-plus-circle" style="margin-right:8px"></i>Создать новый блок</h3>' +
+
+      '<div style="display:flex;gap:8px;margin-bottom:16px">' +
+        '<button class="tab-btn active" id="newBlockTabBlank" onclick="switchNewBlockTab(&apos;blank&apos;)">Пустой блок</button>' +
+        '<button class="tab-btn" id="newBlockTabCopy" onclick="switchNewBlockTab(&apos;copy&apos;)">Копировать существующий</button>' +
+      '</div>' +
+
+      '<div id="newBlockBlank">' +
+        '<div style="display:grid;grid-template-columns:120px 1fr 1fr;gap:10px;margin-bottom:12px">' +
+          '<div><label style="font-size:0.75rem;color:#64748b">ID (англ)</label><input class="input" id="nb_id" placeholder="my_block"></div>' +
+          '<div><label style="font-size:0.75rem;color:#8B5CF6">Название (RU)</label><input class="input" id="nb_name_ru" placeholder="Мой блок"></div>' +
+          '<div><label style="font-size:0.75rem;color:#F59E0B">Название (AM)</label><input class="input" id="nb_name_am" placeholder=""></div>' +
+        '</div>' +
+        '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b">Вставить после блока</label><select class="input" id="nb_after"><option value="_top">В начало</option>' + templates + '</select></div>' +
+        '<div style="margin-bottom:16px;display:flex;gap:8px;align-items:center">' +
+          '<input type="checkbox" id="nb_with_photo"><label style="font-size:0.85rem;color:#94a3b8">Добавить фото-блок</label>' +
+        '</div>' +
+        '<div id="nb_photo_upload" style="display:none;margin-bottom:12px;padding:12px;background:#0f172a;border-radius:8px;border:1px dashed #8B5CF6">' +
+          '<label style="font-size:0.75rem;color:#a78bfa;font-weight:600;display:block;margin-bottom:8px"><i class="fas fa-image" style="margin-right:4px"></i>URL фотографии</label>' +
+          '<input class="input" id="nb_photo_url" placeholder="https://example.com/photo.jpg">' +
+          '<p style="font-size:0.7rem;color:#475569;margin-top:4px">Вставьте URL изображения. Загрузка с компьютера через base64 ниже.</p>' +
+          '<div style="margin-top:8px"><label class="btn btn-outline" style="font-size:0.78rem;padding:6px 14px;cursor:pointer"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить с компьютера<input type="file" accept="image/*" id="nb_photo_file" style="display:none" onchange="handlePhotoUpload(this)"></label></div>' +
+          '<div id="nb_photo_preview" style="margin-top:8px"></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div id="newBlockCopy" style="display:none">' +
+        '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b">Копировать блок</label><select class="input" id="nb_copy_from">' + templates + '</select></div>' +
+        '<div style="display:grid;grid-template-columns:120px 1fr;gap:10px;margin-bottom:12px">' +
+          '<div><label style="font-size:0.75rem;color:#64748b">Новый ID</label><input class="input" id="nb_copy_id" placeholder="copy_block"></div>' +
+          '<div><label style="font-size:0.75rem;color:#8B5CF6">Новое название</label><input class="input" id="nb_copy_name" placeholder="Копия блока"></div>' +
+        '</div>' +
+        '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b">Вставить после блока</label><select class="input" id="nb_copy_after"><option value="_top">В начало</option>' + templates + '</select></div>' +
+        '<div style="margin-bottom:16px;display:flex;gap:8px;align-items:center">' +
+          '<input type="checkbox" id="nb_copy_with_photo"><label style="font-size:0.85rem;color:#94a3b8">Добавить фото при копировании</label>' +
+        '</div>' +
+        '<div id="nb_copy_photo_upload" style="display:none;margin-bottom:12px;padding:12px;background:#0f172a;border-radius:8px;border:1px dashed #8B5CF6">' +
+          '<label style="font-size:0.75rem;color:#a78bfa;font-weight:600;display:block;margin-bottom:8px"><i class="fas fa-image" style="margin-right:4px"></i>URL фотографии для копии</label>' +
+          '<input class="input" id="nb_copy_photo_url" placeholder="https://example.com/photo.jpg">' +
+          '<div style="margin-top:8px"><label class="btn btn-outline" style="font-size:0.78rem;padding:6px 14px;cursor:pointer"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить с компьютера<input type="file" accept="image/*" id="nb_copy_photo_file" style="display:none" onchange="handlePhotoUploadCopy(this)"></label></div>' +
+          '<div id="nb_copy_photo_preview" style="margin-top:8px"></div>' +
+        '</div>' +
+      '</div>' +
+
+      '<div style="display:flex;gap:10px;margin-top:16px">' +
+        '<button class="btn btn-primary" onclick="submitCreateBlock()"><i class="fas fa-check" style="margin-right:4px"></i>Создать</button>' +
+        '<button class="btn btn-outline" onclick="document.getElementById(&apos;createBlockModal&apos;).remove()">Отмена</button>' +
+      '</div>' +
+    '</div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+  // Wire up checkbox toggles
+  document.getElementById('nb_with_photo').onchange = function() {
+    document.getElementById('nb_photo_upload').style.display = this.checked ? 'block' : 'none';
+  };
+  document.getElementById('nb_copy_with_photo').onchange = function() {
+    document.getElementById('nb_copy_photo_upload').style.display = this.checked ? 'block' : 'none';
+  };
+
+  var idField = document.getElementById('nb_id');
+  if (idField) idField.focus();
+}
+
+function switchNewBlockTab(tab) {
+  document.getElementById('newBlockBlank').style.display = tab === 'blank' ? 'block' : 'none';
+  document.getElementById('newBlockCopy').style.display = tab === 'copy' ? 'block' : 'none';
+  document.getElementById('newBlockTabBlank').className = 'tab-btn' + (tab === 'blank' ? ' active' : '');
+  document.getElementById('newBlockTabCopy').className = 'tab-btn' + (tab === 'copy' ? ' active' : '');
+}
+
+// Handle photo file upload → base64 preview (for blocks with photos)
+function handlePhotoUpload(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('nb_photo_url').value = e.target.result;
+    document.getElementById('nb_photo_preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:80px;border-radius:6px;margin-top:6px">';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+function handlePhotoUploadCopy(input) {
+  if (!input.files || !input.files[0]) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    document.getElementById('nb_copy_photo_url').value = e.target.result;
+    document.getElementById('nb_copy_photo_preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:80px;border-radius:6px;margin-top:6px">';
+  };
+  reader.readAsDataURL(input.files[0]);
+}
+
+// Submit new block creation
+async function submitCreateBlock() {
+  var isBlank = document.getElementById('newBlockBlank').style.display !== 'none';
+
+  if (isBlank) {
+    var id = document.getElementById('nb_id').value.trim();
+    var nameRu = document.getElementById('nb_name_ru').value.trim();
+    var nameAm = document.getElementById('nb_name_am').value.trim();
+    var afterBlock = document.getElementById('nb_after').value;
+    var withPhoto = document.getElementById('nb_with_photo').checked;
+    var photoUrl = document.getElementById('nb_photo_url').value.trim();
+
+    if (!id) { toast('Укажите ID блока (англ)', 'error'); return; }
+    if (!nameRu) nameRu = id;
+    // Transliterate if needed
+    id = id.toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_');
+
+    // Create content record
+    await api('/content', { method: 'POST', body: JSON.stringify({ section_key: id, section_name: nameRu, content_json: [{ ru: '', am: '' }] }) });
+
+    // Insert into section order at position
+    var insertIdx = 0;
+    if (afterBlock !== '_top') {
+      for (var i = 0; i < data.sectionOrder.length; i++) {
+        if (data.sectionOrder[i].section_id === afterBlock) { insertIdx = i + 1; break; }
+      }
+    }
+    data.sectionOrder.splice(insertIdx, 0, { section_id: id, sort_order: insertIdx, is_visible: 1, label_ru: nameRu, label_am: nameAm, _expanded: true });
+    // Re-index
+    for (var j = 0; j < data.sectionOrder.length; j++) data.sectionOrder[j].sort_order = j;
+    await saveAllBlocks();
+
+    // Photo block
+    if (withPhoto && photoUrl) {
+      await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: nameRu + ' фото', position: id, is_visible: 1, photos_json: JSON.stringify([{ url: photoUrl, caption: '' }]) }) });
+    }
+  } else {
+    // Copy mode
+    var copyFrom = document.getElementById('nb_copy_from').value;
+    var newId = document.getElementById('nb_copy_id').value.trim();
+    var newName = document.getElementById('nb_copy_name').value.trim();
+    var afterBlock2 = document.getElementById('nb_copy_after').value;
+    var withPhoto2 = document.getElementById('nb_copy_with_photo').checked;
+    var photoUrl2 = document.getElementById('nb_copy_photo_url').value.trim();
+
+    if (!newId) { toast('Укажите новый ID', 'error'); return; }
+    newId = newId.toLowerCase().replace(/[^a-z0-9_-]/g, '_').replace(/_+/g, '_');
+    if (!newName) newName = 'Копия: ' + copyFrom;
+
+    // Find source content
+    var srcContent = data.content.find(function(c) { return c.section_key === copyFrom; });
+    var srcItems = [];
+    if (srcContent) { try { srcItems = JSON.parse(srcContent.content_json); } catch { srcItems = []; } }
+
+    // Create copy
+    await api('/content', { method: 'POST', body: JSON.stringify({ section_key: newId, section_name: newName, content_json: srcItems }) });
+
+    var insertIdx2 = 0;
+    if (afterBlock2 !== '_top') {
+      for (var k = 0; k < data.sectionOrder.length; k++) {
+        if (data.sectionOrder[k].section_id === afterBlock2) { insertIdx2 = k + 1; break; }
+      }
+    }
+    data.sectionOrder.splice(insertIdx2, 0, { section_id: newId, sort_order: insertIdx2, is_visible: 1, label_ru: newName, label_am: '', _expanded: true });
+    for (var m = 0; m < data.sectionOrder.length; m++) data.sectionOrder[m].sort_order = m;
+    await saveAllBlocks();
+
+    // Copy photo blocks from source
+    var srcPhotos = (data.photoBlocks || []).filter(function(p) { return p.position === copyFrom; });
+    for (var pi = 0; pi < srcPhotos.length; pi++) {
+      await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: srcPhotos[pi].block_name + ' (копия)', position: newId, is_visible: 1, photos_json: srcPhotos[pi].photos_json, description_ru: srcPhotos[pi].description_ru, description_am: srcPhotos[pi].description_am }) });
+    }
+    // Additional photo
+    if (withPhoto2 && photoUrl2) {
+      await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: newName + ' фото', position: newId, is_visible: 1, photos_json: JSON.stringify([{ url: photoUrl2, caption: '' }]) }) });
+    }
+  }
+
+  document.getElementById('createBlockModal').remove();
+  toast('Блок создан!');
+  await loadData();
+  render();
+}
+
+// Duplicate block (quick copy with auto-generated ID)
+async function duplicateBlock(idx) {
+  var sec = data.sectionOrder[idx];
+  if (!sec) return;
+  if (!confirm('Копировать блок "' + (sec.label_ru || sec.section_id) + '"?')) return;
+
+  var newId = sec.section_id + '_copy_' + Date.now().toString(36);
+  var newName = (sec.label_ru || sec.section_id) + ' (копия)';
+
+  // Copy content
+  var srcContent = data.content.find(function(c) { return c.section_key === sec.section_id; });
+  var srcItems = [];
+  if (srcContent) { try { srcItems = JSON.parse(srcContent.content_json); } catch { srcItems = []; } }
+  await api('/content', { method: 'POST', body: JSON.stringify({ section_key: newId, section_name: newName, content_json: srcItems }) });
+
+  // Insert after source
+  data.sectionOrder.splice(idx + 1, 0, { section_id: newId, sort_order: idx + 1, is_visible: 1, label_ru: newName, label_am: sec.label_am || '', _expanded: true });
+  for (var j = 0; j < data.sectionOrder.length; j++) data.sectionOrder[j].sort_order = j;
+  await saveAllBlocks();
+
+  // Copy photo blocks
+  var srcPhotos = (data.photoBlocks || []).filter(function(p) { return p.position === sec.section_id; });
+  for (var pi = 0; pi < srcPhotos.length; pi++) {
+    await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: srcPhotos[pi].block_name + ' (копия)', position: newId, is_visible: 1, photos_json: srcPhotos[pi].photos_json }) });
+  }
+
+  toast('Блок скопирован!');
+  await loadData();
+  render();
+}
+
+// Delete block completely
+async function deleteBlock(idx) {
+  var sec = data.sectionOrder[idx];
+  if (!sec) return;
+  if (!confirm('Удалить блок "' + (sec.label_ru || sec.section_id) + '"? Это удалит все тексты и фото блока.')) return;
+
+  // Delete content
+  await api('/content/' + sec.section_id, { method: 'DELETE' });
+  // Delete photo blocks attached
+  var photos = (data.photoBlocks || []).filter(function(p) { return p.position === sec.section_id; });
+  for (var pi = 0; pi < photos.length; pi++) {
+    await api('/photo-blocks/' + photos[pi].id, { method: 'DELETE' });
+  }
+  // Remove from section order
+  data.sectionOrder.splice(idx, 1);
+  for (var j = 0; j < data.sectionOrder.length; j++) data.sectionOrder[j].sort_order = j;
+  await saveAllBlocks();
+
+  toast('Блок удалён');
+  await loadData();
+  render();
+}
+
+// seedContent — load texts from live site
 async function seedContent() {
   toast('Загрузка текстов с сайта...', 'info');
-  const res = await fetch('/api/admin/seed-from-site', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } });
+  var res = await fetch('/api/admin/seed-from-site', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } });
   if (res.ok) {
     toast('Тексты успешно загружены!');
-    await loadData();
-    render();
+    await loadData(); render();
   } else {
     toast('Ошибка загрузки', 'error');
   }
@@ -837,64 +1262,11 @@ async function deleteReferral(id) {
   await loadData(); render();
 }
 
-// ===== SECTION ORDER =====
-function renderSections() {
-  var sections = data.sectionOrder;
-  var h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800">Порядок блоков сайта</h1><p style="color:#94a3b8;margin-top:4px">Перемещайте блоки вверх/вниз и скрывайте ненужные</p></div>' +
-    '<div style="display:flex;gap:8px">' +
-      '<button class="btn btn-outline" onclick="seedSections()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить блоки</button>' +
-      '<button class="btn btn-success" onclick="saveSectionOrder()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить порядок</button>' +
-    '</div>' +
-  '</div>';
-  
-  if (!sections.length) {
-    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-th-list" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
-      '<p style="color:#94a3b8">Блоки ещё не загружены. Нажмите \"Загрузить блоки\" для импорта.</p></div>';
-  } else {
-    h += '<div id="sectionList">';
-    for (var i = 0; i < sections.length; i++) {
-      var s = sections[i];
-      h += '<div class="card" style="margin-bottom:8px;padding:14px 20px;display:flex;align-items:center;gap:16px;' + (!s.is_visible ? 'opacity:0.5;' : '') + '" data-section-idx="' + i + '">' +
-        '<div style="display:flex;flex-direction:column;gap:4px">' +
-          '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.7rem;line-height:1" onclick="moveSection(' + i + ',-1)" ' + (i === 0 ? 'disabled style="padding:4px 8px;font-size:0.7rem;line-height:1;opacity:0.3"' : '') + '><i class="fas fa-chevron-up"></i></button>' +
-          '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.7rem;line-height:1" onclick="moveSection(' + i + ',1)" ' + (i === sections.length-1 ? 'disabled style="padding:4px 8px;font-size:0.7rem;line-height:1;opacity:0.3"' : '') + '><i class="fas fa-chevron-down"></i></button>' +
-        '</div>' +
-        '<div style="flex:1"><span style="font-weight:700;font-size:0.95rem">' + escHtml(s.label_ru || s.section_id) + '</span> <span style="color:#64748b;font-size:0.8rem;margin-left:8px">#' + s.section_id + '</span></div>' +
-        '<button class="btn ' + (s.is_visible ? 'btn-success' : 'btn-danger') + '" style="padding:6px 14px;font-size:0.8rem" onclick="toggleSectionVis(' + i + ')">' +
-          (s.is_visible ? '<i class="fas fa-eye"></i> Видим' : '<i class="fas fa-eye-slash"></i> Скрыт') +
-        '</button>' +
-      '</div>';
-    }
-    h += '</div>';
-  }
-  h += '</div>';
-  return h;
-}
-
-function moveSection(idx, dir) {
-  var arr = data.sectionOrder;
-  var newIdx = idx + dir;
-  if (newIdx < 0 || newIdx >= arr.length) return;
-  var tmp = arr[idx];
-  arr[idx] = arr[newIdx];
-  arr[newIdx] = tmp;
-  // Update sort_order values
-  for (var i = 0; i < arr.length; i++) arr[i].sort_order = i;
-  render();
-}
-
-function toggleSectionVis(idx) {
-  data.sectionOrder[idx].is_visible = data.sectionOrder[idx].is_visible ? 0 : 1;
-  render();
-}
+// ===== SECTION ORDER (now handled by renderBlocks, keep move/toggle helpers) =====
+// renderSections is replaced by renderBlocks
 
 async function saveSectionOrder() {
-  var sections = data.sectionOrder.map(function(s, i) {
-    return { section_id: s.section_id, sort_order: i, is_visible: s.is_visible, label_ru: s.label_ru, label_am: s.label_am };
-  });
-  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: sections }) });
-  toast('Порядок блоков сохранён! Обновите сайт для проверки.');
+  await saveAllBlocks();
 }
 
 async function seedSections() {
@@ -1161,44 +1533,70 @@ async function savePdfTemplate() {
 // ===== SLOT COUNTER =====
 function renderSlotCounter() {
   var counters = data.slotCounters || [];
-  var positions = [
-    { id: 'in-header', label: '📍 В шапке сайта', desc: 'Под навигацией' },
-    { id: 'after-hero', label: '⭐ После Hero', desc: 'Между Hero и услугами' },
-    { id: 'before-calc', label: '🧮 Перед калькулятором', desc: 'Над калькулятором' },
-    { id: 'before-contact', label: '📞 Перед контактами', desc: 'Перед футером' },
-    { id: 'after-ticker', label: '🏃 После бегущей строки', desc: 'Между тикером и услугами' }
-  ];
-
-  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Счётчики свободных мест</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">До 2 счётчиков с отдельными именами и позициями</p>';
-
-  if (counters.length < 2) {
-    h += '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addSlotCounter()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить счётчик</button>';
+  // Build positions from section order dynamically
+  var positions = [];
+  var sections = data.sectionOrder || [];
+  for (var si = 0; si < sections.length; si++) {
+    var sid = sections[si].section_id;
+    var sLabel = sections[si].label_ru || sid;
+    positions.push({ id: 'before-' + sid, label: '⬆ Перед: ' + sLabel });
+    positions.push({ id: 'after-' + sid, label: '⬇ После: ' + sLabel });
+    positions.push({ id: 'in-' + sid, label: '📍 Внутри: ' + sLabel });
   }
+  // Fallback positions
+  if (positions.length === 0) {
+    positions = [
+      { id: 'in-header', label: 'В шапке сайта' },
+      { id: 'after-hero', label: 'После Hero' },
+      { id: 'before-calc', label: 'Перед калькулятором' },
+      { id: 'before-contact', label: 'Перед контактами' }
+    ];
+  }
+
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-clock" style="color:#8B5CF6;margin-right:10px"></i>Счётчики свободных мест</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Создавайте неограниченное количество счётчиков и размещайте их в любом блоке сайта</p>';
+
+  h += '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addSlotCounter()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить счётчик</button>';
 
   for (var ci = 0; ci < counters.length; ci++) {
     var s = counters[ci];
     var cid = s.id;
     var pos = s.position || 'after-hero';
+    var free = Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0));
+    var pct = s.total_slots > 0 ? Math.round((free / s.total_slots) * 100) : 0;
+    var barColor = pct > 50 ? '#10B981' : pct > 20 ? '#F59E0B' : '#EF4444';
+
     h += '<div class="card" style="margin-bottom:20px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-      '<h3 style="font-weight:700"><i class="fas fa-hashtag" style="color:#8B5CF6;margin-right:8px"></i>Счётчик #' + (ci+1) + ' — <span style="color:#a78bfa">' + escHtml(s.counter_name || 'main') + '</span></h3>' +
+      '<h3 style="font-weight:700;display:flex;align-items:center;gap:10px"><i class="fas fa-hashtag" style="color:#8B5CF6"></i>Счётчик #' + (ci+1) + ' <span style="color:#a78bfa;font-size:0.9rem">' + escHtml(s.counter_name || 'main') + '</span>' +
+      (s.show_timer ? ' <span class="badge badge-green">Видим</span>' : ' <span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171">Скрыт</span>') +
+      '</h3>' +
       '<button class="btn btn-danger" style="font-size:0.8rem;padding:6px 14px" onclick="deleteSlotCounter('+cid+')"><i class="fas fa-trash"></i></button>' +
       '</div>' +
+
+      // Visual bar preview
+      '<div style="margin-bottom:16px;padding:12px;background:#0f172a;border-radius:8px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
+          '<span style="font-size:0.82rem;color:#94a3b8">' + escHtml(s.label_ru || 'Свободных мест') + '</span>' +
+          '<span style="font-size:1.4rem;font-weight:800;color:' + barColor + '">' + free + '<span style="color:#64748b;font-weight:400;font-size:0.85rem"> / ' + s.total_slots + '</span></span>' +
+        '</div>' +
+        '<div style="height:8px;background:#1e293b;border-radius:4px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:' + barColor + ';border-radius:4px;transition:width 0.3s"></div></div>' +
+      '</div>' +
+
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Имя</label><input class="input" id="sc_name_'+cid+'" value="' + escHtml(s.counter_name) + '"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Всего мест</label><input class="input" type="number" id="sc_total_'+cid+'" value="' + (s.total_slots || 10) + '"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Занято</label><input class="input" type="number" id="sc_booked_'+cid+'" value="' + (s.booked_slots || 0) + '"></div>' +
-        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Свободно</label><div style="font-size:1.8rem;font-weight:800;color:#10B981;padding:6px 0">' + Math.max(0, (s.total_slots || 10) - (s.booked_slots || 0)) + '</div></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Свободно</label><div style="font-size:1.8rem;font-weight:800;color:#10B981;padding:6px 0">' + free + '</div></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
         '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Надпись (RU)</label><input class="input" id="sc_lru_'+cid+'" value="' + escHtml(s.label_ru) + '"></div>' +
         '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Надпись (AM)</label><input class="input" id="sc_lam_'+cid+'" value="' + escHtml(s.label_am) + '"></div>' +
       '</div>' +
       '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><input type="checkbox" id="sc_show_'+cid+'"' + (s.show_timer ? ' checked' : '') + '><label style="font-size:0.9rem;color:#94a3b8">Показывать на сайте</label></div>' +
-      '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:8px;display:block">Позиция на странице</label><select class="input" id="sc_pos_'+cid+'" style="cursor:pointer">';
+      '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:8px;display:block">Позиция на странице (привязка к блоку)</label><select class="input" id="sc_pos_'+cid+'" style="cursor:pointer">';
     for (var pi = 0; pi < positions.length; pi++) {
-      h += '<option value="'+positions[pi].id+'"'+(pos===positions[pi].id?' selected':'')+'>'+positions[pi].label+' — '+positions[pi].desc+'</option>';
+      h += '<option value="'+positions[pi].id+'"'+(pos===positions[pi].id?' selected':'')+'>'+escHtml(positions[pi].label)+'</option>';
     }
     h += '</select></div>' +
       '<button class="btn btn-success" onclick="saveSlotCounter('+cid+')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>' +
@@ -1374,14 +1772,22 @@ async function saveFooter() {
 // ===== PHOTO BLOCKS =====
 function renderPhotos() {
   var blocks = data.photoBlocks || [];
-  var positions = [
-    { id: 'after-hero', label: 'После Hero' },
-    { id: 'after-services', label: 'После услуг' },
-    { id: 'before-calc', label: 'Перед калькулятором' },
-    { id: 'after-about', label: 'После «О нас»' },
-    { id: 'before-contact', label: 'Перед контактами' },
-    { id: 'after-guarantee', label: 'После гарантий' }
-  ];
+  // Dynamic positions from section order
+  var positions = [];
+  var sections = data.sectionOrder || [];
+  for (var si = 0; si < sections.length; si++) {
+    positions.push({ id: sections[si].section_id, label: escHtml(sections[si].label_ru || sections[si].section_id) });
+  }
+  if (positions.length === 0) {
+    positions = [
+      { id: 'after-hero', label: 'После Hero' },
+      { id: 'after-services', label: 'После услуг' },
+      { id: 'before-calc', label: 'Перед калькулятором' },
+      { id: 'after-about', label: 'После «О нас»' },
+      { id: 'before-contact', label: 'Перед контактами' },
+      { id: 'after-guarantee', label: 'После гарантий' }
+    ];
+  }
 
   var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Фото блоки</h1>' +
     '<p style="color:#94a3b8;margin-bottom:24px">Создавайте фото-блоки с описаниями и размещайте их на сайте</p>' +
@@ -1503,11 +1909,10 @@ function render() {
   switch (currentPage) {
     case 'dashboard': pageHtml = renderDashboard(); break;
     case 'leads': pageHtml = renderLeads(); break;
-    case 'content': pageHtml = renderContent(); break;
+    case 'blocks': pageHtml = renderBlocks(); break;
     case 'calculator': pageHtml = renderCalculator(); break;
     case 'pdf': pageHtml = renderPdfTemplate(); break;
     case 'referrals': pageHtml = renderReferrals(); break;
-    case 'sections': pageHtml = renderSections(); break;
     case 'slots': pageHtml = renderSlotCounter(); break;
     case 'footer': pageHtml = renderFooter(); break;
     case 'photos': pageHtml = renderPhotos(); break;

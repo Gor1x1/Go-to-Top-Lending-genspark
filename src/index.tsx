@@ -69,6 +69,12 @@ app.get('/api/site-data', async (c) => {
     // Load section order
     const sectionOrderRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
     
+    // Load slot counters (for frontend rendering)
+    const slotCountersRes = await db.prepare('SELECT * FROM slot_counter WHERE show_timer = 1 ORDER BY id').all();
+    
+    // Load photo blocks (for frontend rendering)
+    const photoBlocksRes = await db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all();
+    
     // Set Cache-Control to no-cache so edits appear instantly
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
@@ -81,11 +87,13 @@ app.get('/api/site-data', async (c) => {
       telegram,
       scripts,
       sectionOrder: sectionOrderRes.results,
+      slotCounters: slotCountersRes.results,
+      photoBlocks: photoBlocksRes.results,
       _ts: Date.now()
     });
   } catch (e: any) {
     // If DB not initialized yet, return empty — frontend will use hardcoded fallback
-    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], _ts: Date.now() });
+    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], _ts: Date.now() });
   }
 });
 
