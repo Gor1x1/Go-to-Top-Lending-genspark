@@ -332,66 +332,95 @@ async function seedContent() {
 
 // ===== CALCULATOR =====
 function renderCalculator() {
-  let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Калькулятор услуг</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Управление вкладками и услугами калькулятора</p>';
+  let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:10px"></i>Калькулятор услуг</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Управление вкладками и услугами. Перетаскивайте для изменения порядка.</p>';
   
-  // Tabs management
+  // ===== TABS MANAGEMENT (with inline edit, drag, reorder) =====
   h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-folder" style="color:#8B5CF6;margin-right:8px"></i>Вкладки калькулятора</h3>';
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px">';
-  for (const tab of data.calcTabs) {
-    h += '<div class="tab-btn active" style="position:relative;padding-right:32px">' + tab.name_ru + ' / ' + tab.name_am +
-      '<span onclick="event.stopPropagation();deleteCalcTab(' + tab.id + ')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);cursor:pointer;color:#ef4444;font-size:0.7rem"><i class="fas fa-times"></i></span></div>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px;margin-bottom:16px">';
+  for (var ti = 0; ti < data.calcTabs.length; ti++) {
+    var tab = data.calcTabs[ti];
+    h += '<div class="section-edit-row" style="display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:grab" draggable="true" ondragstart="dragTab(event,' + tab.id + ',' + ti + ')" ondragover="event.preventDefault()" ondrop="dropTab(event,' + ti + ')">' +
+      '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab"></i>' +
+      '<span style="font-size:0.8rem;color:#64748b;min-width:20px">#' + (ti+1) + '</span>' +
+      '<input class="input" value="' + escHtml(tab.name_ru) + '" style="flex:1;padding:6px 10px;font-size:0.85rem" id="tab_ru_' + tab.id + '" placeholder="Название RU">' +
+      '<input class="input" value="' + escHtml(tab.name_am || '') + '" style="flex:1;padding:6px 10px;font-size:0.85rem" id="tab_am_' + tab.id + '" placeholder="Название AM">' +
+      '<input class="input" value="' + escHtml(tab.tab_key) + '" style="width:100px;padding:6px 10px;font-size:0.8rem;color:#64748b" id="tab_key_' + tab.id + '" placeholder="key">' +
+      '<button class="btn btn-success" style="padding:6px 10px;font-size:0.8rem" onclick="saveCalcTab(' + tab.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
+      '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="deleteCalcTab(' + tab.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
+    '</div>';
   }
-  h += '<button class="btn btn-outline" style="font-size:0.8rem" onclick="addCalcTab()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>';
-  h += '</div></div>';
+  h += '</div>';
+  h += '<button class="btn btn-outline" style="font-size:0.85rem" onclick="addCalcTab()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить вкладку</button>';
+  h += '</div>';
   
-  // Services
-  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-list" style="color:#8B5CF6;margin-right:8px"></i>Услуги</h3>';
-  h += '<button class="btn btn-primary" style="margin-bottom:16px" onclick="addCalcService()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить услугу</button>';
+  // ===== SERVICES (with tab selection, drag reorder) =====
+  h += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<h3 style="font-weight:700"><i class="fas fa-list" style="color:#8B5CF6;margin-right:8px"></i>Услуги</h3>' +
+    '<button class="btn btn-primary" style="font-size:0.85rem" onclick="addCalcService()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить услугу</button>' +
+  '</div>';
   
   // Group by tab
-  const byTab = {};
-  for (const svc of data.calcServices) {
-    const tabKey = svc.tab_key || 'unknown';
+  var byTab = {};
+  for (var si = 0; si < data.calcServices.length; si++) {
+    var svc = data.calcServices[si];
+    var tabKey = svc.tab_key || 'unknown';
     if (!byTab[tabKey]) byTab[tabKey] = [];
     byTab[tabKey].push(svc);
   }
   
-  for (const [tabKey, svcs] of Object.entries(byTab)) {
-    const tab = data.calcTabs.find(t => t.tab_key === tabKey);
-    h += '<div style="margin-bottom:20px"><h4 style="color:#a78bfa;font-weight:600;margin-bottom:8px">' + (tab ? tab.name_ru : tabKey) + '</h4>';
-    for (const svc of svcs) {
-      var isTiered = svc.price_type === 'tiered' && svc.price_tiers_json;
+  for (var tabKey in byTab) {
+    if (!byTab.hasOwnProperty(tabKey)) continue;
+    var svcs = byTab[tabKey];
+    var tab = data.calcTabs.find(function(t){ return t.tab_key === tabKey; });
+    h += '<div style="margin-bottom:24px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;padding:8px 12px;background:rgba(139,92,246,0.1);border-radius:8px">' +
+        '<i class="fas fa-folder-open" style="color:#a78bfa"></i>' +
+        '<span style="color:#a78bfa;font-weight:700;font-size:0.95rem">' + (tab ? tab.name_ru : tabKey) + '</span>' +
+        '<span class="badge badge-purple" style="margin-left:auto">' + svcs.length + ' услуг</span>' +
+      '</div>';
+    
+    for (var si2 = 0; si2 < svcs.length; si2++) {
+      var svc2 = svcs[si2];
+      var isTiered = svc2.price_type === 'tiered' && svc2.price_tiers_json;
       var tiers = [];
-      if (isTiered) { try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; } }
+      if (isTiered) { try { tiers = JSON.parse(svc2.price_tiers_json); } catch(e) { tiers = []; } }
       
-      h += '<div class="section-edit-row" style="margin-bottom:12px">' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr auto auto auto;gap:12px;align-items:center">' +
-          '<div><div style="font-size:0.7rem;color:#64748b">RU</div><input class="input" value="' + escHtml(svc.name_ru) + '" id="svc_ru_' + svc.id + '"></div>' +
-          '<div><div style="font-size:0.7rem;color:#64748b">AM</div><input class="input" value="' + escHtml(svc.name_am) + '" id="svc_am_' + svc.id + '"></div>' +
-          '<div><div style="font-size:0.7rem;color:#64748b">Цена (֏)</div><input class="input" type="number" value="' + svc.price + '" style="width:100px" id="svc_price_' + svc.id + '"></div>' +
-          '<button class="btn btn-success" style="padding:8px 12px" onclick="saveCalcService(' + svc.id + ')"><i class="fas fa-save"></i></button>' +
-          '<button class="btn btn-danger" style="padding:8px 12px" onclick="deleteCalcService(' + svc.id + ')"><i class="fas fa-trash"></i></button>' +
+      h += '<div class="section-edit-row" style="margin-bottom:10px" draggable="true" ondragstart="dragSvc(event,' + svc2.id + ',' + si2 + ')" ondragover="event.preventDefault()" ondrop="dropSvc(event,' + si2 + ',\\'' + tabKey + '\\')">' +
+        '<div style="display:grid;grid-template-columns:20px 1fr 1fr 100px 80px auto auto auto;gap:8px;align-items:center">' +
+          '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:0.8rem"></i>' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">RU</div><input class="input" value="' + escHtml(svc2.name_ru) + '" id="svc_ru_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">AM</div><input class="input" value="' + escHtml(svc2.name_am || '') + '" id="svc_am_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Цена ֏</div><input class="input" type="number" value="' + svc2.price + '" id="svc_price_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Раздел</div><select class="input" id="svc_tab_' + svc2.id + '" style="padding:6px 8px;font-size:0.8rem">';
+      
+      for (var tabi = 0; tabi < data.calcTabs.length; tabi++) {
+        var t = data.calcTabs[tabi];
+        h += '<option value="' + t.id + '"' + (svc2.tab_id === t.id ? ' selected' : '') + '>' + escHtml(t.name_ru) + '</option>';
+      }
+      h += '</select></div>' +
+          '<button class="btn btn-success" style="padding:6px 10px" onclick="saveCalcService(' + svc2.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
+          '<button class="btn btn-danger" style="padding:6px 10px" onclick="deleteCalcService(' + svc2.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
         '</div>';
       
-      // Tier editor for tiered services
+      // Tier editor
       if (isTiered && tiers.length > 0) {
-        h += '<div style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
-          '<div style="font-size:0.8rem;font-weight:600;color:#a78bfa;margin-bottom:8px"><i class="fas fa-layer-group" style="margin-right:6px"></i>Тарифная шкала (price tiers)</div>';
-        for (var ti = 0; ti < tiers.length; ti++) {
-          h += '<div style="display:grid;grid-template-columns:auto 80px auto 80px auto 100px auto;gap:6px;align-items:center;margin-bottom:6px">' +
-            '<span style="font-size:0.8rem;color:#94a3b8;text-align:right;min-width:20px">от</span>' +
-            '<input class="input" type="number" value="' + tiers[ti].min + '" style="padding:6px 8px;font-size:0.85rem;text-align:left" id="tier_min_' + svc.id + '_' + ti + '">' +
-            '<span style="font-size:0.8rem;color:#94a3b8;text-align:right;min-width:20px">до</span>' +
-            '<input class="input" type="number" value="' + tiers[ti].max + '" style="padding:6px 8px;font-size:0.85rem;text-align:right" id="tier_max_' + svc.id + '_' + ti + '">' +
-            '<span style="font-size:0.8rem;color:#94a3b8;white-space:nowrap">=</span>' +
-            '<div style="display:flex;align-items:center;gap:4px"><input class="input" type="number" value="' + tiers[ti].price + '" style="padding:6px 8px;font-size:0.85rem;text-align:left;width:90px" id="tier_price_' + svc.id + '_' + ti + '"><span style="font-size:0.85rem;color:#94a3b8">֏</span></div>' +
-            '<button class="tier-del-btn" onclick="deleteTier(' + svc.id + ',' + ti + ',' + tiers.length + ')" title="Удалить строку"><i class="fas fa-times"></i></button>' +
+        h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
+          '<div style="font-size:0.78rem;font-weight:600;color:#a78bfa;margin-bottom:6px"><i class="fas fa-layer-group" style="margin-right:4px"></i>Тарифная шкала</div>';
+        for (var tii = 0; tii < tiers.length; tii++) {
+          h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">' +
+            '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">от</span>' +
+            '<input class="input" type="number" value="' + tiers[tii].min + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_min_' + svc2.id + '_' + tii + '">' +
+            '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">до</span>' +
+            '<input class="input" type="number" value="' + tiers[tii].max + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_max_' + svc2.id + '_' + tii + '">' +
+            '<span style="font-size:0.75rem;color:#94a3b8">=</span>' +
+            '<input class="input" type="number" value="' + tiers[tii].price + '" style="width:80px;padding:4px 6px;font-size:0.8rem" id="tier_price_' + svc2.id + '_' + tii + '"><span style="font-size:0.8rem;color:#94a3b8">֏</span>' +
+            '<button class="tier-del-btn" onclick="deleteTier(' + svc2.id + ',' + tii + ',' + tiers.length + ')"><i class="fas fa-times"></i></button>' +
           '</div>';
         }
-        h += '<div style="margin-top:8px;display:flex;gap:8px">' +
-          '<button class="btn btn-success" style="padding:6px 14px;font-size:0.8rem" onclick="saveTiers(' + svc.id + ',' + tiers.length + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить тарифы</button>' +
-          '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="addTier(' + svc.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить строку</button>' +
+        h += '<div style="margin-top:6px;display:flex;gap:6px">' +
+          '<button class="btn btn-success" style="padding:4px 10px;font-size:0.75rem" onclick="saveTiers(' + svc2.id + ',' + tiers.length + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить</button>' +
+          '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="addTier(' + svc2.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Строка</button>' +
         '</div></div>';
       }
       h += '</div>';
@@ -402,13 +431,61 @@ function renderCalculator() {
   return h;
 }
 
+// ===== Tab drag-reorder =====
+var _dragTabId = null, _dragTabIdx = null;
+function dragTab(e, id, idx) { _dragTabId = id; _dragTabIdx = idx; e.dataTransfer.effectAllowed = 'move'; }
+async function dropTab(e, targetIdx) {
+  e.preventDefault();
+  if (_dragTabIdx === null || _dragTabIdx === targetIdx) return;
+  // Reorder tabs
+  var tabs = data.calcTabs.slice();
+  var moved = tabs.splice(_dragTabIdx, 1)[0];
+  tabs.splice(targetIdx, 0, moved);
+  // Save new order
+  for (var i = 0; i < tabs.length; i++) {
+    await api('/calc-tabs/' + tabs[i].id, { method: 'PUT', body: JSON.stringify({ name_ru: tabs[i].name_ru, name_am: tabs[i].name_am, sort_order: i + 1, is_active: tabs[i].is_active ?? 1 }) });
+  }
+  toast('Порядок вкладок обновлён');
+  await loadData(); render();
+}
+
+// ===== Service drag-reorder =====
+var _dragSvcId = null, _dragSvcIdx = null;
+function dragSvc(e, id, idx) { _dragSvcId = id; _dragSvcIdx = idx; e.dataTransfer.effectAllowed = 'move'; }
+async function dropSvc(e, targetIdx, tabKey) {
+  e.preventDefault();
+  if (_dragSvcId === null) return;
+  var svcs = data.calcServices.filter(function(s){ return s.tab_key === tabKey; });
+  var fromIdx = svcs.findIndex(function(s){ return s.id === _dragSvcId; });
+  if (fromIdx < 0 || fromIdx === targetIdx) return;
+  var moved = svcs.splice(fromIdx, 1)[0];
+  svcs.splice(targetIdx, 0, moved);
+  for (var i = 0; i < svcs.length; i++) {
+    await api('/calc-services/' + svcs[i].id, { method: 'PUT', body: JSON.stringify({ ...svcs[i], sort_order: i + 1 }) });
+  }
+  toast('Порядок услуг обновлён');
+  await loadData(); render();
+}
+
+async function saveCalcTab(id) {
+  var ru = document.getElementById('tab_ru_' + id).value;
+  var am = document.getElementById('tab_am_' + id).value;
+  var key = document.getElementById('tab_key_' + id).value;
+  var tab = data.calcTabs.find(function(t){ return t.id === id; });
+  if (!tab) return;
+  await api('/calc-tabs/' + id, { method: 'PUT', body: JSON.stringify({ name_ru: ru, name_am: am, sort_order: tab.sort_order, is_active: tab.is_active ?? 1 }) });
+  toast('Вкладка сохранена');
+  await loadData(); render();
+}
+
 async function saveCalcService(id) {
-  const svc = data.calcServices.find(s => s.id === id);
+  var svc = data.calcServices.find(function(s){ return s.id === id; });
   if (!svc) return;
-  const ru = document.getElementById('svc_ru_' + id).value;
-  const am = document.getElementById('svc_am_' + id).value;
-  const price = parseInt(document.getElementById('svc_price_' + id).value);
-  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price }) });
+  var ru = document.getElementById('svc_ru_' + id).value;
+  var am = document.getElementById('svc_am_' + id).value;
+  var price = parseInt(document.getElementById('svc_price_' + id).value) || 0;
+  var tabId = parseInt(document.getElementById('svc_tab_' + id).value) || svc.tab_id;
+  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, tab_id: tabId }) });
   toast('Услуга сохранена');
   await loadData(); render();
 }
@@ -465,24 +542,56 @@ async function deleteCalcService(id) {
 }
 
 async function addCalcService() {
-  const tabId = data.calcTabs.length ? data.calcTabs[0].id : null;
-  if (!tabId) { toast('Сначала создайте вкладку', 'error'); return; }
-  const ru = prompt('Название услуги (RU):');
-  if (!ru) return;
-  const am = prompt('Название услуги (AM):') || ru;
-  const price = parseInt(prompt('Цена (֏):') || '0');
-  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price, price_type: 'fixed', sort_order: data.calcServices.length + 1 }) });
-  toast('Услуга добавлена');
+  if (!data.calcTabs.length) { toast('Сначала создайте вкладку', 'error'); return; }
+  // Build tab options
+  var tabOpts = '';
+  for (var i = 0; i < data.calcTabs.length; i++) {
+    tabOpts += '<option value="' + data.calcTabs[i].id + '">' + escHtml(data.calcTabs[i].name_ru) + '</option>';
+  }
+  // Show inline form
+  var formHtml = '<div id="addSvcForm" class="card" style="margin-bottom:16px;border-color:#8B5CF6">' +
+    '<h4 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-plus-circle" style="margin-right:6px"></i>Новая услуга</h4>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:10px;margin-bottom:10px">' +
+      '<input class="input" id="new_svc_ru" placeholder="Название (RU)">' +
+      '<input class="input" id="new_svc_am" placeholder="Название (AM)">' +
+      '<input class="input" type="number" id="new_svc_price" placeholder="Цена ֏" value="0">' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;align-items:center">' +
+      '<select class="input" id="new_svc_tab" style="max-width:200px">' + tabOpts + '</select>' +
+      '<select class="input" id="new_svc_type" style="max-width:150px">' +
+        '<option value="fixed">Фикс. цена</option>' +
+        '<option value="tiered">Тарифная шкала</option>' +
+      '</select>' +
+      '<button class="btn btn-primary" onclick="submitNewService()"><i class="fas fa-check" style="margin-right:4px"></i>Добавить</button>' +
+      '<button class="btn btn-outline" onclick="document.getElementById(\\\'addSvcForm\\\').remove()">Отмена</button>' +
+    '</div></div>';
+  // Insert at top of services card
+  var svcCard = document.querySelector('#content .card:last-of-type');
+  if (svcCard) svcCard.insertAdjacentHTML('afterbegin', formHtml);
+}
+
+async function submitNewService() {
+  var ru = document.getElementById('new_svc_ru').value.trim();
+  if (!ru) { toast('Введите название', 'error'); return; }
+  var am = document.getElementById('new_svc_am').value.trim() || ru;
+  var price = parseInt(document.getElementById('new_svc_price').value) || 0;
+  var tabId = parseInt(document.getElementById('new_svc_tab').value);
+  var pType = document.getElementById('new_svc_type').value;
+  var tiersJson = null;
+  if (pType === 'tiered') { tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]); }
+  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_type: pType, price_tiers_json: tiersJson, sort_order: data.calcServices.length + 1 }) });
+  toast('Услуга добавлена!');
   await loadData(); render();
 }
 
 async function addCalcTab() {
-  const key = prompt('Ключ вкладки (англ, напр: buyouts):');
+  var key = prompt('Ключ вкладки (англ, напр: delivery):');
   if (!key) return;
-  const ru = prompt('Название (RU):');
-  const am = prompt('Название (AM):') || ru;
+  var ru = prompt('Название (RU):');
+  if (!ru) return;
+  var am = prompt('Название (AM):') || ru;
   await api('/calc-tabs', { method: 'POST', body: JSON.stringify({ tab_key: key, name_ru: ru, name_am: am, sort_order: data.calcTabs.length + 1 }) });
-  toast('Вкладка добавлена');
+  toast('Вкладка добавлена!');
   await loadData(); render();
 }
 
@@ -812,46 +921,73 @@ async function changePassword() {
 function renderLeads() {
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
-  var statusColors = { 'new': 'badge-green', 'contacted': 'badge-purple', 'in_progress': 'badge-amber', 'done': 'badge-green', 'rejected': '' };
-  var statusLabels = { 'new': 'Новый', 'contacted': 'Связались', 'in_progress': 'В работе', 'done': 'Завершён', 'rejected': 'Отклонён' };
   var h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800">Лиды / CRM</h1><p style="color:#94a3b8;margin-top:4px">Все заявки с сайта. Всего: ' + total + '</p></div>' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Лиды / CRM</h1><p style="color:#94a3b8;margin-top:4px">Все заявки с сайта. Всего: ' + total + '</p></div>' +
     '<a href="/api/admin/leads/export" target="_blank" class="btn btn-success" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>Экспорт CSV</a>' +
   '</div>';
 
   if (!leads.length) {
     h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i><p style="color:#94a3b8">Заявок пока нет.</p></div>';
   } else {
-    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse">' +
-      '<thead><tr style="border-bottom:2px solid #334155">' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">ID</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Источник</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Имя</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Контакт</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Услуга</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Статус</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Дата</th>' +
-      '<th style="padding:10px;text-align:left;color:#94a3b8;font-size:0.8rem">Действия</th>' +
-      '</tr></thead><tbody>';
     for (var i = 0; i < leads.length; i++) {
       var l = leads[i];
-      var sc = statusColors[l.status] || '';
-      h += '<tr style="border-bottom:1px solid #1e293b">' +
-        '<td style="padding:10px;font-size:0.85rem">#' + l.id + '</td>' +
-        '<td style="padding:10px;font-size:0.85rem"><span class="badge badge-purple">' + (l.source || 'form') + '</span></td>' +
-        '<td style="padding:10px;font-size:0.85rem;font-weight:600">' + escHtml(l.name) + '</td>' +
-        '<td style="padding:10px;font-size:0.85rem;color:#a78bfa">' + escHtml(l.contact) + '</td>' +
-        '<td style="padding:10px;font-size:0.85rem">' + escHtml(l.service || l.product || l.message || '').substring(0, 40) + '</td>' +
-        '<td style="padding:10px"><select class="input" style="width:130px;padding:4px 8px;font-size:0.8rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
+      var isCalc = l.source === 'calculator_pdf';
+      var calcData = null;
+      if (isCalc && l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
+      var statusIcon = {'new':'🟢','contacted':'💬','in_progress':'🔄','done':'✅','rejected':'❌'}[l.status] || '⚪';
+      
+      h += '<div class="card" style="margin-bottom:12px">' +
+        '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
+          '<div style="flex:1;min-width:200px">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+              '<span style="font-size:1rem;font-weight:800;color:#a78bfa">#' + l.id + '</span>' +
+              '<span class="badge badge-purple">' + (l.source || 'form') + '</span>' +
+              (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
+            '</div>' +
+            '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
+            '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
+            (l.message ? '<div style="font-size:0.82rem;color:#94a3b8;margin-top:4px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(l.message).substring(0,80) + '</div>' : '') +
+          '</div>';
+      
+      // Right side: status + total + date + actions
+      h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:180px">';
+      
+      if (calcData && calcData.total) {
+        h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(calcData.total).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+      }
+      
+      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
         '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новый</option>' +
         '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 Связались</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
         '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option>' +
-        '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option></select></td>' +
-        '<td style="padding:10px;font-size:0.8rem;color:#64748b">' + (l.created_at || '').substring(0, 16) + '</td>' +
-        '<td style="padding:10px"><button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button></td></tr>';
+        '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option></select>';
+      
+      h += '<div style="font-size:0.78rem;color:#64748b">' + (l.created_at || '').substring(0, 16) + '</div>';
+      h += '<div style="display:flex;gap:4px">';
+      if (isCalc) {
+        h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-file-pdf" style="margin-right:4px"></i>КП</a>';
+      }
+      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
+      h += '</div></div></div>';
+      
+      // Services breakdown
+      if (calcData && calcData.items && calcData.items.length > 0) {
+        h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
+          '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-receipt" style="margin-right:4px;color:#a78bfa"></i>Выбранные услуги:</div>' +
+          '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px 12px;font-size:0.82rem">' +
+          '<div style="color:#64748b;font-weight:600">Услуга</div><div style="color:#64748b;font-weight:600;text-align:center">Кол-во</div><div style="color:#64748b;font-weight:600;text-align:right">Цена</div><div style="color:#64748b;font-weight:600;text-align:right">Сумма</div>';
+        for (var ci = 0; ci < calcData.items.length; ci++) {
+          var item = calcData.items[ci];
+          h += '<div style="color:#e2e8f0">' + escHtml(item.name || '') + '</div>' +
+            '<div style="text-align:center;color:#94a3b8">' + (item.qty || 1) + '</div>' +
+            '<div style="text-align:right;color:#94a3b8;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '&nbsp;֏</div>' +
+            '<div style="text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+        }
+        h += '</div></div>';
+      }
+      h += '</div>';
     }
-    h += '</tbody></table></div>';
   }
   h += '</div>';
   return h;

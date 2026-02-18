@@ -193,7 +193,7 @@ app.post('/api/generate-pdf', async (c) => {
 
     let rows = '';
     for (const item of items) {
-      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right">' + Number(item.price || 0).toLocaleString('ru-RU') + ' \u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + ' \u058f</td></tr>';
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
 
     // Save lead with unique ID
@@ -249,15 +249,97 @@ app.post('/api/generate-pdf', async (c) => {
       (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
       (intro ? '<div class="intro">' + intro + '</div>' : '') +
       '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows +
-      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px">' + Number(total).toLocaleString('ru-RU') + ' \u058f</td></tr></tbody></table>' +
+      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + Number(total).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr></tbody></table>' +
       (outro ? '<div class="outro">' + outro + '</div>' : '') +
       (footer ? '<div class="ftr">' + footer + '</div>' : '') +
       '<a class="dlbar" onclick="window.print()">' + L.dl + '</a>' +
       '</body></html>';
 
-    return c.html(pdfHtml);
+    // Return the lead ID so client can navigate to the PDF page
+    return c.json({ leadId: leadId, url: '/pdf/' + leadId });
   } catch (e: any) {
     return c.json({ error: e.message }, 500);
+  }
+})
+
+// ===== PDF VIEW — GET /pdf/:id (works on ALL devices including Android WebView) =====
+app.get('/pdf/:id', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const id = c.req.param('id');
+    const lead = await db.prepare('SELECT * FROM leads WHERE id = ? AND source = ?').bind(id, 'calculator_pdf').first();
+    if (!lead) return c.text('PDF not found', 404);
+    
+    const lang = (lead.lang as string) || 'ru';
+    const isAm = lang === 'am';
+    let calcData: any = {};
+    try { calcData = JSON.parse(lead.calc_data as string); } catch { calcData = { items: [], total: 0 }; }
+    const items = calcData.items || [];
+    const total = calcData.total || 0;
+    const clientName = (lead.name as string) || '';
+    const clientContact = (lead.contact as string) || '';
+    const referralCode = calcData.referralCode || '';
+    
+    let tpl = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+    if (!tpl) tpl = { header_ru: 'Коммерческое предложение', header_am: 'Առևտրային առաջարկ', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
+    
+    const header = isAm ? (tpl.header_am || '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f') : (tpl.header_ru || 'Коммерческое предложение');
+    const intro = isAm ? tpl.intro_am : tpl.intro_ru;
+    const outro = isAm ? tpl.outro_am : tpl.outro_ru;
+    const footer = isAm ? tpl.footer_am : tpl.footer_ru;
+    
+    let rows = '';
+    for (const item of items) {
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+    }
+    
+    const L = isAm
+      ? { svc: 'Ծառայություն', qty: 'Քանակ', price: 'Գին', sum: 'Գումար', total: 'ԸՆԴԱՄԵՆԸ:', client: 'Հաճախորդ:', date: 'Ամսաթիվ:', id: 'Հայտ №', dl: '📥 Ներբեռնել PDF', share: '📤 Կիսել' }
+      : { svc: 'Услуга', qty: 'Кол-во', price: 'Цена', sum: 'Сумма', total: 'ИТОГО:', client: 'Клиент:', date: 'Дата:', id: 'Заявка №', dl: '📥 Скачать PDF', share: '📤 Поделиться' };
+    
+    const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
+      '*{margin:0;padding:0;box-sizing:border-box}' +
+      'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;padding:24px;max-width:800px;margin:0 auto;background:#fff}' +
+      '.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}' +
+      '.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}' +
+      '.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}' +
+      '.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}' +
+      '.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}' +
+      '.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}' +
+      'table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}' +
+      'th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}' +
+      'td{padding:10px 12px;border-bottom:1px solid #e5e7eb}' +
+      '.tr{background:#f3f0ff;font-weight:700;font-size:16px}' +
+      '.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}' +
+      '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}' +
+      '.dlbar{background:#8B5CF6;color:white;text-align:center;padding:14px;border-radius:12px;margin-top:16px;cursor:pointer;font-weight:700;font-size:15px;box-shadow:0 4px 20px rgba(139,92,246,0.4);text-decoration:none;display:block;border:none;width:100%}' +
+      '.dlbar:hover{background:#7C3AED}' +
+      '.actions{position:sticky;bottom:8px;display:flex;gap:8px;margin-top:24px}' +
+      '.actions .dlbar{flex:1}' +
+      '@media print{.actions{display:none!important}body{padding:16px}}' +
+      '@media(max-width:600px){body{padding:16px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}.actions{flex-direction:column}}' +
+      '</style></head><body>' +
+      '<div class="hdr"><div class="logo">' + ((tpl.company_name as string) || 'Go to Top') + '</div><div class="ci">' +
+      (tpl.company_phone ? '<div>' + tpl.company_phone + '</div>' : '') +
+      (tpl.company_email ? '<div>' + tpl.company_email + '</div>' : '') +
+      (tpl.company_address ? '<div>' + tpl.company_address + '</div>' : '') +
+      '</div></div>' +
+      '<div class="ttl">' + (header || '') + '</div>' +
+      '<div class="meta"><span>' + L.date + ' ' + new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU') + '</span><span>' + L.id + id + '</span></div>' +
+      (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
+      (intro ? '<div class="intro">' + intro + '</div>' : '') +
+      '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows +
+      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + Number(total).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr></tbody></table>' +
+      (outro ? '<div class="outro">' + outro + '</div>' : '') +
+      (footer ? '<div class="ftr">' + footer + '</div>' : '') +
+      '<div class="actions"><button class="dlbar" onclick="window.print()">' + L.dl + '</button>' +
+      '<button class="dlbar" style="background:#334155" onclick="history.back()">' + (isAm ? '\u2190 \u054e\u0565\u0580\u0561\u0564\u0561\u057c\u0576\u0561\u056c' : '\u2190 \u041d\u0430\u0437\u0430\u0434 \u043d\u0430 \u0441\u0430\u0439\u0442') + '</button></div>' +
+      '</body></html>';
+    
+    return c.html(pdfHtml);
+  } catch (e: any) {
+    return c.text('Error: ' + e.message, 500);
   }
 })
 
@@ -486,7 +568,7 @@ img{max-width:100%;height:auto}
 .calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .calc-total{display:flex;justify-content:space-between;align-items:center;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple)}
 .calc-total-label{font-size:1.1rem;font-weight:600}
-.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple)}
+.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:nowrap}
 .calc-cta{margin-top:24px;text-align:center}
 .buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
 .buyout-tier-info strong{color:var(--accent)}
@@ -2570,21 +2652,21 @@ async function checkRefCode() {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, clientName: clientName, clientContact: clientPhone, referralCode: refCode })
-    }).then(function(r){ return r.text(); }).then(function(html) {
+    }).then(function(r){ return r.json(); }).then(function(data) {
       pdfBtn.disabled = false;
-      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? 'Ներբեռնել ԿԱ (PDF)' : 'Скачать КП (PDF)');
-      /* iPhone Safari: always use blob download */
-      var blob = new Blob([html], {type:'text/html;charset=utf-8'});
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement('a'); a.href = url;
-      a.download = 'GoToTop_KP_' + new Date().toISOString().slice(0,10) + '.html';
-      a.style.display = 'none';
-      document.body.appendChild(a); a.click();
-      setTimeout(function(){ document.body.removeChild(a); URL.revokeObjectURL(url); }, 500);
+      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c \u053f\u0531 (PDF)' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c \u041a\u041f (PDF)');
+      /* Navigate to PDF page — works on ALL devices: Android WebView, iOS Safari, Desktop */
+      /* CRITICAL: Use window.location.href instead of window.open() — popup blockers on iOS Safari
+         and Android browsers (Chrome, Samsung Internet, WebView) block window.open() called
+         inside async callbacks (fetch .then). location.href is never blocked. */
+      var pdfUrl = (data && data.url) ? data.url : ((data && data.leadId) ? '/pdf/' + data.leadId : null);
+      if (pdfUrl) {
+        window.location.href = pdfUrl;
+      }
     }).catch(function(e){
       console.error('PDF error:', e);
       pdfBtn.disabled = false;
-      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? 'Ներբեռնել ԿԱ (PDF)' : 'Скачать КП (PDF)');
+      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c \u053f\u0531 (PDF)' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c \u041a\u041f (PDF)');
     });
   });
 
