@@ -306,6 +306,8 @@ export async function initDatabase(db: D1Database): Promise<void> {
   // v4 Migrations: telegram group link & TZ link for leads
   try { await db.prepare("ALTER TABLE leads ADD COLUMN telegram_group TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE leads ADD COLUMN tz_link TEXT DEFAULT ''").run(); } catch {}
+  // v5 Migrations: refund_amount for leads
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN refund_amount REAL DEFAULT 0").run(); } catch {}
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====

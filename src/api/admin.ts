@@ -467,6 +467,8 @@ api.put('/leads/:id', authMiddleware, async (c) => {
   if (d.custom_fields !== undefined) { fields.push('custom_fields=?'); vals.push(d.custom_fields); }
   if (d.telegram_group !== undefined) { fields.push('telegram_group=?'); vals.push(d.telegram_group); }
   if (d.tz_link !== undefined) { fields.push('tz_link=?'); vals.push(d.tz_link); }
+  if (d.refund_amount !== undefined) { fields.push('refund_amount=?'); vals.push(d.refund_amount); }
+  if (d.lang !== undefined) { fields.push('lang=?'); vals.push(d.lang); }
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
   vals.push(id);
   await db.prepare(`UPDATE leads SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
@@ -479,8 +481,8 @@ api.post('/leads', authMiddleware, async (c) => {
   // Get next lead number
   const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
   const nextNum = ((lastLead?.max_num as number) || 0) + 1;
-  await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, total_amount, calc_data, referral_code, custom_fields) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .bind(nextNum, d.source || 'manual', d.name || '', d.contact || '', d.product || '', d.service || '', d.message || '', d.lang || 'ru', d.total_amount || 0, d.calc_data || '', d.referral_code || '', d.custom_fields || '').run();
+  await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, total_amount, calc_data, referral_code, custom_fields, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(nextNum, d.source || 'manual', d.name || '', d.contact || '', d.product || '', d.service || '', '', d.lang || 'ru', d.total_amount || 0, d.calc_data || '', d.referral_code || '', d.custom_fields || '', d.message || '').run();
   return c.json({ success: true });
 });
 
@@ -634,8 +636,16 @@ api.delete('/leads/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-api.get('/leads/export', authMiddleware, async (c) => {
+api.get('/leads/export', async (c) => {
+  // Allow auth via query parameter for direct download links
   const db = c.env.DB;
+  const token = c.req.header('Authorization')?.replace('Bearer ', '') || c.req.query('token') || '';
+  if (!token) return c.json({ error: 'Unauthorized' }, 401);
+  try {
+    const { verifyToken } = await import('../lib/auth');
+    const payload = await verifyToken(token);
+    if (!payload) return c.json({ error: 'Unauthorized' }, 401);
+  } catch { return c.json({ error: 'Unauthorized' }, 401); }
   const res = await db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
   const leads = res.results;
   let csv = 'ID,Source,Name,Contact,Product,Service,Message,Language,Status,Notes,Referral,Created\n';
@@ -1050,12 +1060,13 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     });
   }
   
-  // Total = services + articles
-  const totalAmount = servicesTotalAmount + articlesTotalAmount;
+  // Total = services + articles - refund
+  const refundAmount = Number(leadRow.refund_amount) || 0;
+  const totalAmount = servicesTotalAmount + articlesTotalAmount - refundAmount;
   const allItems = [...serviceItems, ...articleItems];
   
   // Update lead total_amount and calc_data (for PDF)
-  const calcData = JSON.stringify({ items: allItems, total: totalAmount, referralCode: existingCalcData?.referralCode || '' });
+  const calcData = JSON.stringify({ items: allItems, total: totalAmount, refund: refundAmount, referralCode: existingCalcData?.referralCode || '' });
   await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
     .bind(totalAmount, calcData, leadId).run();
   // Set source to calculator_pdf so PDF route works

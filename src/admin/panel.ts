@@ -1460,6 +1460,7 @@ function renderLeads() {
       var calcData = null;
       if (l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
       var leadAmt = Number(l.total_amount || 0);
+      var refundAmt = Number(l.refund_amount || 0);
       var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', checking:'#8B5CF6', done:'#10B981', rejected:'#EF4444' };
       var statusBorderColor = statusColors[l.status] || '#334155';
       // Compute services vs articles amounts
@@ -1472,7 +1473,7 @@ function renderLeads() {
         }
       }
       
-      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + '">' +
+      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + ';cursor:pointer" onclick="toggleLeadExpand(' + l.id + ')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
@@ -1491,9 +1492,10 @@ function renderLeads() {
               (l.tz_link ? '<a href="' + escHtml(l.tz_link) + '" target="_blank" style="font-size:0.72rem;color:#F59E0B;text-decoration:none"><i class="fas fa-file-alt" style="margin-right:2px"></i>ТЗ</a>' : '') +
             '</div>' : '') +
             // Services/Articles amounts on main card
-            ((svcAmt > 0 || artAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px">' +
+            ((svcAmt > 0 || artAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
+              (refundAmt > 0 ? '<span style="font-size:0.72rem;color:#f87171;font-weight:600"><i class="fas fa-undo-alt" style="margin-right:3px"></i>Возврат: -' + Number(refundAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
             '</div>' : '') +
           '</div>';
       
@@ -1505,7 +1507,7 @@ function renderLeads() {
       }
       
       // Status selector — 6 statuses
-      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
+      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onclick="event.stopPropagation()" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
         '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новые лиды</option>' +
         '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 На связи</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
@@ -1514,7 +1516,7 @@ function renderLeads() {
         '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option></select>';
       
       // Assign to employee
-      h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onchange="assignLead(' + l.id + ', this.value)">' +
+      h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onclick="event.stopPropagation()" onchange="assignLead(' + l.id + ', this.value)">' +
         '<option value="">Ответственный...</option>';
       for (var uj = 0; uj < (data.users||[]).length; uj++) {
         var uu = data.users[uj];
@@ -1524,8 +1526,8 @@ function renderLeads() {
       
       h += '<div style="font-size:0.78rem;color:#64748b">' + formatArmTime(l.created_at) + '</div>';
       h += '<div style="display:flex;gap:4px">';
-      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="toggleLeadExpand(' + l.id + ')" title="Детали, услуги и калькулятор"><i class="fas fa-chevron-down"></i></button>';
-      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="event.stopPropagation()" title="Детали"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
+      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="event.stopPropagation();deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div></div></div>';
       
       // ========== EXPANDABLE DETAIL AREA ==========
@@ -1544,6 +1546,15 @@ function renderLeads() {
         '<input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..."></div>' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента:</div>' +
         '<input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..."></div></div>';
+
+      // --- 2.5. REFUND AMOUNT ---
+      var refundVal = Number(l.refund_amount || 0);
+      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-undo-alt" style="margin-right:4px;color:#EF4444"></i>Возврат средств (֏):</div>' +
+        '<input class="input" type="number" min="0" step="1" id="lead-refund-' + l.id + '" value="' + refundVal + '" style="font-size:0.88rem;padding:8px;border-color:rgba(239,68,68,0.3)" placeholder="0"></div>' +
+        '<div style="display:flex;align-items:flex-end">' +
+        (refundVal > 0 ? '<div style="font-size:0.78rem;color:#f87171;font-weight:600;padding:8px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Возврат: ' + Number(refundVal).toLocaleString('ru-RU') + ' ֏ будет вычтен из итога</div>' : '<div style="font-size:0.78rem;color:#64748b;padding:8px">Сумма вычитается из стоимости выкупов</div>') +
+        '</div></div>';
 
       // --- 3. NOTES (at top, above services) ---
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
@@ -1600,7 +1611,7 @@ function renderLeads() {
   return h;
 }
 
-// Create lead modal — simplified: name, contact, notes only
+// Create lead modal — simplified: name, contact, language, notes
 function showCreateLeadModal() {
   var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
     '<div class="card" style="width:500px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
@@ -1609,6 +1620,8 @@ function showCreateLeadModal() {
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Имя *</label><input class="input" id="nl_name" required></div>' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Контакт *</label><input class="input" id="nl_contact" required placeholder="+374..."></div></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Язык (для PDF)</label>' +
+    '<select class="input" id="nl_lang" style="width:100%"><option value="ru">🇷🇺 Русский</option><option value="am">🇦🇲 Армянский</option></select></div>' +
     '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Заметка</label><textarea class="input" id="nl_message" rows="3" placeholder="Дополнительная информация..."></textarea></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>Создать</button></div>' +
     '</form></div></div>';
@@ -1625,6 +1638,7 @@ async function submitCreateLead(e) {
     name: document.getElementById('nl_name').value.trim(),
     contact: document.getElementById('nl_contact').value.trim(),
     message: document.getElementById('nl_message').value.trim(),
+    lang: document.getElementById('nl_lang').value,
     source: 'manual'
   }) });
   toast('Лид создан');
@@ -1685,6 +1699,19 @@ async function deleteLead(id) {
   await loadData(); render();
 }
 
+async function exportLeadsCSV() {
+  var token = localStorage.getItem('admin_token') || '';
+  try {
+    var resp = await fetch('/api/admin/leads/export?token=' + encodeURIComponent(token));
+    if (!resp.ok) { toast('Ошибка экспорта CSV', 'error'); return; }
+    var blob = await resp.blob();
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a'); a.href = url; a.download = 'leads_export.csv'; a.click();
+    URL.revokeObjectURL(url);
+    toast('CSV скачан');
+  } catch(e) { toast('Ошибка экспорта', 'error'); }
+}
+
 // ===== LEAD COMMENTS =====
 async function loadComments(leadId) {
   const res = await api('/leads/' + leadId + '/comments');
@@ -1732,9 +1759,11 @@ async function deleteComment(commentId, leadId) {
 
 function toggleLeadExpand(id) {
   var el = document.getElementById('lead-detail-' + id);
+  var arrow = document.getElementById('lead-arrow-' + id);
   if (!el) return;
   if (el.style.display === 'none') {
     el.style.display = 'block';
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
     // Articles: if already loaded, just render immediately; otherwise fetch
     if (data.leadArticles[id]) {
       renderArticlesSection(id);
@@ -1743,6 +1772,7 @@ function toggleLeadExpand(id) {
     }
   } else {
     el.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
   }
 }
 
@@ -2136,20 +2166,22 @@ async function removeLeadService(leadId, serviceIndex) {
   }, 100);
 }
 
-// Save all lead changes: name + contact + notes + telegram + tz + recalculate total
+// Save all lead changes: name + contact + notes + telegram + tz + refund + recalculate total
 async function saveLeadAll(leadId) {
-  // 1. Save name + contact + notes + telegram_group + tz_link
+  // 1. Save name + contact + notes + telegram_group + tz_link + refund_amount
   var nameEl = document.getElementById('lead-name-' + leadId);
   var contactEl = document.getElementById('lead-contact-' + leadId);
   var notesEl = document.getElementById('lead-notes-' + leadId);
   var tgEl = document.getElementById('lead-tg-' + leadId);
   var tzEl = document.getElementById('lead-tz-' + leadId);
+  var refundEl = document.getElementById('lead-refund-' + leadId);
   var updateData = {};
   if (nameEl) updateData.name = nameEl.value;
   if (contactEl) updateData.contact = contactEl.value;
   if (notesEl) updateData.notes = notesEl.value;
   if (tgEl) updateData.telegram_group = tgEl.value;
   if (tzEl) updateData.tz_link = tzEl.value;
+  if (refundEl) updateData.refund_amount = parseFloat(refundEl.value) || 0;
   if (Object.keys(updateData).length > 0) {
     await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify(updateData) });
     var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
@@ -2159,6 +2191,7 @@ async function saveLeadAll(leadId) {
       if (notesEl) lead.notes = notesEl.value;
       if (tgEl) lead.telegram_group = tgEl.value;
       if (tzEl) lead.tz_link = tzEl.value;
+      if (refundEl) lead.refund_amount = parseFloat(refundEl.value) || 0;
     }
   }
   // 2. Recalculate total (articles + services)
