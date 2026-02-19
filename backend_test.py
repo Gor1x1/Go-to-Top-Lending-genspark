@@ -234,13 +234,8 @@ class GoToTopAPITester:
         """Test unauthorized access"""
         old_token = self.token
         self.token = None
-        success = not self.run_test("Unauthorized Access", "GET", "/api/users", 401)[0]
+        success, _ = self.run_test("Unauthorized Access", "GET", "/api/users", 401)
         self.token = old_token
-        if success:
-            self.tests_passed += 1
-            print("✅ Unauthorized access properly blocked")
-        else:
-            self.failed_tests.append("Unauthorized access test failed")
         return success
 
 def main():
