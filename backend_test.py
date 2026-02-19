@@ -293,6 +293,8 @@ def main():
         tester.test_list_leads,
         tester.test_list_leads_with_filter,
         tester.test_update_lead,
+        tester.test_leads_analytics,
+        tester.test_leads_export,
         tester.test_delete_lead,
         
         # Settings and activity
