@@ -1,22 +1,26 @@
 import React, { useState, useEffect, createContext, useContext } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Employees from './pages/Employees';
 import Permissions from './pages/Permissions';
 import Leads from './pages/Leads';
+import BlockConstructor from './pages/BlockConstructor';
+import CalculatorPage from './pages/CalculatorPage';
+import PdfTemplate from './pages/PdfTemplate';
+import Referrals from './pages/Referrals';
+import SlotCounters from './pages/SlotCounters';
+import FooterPage from './pages/FooterPage';
+import TelegramMessages from './pages/TelegramMessages';
+import TgBot from './pages/TgBot';
+import ScriptsPage from './pages/ScriptsPage';
 import Settings from './pages/Settings';
 import Sidebar from './components/Sidebar';
 import './App.css';
 
 const API = process.env.REACT_APP_BACKEND_URL;
-
-// Auth Context
 export const AuthContext = createContext(null);
-
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export function useAuth() { return useContext(AuthContext); }
 
 export async function apiFetch(path, opts = {}) {
   const token = localStorage.getItem('gtt_token');
@@ -25,7 +29,6 @@ export async function apiFetch(path, opts = {}) {
   const res = await fetch(`${API}${path}`, { ...opts, headers });
   if (res.status === 401) {
     localStorage.removeItem('gtt_token');
-    localStorage.removeItem('gtt_user');
     window.location.href = '/login';
     return null;
   }
@@ -34,10 +37,8 @@ export async function apiFetch(path, opts = {}) {
 
 function AppLayout() {
   const { user, permissions } = useAuth();
-  const location = useLocation();
-
   if (!user) return <Navigate to="/login" />;
-
+  const has = (s) => permissions.includes(s);
   return (
     <div className="app-layout">
       <Sidebar />
@@ -45,9 +46,18 @@ function AppLayout() {
         <Routes>
           <Route path="/" element={<Navigate to="/dashboard" />} />
           <Route path="/dashboard" element={<Dashboard />} />
-          {permissions.includes('leads') && <Route path="/leads" element={<Leads />} />}
-          {permissions.includes('employees') && <Route path="/employees" element={<Employees />} />}
-          {permissions.includes('permissions') && <Route path="/permissions" element={<Permissions />} />}
+          {has('leads') && <Route path="/leads" element={<Leads />} />}
+          {has('blocks') && <Route path="/blocks" element={<BlockConstructor />} />}
+          {has('calculator') && <Route path="/calculator" element={<CalculatorPage />} />}
+          {has('pdf') && <Route path="/pdf" element={<PdfTemplate />} />}
+          {has('referrals') && <Route path="/referrals" element={<Referrals />} />}
+          {has('slots') && <Route path="/slots" element={<SlotCounters />} />}
+          {has('footer') && <Route path="/footer" element={<FooterPage />} />}
+          {has('telegram') && <Route path="/telegram" element={<TelegramMessages />} />}
+          {has('tgbot') && <Route path="/tgbot" element={<TgBot />} />}
+          {has('scripts') && <Route path="/scripts" element={<ScriptsPage />} />}
+          {has('employees') && <Route path="/employees" element={<Employees />} />}
+          {has('permissions') && <Route path="/permissions" element={<Permissions />} />}
           <Route path="/settings" element={<Settings />} />
           <Route path="*" element={<Navigate to="/dashboard" />} />
         </Routes>
@@ -70,21 +80,17 @@ function App() {
           res.json().then(data => {
             setUser(data);
             setPermissions(data.permissions || []);
-            // Load roles config
             apiFetch('/api/config/roles').then(r => r && r.ok && r.json().then(setRolesConfig));
           });
         }
         setLoading(false);
       }).catch(() => setLoading(false));
-    } else {
-      setLoading(false);
-    }
+    } else { setLoading(false); }
   }, []);
 
   const login = async (username, password) => {
     const res = await fetch(`${API}/api/auth/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ username, password }),
     });
     const data = await res.json();
@@ -92,7 +98,6 @@ function App() {
       localStorage.setItem('gtt_token', data.token);
       setUser(data.user);
       setPermissions(data.user.permissions || []);
-      // Load roles config
       const rc = await apiFetch('/api/config/roles');
       if (rc && rc.ok) setRolesConfig(await rc.json());
       return { success: true };
@@ -100,20 +105,9 @@ function App() {
     return { success: false, error: data.detail || 'Ошибка входа' };
   };
 
-  const logout = () => {
-    localStorage.removeItem('gtt_token');
-    setUser(null);
-    setPermissions([]);
-  };
+  const logout = () => { localStorage.removeItem('gtt_token'); setUser(null); setPermissions([]); };
 
-  if (loading) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-spinner" />
-        <p>Загрузка...</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="loading-screen"><div className="loading-spinner" /><p>Загрузка...</p></div>;
 
   return (
     <AuthContext.Provider value={{ user, permissions, login, logout, rolesConfig, setUser, setPermissions }}>
