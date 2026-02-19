@@ -1420,11 +1420,6 @@ function renderLeads() {
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
     '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
     '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span></div></div>';
-  // Total all time
-  h += '<div class="stat-card" style="padding:14px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#a78bfa">' + leads.length + '</span><span style="font-size:1.4rem">📊</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Всего</div>' +
-    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(totalAmount) + '</div></div>';
   h += '</div>';
   
   // Filters row — 6 statuses only
@@ -1467,6 +1462,15 @@ function renderLeads() {
       var leadAmt = Number(l.total_amount || 0);
       var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', checking:'#8B5CF6', done:'#10B981', rejected:'#EF4444' };
       var statusBorderColor = statusColors[l.status] || '#334155';
+      // Compute services vs articles amounts
+      var svcAmt = 0, artAmt = 0;
+      var serviceItems = [];
+      if (calcData && calcData.items) {
+        for (var bi = 0; bi < calcData.items.length; bi++) {
+          if (calcData.items[bi].wb_article) artAmt += Number(calcData.items[bi].subtotal||0);
+          else { svcAmt += Number(calcData.items[bi].subtotal||0); serviceItems.push(calcData.items[bi]); }
+        }
+      }
       
       h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
@@ -1476,11 +1480,21 @@ function renderLeads() {
               '<span class="badge badge-purple">' + (l.source || 'form') + '</span>' +
               (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
               (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '<span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.7rem">Не назначен</span>') +
-              (l.articles_count > 0 ? '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.7rem"><i class="fas fa-box" style="margin-right:3px"></i>' + (l.articles_done||0) + '/' + l.articles_count + ' арт.</span>' : '') +
+              (l.articles_count > 0 ? '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.7rem"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + '</span>' : '') +
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
             (l.message ? '<div style="font-size:0.82rem;color:#94a3b8;margin-top:4px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(l.message).substring(0,80) + '</div>' : '') +
+            // TG/TZ quick links on main card
+            ((l.telegram_group || l.tz_link) ? '<div style="display:flex;gap:6px;margin-top:6px">' +
+              (l.telegram_group ? '<a href="' + escHtml(l.telegram_group) + '" target="_blank" style="font-size:0.72rem;color:#0EA5E9;text-decoration:none"><i class="fab fa-telegram" style="margin-right:2px"></i>TG</a>' : '') +
+              (l.tz_link ? '<a href="' + escHtml(l.tz_link) + '" target="_blank" style="font-size:0.72rem;color:#F59E0B;text-decoration:none"><i class="fas fa-file-alt" style="margin-right:2px"></i>ТЗ</a>' : '') +
+            '</div>' : '') +
+            // Services/Articles amounts on main card
+            ((svcAmt > 0 || artAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px">' +
+              (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
+              (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
+            '</div>' : '') +
           '</div>';
       
       // Right side: status + total + date + actions
@@ -1510,101 +1524,75 @@ function renderLeads() {
       
       h += '<div style="font-size:0.78rem;color:#64748b">' + formatArmTime(l.created_at) + '</div>';
       h += '<div style="display:flex;gap:4px">';
-      if (isCalc) {
-        h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-file-pdf" style="margin-right:4px"></i>КП</a>';
-      }
       h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="toggleLeadExpand(' + l.id + ')" title="Детали, услуги и калькулятор"><i class="fas fa-chevron-down"></i></button>';
       h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div></div></div>';
       
-      // Expandable detail area (services + notes + comments)
+      // ========== EXPANDABLE DETAIL AREA ==========
       h += '<div id="lead-detail-' + l.id + '" style="display:none">';
       
-      // ===== EDITABLE LEAD NAME =====
-      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
-        '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя лида (клиент):</div>' +
-        '<input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..."></div>';
+      // --- 1. EDITABLE FIELDS: Name + Contact (phone) ---
+      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя клиента:</div>' +
+        '<input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..."></div>' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон:</div>' +
+        '<input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..."></div></div>';
 
-      // ===== TELEGRAM GROUP & TZ LINKS =====
+      // --- 2. TELEGRAM GROUP & TZ LINKS ---
       h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Telegram группа:</div>' +
         '<input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..."></div>' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента:</div>' +
         '<input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..."></div></div>';
-      // Quick links if set
-      if (l.telegram_group || l.tz_link) {
-        h += '<div style="margin-top:6px;display:flex;gap:8px">';
-        if (l.telegram_group) h += '<a href="' + escHtml(l.telegram_group) + '" target="_blank" class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fab fa-telegram" style="margin-right:4px"></i>TG группа</a>';
-        if (l.tz_link) h += '<a href="' + escHtml(l.tz_link) + '" target="_blank" class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:4px"></i>ТЗ</a>';
-        h += '</div>';
-      }
 
-      // ===== SERVICES & ARTICLES BREAKDOWN =====
-      var svcAmt = 0, artAmt = 0;
-      if (calcData && calcData.items) {
-        for (var bi = 0; bi < calcData.items.length; bi++) {
-          if (calcData.items[bi].wb_article) artAmt += Number(calcData.items[bi].subtotal||0);
-          else svcAmt += Number(calcData.items[bi].subtotal||0);
-        }
-      }
-      if (svcAmt > 0 || artAmt > 0) {
-        h += '<div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap">' +
-          '<div style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px 16px;flex:1;min-width:120px;text-align:center">' +
-            '<div style="font-size:0.72rem;color:#94a3b8">Услуги</div>' +
-            '<div style="font-size:1.1rem;font-weight:800;color:#a78bfa">' + Number(svcAmt).toLocaleString('ru-RU') + '&nbsp;֏</div></div>' +
-          '<div style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);border-radius:8px;padding:10px 16px;flex:1;min-width:120px;text-align:center">' +
-            '<div style="font-size:0.72rem;color:#94a3b8">Закупки</div>' +
-            '<div style="font-size:1.1rem;font-weight:800;color:#fb923c">' + Number(artAmt).toLocaleString('ru-RU') + '&nbsp;֏</div></div></div>';
-      }
-
-      // ===== SERVICES FROM CALCULATOR (BUILT-IN) =====
-      h += '<div id="lead-services-' + l.id + '" style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
-      // Services breakdown from existing calc_data
-      var serviceItems = [];
-      if (calcData && calcData.items) {
-        serviceItems = calcData.items.filter(function(it) { return !it.wb_article; });
-      }
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-        '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ')</span>' +
-        '<button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить услугу</button>' +
-      '</div>';
-      if (serviceItems.length > 0) {
-        h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:8px">' +
-          '<thead><tr style="background:#1e293b"><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left">Услуга</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Кол-во</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Цена</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Сумма</th><th style="padding:6px 8px"></th></tr></thead><tbody>';
-        var svcTotal = 0;
-        for (var si3 = 0; si3 < serviceItems.length; si3++) {
-          var si = serviceItems[si3];
-          svcTotal += Number(si.subtotal || 0);
-          h += '<tr style="border-bottom:1px solid #334155">' +
-            '<td style="padding:6px 8px;color:#e2e8f0">' + escHtml(si.name) + '</td>' +
-            '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + (si.qty||1) + '</td>' +
-            '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(si.price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
-            '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(si.subtotal||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
-            '<td style="padding:6px 8px;text-align:center"><button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="removeLeadService(' + l.id + ',' + si3 + ')" title="Удалить"><i class="fas fa-trash"></i></button></td></tr>';
-        }
-        h += '</tbody><tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="3" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО услуги:</td><td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</td><td></td></tr></tfoot></table></div>';
-      } else {
-        h += '<div style="text-align:center;padding:14px;color:#64748b;font-size:0.82rem;background:#0f172a;border-radius:8px"><i class="fas fa-info-circle" style="margin-right:6px"></i>Нет услуг. Нажмите «Добавить услугу» чтобы выбрать из калькулятора.</div>';
-      }
-      h += '</div>';
-
-      // ===== GENERATE PDF BUTTON =====
-      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>' +
-        (isCalc ? '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>' : '') +
-      '</div>';
-
-      // Notes — editable (no individual save button)
+      // --- 3. NOTES (at top, above services) ---
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
         '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
         '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea></div>';
-      // Save all lead changes button
-      h += '<div style="margin-top:14px;border-top:1px solid #334155;padding-top:14px;display:flex;justify-content:flex-end;gap:8px">' +
+
+      // --- 4. SERVICES — collapsible with total shown when closed ---
+      var svcTotal = 0;
+      for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
+      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(\\'svc-body-' + l.id + '\\',\\'svc-arrow-' + l.id + '\\')">' +
+        '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ') — <span style="color:#8B5CF6">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</span></span>' +
+        '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
+        '<i id="svc-arrow-' + l.id + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
+      h += '<div id="svc-body-' + l.id + '" style="display:none;margin-top:8px">';
+      if (serviceItems.length > 0) {
+        h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:8px">' +
+          '<thead><tr style="background:#1e293b"><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left">Услуга</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Кол-во</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Цена</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Сумма</th><th style="padding:6px 8px"></th></tr></thead><tbody>';
+        for (var si4 = 0; si4 < serviceItems.length; si4++) {
+          var sii = serviceItems[si4];
+          h += '<tr style="border-bottom:1px solid #334155">' +
+            '<td style="padding:6px 8px;color:#e2e8f0">' + escHtml(sii.name) + '</td>' +
+            '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + (sii.qty||1) + '</td>' +
+            '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(sii.price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+            '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(sii.subtotal||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+            '<td style="padding:6px 8px;text-align:center"><button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="removeLeadService(' + l.id + ',' + si4 + ')" title="Удалить"><i class="fas fa-trash"></i></button></td></tr>';
+        }
+        h += '</tbody><tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="3" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО услуги:</td><td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</td><td></td></tr></tfoot></table></div>';
+      } else {
+        h += '<div style="text-align:center;padding:14px;color:#64748b;font-size:0.82rem;background:#0f172a;border-radius:8px"><i class="fas fa-info-circle" style="margin-right:6px"></i>Нет услуг. Нажмите «Добавить» чтобы выбрать из калькулятора.</div>';
+      }
+      h += '</div></div>';
+
+      // --- 5. ARTICLES — collapsible, loaded dynamically, with total shown ---
+      h += '<div id="articles-' + l.id + '"><div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка артикулов...</span></div></div>';
+
+      // --- 6. COMMENTS ---
+      h += '<div id="comments-' + l.id + '"></div>';
+
+      // --- 7. PDF BUTTONS + SAVE (at the very bottom) ---
+      h += '<div style="margin-top:14px;border-top:1px solid #334155;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
+        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>' +
+        (isCalc ? '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>' : '') +
+        '</div>' +
         '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button></div>';
-      // Articles section (WB артикулы) — loaded dynamically
-      h += '<div id="articles-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка артикулов...</span></div></div>';
-      h += '</div>';
-      h += '</div>';
+
+      h += '</div>'; // end lead-detail
+      h += '</div>'; // end card
     }
   }
   h += '<div id="createLeadModalArea"></div>';
@@ -1758,6 +1746,19 @@ function toggleLeadExpand(id) {
   }
 }
 
+function toggleSection(bodyId, arrowId) {
+  var body = document.getElementById(bodyId);
+  var arrow = document.getElementById(arrowId);
+  if (!body) return;
+  if (body.style.display === 'none') {
+    body.style.display = 'block';
+    if (arrow) arrow.style.transform = 'rotate(90deg)';
+  } else {
+    body.style.display = 'none';
+    if (arrow) arrow.style.transform = 'rotate(0deg)';
+  }
+}
+
 // ===== LEAD ARTICLES (WB артикулы) =====
 var articleStatusLabels = { pending:'⏳ Ожидает', ordered:'📦 Заказан', shipped:'🚚 Отправлен', delivered:'✅ Доставлен', completed:'🏁 Завершён', cancelled:'❌ Отменён', returned:'↩️ Возврат' };
 var articleStatusColors = { pending:'#F59E0B', ordered:'#3B82F6', shipped:'#06B6D4', delivered:'#10B981', completed:'#8B5CF6', cancelled:'#EF4444', returned:'#94a3b8' };
@@ -1772,11 +1773,14 @@ function renderArticlesSection(leadId) {
   var el = document.getElementById('articles-' + leadId);
   if (!el) return;
   var articles = data.leadArticles[leadId] || [];
+  var totalSum = 0;
+  for (var ti = 0; ti < articles.length; ti++) { totalSum += Number(articles[ti].total_price || 0); }
   var h = '<div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-    '<span style="font-size:0.85rem;font-weight:700;color:#fb923c"><i class="fas fa-box" style="margin-right:6px"></i>Артикулы WB (' + articles.length + ')</span>' +
-    '<button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="showArticleModal(' + leadId + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
-    '</div>';
+    '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(\\'art-body-' + leadId + '\\',\\'art-arrow-' + leadId + '\\')">' +
+    '<span style="font-size:0.85rem;font-weight:700;color:#fb923c"><i class="fas fa-box" style="margin-right:6px"></i>Артикулы WB (' + articles.length + ') — <span style="color:#F59E0B">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</span></span>' +
+    '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showArticleModal(' + leadId + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
+    '<i id="art-arrow-' + leadId + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
+  h += '<div id="art-body-' + leadId + '" style="display:none;margin-top:8px">';
   if (articles.length === 0) {
     h += '<div style="text-align:center;padding:20px;color:#64748b;font-size:0.82rem"><i class="fas fa-inbox" style="margin-right:6px"></i>Нет артикулов. Добавьте первый.</div>';
   } else {
@@ -1784,20 +1788,17 @@ function renderArticlesSection(leadId) {
     h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:8px">' +
       '<thead><tr style="background:#1e293b">' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left;white-space:nowrap">Артикул</th>' +
-      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left">Товар</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left">Ключ. слово</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Размер</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Цвет</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Кол-во</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Цена</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Сумма</th>' +
-
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center"></th>' +
       '</tr></thead><tbody>';
-    var totalSum = 0;
     for (var ai = 0; ai < articles.length; ai++) {
       var art = articles[ai];
       var artColor = articleStatusColors[art.status] || '#94a3b8';
-      totalSum += Number(art.total_price || 0);
       h += '<tr style="border-bottom:1px solid #334155">' +
         '<td style="padding:6px 8px">' +
           (art.wb_link ? '<a href="' + escHtml(art.wb_link) + '" target="_blank" style="color:#a78bfa;text-decoration:none;font-weight:700">' + escHtml(art.wb_article || '—') + ' <i class="fas fa-external-link-alt" style="font-size:0.6rem"></i></a>' : '<span style="color:#e2e8f0;font-weight:700">' + escHtml(art.wb_article || '—') + '</span>') +
@@ -1808,7 +1809,6 @@ function renderArticlesSection(leadId) {
         '<td style="padding:6px 8px;text-align:center;color:#e2e8f0;font-weight:600">' + (art.quantity || 1) + '</td>' +
         '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(art.price_per_unit||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
         '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(art.total_price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
-
         '<td style="padding:6px 8px;text-align:center;white-space:nowrap">' +
           '<button style="background:none;border:none;color:#a78bfa;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="showArticleModal(' + leadId + ',' + art.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>' +
           '<button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="deleteArticle(' + art.id + ',' + leadId + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
@@ -1823,7 +1823,7 @@ function renderArticlesSection(leadId) {
       '<td colspan="2" style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;font-size:0.9rem;white-space:nowrap">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
       '</tr></tfoot></table></div>';
   }
-  h += '</div>';
+  h += '</div></div>';
   el.innerHTML = h;
 }
 
@@ -1840,7 +1840,7 @@ function showArticleModal(leadId, articleId) {
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Артикул WB *</label><input class="input" id="art_wb_article" required value="' + escHtml((art && art.wb_article) || '') + '" placeholder="123456789"></div>' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Ссылка WB</label><input class="input" id="art_wb_link" value="' + escHtml((art && art.wb_link) || '') + '" placeholder="https://www.wildberries.ru/catalog/..."></div></div>' +
-    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Название товара</label><input class="input" id="art_product_name" value="' + escHtml((art && art.product_name) || '') + '" placeholder="Кроссовки Nike Air Max"></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Ключевое слово</label><input class="input" id="art_product_name" value="' + escHtml((art && art.product_name) || '') + '" placeholder="Например: кроссовки Nike Air Max"></div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Размер</label><input class="input" id="art_size" value="' + escHtml((art && art.size) || '') + '" placeholder="42"></div>' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Цвет</label><input class="input" id="art_color" value="' + escHtml((art && art.color) || '') + '" placeholder="Чёрный"></div>' +
@@ -2136,15 +2136,17 @@ async function removeLeadService(leadId, serviceIndex) {
   }, 100);
 }
 
-// Save all lead changes: name + notes + telegram + tz + recalculate total
+// Save all lead changes: name + contact + notes + telegram + tz + recalculate total
 async function saveLeadAll(leadId) {
-  // 1. Save name + notes + telegram_group + tz_link
+  // 1. Save name + contact + notes + telegram_group + tz_link
   var nameEl = document.getElementById('lead-name-' + leadId);
+  var contactEl = document.getElementById('lead-contact-' + leadId);
   var notesEl = document.getElementById('lead-notes-' + leadId);
   var tgEl = document.getElementById('lead-tg-' + leadId);
   var tzEl = document.getElementById('lead-tz-' + leadId);
   var updateData = {};
   if (nameEl) updateData.name = nameEl.value;
+  if (contactEl) updateData.contact = contactEl.value;
   if (notesEl) updateData.notes = notesEl.value;
   if (tgEl) updateData.telegram_group = tgEl.value;
   if (tzEl) updateData.tz_link = tzEl.value;
@@ -2153,6 +2155,7 @@ async function saveLeadAll(leadId) {
     var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
     if (lead) {
       if (nameEl) lead.name = nameEl.value;
+      if (contactEl) lead.contact = contactEl.value;
       if (notesEl) lead.notes = notesEl.value;
       if (tgEl) lead.telegram_group = tgEl.value;
       if (tzEl) lead.tz_link = tzEl.value;
@@ -2238,11 +2241,7 @@ function renderLeadsAnalytics() {
   var bs = d.by_status || {};
   var sa = d.status_amounts || {};
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">';
-  // Total  
-  h += '<div class="stat-card" style="padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));border-color:rgba(139,92,246,0.3)">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">Всего заявок</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + (d.total?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#a78bfa;margin-top:4px">' + fmtAmt(d.total?.amount) + '</div></div>';
+
   // New
   h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'new\\')">' +
     '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🟢 Новые лиды</div>' +
