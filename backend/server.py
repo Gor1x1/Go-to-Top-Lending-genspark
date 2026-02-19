@@ -1,9 +1,12 @@
 import os
 import secrets
+import uuid
+import json
 from datetime import datetime, timezone, timedelta
-from typing import Optional
-from fastapi import FastAPI, HTTPException, Depends, Header, Query, Response
+from typing import Optional, List
+from fastapi import FastAPI, HTTPException, Depends, Header, Query, Response, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from pymongo import MongoClient
 from jose import jwt, JWTError
@@ -11,6 +14,16 @@ from passlib.context import CryptContext
 from bson import ObjectId
 import csv
 import io
+import httpx
+from bs4 import BeautifulSoup
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import mm
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+import aiofiles
 
 MONGO_URL = os.environ.get("MONGO_URL")
 DB_NAME = os.environ.get("DB_NAME", "gototop")
