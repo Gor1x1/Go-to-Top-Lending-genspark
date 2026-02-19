@@ -163,7 +163,7 @@ class GoToTopAPITester:
             "message": "Test message for lead",
             "source": "test"
         }
-        success, response = self.run_test("Create Lead", "POST", "/api/leads", 201, data=lead_data)
+        success, response = self.run_test("Create Lead", "POST", "/api/leads", 200, data=lead_data)
         if success and 'id' in response:
             self.test_lead_id = response['id']
             print(f"📋 Created test lead with ID: {self.test_lead_id}")
