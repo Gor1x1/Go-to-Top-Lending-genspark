@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch, useAuth } from '../App';
-import { Search, ChevronDown, Trash2, Edit3, Plus, Download } from 'lucide-react';
+import { Search, Trash2, Edit3, Download } from 'lucide-react';
 
 const STATUSES = [
   { value: 'all', label: 'Все', color: 'gray' },
@@ -69,6 +69,13 @@ export default function Leads() {
 
       {/* Filters */}
       <div className="actions-bar" data-testid="leads-filters">
+        <button className="btn btn-sm btn-outline" data-testid="export-csv-btn"
+          onClick={() => { const t = localStorage.getItem('gtt_token'); window.open(`${process.env.REACT_APP_BACKEND_URL}/api/leads/export?token=${t}`, '_blank'); }}>
+          <Download size={14}/> CSV экспорт
+        </button>
+        <div className="spacer" />
+      </div>
+      <div className="actions-bar" data-testid="leads-status-filters">
         {STATUSES.map(s => (
           <button key={s.value}
             className={`btn btn-sm ${filter === s.value ? 'btn-primary' : 'btn-outline'}`}
