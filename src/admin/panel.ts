@@ -94,23 +94,28 @@ function renderLogin() {
 
 async function doLogin(e) {
   e.preventDefault();
-  const res = await fetch(API + '/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value })
-  }).then(r => r.json());
-  if (res.token) {
-    token = res.token;
-    currentUser = res.user;
-    rolesConfig = res.rolesConfig;
-    localStorage.setItem('gtt_token', token);
-    localStorage.setItem('gtt_user', JSON.stringify(res.user));
-    localStorage.setItem('gtt_roles', JSON.stringify(res.rolesConfig));
-    toast('Добро пожаловать, ' + (res.user.display_name || res.user.username));
-    await loadData();
-    render();
-  } else {
-    toast(res.error || 'Ошибка входа', 'error');
+  try {
+    const res = await fetch(API + '/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username: document.getElementById('loginUser').value, password: document.getElementById('loginPass').value })
+    }).then(r => r.json());
+    if (res.token) {
+      token = res.token;
+      currentUser = res.user;
+      rolesConfig = res.rolesConfig;
+      localStorage.setItem('gtt_token', token);
+      localStorage.setItem('gtt_user', JSON.stringify(res.user));
+      localStorage.setItem('gtt_roles', JSON.stringify(res.rolesConfig));
+      toast('Добро пожаловать, ' + (res.user.display_name || res.user.username));
+      try { await loadData(); } catch(err) { console.error('loadData error:', err); }
+      render();
+    } else {
+      toast(res.error || 'Ошибка входа', 'error');
+    }
+  } catch(err) {
+    console.error('Login error:', err);
+    toast('Ошибка сети', 'error');
   }
 }
 
@@ -167,8 +172,8 @@ function renderSidebar() {
   if (currentUser) {
     const rl = rolesConfig?.role_labels || {};
     h += '<div style="margin-top:10px;padding:8px 12px;background:#0f172a;border-radius:8px;font-size:0.78rem">' +
-      '<div style="color:#e2e8f0;font-weight:600">' + esc(currentUser.display_name) + '</div>' +
-      '<div style="color:#8B5CF6;font-size:0.72rem">' + esc(rl[currentUser.role] || currentUser.role) + '</div></div>';
+      '<div style="color:#e2e8f0;font-weight:600">' + escHtml(currentUser.display_name) + '</div>' +
+      '<div style="color:#8B5CF6;font-size:0.72rem">' + escHtml(rl[currentUser.role] || currentUser.role) + '</div></div>';
   }
   h += '</div><div style="padding:8px 0;flex:1">';
   for (const p of pages) {
