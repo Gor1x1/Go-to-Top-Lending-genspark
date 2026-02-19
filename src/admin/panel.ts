@@ -57,7 +57,7 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {} };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -149,6 +149,7 @@ async function loadData() {
 const pages = [
   { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Дашборд' },
   { id: 'leads', icon: 'fa-users', label: 'Лиды / CRM' },
+  { id: 'analytics', icon: 'fa-chart-bar', label: 'Аналитика лидов' },
   { id: 'employees', icon: 'fa-user-friends', label: 'Сотрудники' },
   { id: 'permissions', icon: 'fa-shield-alt', label: 'Доступы' },
   { id: 'blocks', icon: 'fa-cubes', label: 'Конструктор блоков' },
@@ -1331,18 +1332,16 @@ function renderLeads() {
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
   
-  // --- Analytics mini-dashboard ---
-  var statNew = 0, statContacted = 0, statInProgress = 0, statDone = 0, statRejected = 0, totalRevenue = 0, todayCount = 0;
+  // --- Analytics mini-dashboard with per-status sums ---
+  var stats = { new: {c:0,a:0}, contacted: {c:0,a:0}, in_progress: {c:0,a:0}, done: {c:0,a:0}, rejected: {c:0,a:0} };
+  var todayCount = 0, todayAmount = 0, totalAmount = 0;
   var today = new Date().toISOString().slice(0,10);
   for (var ai = 0; ai < leads.length; ai++) {
     var al = leads[ai];
-    if (al.status === 'new') statNew++;
-    else if (al.status === 'contacted') statContacted++;
-    else if (al.status === 'in_progress') statInProgress++;
-    else if (al.status === 'done') statDone++;
-    else if (al.status === 'rejected') statRejected++;
-    if ((al.created_at||'').startsWith(today)) todayCount++;
-    if (al.calc_data) { try { var cd = JSON.parse(al.calc_data); if (cd.total) totalRevenue += Number(cd.total); } catch(e) {} }
+    var amt = Number(al.total_amount || 0);
+    totalAmount += amt;
+    if (stats[al.status]) { stats[al.status].c++; stats[al.status].a += amt; }
+    if ((al.created_at||'').startsWith(today)) { todayCount++; todayAmount += amt; }
   }
   
   // --- Filter leads ---
@@ -1352,38 +1351,63 @@ function renderLeads() {
     if (leadsFilter.assignee !== 'all' && String(l.assigned_to||'') !== leadsFilter.assignee) return false;
     if (leadsFilter.search) {
       var q = leadsFilter.search.toLowerCase();
-      if (!((l.name||'').toLowerCase().includes(q) || (l.contact||'').toLowerCase().includes(q) || (l.message||'').toLowerCase().includes(q) || ('#'+l.id).includes(q))) return false;
+      if (!((l.name||'').toLowerCase().includes(q) || (l.contact||'').toLowerCase().includes(q) || (l.message||'').toLowerCase().includes(q) || ('#'+l.id).includes(q) || (l.lead_number && ('#'+l.lead_number).includes(q)))) return false;
     }
     return true;
   });
+  
+  var fmtA = function(n) { return n > 0 ? Number(n).toLocaleString('ru-RU') + '\\u00a0֏' : '—'; };
   
   var h = '<div style="padding:32px">';
   // Header
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
     '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Лиды / CRM</h1>' +
-    '<p style="color:#94a3b8;margin-top:4px">Все заявки с сайта. Всего: ' + total + ' | Показано: ' + filtered.length + '</p></div>' +
+    '<p style="color:#94a3b8;margin-top:4px">Всего: <strong>' + total + '</strong> | Показано: <strong>' + filtered.length + '</strong></p></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-success" onclick="showCreateLeadModal()"><i class="fas fa-plus" style="margin-right:4px"></i>Новый лид</button>' +
+      '<button class="btn btn-primary" onclick="navigate(\\'analytics\\')"><i class="fas fa-chart-bar" style="margin-right:4px"></i>Аналитика</button>' +
       '<button class="btn btn-outline" onclick="loadLeadsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button>' +
-      '<a href="/api/admin/leads/export" target="_blank" class="btn btn-success" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>CSV</a>' +
+      '<a href="/api/admin/leads/export" target="_blank" class="btn btn-outline" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>CSV</a>' +
     '</div></div>';
   
-  // Analytics cards
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">' +
-    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'new\\')">' +
-      '<div style="font-size:1.5rem;font-weight:800;color:#10B981">🟢 ' + statNew + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Новые</div></div>' +
-    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'contacted\\')">' +
-      '<div style="font-size:1.5rem;font-weight:800;color:#3B82F6">💬 ' + statContacted + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Связались</div></div>' +
-    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
-      '<div style="font-size:1.5rem;font-weight:800;color:#F59E0B">🔄 ' + statInProgress + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">В работе</div></div>' +
-    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
-      '<div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">✅ ' + statDone + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Завершены</div></div>' +
-    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'rejected\\')">' +
-      '<div style="font-size:1.5rem;font-weight:800;color:#EF4444">❌ ' + statRejected + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Отклонены</div></div>' +
-    '<div class="stat-card" style="padding:14px">' +
-      '<div style="font-size:1.5rem;font-weight:800;color:#a78bfa">' + todayCount + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Сегодня</div></div>' +
-    '<div class="stat-card" style="padding:14px">' +
-      '<div style="font-size:1.3rem;font-weight:800;color:#10B981">' + (totalRevenue > 0 ? Number(totalRevenue).toLocaleString('ru-RU') + ' ֏' : '—') + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Общая сумма</div></div>' +
-  '</div>';
+  // KPI cards with per-status sums
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:20px">';
+  // New
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.04));border-color:rgba(16,185,129,0.25)" onclick="setLeadsFilter(\\'status\\',\\'new\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.new.c + '</span><span style="font-size:1.4rem">🟢</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Новые</div>' +
+    '<div style="color:#34d399;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.new.a) + '</div></div>';
+  // Contacted
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(59,130,246,0.04));border-color:rgba(59,130,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'contacted\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#3B82F6">' + stats.contacted.c + '</span><span style="font-size:1.4rem">💬</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">На связи</div>' +
+    '<div style="color:#60a5fa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.contacted.a) + '</div></div>';
+  // In progress
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border-color:rgba(245,158,11,0.25)" onclick="setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
+    '<div style="color:#fbbf24;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div></div>';
+  // Done
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#8B5CF6">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершены</div>' +
+    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div></div>';
+  // Rejected
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(\\'status\\',\\'rejected\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Отказы</div>' +
+    '<div style="color:#f87171;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.rejected.a) + '</div></div>';
+  // Today
+  h += '<div class="stat-card" style="padding:14px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#a78bfa">' + todayCount + '</span><span style="font-size:1.4rem">📅</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Сегодня</div>' +
+    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(todayAmount) + '</div></div>';
+  // Total sum
+  h += '<div class="stat-card" style="padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.4rem;font-weight:900;color:#10B981">' + fmtA(totalAmount) + '</span><span style="font-size:1.4rem">💰</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Общая сумма</div>' +
+    '<div style="color:#34d399;font-size:0.82rem;font-weight:700;margin-top:2px">' + total + ' заявок</div></div>';
+  h += '</div>';
   
   // Filters row
   h += '<div class="card" style="padding:14px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
@@ -1399,7 +1423,8 @@ function renderLeads() {
       '<option value="all"' + (leadsFilter.source==='all'?' selected':'') + '>Все источники</option>' +
       '<option value="form"' + (leadsFilter.source==='form'?' selected':'') + '>Форма</option>' +
       '<option value="popup"' + (leadsFilter.source==='popup'?' selected':'') + '>Попап</option>' +
-      '<option value="calculator_pdf"' + (leadsFilter.source==='calculator_pdf'?' selected':'') + '>Калькулятор</option></select>' +
+      '<option value="calculator_pdf"' + (leadsFilter.source==='calculator_pdf'?' selected':'') + '>Калькулятор</option>' +
+      '<option value="manual"' + (leadsFilter.source==='manual'?' selected':'') + '>Ручной</option></select>' +
     '<select class="input" style="width:170px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'assignee\\',this.value)">' +
       '<option value="all"' + (leadsFilter.assignee==='all'?' selected':'') + '>Все ответственные</option>' +
       '<option value=""' + (leadsFilter.assignee===''?' selected':'') + '>Не назначен</option>';
@@ -1413,22 +1438,25 @@ function renderLeads() {
   '</div>';
 
   if (!filtered.length) {
-    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i><p style="color:#94a3b8">' + (leads.length > 0 ? 'Нет заявок по выбранным фильтрам' : 'Заявок пока нет') + '</p></div>';
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i><p style="color:#94a3b8">' + (leads.length > 0 ? 'Нет заявок по выбранным фильтрам' : 'Заявок пока нет. Нажмите «Новый лид» для создания.') + '</p></div>';
   } else {
     for (var i = 0; i < filtered.length; i++) {
       var l = filtered[i];
       var isCalc = l.source === 'calculator_pdf';
       var calcData = null;
       if (isCalc && l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
+      var leadAmt = Number(l.total_amount || 0);
+      var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', done:'#8B5CF6', rejected:'#EF4444' };
+      var statusBorderColor = statusColors[l.status] || '#334155';
       
-      h += '<div class="card" style="margin-bottom:12px">' +
+      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + '">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
-              '<span style="font-size:1rem;font-weight:800;color:#a78bfa">#' + l.id + '</span>' +
+              '<span style="font-size:1rem;font-weight:800;color:#a78bfa">#' + (l.lead_number || l.id) + '</span>' +
               '<span class="badge badge-purple">' + (l.source || 'form') + '</span>' +
               (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
-              (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '') +
+              (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '<span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.7rem">Не назначен</span>') +
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
@@ -1438,8 +1466,8 @@ function renderLeads() {
       // Right side: status + total + date + actions
       h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:200px">';
       
-      if (calcData && calcData.total) {
-        h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(calcData.total).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+      if (leadAmt > 0) {
+        h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + '&nbsp;֏</div>';
       }
       
       // Status selector
@@ -1464,9 +1492,12 @@ function renderLeads() {
       if (isCalc) {
         h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-file-pdf" style="margin-right:4px"></i>КП</a>';
       }
+      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="toggleLeadExpand(' + l.id + ')" title="Детали и комментарии"><i class="fas fa-chevron-down"></i></button>';
       h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div></div></div>';
       
+      // Expandable detail area (services + notes + comments)
+      h += '<div id="lead-detail-' + l.id + '" style="display:none">';
       // Services breakdown
       if (calcData && calcData.items && calcData.items.length > 0) {
         h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
@@ -1482,11 +1513,71 @@ function renderLeads() {
         }
         h += '</div></div>';
       }
+      // Notes — editable
+      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
+        '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
+        '<div style="display:flex;gap:8px"><textarea class="input" id="lead-notes-' + l.id + '" style="flex:1;min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea>' +
+        '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadNotes(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
+      // Comments section (loaded dynamically)
+      h += '<div id="comments-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка комментариев...</span></div></div>';
+      h += '</div>';
       h += '</div>';
     }
   }
+  h += '<div id="createLeadModalArea"></div>';
   h += '</div>';
   return h;
+}
+
+// Create lead modal
+function showCreateLeadModal() {
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
+    '<div class="card" style="width:600px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-user-plus" style="color:#8B5CF6;margin-right:8px"></i>Новый лид</h3>' +
+    '<form onsubmit="submitCreateLead(event)">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Имя *</label><input class="input" id="nl_name" required></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Контакт *</label><input class="input" id="nl_contact" required placeholder="+374..."></div></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Продукт</label><input class="input" id="nl_product"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Услуга</label><input class="input" id="nl_service"></div></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма (֏)</label><input class="input" type="number" id="nl_amount" value="0"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Источник</label><select class="input" id="nl_source"><option value="manual">Ручной ввод</option><option value="form">Форма</option><option value="popup">Попап</option></select></div></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Сообщение / описание</label><textarea class="input" id="nl_message" rows="3" placeholder="Дополнительная информация..."></textarea></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>Создать</button></div>' +
+    '</form></div></div>';
+  var area = document.getElementById('createLeadModalArea');
+  if (area) area.innerHTML = h;
+  else document.body.insertAdjacentHTML('beforeend', h);
+  var nameEl = document.getElementById('nl_name');
+  if (nameEl) nameEl.focus();
+}
+
+async function submitCreateLead(e) {
+  e.preventDefault();
+  await api('/leads', { method:'POST', body: JSON.stringify({
+    name: document.getElementById('nl_name').value.trim(),
+    contact: document.getElementById('nl_contact').value.trim(),
+    product: document.getElementById('nl_product').value.trim(),
+    service: document.getElementById('nl_service').value.trim(),
+    total_amount: parseFloat(document.getElementById('nl_amount').value) || 0,
+    source: document.getElementById('nl_source').value,
+    message: document.getElementById('nl_message').value.trim()
+  }) });
+  toast('Лид создан');
+  var modal = document.querySelector('[style*="fixed"][style*="z-index:999"]');
+  if (modal) modal.remove();
+  await loadData(); render();
+}
+
+async function saveLeadNotes(id) {
+  var el = document.getElementById('lead-notes-' + id);
+  if (!el) return;
+  await api('/leads/' + id, { method:'PUT', body: JSON.stringify({ notes: el.value }) });
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
+  if (lead) lead.notes = el.value;
+  toast('Заметка сохранена');
 }
 
 function getAssigneeName(id) {
@@ -1530,6 +1621,309 @@ async function deleteLead(id) {
   await api('/leads/' + id, { method: 'DELETE' });
   toast('Заявка удалена');
   await loadData(); render();
+}
+
+// ===== LEAD COMMENTS =====
+async function loadComments(leadId) {
+  const res = await api('/leads/' + leadId + '/comments');
+  data.leadComments[leadId] = res || [];
+  renderCommentSection(leadId);
+}
+
+function renderCommentSection(leadId) {
+  const el = document.getElementById('comments-' + leadId);
+  if (!el) return;
+  const comments = data.leadComments[leadId] || [];
+  let h = '<div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+    '<span style="font-size:0.82rem;font-weight:700;color:#a78bfa"><i class="fas fa-comments" style="margin-right:6px"></i>Комментарии (' + comments.length + ')</span></div>';
+  for (var ci = 0; ci < comments.length; ci++) {
+    var cm = comments[ci];
+    h += '<div style="padding:8px 12px;background:#0f172a;border-radius:8px;margin-bottom:6px;border-left:3px solid #8B5CF6">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+        '<span style="font-size:0.78rem;font-weight:600;color:#a78bfa">' + escHtml(cm.user_name) + '</span>' +
+        '<div style="display:flex;gap:8px;align-items:center"><span style="font-size:0.7rem;color:#64748b">' + (cm.created_at||'').substring(0,16) + '</span>' +
+        '<button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.7rem;padding:2px" onclick="deleteComment(' + cm.id + ',' + leadId + ')"><i class="fas fa-times"></i></button></div></div>' +
+      '<div style="font-size:0.85rem;color:#e2e8f0;white-space:pre-wrap">' + escHtml(cm.comment) + '</div></div>';
+  }
+  h += '<div style="display:flex;gap:8px;margin-top:8px">' +
+    '<input class="input" style="flex:1;padding:8px 12px;font-size:0.82rem" id="newComment-' + leadId + '" placeholder="Написать комментарий..." onkeydown="if(event.key===\\'Enter\\')addComment(' + leadId + ')">' +
+    '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.82rem;white-space:nowrap" onclick="addComment(' + leadId + ')"><i class="fas fa-paper-plane"></i></button>' +
+  '</div></div>';
+  el.innerHTML = h;
+}
+
+async function addComment(leadId) {
+  var input = document.getElementById('newComment-' + leadId);
+  if (!input || !input.value.trim()) return;
+  await api('/leads/' + leadId + '/comments', { method:'POST', body: JSON.stringify({ comment: input.value.trim() }) });
+  input.value = '';
+  toast('Комментарий добавлен');
+  await loadComments(leadId);
+}
+
+async function deleteComment(commentId, leadId) {
+  await api('/leads/comments/' + commentId, { method:'DELETE' });
+  toast('Удалено');
+  await loadComments(leadId);
+}
+
+function toggleLeadExpand(id) {
+  var el = document.getElementById('lead-detail-' + id);
+  if (!el) return;
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (!data.leadComments[id]) loadComments(id);
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// ===== LEADS ANALYTICS =====
+let analyticsDateFrom = '';
+let analyticsDateTo = '';
+let analyticsData = null;
+
+async function loadAnalyticsData() {
+  var params = '';
+  if (analyticsDateFrom) params += '&from=' + analyticsDateFrom;
+  if (analyticsDateTo) params += '&to=' + analyticsDateTo;
+  analyticsData = await api('/leads/analytics?' + params.replace(/^&/,''));
+  render();
+}
+
+function fmtAmt(n) { return n ? Number(n).toLocaleString('ru-RU') + '\\u00a0֏' : '0 ֏'; }
+
+function renderLeadsAnalytics() {
+  var d = analyticsData;
+  if (!d) {
+    // Load on first render
+    loadAnalyticsData();
+    return '<div style="padding:32px;text-align:center"><div class="spinner" style="width:40px;height:40px;margin:60px auto"></div><p style="color:#94a3b8;margin-top:16px">Загрузка аналитики...</p></div>';
+  }
+  
+  var h = '<div style="padding:32px">';
+  // Header
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:10px"></i>Аналитика лидов</h1>' +
+    '<p style="color:#94a3b8;margin-top:4px">Детальный анализ заявок, конверсий и выручки</p></div>' +
+    '<button class="btn btn-outline" onclick="analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button></div>';
+  
+  // Date filter
+  h += '<div class="card" style="padding:16px;margin-bottom:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+    '<i class="fas fa-calendar-alt" style="color:#8B5CF6"></i>' +
+    '<span style="font-size:0.85rem;color:#94a3b8;font-weight:600">Период:</span>' +
+    '<input type="date" class="input" style="width:160px;padding:6px 10px;font-size:0.82rem" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">' +
+    '<span style="color:#64748b">—</span>' +
+    '<input type="date" class="input" style="width:160px;padding:6px 10px;font-size:0.82rem" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">' +
+    '<div style="display:flex;gap:4px;margin-left:8px">' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'today\\')">Сегодня</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'week\\')">7 дней</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'month\\')">30 дней</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'all\\')">Все</button>' +
+    '</div></div>';
+  
+  // ===== KPI CARDS =====
+  var bs = d.by_status || {};
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">';
+  // Total  
+  h += '<div class="stat-card" style="padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));border-color:rgba(139,92,246,0.3)">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">Всего заявок</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + (d.total?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#a78bfa;margin-top:4px">' + fmtAmt(d.total?.amount) + '</div></div>';
+  // New
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'new\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🟢 Новые</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.new?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.new?.amount) + '</div></div>';
+  // Contacted
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));border-color:rgba(59,130,246,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'contacted\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">💬 На связи</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#3B82F6">' + (bs.contacted?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#60a5fa;margin-top:4px">' + fmtAmt(bs.contacted?.amount) + '</div></div>';
+  // In progress
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(245,158,11,0.05));border-color:rgba(245,158,11,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🔄 В работе</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#F59E0B">' + (bs.in_progress?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#fbbf24;margin-top:4px">' + fmtAmt(bs.in_progress?.amount) + '</div></div>';
+  // Done
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'done\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">✅ Завершены</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.done?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.done?.amount) + '</div></div>';
+  // Rejected
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.05));border-color:rgba(239,68,68,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'rejected\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">❌ Отказы</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#EF4444">' + (bs.rejected?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#f87171;margin-top:4px">' + fmtAmt(bs.rejected?.amount) + '</div></div>';
+  h += '</div>';
+  
+  // ===== CONVERSION FUNNEL =====
+  var funnelTotal = d.total?.count || 1;
+  var funnelSteps = [
+    { label: 'Всего заявок', count: d.total?.count||0, color: '#8B5CF6', icon: '📥' },
+    { label: 'На связи', count: (bs.contacted?.count||0) + (bs.in_progress?.count||0) + (bs.done?.count||0), color: '#3B82F6', icon: '💬' },
+    { label: 'В работе', count: (bs.in_progress?.count||0) + (bs.done?.count||0), color: '#F59E0B', icon: '🔄' },
+    { label: 'Завершены', count: bs.done?.count||0, color: '#10B981', icon: '✅' }
+  ];
+  h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка конверсии</h3>' +
+    '<div style="display:flex;gap:0;align-items:center">';
+  for (var fi = 0; fi < funnelSteps.length; fi++) {
+    var fs = funnelSteps[fi];
+    var fPct = funnelTotal > 0 ? Math.round((fs.count / funnelTotal) * 100) : 0;
+    var widthPct = Math.max(15, funnelTotal > 0 ? Math.round((fs.count / funnelTotal) * 100) : 15);
+    h += '<div style="flex:' + widthPct + ';text-align:center;padding:16px 8px;background:' + fs.color + '20;border-top:3px solid ' + fs.color + ';' + (fi === 0 ? 'border-radius:8px 0 0 8px;' : fi === funnelSteps.length-1 ? 'border-radius:0 8px 8px 0;' : '') + '">' +
+      '<div style="font-size:1.5rem">' + fs.icon + '</div>' +
+      '<div style="font-size:1.3rem;font-weight:900;color:' + fs.color + '">' + fs.count + '</div>' +
+      '<div style="font-size:0.72rem;color:#94a3b8;margin-top:2px">' + fs.label + '</div>' +
+      '<div style="font-size:0.7rem;font-weight:700;color:' + fs.color + '">' + fPct + '%</div>' +
+    '</div>';
+    if (fi < funnelSteps.length - 1) h += '<div style="font-size:1.2rem;color:#475569;padding:0 4px">→</div>';
+  }
+  h += '</div></div>';
+  
+  // ===== CONVERSION & AVG CHECK CARDS =====
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">' +
+    '<div class="card" style="text-align:center;padding:24px">' +
+      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-percentage" style="margin-right:6px"></i>Конверсия</div>' +
+      '<div style="font-size:2.5rem;font-weight:900;color:#8B5CF6">' + (d.conversion_rate||'0') + '%</div>' +
+      '<div style="font-size:0.75rem;color:#64748b;margin-top:4px">в завершённые сделки</div></div>' +
+    '<div class="card" style="text-align:center;padding:24px">' +
+      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-receipt" style="margin-right:6px"></i>Средний чек</div>' +
+      '<div style="font-size:2.2rem;font-weight:900;color:#10B981">' + fmtAmt(d.avg_check) + '</div>' +
+      '<div style="font-size:0.75rem;color:#64748b;margin-top:4px">по завершённым сделкам</div></div>' +
+    '<div class="card" style="text-align:center;padding:24px">' +
+      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-calendar-day" style="margin-right:6px"></i>Сегодня</div>' +
+      '<div style="font-size:2rem;font-weight:900;color:#F59E0B">' + (d.today?.count||0) + ' <span style="font-size:0.9rem;color:#94a3b8">заявок</span></div>' +
+      '<div style="font-size:1rem;font-weight:600;color:#fbbf24;margin-top:4px">' + fmtAmt(d.today?.amount) + '</div></div>' +
+    '<div class="card" style="text-align:center;padding:24px">' +
+      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-ban" style="margin-right:6px"></i>Процент отказов</div>' +
+      '<div style="font-size:2.5rem;font-weight:900;color:#EF4444">' + ((d.total?.count||0) > 0 ? (((bs.rejected?.count||0) / (d.total?.count||1)) * 100).toFixed(1) : '0') + '%</div>' +
+      '<div style="font-size:0.75rem;color:#64748b;margin-top:4px">' + (bs.rejected?.count||0) + ' из ' + (d.total?.count||0) + '</div></div>' +
+  '</div>';
+  
+  // ===== DAILY CHART =====
+  var daily = d.daily || [];
+  if (daily.length > 0) {
+    var maxVal = Math.max.apply(null, daily.map(function(x) { return x.count || 1; }));
+    h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-chart-area" style="color:#8B5CF6;margin-right:8px"></i>Заявки по дням (30 дней)</h3>' +
+      '<div style="display:flex;gap:4px;align-items:flex-end;height:140px;padding:0 4px">';
+    for (var di = 0; di < daily.length; di++) {
+      var dd = daily[di];
+      var barH = Math.max(8, Math.round((dd.count / maxVal) * 120));
+      var dayLabel = (dd.day||'').slice(5);
+      h += '<div style="flex:1;text-align:center;min-width:0">' +
+        '<div title="' + dd.day + ': ' + dd.count + ' заявок, ' + fmtAmt(dd.amount) + '" style="background:linear-gradient(to top,#8B5CF6,#a78bfa);height:' + barH + 'px;border-radius:4px 4px 0 0;margin:0 auto;cursor:pointer;max-width:40px;min-width:8px"></div>' +
+        '<div style="font-size:0.6rem;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis">' + dayLabel + '</div>' +
+        '<div style="font-size:0.65rem;font-weight:700;color:#e2e8f0">' + dd.count + '</div></div>';
+    }
+    h += '</div></div>';
+  }
+  
+  // ===== SERVICES POPULARITY =====
+  var services = d.services || [];
+  if (services.length > 0) {
+    h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-star" style="color:#F59E0B;margin-right:8px"></i>Популярность услуг</h3>';
+    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
+      '<thead><tr style="border-bottom:2px solid #334155">' +
+        '<th style="padding:10px 12px;text-align:left;color:#94a3b8;font-size:0.78rem">#</th>' +
+        '<th style="padding:10px 12px;text-align:left;color:#94a3b8;font-size:0.78rem">Услуга</th>' +
+        '<th style="padding:10px 12px;text-align:center;color:#94a3b8;font-size:0.78rem">Заказов</th>' +
+        '<th style="padding:10px 12px;text-align:center;color:#94a3b8;font-size:0.78rem">Кол-во ед.</th>' +
+        '<th style="padding:10px 12px;text-align:right;color:#94a3b8;font-size:0.78rem">Выручка</th>' +
+        '<th style="padding:10px 12px;text-align:right;color:#94a3b8;font-size:0.78rem">% от общей</th>' +
+      '</tr></thead><tbody>';
+    var totalServiceRev = services.reduce(function(a, s) { return a + (s.revenue||0); }, 0);
+    for (var si = 0; si < services.length; si++) {
+      var sv = services[si];
+      var pct = totalServiceRev > 0 ? ((sv.revenue / totalServiceRev) * 100).toFixed(1) : '0';
+      var barW = totalServiceRev > 0 ? Math.round((sv.revenue / totalServiceRev) * 100) : 0;
+      h += '<tr style="border-bottom:1px solid #1e293b">' +
+        '<td style="padding:10px 12px;color:#64748b;font-weight:700">' + (si+1) + '</td>' +
+        '<td style="padding:10px 12px;font-weight:600;color:#e2e8f0">' + escHtml(sv.name) + '</td>' +
+        '<td style="padding:10px 12px;text-align:center;color:#94a3b8">' + sv.count + '</td>' +
+        '<td style="padding:10px 12px;text-align:center;color:#94a3b8">' + sv.qty + '</td>' +
+        '<td style="padding:10px 12px;text-align:right;font-weight:700;color:#a78bfa;white-space:nowrap">' + fmtAmt(sv.revenue) + '</td>' +
+        '<td style="padding:10px 12px;text-align:right"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><div style="width:80px;height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.8rem;font-weight:600;color:#e2e8f0;min-width:40px;text-align:right">' + pct + '%</span></div></td>' +
+      '</tr>';
+    }
+    h += '</tbody></table></div></div>';
+  }
+  
+  // ===== BY SOURCE & BY ASSIGNEE =====
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">';
+  // By source
+  var bSrc = d.by_source || {};
+  var srcKeys = Object.keys(bSrc);
+  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:1rem"><i class="fas fa-broadcast-tower" style="color:#3B82F6;margin-right:8px"></i>По источнику</h3>';
+  if (srcKeys.length > 0) {
+    var srcLabels = { form: 'Форма на сайте', popup: 'Попап', calculator_pdf: 'Калькулятор / PDF' };
+    for (var ski = 0; ski < srcKeys.length; ski++) {
+      var sk = srcKeys[ski];
+      var sv2 = bSrc[sk];
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e293b">' +
+        '<div><div style="font-weight:600;font-size:0.88rem">' + escHtml(srcLabels[sk]||sk) + '</div>' +
+        '<div style="font-size:0.78rem;color:#94a3b8">' + (sv2.count||0) + ' заявок</div></div>' +
+        '<div style="text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(sv2.amount) + '</div></div>';
+    }
+  } else { h += '<p style="color:#64748b;font-size:0.85rem">Нет данных</p>'; }
+  h += '</div>';
+  // By assignee
+  var assigns = d.by_assignee || [];
+  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:1rem"><i class="fas fa-user-tie" style="color:#10B981;margin-right:8px"></i>По ответственному</h3>';
+  if (assigns.length > 0) {
+    for (var ai2 = 0; ai2 < assigns.length; ai2++) {
+      var as = assigns[ai2];
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e293b">' +
+        '<div><div style="font-weight:600;font-size:0.88rem">' + escHtml(as.name) + '</div>' +
+        '<div style="font-size:0.78rem;color:#94a3b8">' + as.count + ' заявок</div></div>' +
+        '<div style="text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(as.amount) + '</div></div>';
+    }
+  } else { h += '<p style="color:#64748b;font-size:0.85rem">Нет данных</p>'; }
+  h += '</div></div>';
+  
+  // ===== REFERRAL PERFORMANCE =====
+  var refs = d.referrals || [];
+  if (refs.length > 0) {
+    h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:12px;font-size:1rem"><i class="fas fa-gift" style="color:#F59E0B;margin-right:8px"></i>Реферальные коды</h3>';
+    for (var ri = 0; ri < refs.length; ri++) {
+      var rf = refs[ri];
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
+        '<div style="display:flex;align-items:center;gap:8px"><span class="badge badge-amber" style="font-family:monospace">' + escHtml(rf.referral_code) + '</span><span style="font-size:0.82rem;color:#94a3b8">' + rf.count + ' заявок</span></div>' +
+        '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(rf.amount) + '</div></div>';
+    }
+    h += '</div>';
+  }
+  
+  // ===== TIME PERIOD CARDS =====
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">' +
+    '<div class="card" style="text-align:center;padding:20px">' +
+      '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">Сегодня</div>' +
+      '<div style="font-size:1.8rem;font-weight:900;color:#F59E0B">' + (d.today?.count||0) + '</div>' +
+      '<div style="font-size:0.9rem;color:#fbbf24;margin-top:2px">' + fmtAmt(d.today?.amount) + '</div></div>' +
+    '<div class="card" style="text-align:center;padding:20px">' +
+      '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">7 дней</div>' +
+      '<div style="font-size:1.8rem;font-weight:900;color:#3B82F6">' + (d.week?.count||0) + '</div>' +
+      '<div style="font-size:0.9rem;color:#60a5fa;margin-top:2px">' + fmtAmt(d.week?.amount) + '</div></div>' +
+    '<div class="card" style="text-align:center;padding:20px">' +
+      '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">30 дней</div>' +
+      '<div style="font-size:1.8rem;font-weight:900;color:#10B981">' + (d.month?.count||0) + '</div>' +
+      '<div style="font-size:0.9rem;color:#34d399;margin-top:2px">' + fmtAmt(d.month?.amount) + '</div></div>' +
+  '</div>';
+  
+  h += '</div>';
+  return h;
+}
+
+function setAnalyticsPeriod(period) {
+  var now = new Date();
+  var fmt = function(d) { return d.toISOString().slice(0,10); };
+  if (period === 'today') { analyticsDateFrom = fmt(now); analyticsDateTo = fmt(now); }
+  else if (period === 'week') { var d7 = new Date(now); d7.setDate(d7.getDate()-7); analyticsDateFrom = fmt(d7); analyticsDateTo = fmt(now); }
+  else if (period === 'month') { var d30 = new Date(now); d30.setDate(d30.getDate()-30); analyticsDateFrom = fmt(d30); analyticsDateTo = fmt(now); }
+  else { analyticsDateFrom = ''; analyticsDateTo = ''; }
+  analyticsData = null;
+  loadAnalyticsData();
 }
 
 // ===== TELEGRAM BOT =====
@@ -2400,6 +2794,7 @@ function render() {
   switch (currentPage) {
     case 'dashboard': pageHtml = renderDashboard(); break;
     case 'leads': pageHtml = renderLeads(); break;
+    case 'analytics': pageHtml = renderLeadsAnalytics(); break;
     case 'employees': pageHtml = renderEmployees(); break;
     case 'permissions': pageHtml = renderPermissions(); break;
     case 'blocks': pageHtml = renderSiteBlocks(); break;

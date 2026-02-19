@@ -484,19 +484,125 @@ api.post('/leads', authMiddleware, async (c) => {
 
 api.get('/leads/analytics', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const total = await db.prepare('SELECT COUNT(*) as count FROM leads').first();
-  const totalAmount = await db.prepare('SELECT COALESCE(SUM(total_amount),0) as total FROM leads').first();
-  const todayCount = await db.prepare("SELECT COUNT(*) as count FROM leads WHERE date(created_at) = date('now')").first();
-  const todayAmount = await db.prepare("SELECT COALESCE(SUM(total_amount),0) as total FROM leads WHERE date(created_at) = date('now')").first();
-  // By status
-  const byStatusRes = await db.prepare("SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads GROUP BY status").all();
+  const url = new URL(c.req.url);
+  const dateFrom = url.searchParams.get('from') || '';
+  const dateTo = url.searchParams.get('to') || '';
+  
+  let dateFilter = '';
+  const dateParams: string[] = [];
+  if (dateFrom) { dateFilter += " AND date(created_at) >= ?"; dateParams.push(dateFrom); }
+  if (dateTo) { dateFilter += " AND date(created_at) <= ?"; dateParams.push(dateTo); }
+  
+  // Total stats
+  const total = await db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1' + dateFilter).bind(...dateParams).first();
+  const todayCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) = date('now')").first();
+  const weekCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-7 days')").first();
+  const monthCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days')").first();
+  
+  // By status (with date filter)
+  const byStatusRes = await db.prepare("SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1" + dateFilter + " GROUP BY status").bind(...dateParams).all();
   const byStatus: Record<string, any> = {};
   for (const r of byStatusRes.results) { byStatus[r.status as string] = { count: r.count, amount: r.amount }; }
-  // By source
-  const bySourceRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads GROUP BY source").all();
+  
+  // By source (with date filter)
+  const bySourceRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1" + dateFilter + " GROUP BY source").bind(...dateParams).all();
   const bySource: Record<string, any> = {};
   for (const r of bySourceRes.results) { bySource[r.source as string] = { count: r.count, amount: r.amount }; }
-  return c.json({ total: total?.count || 0, total_amount: totalAmount?.total || 0, today_count: todayCount?.count || 0, today_amount: todayAmount?.total || 0, by_status: byStatus, by_source: bySource });
+  
+  // By assignee (with date filter)
+  const byAssigneeRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE 1=1" + dateFilter.replace(/created_at/g, 'l.created_at') + " GROUP BY l.assigned_to").bind(...dateParams).all();
+  const byAssignee: any[] = [];
+  for (const r of byAssigneeRes.results) { byAssignee.push({ user_id: r.assigned_to, name: r.display_name || 'Не назначен', count: r.count, amount: r.amount }); }
+  
+  // Daily breakdown (last 30 days)
+  const dailyRes = await db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day").all();
+  
+  // Service popularity — parse calc_data from all leads
+  const allLeadsRes = await db.prepare("SELECT calc_data, total_amount, status FROM leads WHERE calc_data != '' AND calc_data IS NOT NULL" + dateFilter).bind(...dateParams).all();
+  const serviceStats: Record<string, { count: number; qty: number; revenue: number }> = {};
+  for (const lead of allLeadsRes.results) {
+    try {
+      const cd = JSON.parse(lead.calc_data as string);
+      if (cd.items && Array.isArray(cd.items)) {
+        for (const item of cd.items) {
+          const name = item.name || 'Неизвестно';
+          if (!serviceStats[name]) serviceStats[name] = { count: 0, qty: 0, revenue: 0 };
+          serviceStats[name].count++;
+          serviceStats[name].qty += Number(item.qty || 1);
+          serviceStats[name].revenue += Number(item.subtotal || 0);
+        }
+      }
+    } catch {}
+  }
+  const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
+  
+  // Conversion funnel
+  const statusCounts = {
+    new: (byStatus.new?.count || 0),
+    contacted: (byStatus.contacted?.count || 0),
+    in_progress: (byStatus.in_progress?.count || 0),
+    done: (byStatus.done?.count || 0),
+    rejected: (byStatus.rejected?.count || 0),
+  };
+  const conversionRate = (total?.count || 0) > 0 ? ((statusCounts.done / (total?.count || 1)) * 100).toFixed(1) : '0';
+  const avgCheck = statusCounts.done > 0 ? Math.round((byStatus.done?.amount || 0) / statusCounts.done) : 0;
+  
+  // Referral stats
+  const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dateFilter + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
+  
+  return c.json({
+    total: { count: total?.count || 0, amount: total?.amount || 0 },
+    today: { count: todayCount?.count || 0, amount: todayCount?.amount || 0 },
+    week: { count: weekCount?.count || 0, amount: weekCount?.amount || 0 },
+    month: { count: monthCount?.count || 0, amount: monthCount?.amount || 0 },
+    by_status: byStatus,
+    by_source: bySource,
+    by_assignee: byAssignee,
+    daily: dailyRes.results,
+    services: serviceList,
+    conversion_rate: conversionRate,
+    avg_check: avgCheck,
+    referrals: refRes.results,
+    date_from: dateFrom,
+    date_to: dateTo,
+  });
+});
+
+// ===== LEAD COMMENTS =====
+api.get('/leads/:id/comments', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const leadId = c.req.param('id');
+  const res = await db.prepare('SELECT * FROM lead_comments WHERE lead_id = ? ORDER BY created_at DESC').bind(leadId).all();
+  return c.json(res.results);
+});
+
+api.post('/leads/:id/comments', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const leadId = c.req.param('id');
+  const { comment } = await c.req.json();
+  // Get current user from token
+  const auth = c.req.header('Authorization') || '';
+  const token = auth.replace('Bearer ', '');
+  let userName = 'Система';
+  let userId = 0;
+  try {
+    const { verifyToken } = await import('../lib/auth');
+    const payload = await verifyToken(token);
+    if (payload) {
+      userId = Number(payload.sub) || 0;
+      const user = await db.prepare('SELECT display_name FROM users WHERE id = ?').bind(userId).first();
+      userName = (user?.display_name as string) || 'Пользователь';
+    }
+  } catch {}
+  await db.prepare('INSERT INTO lead_comments (lead_id, user_id, user_name, comment) VALUES (?,?,?,?)').bind(leadId, userId, userName, comment).run();
+  return c.json({ success: true });
+});
+
+api.delete('/leads/comments/:commentId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const commentId = c.req.param('commentId');
+  await db.prepare('DELETE FROM lead_comments WHERE id = ?').bind(commentId).run();
+  return c.json({ success: true });
 });
 
 api.delete('/leads/:id', authMiddleware, async (c) => {

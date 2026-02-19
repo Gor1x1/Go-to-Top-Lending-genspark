@@ -160,6 +160,16 @@ CREATE TABLE IF NOT EXISTS leads (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS lead_comments (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_id INTEGER NOT NULL,
+  user_id INTEGER,
+  user_name TEXT DEFAULT '',
+  comment TEXT NOT NULL DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS site_settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL DEFAULT '',
@@ -270,7 +280,7 @@ export async function initDatabase(db: D1Database): Promise<void> {
 // ===== ROLES & PERMISSIONS CONFIG =====
 export const ALL_ROLES = ['main_admin', 'developer', 'analyst', 'operator', 'buyer', 'courier'] as const;
 export const ALL_SECTIONS = [
-  'dashboard', 'leads', 'employees', 'permissions',
+  'dashboard', 'leads', 'analytics', 'employees', 'permissions',
   'blocks', 'calculator', 'pdf', 'referrals', 'slots',
   'footer', 'telegram', 'tgbot', 'scripts', 'settings'
 ] as const;
@@ -279,7 +289,7 @@ export const ROLE_LABELS: Record<string, string> = {
   operator: 'Оператор', buyer: 'Выкупщик', courier: 'Курьер',
 };
 export const SECTION_LABELS: Record<string, string> = {
-  dashboard: 'Дашборд', leads: 'Лиды / CRM', employees: 'Сотрудники',
+  dashboard: 'Дашборд', leads: 'Лиды / CRM', analytics: 'Аналитика лидов', employees: 'Сотрудники',
   permissions: 'Управление доступами', blocks: 'Конструктор блоков',
   calculator: 'Калькулятор', pdf: 'PDF шаблон', referrals: 'Реферальные коды',
   slots: 'Счётчики слотов', footer: 'Футер сайта', telegram: 'TG сообщения',
@@ -287,8 +297,9 @@ export const SECTION_LABELS: Record<string, string> = {
 };
 export const DEFAULT_PERMISSIONS: Record<string, string[]> = {
   main_admin: [...ALL_SECTIONS],
+  // analyst gets analytics access by default
   developer: ['dashboard', 'blocks', 'calculator', 'scripts', 'settings'],
-  analyst: ['dashboard', 'leads'],
+  analyst: ['dashboard', 'leads', 'analytics'],
   operator: ['dashboard', 'leads'],
   buyer: ['dashboard'],
   courier: ['dashboard'],
