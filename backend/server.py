@@ -271,7 +271,7 @@ async def create_user(req: CreateUserRequest, user=Depends(get_current_user)):
     result = users_col.insert_one(new_user)
     log_activity(user["id"], user["display_name"], "create_user", f"Создан: {req.display_name} ({req.role})")
     
-    new_user_data = {k: v for k, v in new_user.items() if k != "password_hash"}
+    new_user_data = {k: v for k, v in new_user.items() if k not in ("password_hash", "_id")}
     new_user_data["id"] = str(result.inserted_id)
     new_user_data["role_label"] = ROLE_LABELS.get(req.role, req.role)
     return new_user_data
@@ -395,7 +395,7 @@ async def create_lead(req: CreateLeadRequest, user=Depends(get_current_user)):
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     result = leads_col.insert_one(lead)
-    lead_data = {k: v for k, v in lead.items()}
+    lead_data = {k: v for k, v in lead.items() if k != "_id"}
     lead_data["id"] = str(result.inserted_id)
     log_activity(user["id"], user["display_name"], "create_lead", f"Лид: {req.name}")
     return lead_data
