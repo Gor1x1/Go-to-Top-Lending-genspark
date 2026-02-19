@@ -4,7 +4,7 @@ import json
 from datetime import datetime
 
 class GoToTopAPITester:
-    def __init__(self, base_url="https://b25a4dbe-c8b9-497e-8d46-73724d9986f1.preview.emergentagent.com"):
+    def __init__(self, base_url="https://leads-calculator.preview.emergentagent.com"):
         self.base_url = base_url
         self.token = None
         self.tests_run = 0
