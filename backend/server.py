@@ -60,6 +60,8 @@ pdf_col = db["pdf_templates"]
 slots_col = db["slot_counter"]
 footer_col = db["footer_settings"]
 photo_blocks_col = db["photo_blocks"]
+site_blocks_col = db["site_blocks"]
+generated_pdfs_col = db["generated_pdfs"]
 
 # Indexes
 users_col.create_index("username", unique=True)
