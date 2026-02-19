@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetch, useAuth } from '../App';
-import { Search, Trash2, Edit3, Download } from 'lucide-react';
+import { Search, Trash2, Edit3, Download, Plus, ChevronDown, ChevronUp, Calculator, BarChart3, X, Save, FileText, ExternalLink, User } from 'lucide-react';
 
 const STATUSES = [
   { value: 'all', label: 'Все', color: 'gray' },
@@ -11,180 +11,363 @@ const STATUSES = [
   { value: 'completed', label: 'Завершён', color: 'blue' },
   { value: 'cancelled', label: 'Отменён', color: 'red' },
 ];
-
 const STATUS_MAP = Object.fromEntries(STATUSES.map(s => [s.value, s]));
+const SOURCES = [
+  { value: 'all', label: 'Все источники' },
+  { value: 'form', label: 'Форма' },
+  { value: 'popup', label: 'Попап' },
+  { value: 'calculator_pdf', label: 'Калькулятор' },
+  { value: 'manual', label: 'Вручную' },
+  { value: 'telegram', label: 'Telegram' },
+];
+const SOURCE_MAP = Object.fromEntries(SOURCES.map(s => [s.value, s]));
+
+function parseCalcData(str) {
+  if (!str) return null;
+  try { const d = JSON.parse(str); return d; } catch { return null; }
+}
+
+function formatAmount(amt) {
+  if (!amt && amt !== 0) return '—';
+  return Number(amt).toLocaleString('ru-RU') + ' ֏';
+}
 
 export default function Leads() {
   const { user } = useAuth();
   const [leads, setLeads] = useState([]);
   const [total, setTotal] = useState(0);
   const [filter, setFilter] = useState('all');
+  const [sourceFilter, setSourceFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [users, setUsers] = useState([]);
+  const [expandedLead, setExpandedLead] = useState(null);
   const [editLead, setEditLead] = useState(null);
-  const [editForm, setEditForm] = useState({ status: '', notes: '', assigned_to: '' });
+  const [editForm, setEditForm] = useState({});
+  const [showCreate, setShowCreate] = useState(false);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [analytics, setAnalytics] = useState(null);
+  const [createForm, setCreateForm] = useState({ name: '', contact: '', product: '', service: '', message: '', source: 'manual', lang: 'ru', total_amount: 0, calc_data: '', referral_code: '', custom_fields: '' });
+  const [calcItems, setCalcItems] = useState([{ name: '', qty: 1, price: 0 }]);
 
-  useEffect(() => { loadLeads(); loadUsers(); }, [filter]);
+  useEffect(() => { loadLeads(); loadUsers(); }, [filter, sourceFilter]);
 
   const loadLeads = async () => {
     setLoading(true);
-    const res = await apiFetch(`/api/leads?status=${filter}&limit=100`);
-    if (res && res.ok) {
-      const data = await res.json();
-      setLeads(data.leads || []);
-      setTotal(data.total || 0);
-    }
+    const params = new URLSearchParams({ status: filter, limit: '200' });
+    if (sourceFilter !== 'all') params.set('source', sourceFilter);
+    const res = await apiFetch(`/api/leads?${params}`);
+    if (res?.ok) { const d = await res.json(); setLeads(d.leads || []); setTotal(d.total || 0); }
     setLoading(false);
   };
 
-  const loadUsers = async () => {
-    const res = await apiFetch('/api/users');
-    if (res && res.ok) setUsers(await res.json());
+  const loadUsers = async () => { const res = await apiFetch('/api/users'); if (res?.ok) setUsers(await res.json()); };
+
+  const loadAnalytics = async () => {
+    const res = await apiFetch('/api/leads/analytics');
+    if (res?.ok) { setAnalytics(await res.json()); setShowAnalytics(true); }
   };
 
   const openEdit = (lead) => {
     setEditLead(lead);
-    setEditForm({ status: lead.status || 'new', notes: lead.notes || '', assigned_to: lead.assigned_to || '' });
+    setEditForm({
+      name: lead.name || '', contact: lead.contact || '', product: lead.product || '',
+      service: lead.service || '', message: lead.message || '', status: lead.status || 'new',
+      notes: lead.notes || '', assigned_to: lead.assigned_to || '',
+      total_amount: lead.total_amount || 0, referral_code: lead.referral_code || '',
+      custom_fields: lead.custom_fields || '',
+    });
   };
 
   const saveEdit = async () => {
     if (!editLead) return;
     await apiFetch(`/api/leads/${editLead.id}`, { method: 'PUT', body: JSON.stringify(editForm) });
-    setEditLead(null);
+    setEditLead(null); loadLeads();
+  };
+
+  const quickStatus = async (leadId, status) => {
+    await apiFetch(`/api/leads/${leadId}`, { method: 'PUT', body: JSON.stringify({ status }) });
     loadLeads();
   };
 
-  const deleteLead = async (id) => {
-    if (!window.confirm('Удалить этот лид?')) return;
-    await apiFetch(`/api/leads/${id}`, { method: 'DELETE' });
+  const deleteLead = async (id) => { if (!window.confirm('Удалить лид?')) return; await apiFetch(`/api/leads/${id}`, { method: 'DELETE' }); loadLeads(); };
+
+  const calcTotal = useMemo(() => calcItems.reduce((s, i) => s + (i.qty * i.price), 0), [calcItems]);
+
+  const createLead = async () => {
+    const calcData = calcItems.some(i => i.name) ? JSON.stringify({ items: calcItems.filter(i => i.name).map(i => ({ ...i, sum: i.qty * i.price })), total: calcTotal }) : '';
+    const body = { ...createForm, total_amount: calcTotal || createForm.total_amount, calc_data: calcData };
+    await apiFetch('/api/leads', { method: 'POST', body: JSON.stringify(body) });
+    setShowCreate(false); setCreateForm({ name: '', contact: '', product: '', service: '', message: '', source: 'manual', lang: 'ru', total_amount: 0, calc_data: '', referral_code: '', custom_fields: '' });
+    setCalcItems([{ name: '', qty: 1, price: 0 }]);
+    loadLeads(); loadAnalytics();
+  };
+
+  const updateCalcForLead = async (leadId, items, total) => {
+    const calcData = JSON.stringify({ items: items.map(i => ({ ...i, sum: i.qty * i.price })), total });
+    await apiFetch(`/api/leads/${leadId}`, { method: 'PUT', body: JSON.stringify({ calc_data: calcData, total_amount: total }) });
     loadLeads();
   };
 
   return (
     <div className="page" data-testid="leads-page">
-      <div className="page-header">
-        <h1 className="page-title">Лиды / CRM</h1>
-        <p className="page-desc">Всего: {total} заявок</p>
-      </div>
-
-      {/* Filters */}
-      <div className="actions-bar" data-testid="leads-filters">
-        <button className="btn btn-sm btn-outline" data-testid="export-csv-btn"
-          onClick={() => { const t = localStorage.getItem('gtt_token'); window.open(`${process.env.REACT_APP_BACKEND_URL}/api/leads/export?token=${t}`, '_blank'); }}>
-          <Download size={14}/> CSV экспорт
-        </button>
-        <div className="spacer" />
-      </div>
-      <div className="actions-bar" data-testid="leads-status-filters">
-        {STATUSES.map(s => (
-          <button key={s.value}
-            className={`btn btn-sm ${filter === s.value ? 'btn-primary' : 'btn-outline'}`}
-            onClick={() => setFilter(s.value)}
-            data-testid={`filter-${s.value}`}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      {loading ? (
-        <div className="loading-spinner" style={{margin:'40px auto'}} />
-      ) : leads.length === 0 ? (
-        <div className="empty-state">
-          <Search size={48} />
-          <p style={{marginTop:12}}>Нет заявок{filter !== 'all' ? ` со статусом "${STATUS_MAP[filter]?.label}"` : ''}</p>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div><h1 className="page-title">Лиды / CRM</h1><p className="page-desc">Всего: {total} заявок</p></div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-outline" onClick={loadAnalytics} data-testid="analytics-btn"><BarChart3 size={16} /> Аналитика</button>
+          <button className="btn btn-primary" onClick={() => setShowCreate(true)} data-testid="create-lead-btn"><Plus size={16} /> Новый лид</button>
         </div>
-      ) : (
-        <div className="table-wrap" data-testid="leads-table">
-          <table>
-            <thead>
-              <tr>
-                <th>#</th>
-                <th>Имя</th>
-                <th>Контакт</th>
-                <th>Источник</th>
-                <th>Услуга</th>
-                <th>Статус</th>
-                <th>Ответственный</th>
-                <th>Дата</th>
-                <th>Действия</th>
-              </tr>
-            </thead>
-            <tbody>
-              {leads.map((lead, i) => {
-                const st = STATUS_MAP[lead.status] || STATUS_MAP['new'];
-                return (
-                  <tr key={lead.id}>
-                    <td style={{color:'var(--text-muted)',fontSize:'0.8rem'}}>{i + 1}</td>
-                    <td style={{fontWeight:600,color:'var(--text)'}}>{lead.name || '—'}</td>
-                    <td>{lead.contact || '—'}</td>
-                    <td><span className="badge badge-gray">{lead.source || '—'}</span></td>
-                    <td style={{maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{lead.service || lead.product || '—'}</td>
-                    <td><span className={`badge badge-${st.color}`}>{st.label}</span></td>
-                    <td style={{fontSize:'0.82rem'}}>{lead.assigned_name || <span style={{color:'var(--text-muted)'}}>—</span>}</td>
-                    <td style={{fontSize:'0.78rem',color:'var(--text-muted)',whiteSpace:'nowrap'}}>
-                      {lead.created_at ? new Date(lead.created_at).toLocaleDateString('ru-RU') : '—'}
-                    </td>
-                    <td>
-                      <div style={{display:'flex',gap:6}}>
-                        <button className="btn-icon" onClick={() => openEdit(lead)} title="Редактировать" data-testid={`edit-lead-${i}`}>
-                          <Edit3 size={14} />
-                        </button>
-                        <button className="btn-icon" onClick={() => deleteLead(lead.id)} title="Удалить"
-                          style={{color:'var(--danger)',borderColor:'rgba(239,68,68,0.3)'}}>
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
+      </div>
+
+      {/* Analytics Panel */}
+      {showAnalytics && analytics && (
+        <div className="card" style={{ marginBottom: 20 }} data-testid="analytics-panel">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <h3 style={{ fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8 }}><BarChart3 size={18} style={{ color: 'var(--purple)' }} /> Аналитика лидов</h3>
+            <button className="btn-icon" onClick={() => setShowAnalytics(false)}><X size={14} /></button>
+          </div>
+          <div className="stat-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)', marginBottom: 16 }}>
+            <div className="stat-card purple"><div className="stat-value">{analytics.total}</div><div className="stat-label">Всего лидов</div></div>
+            <div className="stat-card green"><div className="stat-value">{formatAmount(analytics.total_amount)}</div><div className="stat-label">Общая стоимость</div></div>
+            <div className="stat-card blue"><div className="stat-value">{analytics.today_count}</div><div className="stat-label">Сегодня</div></div>
+            <div className="stat-card amber"><div className="stat-value">{formatAmount(analytics.today_amount)}</div><div className="stat-label">Сумма за сегодня</div></div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent)', marginBottom: 8 }}>По статусам</div>
+              {Object.entries(analytics.by_status || {}).map(([st, data]) => {
+                const s = STATUS_MAP[st] || { label: st, color: 'gray' };
+                return (<div key={st} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                  <span className={`badge badge-${s.color}`}>{s.label}</span>
+                  <span><strong>{data.count}</strong> шт — <strong>{formatAmount(data.amount)}</strong></span>
+                </div>);
               })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      {/* Edit modal */}
-      {editLead && (
-        <div className="modal-overlay" onClick={() => setEditLead(null)}>
-          <div className="modal-card" onClick={e => e.stopPropagation()} data-testid="lead-edit-modal">
-            <h3 className="modal-title">Редактировать лид</h3>
-            <div style={{marginBottom:12,padding:'10px 14px',background:'var(--bg-surface)',borderRadius:'var(--radius-sm)',border:'1px solid var(--border)'}}>
-              <div style={{fontWeight:600}}>{editLead.name || '—'}</div>
-              <div style={{fontSize:'0.82rem',color:'var(--text-muted)'}}>{editLead.contact} | {editLead.source}</div>
-              {editLead.message && <div style={{fontSize:'0.82rem',color:'var(--text-sec)',marginTop:4}}>{editLead.message}</div>}
             </div>
-            <div className="form-group">
-              <label className="form-label">Статус</label>
-              <select className="form-input" data-testid="lead-status-select" value={editForm.status}
-                onChange={e => setEditForm({...editForm, status: e.target.value})}>
-                {STATUSES.filter(s => s.value !== 'all').map(s => (
-                  <option key={s.value} value={s.value}>{s.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Ответственный</label>
-              <select className="form-input" data-testid="lead-assign-select" value={editForm.assigned_to}
-                onChange={e => setEditForm({...editForm, assigned_to: e.target.value})}>
-                <option value="">Не назначен</option>
-                {users.map(u => (
-                  <option key={u.id} value={u.id}>{u.display_name} ({u.role_label || u.role})</option>
-                ))}
-              </select>
-            </div>
-            <div className="form-group">
-              <label className="form-label">Заметки</label>
-              <textarea className="form-input" data-testid="lead-notes" value={editForm.notes}
-                onChange={e => setEditForm({...editForm, notes: e.target.value})} placeholder="Комментарии по лиду..." />
-            </div>
-            <div className="modal-actions">
-              <button className="btn btn-outline" onClick={() => setEditLead(null)}>Отмена</button>
-              <button className="btn btn-primary" onClick={saveEdit} data-testid="lead-save-btn">Сохранить</button>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent)', marginBottom: 8 }}>По источникам</div>
+              {Object.entries(analytics.by_source || {}).map(([src, data]) => (
+                <div key={src} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                  <span className="badge badge-purple">{SOURCE_MAP[src]?.label || src}</span>
+                  <span><strong>{data.count}</strong> шт — <strong>{formatAmount(data.amount)}</strong></span>
+                </div>
+              ))}
             </div>
           </div>
         </div>
       )}
+
+      {/* Filters */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
+        <button className="btn btn-sm btn-outline" onClick={() => { const t = localStorage.getItem('gtt_token'); window.open(`${process.env.REACT_APP_BACKEND_URL}/api/leads/export`, '_blank'); }} data-testid="export-csv-btn"><Download size={14} /> CSV</button>
+        <select className="form-input" style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem' }} value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} data-testid="source-filter">
+          {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+        </select>
+        <div className="spacer" />
+      </div>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {STATUSES.map(s => (
+          <button key={s.value} className={`btn btn-sm ${filter === s.value ? 'btn-primary' : 'btn-outline'}`}
+            onClick={() => setFilter(s.value)} data-testid={`filter-${s.value}`}>{s.label}</button>
+        ))}
+      </div>
+
+      {/* Lead Cards */}
+      {loading ? <div className="loading-spinner" style={{ margin: '40px auto' }} /> :
+        leads.length === 0 ? <div className="empty-state"><Search size={48} /><p style={{ marginTop: 12 }}>Нет заявок</p></div> :
+          <div style={{ display: 'grid', gap: 8 }}>
+            {leads.map((lead, i) => {
+              const st = STATUS_MAP[lead.status] || STATUS_MAP['new'];
+              const calcData = parseCalcData(lead.calc_data);
+              const isExpanded = expandedLead === lead.id;
+              const amt = lead.total_amount || (calcData?.total) || 0;
+
+              return (
+                <div key={lead.id} className="card" style={{ padding: 0, overflow: 'hidden', borderLeft: `3px solid var(--${st.color === 'green' ? 'success' : st.color === 'amber' ? 'warning' : st.color === 'red' ? 'danger' : st.color === 'purple' ? 'purple' : 'info'})` }} data-testid={`lead-card-${i}`}>
+                  {/* Lead header */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '14px 18px', cursor: 'pointer' }} onClick={() => setExpandedLead(isExpanded ? null : lead.id)}>
+                    <span style={{ fontWeight: 800, color: 'var(--text-muted)', fontSize: '0.82rem', minWidth: 36 }}>#{lead.lead_number || i + 1}</span>
+                    <span className={`badge badge-${lead.source === 'calculator_pdf' ? 'purple' : lead.source === 'form' ? 'blue' : lead.source === 'telegram' ? 'blue' : 'gray'}`} style={{ fontSize: '0.7rem' }}>
+                      {SOURCE_MAP[lead.source]?.label || lead.source}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.95rem' }}>{lead.name || '—'}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{lead.contact || '—'}</div>
+                    </div>
+                    {amt > 0 && <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--success)', whiteSpace: 'nowrap' }}>{formatAmount(amt)}</div>}
+                    <select className="form-input" style={{ width: 'auto', padding: '6px 10px', fontSize: '0.78rem', background: 'var(--bg-surface)' }}
+                      value={lead.status} onClick={e => e.stopPropagation()} onChange={e => quickStatus(lead.id, e.target.value)} data-testid={`status-select-${i}`}>
+                      {STATUSES.filter(s => s.value !== 'all').map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+                    </select>
+                    <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                      <button className="btn-icon" onClick={() => openEdit(lead)} title="Редактировать" data-testid={`edit-lead-${i}`}><Edit3 size={14} /></button>
+                      <button className="btn-icon" style={{ color: 'var(--danger)', borderColor: 'rgba(239,68,68,0.3)' }} onClick={() => deleteLead(lead.id)}><Trash2 size={14} /></button>
+                    </div>
+                    {isExpanded ? <ChevronUp size={16} style={{ color: 'var(--text-muted)' }} /> : <ChevronDown size={16} style={{ color: 'var(--text-muted)' }} />}
+                  </div>
+
+                  {/* Expanded details */}
+                  {isExpanded && (
+                    <div style={{ padding: '0 18px 16px', borderTop: '1px solid var(--border)' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, padding: '14px 0', fontSize: '0.85rem' }}>
+                        <div><span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Продукт</span>{lead.product || '—'}</div>
+                        <div><span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Услуга</span>{lead.service || '—'}</div>
+                        <div><span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Ответственный</span>{lead.assigned_name || '—'}</div>
+                        <div><span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Реф. код</span>{lead.referral_code || '—'}</div>
+                        <div><span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Язык</span>{lead.lang || '—'}</div>
+                        <div><span style={{ color: 'var(--text-muted)', display: 'block', fontSize: '0.75rem' }}>Дата</span>{lead.created_at ? new Date(lead.created_at).toLocaleString('ru-RU') : '—'}</div>
+                      </div>
+                      {lead.message && <div style={{ padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', fontSize: '0.85rem', color: 'var(--text-sec)', marginBottom: 10 }}>{lead.message}</div>}
+                      {lead.notes && <div style={{ padding: '10px 14px', background: 'rgba(139,92,246,0.05)', borderRadius: 'var(--radius-sm)', border: '1px solid rgba(139,92,246,0.15)', fontSize: '0.85rem', color: 'var(--accent)', marginBottom: 10 }}><strong>Заметки:</strong> {lead.notes}</div>}
+
+                      {/* Calc data — services table */}
+                      {calcData && calcData.items && calcData.items.length > 0 && (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>Выбранные услуги:</div>
+                          <div className="table-wrap">
+                            <table>
+                              <thead><tr><th>Услуга</th><th style={{ textAlign: 'right' }}>Кол-во</th><th style={{ textAlign: 'right' }}>Цена</th><th style={{ textAlign: 'right' }}>Сумма</th></tr></thead>
+                              <tbody>
+                                {calcData.items.map((item, ii) => (
+                                  <tr key={ii}>
+                                    <td style={{ fontWeight: 600, color: 'var(--text)' }}>{item.name}</td>
+                                    <td style={{ textAlign: 'right' }}>{item.qty}</td>
+                                    <td style={{ textAlign: 'right' }}>{formatAmount(item.price)}</td>
+                                    <td style={{ textAlign: 'right', fontWeight: 700, color: 'var(--success)' }}>{formatAmount(item.sum || item.qty * item.price)}</td>
+                                  </tr>
+                                ))}
+                                <tr><td colSpan={3} style={{ fontWeight: 800, textAlign: 'right' }}>Итого:</td><td style={{ textAlign: 'right', fontWeight: 800, fontSize: '1.05rem', color: 'var(--success)' }}>{formatAmount(calcData.total)}</td></tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Custom fields */}
+                      {lead.custom_fields && (() => { try { const cf = JSON.parse(lead.custom_fields); return cf && Object.keys(cf).length > 0 ? (
+                        <div style={{ marginTop: 8 }}>
+                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>Доп. данные:</div>
+                          {Object.entries(cf).map(([k, v]) => (
+                            <div key={k} style={{ fontSize: '0.85rem', marginBottom: 4 }}>
+                              <span style={{ color: 'var(--text-muted)' }}>{k}:</span>{' '}
+                              {String(v).startsWith('http') ? <a href={String(v)} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--accent)' }}>{String(v)} <ExternalLink size={12} style={{ verticalAlign: 'middle' }} /></a> : String(v)}
+                            </div>
+                          ))}
+                        </div>
+                      ) : null; } catch { return null; } })()}
+
+                      {/* Quick calculator for form leads */}
+                      {(!calcData || !calcData.items || calcData.items.length === 0) && lead.source !== 'calculator_pdf' && (
+                        <InlineCalc leadId={lead.id} onSave={(items, total) => updateCalcForLead(lead.id, items, total).then(loadLeads)} />
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+      }
+
+      {/* Edit Lead Modal */}
+      {editLead && (
+        <div className="modal-overlay" onClick={() => setEditLead(null)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 600 }} data-testid="lead-edit-modal">
+            <h3 className="modal-title">Редактировать лид #{editLead.lead_number || ''}</h3>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Имя</label><input className="form-input" value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} data-testid="edit-lead-name" /></div>
+              <div className="form-group"><label className="form-label">Контакт</label><input className="form-input" value={editForm.contact} onChange={e => setEditForm({ ...editForm, contact: e.target.value })} /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Продукт</label><input className="form-input" value={editForm.product} onChange={e => setEditForm({ ...editForm, product: e.target.value })} /></div>
+              <div className="form-group"><label className="form-label">Услуга</label><input className="form-input" value={editForm.service} onChange={e => setEditForm({ ...editForm, service: e.target.value })} /></div>
+            </div>
+            <div className="form-group"><label className="form-label">Сообщение</label><textarea className="form-input" value={editForm.message} onChange={e => setEditForm({ ...editForm, message: e.target.value })} /></div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Статус</label><select className="form-input" value={editForm.status} onChange={e => setEditForm({ ...editForm, status: e.target.value })} data-testid="edit-lead-status">
+                {STATUSES.filter(s => s.value !== 'all').map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select></div>
+              <div className="form-group"><label className="form-label">Ответственный</label><select className="form-input" value={editForm.assigned_to} onChange={e => setEditForm({ ...editForm, assigned_to: e.target.value })}>
+                <option value="">Не назначен</option>{users.map(u => <option key={u.id} value={u.id}>{u.display_name}</option>)}
+              </select></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Стоимость (֏)</label><input className="form-input" type="number" value={editForm.total_amount} onChange={e => setEditForm({ ...editForm, total_amount: Number(e.target.value) })} /></div>
+              <div className="form-group"><label className="form-label">Реф. код</label><input className="form-input" value={editForm.referral_code} onChange={e => setEditForm({ ...editForm, referral_code: e.target.value })} /></div>
+            </div>
+            <div className="form-group"><label className="form-label">Заметки</label><textarea className="form-input" value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} data-testid="edit-lead-notes" /></div>
+            <div className="form-group"><label className="form-label">Доп. данные (JSON)</label><textarea className="form-input" style={{ fontFamily: 'monospace', fontSize: '0.82rem' }} value={editForm.custom_fields} onChange={e => setEditForm({ ...editForm, custom_fields: e.target.value })} placeholder='{"wb_link":"https://...","артикул":"12345"}' /></div>
+            <div className="modal-actions"><button className="btn btn-outline" onClick={() => setEditLead(null)}>Отмена</button><button className="btn btn-primary" onClick={saveEdit} data-testid="lead-save-btn"><Save size={16} /> Сохранить</button></div>
+          </div>
+        </div>
+      )}
+
+      {/* Create Lead Modal */}
+      {showCreate && (
+        <div className="modal-overlay" onClick={() => setShowCreate(false)}>
+          <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 640 }} data-testid="create-lead-modal">
+            <h3 className="modal-title">Новый лид</h3>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Имя клиента *</label><input className="form-input" value={createForm.name} onChange={e => setCreateForm({ ...createForm, name: e.target.value })} data-testid="create-lead-name" /></div>
+              <div className="form-group"><label className="form-label">Контакт *</label><input className="form-input" value={createForm.contact} onChange={e => setCreateForm({ ...createForm, contact: e.target.value })} placeholder="+374... или @telegram" /></div>
+            </div>
+            <div className="form-row">
+              <div className="form-group"><label className="form-label">Источник</label><select className="form-input" value={createForm.source} onChange={e => setCreateForm({ ...createForm, source: e.target.value })}>
+                {SOURCES.filter(s => s.value !== 'all').map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select></div>
+              <div className="form-group"><label className="form-label">Продукт</label><input className="form-input" value={createForm.product} onChange={e => setCreateForm({ ...createForm, product: e.target.value })} /></div>
+            </div>
+            <div className="form-group"><label className="form-label">Сообщение</label><textarea className="form-input" value={createForm.message} onChange={e => setCreateForm({ ...createForm, message: e.target.value })} /></div>
+
+            {/* Inline calculator */}
+            <div style={{ padding: '14px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)', marginBottom: 12 }}>
+              <div style={{ fontWeight: 700, fontSize: '0.88rem', color: 'var(--accent)', marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6 }}><Calculator size={16} /> Расчёт стоимости</div>
+              {calcItems.map((item, idx) => (
+                <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 80px 100px 40px', gap: 6, marginBottom: 6 }}>
+                  <input className="form-input" placeholder="Услуга" value={item.name} onChange={e => { const c = [...calcItems]; c[idx] = { ...c[idx], name: e.target.value }; setCalcItems(c); }} style={{ fontSize: '0.82rem' }} />
+                  <input className="form-input" type="number" placeholder="Кол" value={item.qty} onChange={e => { const c = [...calcItems]; c[idx] = { ...c[idx], qty: Number(e.target.value) }; setCalcItems(c); }} style={{ fontSize: '0.82rem' }} />
+                  <input className="form-input" type="number" placeholder="Цена" value={item.price} onChange={e => { const c = [...calcItems]; c[idx] = { ...c[idx], price: Number(e.target.value) }; setCalcItems(c); }} style={{ fontSize: '0.82rem' }} />
+                  <button className="btn-icon" onClick={() => setCalcItems(calcItems.filter((_, ii) => ii !== idx))} style={{ color: 'var(--danger)' }}><Trash2 size={12} /></button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 8 }}>
+                <button className="btn btn-sm btn-outline" onClick={() => setCalcItems([...calcItems, { name: '', qty: 1, price: 0 }])}><Plus size={14} /> Строка</button>
+                <div style={{ fontWeight: 800, color: 'var(--success)', fontSize: '1.1rem' }}>Итого: {formatAmount(calcTotal)}</div>
+              </div>
+            </div>
+
+            <div className="modal-actions"><button className="btn btn-outline" onClick={() => setShowCreate(false)}>Отмена</button><button className="btn btn-primary" onClick={createLead} data-testid="create-lead-submit"><Plus size={16} /> Создать лид</button></div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InlineCalc({ leadId, onSave }) {
+  const [items, setItems] = useState([{ name: '', qty: 1, price: 0 }]);
+  const [open, setOpen] = useState(false);
+  const total = items.reduce((s, i) => s + i.qty * i.price, 0);
+
+  if (!open) return (
+    <button className="btn btn-sm btn-outline" style={{ marginTop: 8 }} onClick={() => setOpen(true)} data-testid="calc-cost-btn">
+      <Calculator size={14} /> Рассчитать стоимость
+    </button>
+  );
+
+  return (
+    <div style={{ marginTop: 8, padding: '12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--purple)' }}>
+      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent)', marginBottom: 8 }}>Калькулятор стоимости</div>
+      {items.map((item, idx) => (
+        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 90px 32px', gap: 4, marginBottom: 4 }}>
+          <input className="form-input" placeholder="Услуга" value={item.name} style={{ fontSize: '0.8rem', padding: '6px 8px' }} onChange={e => { const c = [...items]; c[idx] = { ...c[idx], name: e.target.value }; setItems(c); }} />
+          <input className="form-input" type="number" value={item.qty} style={{ fontSize: '0.8rem', padding: '6px 8px' }} onChange={e => { const c = [...items]; c[idx] = { ...c[idx], qty: Number(e.target.value) }; setItems(c); }} />
+          <input className="form-input" type="number" value={item.price} style={{ fontSize: '0.8rem', padding: '6px 8px' }} onChange={e => { const c = [...items]; c[idx] = { ...c[idx], price: Number(e.target.value) }; setItems(c); }} />
+          <button className="btn-icon" style={{ padding: 4 }} onClick={() => setItems(items.filter((_, ii) => ii !== idx))}><X size={10} /></button>
+        </div>
+      ))}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+        <button className="btn btn-sm btn-outline" onClick={() => setItems([...items, { name: '', qty: 1, price: 0 }])}><Plus size={12} /></button>
+        <span style={{ fontWeight: 800, color: 'var(--success)' }}>{formatAmount(total)}</span>
+        <button className="btn btn-sm btn-success" onClick={() => onSave(items.filter(i => i.name), total)}><Save size={12} /> Сохранить</button>
+      </div>
     </div>
   );
 }
