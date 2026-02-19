@@ -311,10 +311,16 @@ async def update_user_permissions(user_id: str, req: UpdatePermissionsRequest, u
     return {"success": True, "sections": valid}
 
 # ========== LEADS / CRM ==========
+def get_next_lead_number():
+    last = leads_col.find_one({}, sort=[("lead_number", -1)])
+    return (last.get("lead_number", 0) if last else 0) + 1
+
 @app.get("/api/leads")
-async def list_leads(status: Optional[str] = None, limit: int = Query(50, le=500), offset: int = 0, user=Depends(get_current_user)):
+async def list_leads(status: Optional[str] = None, source: Optional[str] = None, limit: int = Query(50, le=500), offset: int = 0, user=Depends(get_current_user)):
     require_section(user, "leads")
-    query = {} if not status or status == "all" else {"status": status}
+    query = {}
+    if status and status != "all": query["status"] = status
+    if source and source != "all": query["source"] = source
     total = leads_col.count_documents(query)
     leads = [str_id(l) for l in leads_col.find(query).sort("created_at", -1).skip(offset).limit(limit)]
     return {"leads": leads, "total": total}
@@ -323,15 +329,22 @@ async def list_leads(status: Optional[str] = None, limit: int = Query(50, le=500
 async def create_lead_auth(req: CreateLeadRequest, user=Depends(get_current_user)):
     require_section(user, "leads")
     lead = {
+        "lead_number": get_next_lead_number(),
         "source": req.source, "name": req.name, "contact": req.contact,
         "product": req.product, "service": req.service, "message": req.message,
-        "lang": req.lang, "status": "new", "notes": "", "assigned_to": "", "assigned_name": "",
-        "referral_code": "",
-        "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
+        "lang": req.lang, "status": "new", "notes": "",
+        "assigned_to": "", "assigned_name": "",
+        "total_amount": req.total_amount or 0,
+        "calc_data": req.calc_data or "",
+        "referral_code": req.referral_code or "",
+        "custom_fields": req.custom_fields or "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     result = leads_col.insert_one(lead)
     d = {k: v for k, v in lead.items() if k != "_id"}
     d["id"] = str(result.inserted_id)
+    log_activity(user["id"], user["display_name"], "create_lead", f"Лид #{lead['lead_number']}: {req.name}")
     return d
 
 @app.put("/api/leads/{lead_id}")
@@ -340,6 +353,15 @@ async def update_lead(lead_id: str, req: UpdateLeadRequest, user=Depends(get_cur
     update = {"updated_at": datetime.now(timezone.utc).isoformat()}
     if req.status is not None: update["status"] = req.status
     if req.notes is not None: update["notes"] = req.notes
+    if req.name is not None: update["name"] = req.name
+    if req.contact is not None: update["contact"] = req.contact
+    if req.product is not None: update["product"] = req.product
+    if req.service is not None: update["service"] = req.service
+    if req.message is not None: update["message"] = req.message
+    if req.total_amount is not None: update["total_amount"] = req.total_amount
+    if req.calc_data is not None: update["calc_data"] = req.calc_data
+    if req.custom_fields is not None: update["custom_fields"] = req.custom_fields
+    if req.referral_code is not None: update["referral_code"] = req.referral_code
     if req.assigned_to is not None:
         update["assigned_to"] = req.assigned_to
         if req.assigned_to:
@@ -357,25 +379,54 @@ async def delete_lead(lead_id: str, user=Depends(get_current_user)):
     leads_col.delete_one({"_id": ObjectId(lead_id)})
     return {"success": True}
 
+@app.get("/api/leads/analytics")
+async def leads_analytics(user=Depends(get_current_user)):
+    require_section(user, "leads")
+    total = leads_col.count_documents({})
+    by_status = list(leads_col.aggregate([
+        {"$group": {"_id": "$status", "count": {"$sum": 1}, "total_amount": {"$sum": {"$ifNull": ["$total_amount", 0]}}}}
+    ]))
+    by_source = list(leads_col.aggregate([
+        {"$group": {"_id": "$source", "count": {"$sum": 1}, "total_amount": {"$sum": {"$ifNull": ["$total_amount", 0]}}}}
+    ]))
+    total_amount = sum(l.get("total_amount", 0) or 0 for l in leads_col.find({}, {"total_amount": 1}))
+    today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    today_count = leads_col.count_documents({"created_at": {"$gte": today}})
+    today_amount = sum(l.get("total_amount", 0) or 0 for l in leads_col.find({"created_at": {"$gte": today}}, {"total_amount": 1}))
+    return {
+        "total": total,
+        "total_amount": total_amount,
+        "today_count": today_count,
+        "today_amount": today_amount,
+        "by_status": {r["_id"]: {"count": r["count"], "amount": r["total_amount"]} for r in by_status},
+        "by_source": {r["_id"]: {"count": r["count"], "amount": r["total_amount"]} for r in by_source},
+    }
+
 @app.get("/api/leads/export")
 async def export_leads(user=Depends(get_current_user)):
     require_section(user, "leads")
     leads = list(leads_col.find({}).sort("created_at", -1))
     output = io.StringIO()
     writer = csv.writer(output)
-    writer.writerow(["ID", "Source", "Name", "Contact", "Product", "Service", "Message", "Lang", "Status", "Notes", "Referral", "Assigned", "Created"])
+    writer.writerow(["#", "Source", "Name", "Contact", "Product", "Service", "Amount", "Status", "Notes", "Referral", "Assigned", "Created"])
     for l in leads:
-        writer.writerow([str(l["_id"]), l.get("source",""), l.get("name",""), l.get("contact",""), l.get("product",""), l.get("service",""), l.get("message",""), l.get("lang",""), l.get("status",""), l.get("notes",""), l.get("referral_code",""), l.get("assigned_name",""), l.get("created_at","")])
+        writer.writerow([l.get("lead_number",""), l.get("source",""), l.get("name",""), l.get("contact",""), l.get("product",""), l.get("service",""), l.get("total_amount",0), l.get("status",""), l.get("notes",""), l.get("referral_code",""), l.get("assigned_name",""), l.get("created_at","")])
     return Response(content=output.getvalue(), media_type="text/csv", headers={"Content-Disposition": "attachment; filename=leads_export.csv"})
 
 @app.post("/api/lead")
 async def submit_lead_public(req: CreateLeadRequest):
     lead = {
+        "lead_number": get_next_lead_number(),
         "source": req.source or "form", "name": req.name, "contact": req.contact,
         "product": req.product, "service": req.service, "message": req.message,
-        "lang": req.lang, "status": "new", "notes": "", "assigned_to": "", "assigned_name": "",
-        "referral_code": "",
-        "created_at": datetime.now(timezone.utc).isoformat(), "updated_at": datetime.now(timezone.utc).isoformat(),
+        "lang": req.lang, "status": "new", "notes": "",
+        "assigned_to": "", "assigned_name": "",
+        "total_amount": req.total_amount or 0,
+        "calc_data": req.calc_data or "",
+        "referral_code": req.referral_code or "",
+        "custom_fields": "",
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     leads_col.insert_one(lead)
     return {"success": True}
