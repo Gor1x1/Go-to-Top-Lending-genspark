@@ -830,3 +830,356 @@ async def delete_photo_block(block_id: str, user=Depends(get_current_user)):
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "service": "Go to Top Admin"}
+
+# ========== CALCULATOR SERVICES PUBLIC ==========
+@app.get("/api/calc-services-public")
+async def list_calc_services_public():
+    """Public endpoint for calculator - used in Leads inline calculator"""
+    tabs = list(calc_tabs_col.find({"is_active": True}).sort("sort_order", 1))
+    services = list(calc_services_col.find({"is_active": True}).sort("sort_order", 1))
+    result = []
+    for s in services:
+        d = str_id(s)
+        tab = next((t for t in tabs if str(t["_id"]) == d.get("tab_id")), None)
+        d["tab_name_ru"] = tab["name_ru"] if tab else ""
+        d["tab_name_am"] = tab.get("name_am", "") if tab else ""
+        result.append(d)
+    return {"tabs": [str_id(t) for t in tabs], "services": result}
+
+# ========== PDF GENERATION ==========
+@app.post("/api/generate-pdf")
+async def generate_pdf(body: dict, user=Depends(get_current_user)):
+    """Generate PDF for calculator results and attach to lead"""
+    require_section(user, "leads")
+    
+    items = body.get("items", [])
+    total = body.get("total", 0)
+    lead_id = body.get("lead_id")
+    lang = body.get("lang", "ru")
+    client_name = body.get("client_name", "")
+    
+    # Get PDF template settings
+    template = pdf_col.find_one({"template_key": "default"}) or {}
+    
+    # Generate PDF
+    pdf_id = str(uuid.uuid4())
+    pdf_filename = f"calc_{pdf_id}.pdf"
+    pdf_path = os.path.join(UPLOAD_DIR, pdf_filename)
+    
+    # Create PDF
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4, rightMargin=20*mm, leftMargin=20*mm, topMargin=20*mm, bottomMargin=20*mm)
+    elements = []
+    styles = getSampleStyleSheet()
+    
+    # Custom styles
+    title_style = ParagraphStyle('Title', parent=styles['Heading1'], fontSize=18, spaceAfter=12, alignment=1)
+    normal_style = ParagraphStyle('Normal', parent=styles['Normal'], fontSize=11, spaceAfter=6)
+    
+    # Header
+    company_name = template.get("company_name", "Go to Top")
+    header_text = template.get(f"header_{lang}", template.get("header_ru", ""))
+    
+    elements.append(Paragraph(company_name, title_style))
+    if header_text:
+        elements.append(Paragraph(header_text, normal_style))
+    elements.append(Spacer(1, 10*mm))
+    
+    # Client info
+    if client_name:
+        elements.append(Paragraph(f"<b>{'Клиент' if lang == 'ru' else 'Հաdelays'}:</b> {client_name}", normal_style))
+    elements.append(Paragraph(f"<b>{'Дата' if lang == 'ru' else 'Ադdelays'}:</b> {datetime.now().strftime('%d.%m.%Y %H:%M')}", normal_style))
+    elements.append(Spacer(1, 8*mm))
+    
+    # Services table
+    if lang == 'ru':
+        table_data = [["Услуга", "Кол-во", "Цена", "Сумма"]]
+    else:
+        table_data = [["delays", "delays", "delays", "delays"]]
+    
+    for item in items:
+        item_sum = item.get("sum", item.get("qty", 1) * item.get("price", 0))
+        table_data.append([
+            item.get("name", ""),
+            str(item.get("qty", 1)),
+            f"{item.get('price', 0):,.0f} ֏",
+            f"{item_sum:,.0f} ֏"
+        ])
+    
+    # Total row
+    table_data.append(["", "", "Итого:" if lang == 'ru' else "delays:", f"{total:,.0f} ֏"])
+    
+    table = Table(table_data, colWidths=[80*mm, 25*mm, 35*mm, 35*mm])
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.Color(0.54, 0.36, 0.96)),  # Purple
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('ALIGN', (0, 0), (-1, -1), 'LEFT'),
+        ('ALIGN', (1, 0), (-1, -1), 'RIGHT'),
+        ('FONTSIZE', (0, 0), (-1, -1), 10),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 10),
+        ('TOPPADDING', (0, 0), (-1, 0), 10),
+        ('BACKGROUND', (0, 1), (-1, -2), colors.Color(0.98, 0.98, 1)),
+        ('BACKGROUND', (0, -1), (-1, -1), colors.Color(0.9, 0.85, 1)),
+        ('FONTSIZE', (0, -1), (-1, -1), 12),
+        ('GRID', (0, 0), (-1, -1), 0.5, colors.Color(0.8, 0.8, 0.8)),
+        ('BOX', (0, 0), (-1, -1), 1, colors.Color(0.54, 0.36, 0.96)),
+    ]))
+    elements.append(table)
+    elements.append(Spacer(1, 10*mm))
+    
+    # Footer
+    footer_text = template.get(f"footer_{lang}", template.get("footer_ru", ""))
+    if footer_text:
+        elements.append(Paragraph(footer_text, normal_style))
+    
+    # Contact info
+    if template.get("company_phone"):
+        elements.append(Paragraph(f"📞 {template['company_phone']}", normal_style))
+    if template.get("company_email"):
+        elements.append(Paragraph(f"📧 {template['company_email']}", normal_style))
+    
+    doc.build(elements)
+    
+    # Save PDF record
+    pdf_url = f"/api/uploads/{pdf_filename}"
+    pdf_record = {
+        "pdf_id": pdf_id,
+        "filename": pdf_filename,
+        "url": pdf_url,
+        "lead_id": lead_id,
+        "items": items,
+        "total": total,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "created_by": user["id"]
+    }
+    generated_pdfs_col.insert_one(pdf_record)
+    
+    # Update lead with calc_data and PDF link
+    if lead_id:
+        calc_data = json.dumps({"items": items, "total": total, "pdf_url": pdf_url})
+        leads_col.update_one(
+            {"_id": ObjectId(lead_id)},
+            {"$set": {"calc_data": calc_data, "total_amount": total, "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
+        log_activity(user["id"], user["display_name"], "generate_pdf", f"PDF для лида {lead_id}")
+    
+    return {"success": True, "pdf_url": pdf_url, "pdf_id": pdf_id}
+
+# ========== SITE BLOCKS MANAGEMENT ==========
+@app.get("/api/site-blocks")
+async def list_site_blocks(user=Depends(get_current_user)):
+    require_section(user, "blocks")
+    return {"blocks": [str_id(b) for b in site_blocks_col.find({}).sort("sort_order", 1)]}
+
+@app.post("/api/site-blocks/fetch-from-site")
+async def fetch_blocks_from_site(body: dict, user=Depends(get_current_user)):
+    """Parse blocks from live site"""
+    require_section(user, "blocks")
+    
+    url = body.get("url", "https://gototop.win")
+    
+    try:
+        async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            html = response.text
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Не удалось загрузить сайт: {str(e)}")
+    
+    soup = BeautifulSoup(html, 'lxml')
+    
+    # Parse sections/blocks
+    blocks = []
+    sections = soup.find_all(['section', 'div'], class_=lambda x: x and ('section' in str(x).lower() or 'block' in str(x).lower()))
+    
+    # If no sections found, try to find main content areas
+    if not sections:
+        sections = soup.find_all(['section', 'header', 'main', 'footer', 'div'], id=True)
+    
+    # Fallback: get all major sections
+    if not sections:
+        sections = soup.find_all('section')
+    
+    for idx, section in enumerate(sections[:20]):  # Limit to 20 blocks
+        block_id = section.get('id') or section.get('class', ['block'])[0] if section.get('class') else f"block_{idx}"
+        if isinstance(block_id, list):
+            block_id = block_id[0]
+        
+        # Extract texts
+        texts_ru = []
+        texts_am = []
+        
+        # Get headings and paragraphs
+        for el in section.find_all(['h1', 'h2', 'h3', 'h4', 'p', 'span', 'li'], recursive=True)[:15]:
+            text = el.get_text(strip=True)
+            if text and len(text) > 2 and len(text) < 500:
+                texts_ru.append(text)
+        
+        # Get images
+        images = []
+        for img in section.find_all('img', src=True)[:5]:
+            src = img.get('src', '')
+            if src:
+                if src.startswith('/'):
+                    src = url.rstrip('/') + src
+                elif not src.startswith('http'):
+                    src = url.rstrip('/') + '/' + src
+                images.append({"url": src, "alt": img.get('alt', '')})
+        
+        # Get buttons/links
+        buttons = []
+        for btn in section.find_all(['a', 'button'], recursive=True)[:5]:
+            btn_text = btn.get_text(strip=True)
+            btn_href = btn.get('href', '')
+            if btn_text and len(btn_text) < 100:
+                buttons.append({"text_ru": btn_text, "text_am": "", "url": btn_href})
+        
+        block = {
+            "block_key": block_id,
+            "block_type": "section",
+            "title_ru": texts_ru[0] if texts_ru else block_id,
+            "title_am": "",
+            "texts_ru": texts_ru[1:6] if len(texts_ru) > 1 else [],
+            "texts_am": [],
+            "images": images,
+            "buttons": buttons,
+            "sort_order": idx,
+            "is_visible": True,
+            "custom_css": "",
+            "custom_html": "",
+        }
+        blocks.append(block)
+    
+    return {"success": True, "blocks": blocks, "total": len(blocks)}
+
+@app.post("/api/site-blocks")
+async def create_site_block(body: dict, user=Depends(get_current_user)):
+    require_section(user, "blocks")
+    
+    doc = {
+        "block_key": body.get("block_key", f"block_{uuid.uuid4().hex[:8]}"),
+        "block_type": body.get("block_type", "section"),
+        "title_ru": body.get("title_ru", ""),
+        "title_am": body.get("title_am", ""),
+        "texts_ru": body.get("texts_ru", []),
+        "texts_am": body.get("texts_am", []),
+        "images": body.get("images", []),
+        "buttons": body.get("buttons", []),
+        "sort_order": body.get("sort_order", 0),
+        "is_visible": body.get("is_visible", True),
+        "custom_css": body.get("custom_css", ""),
+        "custom_html": body.get("custom_html", ""),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    result = site_blocks_col.insert_one(doc)
+    d = {k: v for k, v in doc.items() if k != "_id"}
+    d["id"] = str(result.inserted_id)
+    log_activity(user["id"], user["display_name"], "create_block", f"Блок: {doc['block_key']}")
+    return d
+
+@app.post("/api/site-blocks/import")
+async def import_site_blocks(body: dict, user=Depends(get_current_user)):
+    """Import multiple blocks from parsed site data"""
+    require_section(user, "blocks")
+    
+    blocks = body.get("blocks", [])
+    imported = 0
+    
+    for block in blocks:
+        # Check if block with this key exists
+        existing = site_blocks_col.find_one({"block_key": block.get("block_key")})
+        if existing:
+            # Update existing
+            site_blocks_col.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {**block, "updated_at": datetime.now(timezone.utc).isoformat()}}
+            )
+        else:
+            # Create new
+            block["created_at"] = datetime.now(timezone.utc).isoformat()
+            block["updated_at"] = datetime.now(timezone.utc).isoformat()
+            site_blocks_col.insert_one(block)
+        imported += 1
+    
+    log_activity(user["id"], user["display_name"], "import_blocks", f"Импортировано: {imported} блоков")
+    return {"success": True, "imported": imported}
+
+@app.put("/api/site-blocks/{block_id}")
+async def update_site_block(block_id: str, body: dict, user=Depends(get_current_user)):
+    require_section(user, "blocks")
+    
+    fields = ["block_key", "block_type", "title_ru", "title_am", "texts_ru", "texts_am", 
+              "images", "buttons", "sort_order", "is_visible", "custom_css", "custom_html"]
+    update = {k: body[k] for k in fields if k in body}
+    update["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    site_blocks_col.update_one({"_id": ObjectId(block_id)}, {"$set": update})
+    return {"success": True}
+
+@app.post("/api/site-blocks/reorder")
+async def reorder_site_blocks(body: dict, user=Depends(get_current_user)):
+    """Update sort order for multiple blocks"""
+    require_section(user, "blocks")
+    
+    orders = body.get("orders", [])  # [{id: "...", sort_order: 0}, ...]
+    for item in orders:
+        site_blocks_col.update_one(
+            {"_id": ObjectId(item["id"])},
+            {"$set": {"sort_order": item["sort_order"]}}
+        )
+    return {"success": True}
+
+@app.delete("/api/site-blocks/{block_id}")
+async def delete_site_block(block_id: str, user=Depends(get_current_user)):
+    require_section(user, "blocks")
+    site_blocks_col.delete_one({"_id": ObjectId(block_id)})
+    return {"success": True}
+
+@app.post("/api/site-blocks/duplicate/{block_id}")
+async def duplicate_site_block(block_id: str, user=Depends(get_current_user)):
+    """Duplicate a block"""
+    require_section(user, "blocks")
+    
+    original = site_blocks_col.find_one({"_id": ObjectId(block_id)})
+    if not original:
+        raise HTTPException(status_code=404, detail="Блок не найден")
+    
+    new_block = {k: v for k, v in original.items() if k != "_id"}
+    new_block["block_key"] = f"{new_block['block_key']}_copy_{uuid.uuid4().hex[:4]}"
+    new_block["title_ru"] = f"{new_block.get('title_ru', '')} (копия)"
+    new_block["created_at"] = datetime.now(timezone.utc).isoformat()
+    new_block["updated_at"] = datetime.now(timezone.utc).isoformat()
+    
+    result = site_blocks_col.insert_one(new_block)
+    d = {k: v for k, v in new_block.items() if k != "_id"}
+    d["id"] = str(result.inserted_id)
+    return d
+
+# ========== FILE UPLOAD ==========
+@app.post("/api/upload")
+async def upload_file(file: UploadFile = File(...), user=Depends(get_current_user)):
+    """Upload image file"""
+    require_section(user, "blocks")
+    
+    # Validate file type
+    allowed_types = ["image/jpeg", "image/png", "image/gif", "image/webp", "image/svg+xml"]
+    if file.content_type not in allowed_types:
+        raise HTTPException(status_code=400, detail="Неподдерживаемый тип файла")
+    
+    # Limit file size (5MB)
+    contents = await file.read()
+    if len(contents) > 5 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Файл слишком большой (макс. 5MB)")
+    
+    # Generate unique filename
+    ext = file.filename.split('.')[-1] if '.' in file.filename else 'jpg'
+    filename = f"{uuid.uuid4().hex}.{ext}"
+    filepath = os.path.join(UPLOAD_DIR, filename)
+    
+    async with aiofiles.open(filepath, 'wb') as f:
+        await f.write(contents)
+    
+    url = f"/api/uploads/{filename}"
+    log_activity(user["id"], user["display_name"], "upload_file", filename)
+    
+    return {"success": True, "url": url, "filename": filename}
