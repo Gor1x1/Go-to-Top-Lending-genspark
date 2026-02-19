@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { apiFetch, useAuth } from '../App';
-import { Search, Trash2, Edit3, Download, Plus, ChevronDown, ChevronUp, Calculator, BarChart3, X, Save, FileText, ExternalLink, User } from 'lucide-react';
+import { Search, Trash2, Edit3, Download, Plus, ChevronDown, ChevronUp, Calculator, BarChart3, X, Save, FileText, ExternalLink, User, Check, FileDown, RefreshCw } from 'lucide-react';
 
 const STATUSES = [
   { value: 'all', label: 'Все', color: 'gray' },
@@ -48,6 +48,14 @@ export default function Leads() {
   const [analytics, setAnalytics] = useState(null);
   const [createForm, setCreateForm] = useState({ name: '', contact: '', product: '', service: '', message: '', source: 'manual', lang: 'ru', total_amount: 0, calc_data: '', referral_code: '', custom_fields: '' });
   const [calcItems, setCalcItems] = useState([{ name: '', qty: 1, price: 0 }]);
+  
+  // Calculator modal state
+  const [showCalcModal, setShowCalcModal] = useState(null); // lead object or null
+  const [calcServices, setCalcServices] = useState([]);
+  const [calcTabs, setCalcTabs] = useState([]);
+  const [selectedTab, setSelectedTab] = useState(null);
+  const [selectedServices, setSelectedServices] = useState([]);
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => { loadLeads(); loadUsers(); }, [filter, sourceFilter]);
 
@@ -61,6 +69,16 @@ export default function Leads() {
   };
 
   const loadUsers = async () => { const res = await apiFetch('/api/users'); if (res?.ok) setUsers(await res.json()); };
+  
+  const loadCalcServices = async () => {
+    const res = await apiFetch('/api/calc-services-public');
+    if (res?.ok) {
+      const data = await res.json();
+      setCalcTabs(data.tabs || []);
+      setCalcServices(data.services || []);
+      if (data.tabs?.length > 0) setSelectedTab(data.tabs[0].id);
+    }
+  };
 
   const loadAnalytics = async () => {
     const res = await apiFetch('/api/leads/analytics');
@@ -102,11 +120,73 @@ export default function Leads() {
     loadLeads(); loadAnalytics();
   };
 
-  const updateCalcForLead = async (leadId, items, total) => {
-    const calcData = JSON.stringify({ items: items.map(i => ({ ...i, sum: i.qty * i.price })), total });
-    await apiFetch(`/api/leads/${leadId}`, { method: 'PUT', body: JSON.stringify({ calc_data: calcData, total_amount: total }) });
-    loadLeads();
+  // Open calculator modal for a lead
+  const openCalcModal = async (lead) => {
+    setShowCalcModal(lead);
+    setSelectedServices([]);
+    await loadCalcServices();
   };
+  
+  // Add service to calculation
+  const toggleService = (service) => {
+    setSelectedServices(prev => {
+      const exists = prev.find(s => s.id === service.id);
+      if (exists) {
+        return prev.filter(s => s.id !== service.id);
+      } else {
+        return [...prev, { ...service, qty: 1 }];
+      }
+    });
+  };
+  
+  const updateServiceQty = (serviceId, qty) => {
+    setSelectedServices(prev => prev.map(s => s.id === serviceId ? { ...s, qty: Math.max(1, qty) } : s));
+  };
+  
+  const calcModalTotal = useMemo(() => {
+    return selectedServices.reduce((sum, s) => sum + (s.qty * (s.price || 0)), 0);
+  }, [selectedServices]);
+  
+  // Generate PDF and save to lead
+  const generateAndSavePDF = async () => {
+    if (!showCalcModal || selectedServices.length === 0) return;
+    setGenerating(true);
+    
+    const items = selectedServices.map(s => ({
+      name: s.name_ru,
+      qty: s.qty,
+      price: s.price || 0,
+      sum: s.qty * (s.price || 0)
+    }));
+    
+    const res = await apiFetch('/api/generate-pdf', {
+      method: 'POST',
+      body: JSON.stringify({
+        lead_id: showCalcModal.id,
+        items,
+        total: calcModalTotal,
+        client_name: showCalcModal.name || '',
+        lang: showCalcModal.lang || 'ru'
+      })
+    });
+    
+    if (res?.ok) {
+      const data = await res.json();
+      setShowCalcModal(null);
+      setSelectedServices([]);
+      loadLeads();
+      // Open PDF in new tab
+      if (data.pdf_url) {
+        window.open(process.env.REACT_APP_BACKEND_URL + data.pdf_url, '_blank');
+      }
+    }
+    setGenerating(false);
+  };
+
+  const filteredServices = useMemo(() => {
+    if (!selectedTab) return calcServices;
+    return calcServices.filter(s => s.tab_id === selectedTab);
+  }, [calcServices, selectedTab]);
 
   return (
     <div className="page" data-testid="leads-page">
@@ -157,7 +237,7 @@ export default function Leads() {
 
       {/* Filters */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        <button className="btn btn-sm btn-outline" onClick={() => { const t = localStorage.getItem('gtt_token'); window.open(`${process.env.REACT_APP_BACKEND_URL}/api/leads/export`, '_blank'); }} data-testid="export-csv-btn"><Download size={14} /> CSV</button>
+        <button className="btn btn-sm btn-outline" onClick={() => { window.open(`${process.env.REACT_APP_BACKEND_URL}/api/leads/export`, '_blank'); }} data-testid="export-csv-btn"><Download size={14} /> CSV</button>
         <select className="form-input" style={{ width: 'auto', padding: '6px 12px', fontSize: '0.82rem' }} value={sourceFilter} onChange={e => setSourceFilter(e.target.value)} data-testid="source-filter">
           {SOURCES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
         </select>
@@ -179,6 +259,7 @@ export default function Leads() {
               const calcData = parseCalcData(lead.calc_data);
               const isExpanded = expandedLead === lead.id;
               const amt = lead.total_amount || (calcData?.total) || 0;
+              const hasPDF = calcData?.pdf_url;
 
               return (
                 <div key={lead.id} className="card" style={{ padding: 0, overflow: 'hidden', borderLeft: `3px solid var(--${st.color === 'green' ? 'success' : st.color === 'amber' ? 'warning' : st.color === 'red' ? 'danger' : st.color === 'purple' ? 'purple' : 'info'})` }} data-testid={`lead-card-${i}`}>
@@ -192,6 +273,11 @@ export default function Leads() {
                       <div style={{ fontWeight: 700, color: 'var(--text)', fontSize: '0.95rem' }}>{lead.name || '—'}</div>
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{lead.contact || '—'}</div>
                     </div>
+                    {hasPDF && (
+                      <button className="btn btn-sm btn-outline" style={{ padding: '4px 8px' }} onClick={(e) => { e.stopPropagation(); window.open(process.env.REACT_APP_BACKEND_URL + calcData.pdf_url, '_blank'); }} title="Скачать PDF">
+                        <FileDown size={14} />
+                      </button>
+                    )}
                     {amt > 0 && <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--success)', whiteSpace: 'nowrap' }}>{formatAmount(amt)}</div>}
                     <select className="form-input" style={{ width: 'auto', padding: '6px 10px', fontSize: '0.78rem', background: 'var(--bg-surface)' }}
                       value={lead.status} onClick={e => e.stopPropagation()} onChange={e => quickStatus(lead.id, e.target.value)} data-testid={`status-select-${i}`}>
@@ -221,7 +307,14 @@ export default function Leads() {
                       {/* Calc data — services table */}
                       {calcData && calcData.items && calcData.items.length > 0 && (
                         <div style={{ marginTop: 8 }}>
-                          <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 6 }}>Выбранные услуги:</div>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <div style={{ fontSize: '0.82rem', fontWeight: 700, color: 'var(--accent)' }}>Выбранные услуги:</div>
+                            {calcData.pdf_url && (
+                              <a href={process.env.REACT_APP_BACKEND_URL + calcData.pdf_url} target="_blank" rel="noopener noreferrer" className="btn btn-sm btn-outline" style={{ gap: 4 }}>
+                                <FileDown size={14} /> Скачать PDF
+                              </a>
+                            )}
+                          </div>
                           <div className="table-wrap">
                             <table>
                               <thead><tr><th>Услуга</th><th style={{ textAlign: 'right' }}>Кол-во</th><th style={{ textAlign: 'right' }}>Цена</th><th style={{ textAlign: 'right' }}>Сумма</th></tr></thead>
@@ -254,9 +347,18 @@ export default function Leads() {
                         </div>
                       ) : null; } catch { return null; } })()}
 
-                      {/* Quick calculator for form leads */}
+                      {/* Calculator button for form leads without calc data */}
                       {(!calcData || !calcData.items || calcData.items.length === 0) && lead.source !== 'calculator_pdf' && (
-                        <InlineCalc leadId={lead.id} onSave={(items, total) => updateCalcForLead(lead.id, items, total).then(loadLeads)} />
+                        <button className="btn btn-primary" style={{ marginTop: 12 }} onClick={() => openCalcModal(lead)} data-testid="calc-cost-btn">
+                          <Calculator size={16} /> Рассчитать стоимость
+                        </button>
+                      )}
+                      
+                      {/* Recalculate button for leads with existing calc */}
+                      {calcData && calcData.items && calcData.items.length > 0 && (
+                        <button className="btn btn-outline" style={{ marginTop: 8 }} onClick={() => openCalcModal(lead)}>
+                          <RefreshCw size={14} /> Пересчитать
+                        </button>
                       )}
                     </div>
                   )}
@@ -265,6 +367,105 @@ export default function Leads() {
             })}
           </div>
       }
+
+      {/* Calculator Modal */}
+      {showCalcModal && (
+        <div className="modal-overlay" onClick={() => { setShowCalcModal(null); setSelectedServices([]); }}>
+          <div className="modal-card" onClick={e => e.stopPropagation()} style={{ maxWidth: 800, maxHeight: '90vh', overflow: 'auto' }} data-testid="calc-modal">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <h3 className="modal-title" style={{ margin: 0 }}>
+                <Calculator size={20} style={{ marginRight: 8, color: 'var(--purple)' }} />
+                Калькулятор для #{showCalcModal.lead_number}
+              </h3>
+              <button className="btn-icon" onClick={() => { setShowCalcModal(null); setSelectedServices([]); }}><X size={16} /></button>
+            </div>
+            
+            <div style={{ marginBottom: 12, padding: '10px 14px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.85rem' }}><strong>Клиент:</strong> {showCalcModal.name || '—'}</div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>{showCalcModal.contact || '—'}</div>
+            </div>
+            
+            {/* Tabs */}
+            {calcTabs.length > 0 && (
+              <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+                {calcTabs.map(tab => (
+                  <button key={tab.id} className={`btn btn-sm ${selectedTab === tab.id ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setSelectedTab(tab.id)}>{tab.name_ru}</button>
+                ))}
+              </div>
+            )}
+            
+            {/* Services list */}
+            <div style={{ display: 'grid', gap: 8, marginBottom: 16 }}>
+              {filteredServices.map(service => {
+                const isSelected = selectedServices.some(s => s.id === service.id);
+                const selectedItem = selectedServices.find(s => s.id === service.id);
+                return (
+                  <div key={service.id} 
+                    style={{ 
+                      padding: '12px 16px', 
+                      background: isSelected ? 'rgba(139,92,246,0.1)' : 'var(--bg-card)', 
+                      border: `1px solid ${isSelected ? 'var(--purple)' : 'var(--border)'}`,
+                      borderRadius: 'var(--radius-sm)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 12
+                    }}
+                    onClick={() => toggleService(service)}
+                  >
+                    <div style={{ 
+                      width: 24, height: 24, borderRadius: 4, 
+                      border: `2px solid ${isSelected ? 'var(--purple)' : 'var(--border)'}`,
+                      background: isSelected ? 'var(--purple)' : 'transparent',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      {isSelected && <Check size={14} color="white" />}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text)' }}>{service.name_ru}</div>
+                      {service.name_am && <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>{service.name_am}</div>}
+                    </div>
+                    <div style={{ fontWeight: 700, color: 'var(--purple)' }}>{formatAmount(service.price)}</div>
+                    {isSelected && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
+                        <button className="btn-icon" style={{ padding: '4px 8px' }} onClick={() => updateServiceQty(service.id, selectedItem.qty - 1)}>−</button>
+                        <span style={{ minWidth: 28, textAlign: 'center', fontWeight: 700 }}>{selectedItem.qty}</span>
+                        <button className="btn-icon" style={{ padding: '4px 8px' }} onClick={() => updateServiceQty(service.id, selectedItem.qty + 1)}>+</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            {/* Selected services summary */}
+            {selectedServices.length > 0 && (
+              <div style={{ padding: '16px', background: 'var(--bg-surface)', borderRadius: 'var(--radius)', border: '1px solid var(--purple)', marginBottom: 16 }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 10 }}>Выбранные услуги:</div>
+                {selectedServices.map(s => (
+                  <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid var(--border)', fontSize: '0.85rem' }}>
+                    <span>{s.name_ru} × {s.qty}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--success)' }}>{formatAmount(s.qty * s.price)}</span>
+                  </div>
+                ))}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTop: '2px solid var(--purple)' }}>
+                  <span style={{ fontWeight: 800, fontSize: '1.1rem' }}>Итого:</span>
+                  <span style={{ fontWeight: 800, fontSize: '1.2rem', color: 'var(--success)' }}>{formatAmount(calcModalTotal)}</span>
+                </div>
+              </div>
+            )}
+            
+            <div className="modal-actions">
+              <button className="btn btn-outline" onClick={() => { setShowCalcModal(null); setSelectedServices([]); }}>Отмена</button>
+              <button className="btn btn-primary" onClick={generateAndSavePDF} disabled={selectedServices.length === 0 || generating} data-testid="generate-pdf-btn">
+                {generating ? <RefreshCw size={16} className="spin" /> : <FileText size={16} />}
+                {generating ? 'Генерация...' : 'Сохранить и создать PDF'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Edit Lead Modal */}
       {editLead && (
@@ -337,37 +538,6 @@ export default function Leads() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function InlineCalc({ leadId, onSave }) {
-  const [items, setItems] = useState([{ name: '', qty: 1, price: 0 }]);
-  const [open, setOpen] = useState(false);
-  const total = items.reduce((s, i) => s + i.qty * i.price, 0);
-
-  if (!open) return (
-    <button className="btn btn-sm btn-outline" style={{ marginTop: 8 }} onClick={() => setOpen(true)} data-testid="calc-cost-btn">
-      <Calculator size={14} /> Рассчитать стоимость
-    </button>
-  );
-
-  return (
-    <div style={{ marginTop: 8, padding: '12px', background: 'var(--bg-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--purple)' }}>
-      <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--accent)', marginBottom: 8 }}>Калькулятор стоимости</div>
-      {items.map((item, idx) => (
-        <div key={idx} style={{ display: 'grid', gridTemplateColumns: '1fr 70px 90px 32px', gap: 4, marginBottom: 4 }}>
-          <input className="form-input" placeholder="Услуга" value={item.name} style={{ fontSize: '0.8rem', padding: '6px 8px' }} onChange={e => { const c = [...items]; c[idx] = { ...c[idx], name: e.target.value }; setItems(c); }} />
-          <input className="form-input" type="number" value={item.qty} style={{ fontSize: '0.8rem', padding: '6px 8px' }} onChange={e => { const c = [...items]; c[idx] = { ...c[idx], qty: Number(e.target.value) }; setItems(c); }} />
-          <input className="form-input" type="number" value={item.price} style={{ fontSize: '0.8rem', padding: '6px 8px' }} onChange={e => { const c = [...items]; c[idx] = { ...c[idx], price: Number(e.target.value) }; setItems(c); }} />
-          <button className="btn-icon" style={{ padding: 4 }} onClick={() => setItems(items.filter((_, ii) => ii !== idx))}><X size={10} /></button>
-        </div>
-      ))}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
-        <button className="btn btn-sm btn-outline" onClick={() => setItems([...items, { name: '', qty: 1, price: 0 }])}><Plus size={12} /></button>
-        <span style={{ fontWeight: 800, color: 'var(--success)' }}>{formatAmount(total)}</span>
-        <button className="btn btn-sm btn-success" onClick={() => onSave(items.filter(i => i.name), total)}><Save size={12} /> Сохранить</button>
-      </div>
     </div>
   );
 }
