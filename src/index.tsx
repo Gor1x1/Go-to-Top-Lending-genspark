@@ -131,13 +131,16 @@ app.post('/api/lead', async (c) => {
     await initDatabase(db);
     const body = await c.req.json();
     const ua = c.req.header('User-Agent') || '';
-    await db.prepare('INSERT INTO leads (source, name, contact, product, service, message, lang, referral_code, user_agent) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind('form', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200)).run();
+    // Get next lead number
+    const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
+    const nextNum = ((lastLead?.max_num as number) || 0) + 1;
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, referral_code, user_agent) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'form', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200)).run();
     notifyTelegram(db, { ...body, source: 'form' });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
     console.error('Lead error:', e);
-    return c.json({ success: true, message: 'Lead received' });
+    return c.json({ error: 'Failed to save lead' }, 500);
   }
 })
 
@@ -148,13 +151,16 @@ app.post('/api/popup-lead', async (c) => {
     await initDatabase(db);
     const body = await c.req.json();
     const ua = c.req.header('User-Agent') || '';
-    await db.prepare('INSERT INTO leads (source, name, contact, product, service, message, lang, user_agent) VALUES (?,?,?,?,?,?,?,?)')
-      .bind('popup', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200)).run();
+    // Get next lead number
+    const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
+    const nextNum = ((lastLead?.max_num as number) || 0) + 1;
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'popup', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200)).run();
     notifyTelegram(db, { ...body, source: 'popup' });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
     console.error('Popup lead error:', e);
-    return c.json({ success: true, message: 'Lead received' });
+    return c.json({ error: 'Failed to save lead' }, 500);
   }
 })
 
@@ -210,8 +216,10 @@ app.post('/api/generate-pdf', async (c) => {
 
     // Save lead with unique ID
     const ua = c.req.header('User-Agent') || '';
-    const leadResult = await db.prepare('INSERT INTO leads (source, name, contact, calc_data, lang, referral_code, user_agent) VALUES (?,?,?,?,?,?,?)')
-      .bind('calculator_pdf', clientName, clientContact, JSON.stringify({ items, total, referralCode }), lang, referralCode, ua.substring(0,200)).run();
+    const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
+    const nextNum = ((lastLead?.max_num as number) || 0) + 1;
+    const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'calculator_pdf', clientName, clientContact, JSON.stringify({ items, total, referralCode }), lang, referralCode, ua.substring(0,200), total).run();
     const leadId = leadResult.meta?.last_row_id || 0;
 
     // Notify via Telegram with detailed info

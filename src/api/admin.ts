@@ -987,19 +987,39 @@ api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-// Recalculate lead total_amount from articles and update calc_data for PDF
+// Recalculate lead total_amount from articles + services and update calc_data for PDF
 api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   const db = c.env.DB;
   const leadId = c.req.param('id');
+  
+  // Get existing lead data (services from calculator)
+  const leadRow = await db.prepare('SELECT * FROM leads WHERE id = ?').bind(leadId).first();
+  if (!leadRow) return c.json({ error: 'Lead not found' }, 404);
+  
+  // Parse existing calc_data to get service items
+  let existingCalcData: any = null;
+  let serviceItems: any[] = [];
+  let servicesTotalAmount = 0;
+  try {
+    existingCalcData = JSON.parse(leadRow.calc_data as string || '{}');
+    // Keep service items (those without wb_article field)
+    if (existingCalcData.items) {
+      serviceItems = existingCalcData.items.filter((item: any) => !item.wb_article);
+      for (const si of serviceItems) {
+        servicesTotalAmount += Number(si.subtotal) || 0;
+      }
+    }
+  } catch {}
+  
   // Sum all articles total_price
   const articlesRes = await db.prepare('SELECT * FROM lead_articles WHERE lead_id = ? ORDER BY sort_order, id').bind(leadId).all();
   const articles = articlesRes.results || [];
-  let totalAmount = 0;
-  const items: any[] = [];
+  let articlesTotalAmount = 0;
+  const articleItems: any[] = [];
   for (const art of articles) {
     const tp = Number(art.total_price) || 0;
-    totalAmount += tp;
-    items.push({
+    articlesTotalAmount += tp;
+    articleItems.push({
       name: (art.product_name || art.wb_article || 'Артикул') + (art.size ? ' (р.' + art.size + ')' : '') + (art.color ? ' ' + art.color : ''),
       qty: Number(art.quantity) || 1,
       price: Number(art.price_per_unit) || 0,
@@ -1007,11 +1027,16 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
       wb_article: art.wb_article
     });
   }
+  
+  // Total = services + articles
+  const totalAmount = servicesTotalAmount + articlesTotalAmount;
+  const allItems = [...serviceItems, ...articleItems];
+  
   // Update lead total_amount and calc_data (for PDF)
-  const calcData = JSON.stringify({ items, total: totalAmount, referralCode: '' });
-  await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ?, source = CASE WHEN source = ? THEN source ELSE source END WHERE id = ?')
-    .bind(totalAmount, calcData, 'calculator_pdf', leadId).run();
-  // Also set source to calculator_pdf if not already, so PDF route works
+  const calcData = JSON.stringify({ items: allItems, total: totalAmount, referralCode: existingCalcData?.referralCode || '' });
+  await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
+    .bind(totalAmount, calcData, leadId).run();
+  // Set source to calculator_pdf so PDF route works
   await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND (source = 'form' OR source = 'manual' OR source = 'popup')").bind(leadId).run();
   await updateLeadArticlesCount(db, Number(leadId));
   return c.json({ success: true, total_amount: totalAmount, articles_count: articles.length });

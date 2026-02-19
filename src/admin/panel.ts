@@ -1509,6 +1509,8 @@ function renderLeads() {
       h += '<div style="display:flex;gap:4px">';
       if (isCalc) {
         h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-file-pdf" style="margin-right:4px"></i>КП</a>';
+      } else {
+        h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;color:#F59E0B;border-color:#F59E0B" onclick="generateLeadKP(' + l.id + ')" title="Создать коммерческое предложение"><i class="fas fa-file-invoice-dollar" style="margin-right:4px"></i>КП</button>';
       }
       h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="toggleLeadExpand(' + l.id + ')" title="Детали и комментарии"><i class="fas fa-chevron-down"></i></button>';
       h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
@@ -1536,8 +1538,9 @@ function renderLeads() {
         '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
         '<div style="display:flex;gap:8px"><textarea class="input" id="lead-notes-' + l.id + '" style="flex:1;min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea>' +
         '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadNotes(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
-      // Comments section (loaded dynamically)
-      h += '<div id="comments-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка комментариев...</span></div></div>';
+      // Save all lead changes button
+      h += '<div style="margin-top:14px;border-top:1px solid #334155;padding-top:14px;display:flex;justify-content:flex-end;gap:8px">' +
+        '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить изменения</button></div>';
       // Articles section (WB артикулы) — loaded dynamically
       h += '<div id="articles-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка артикулов...</span></div></div>';
       h += '</div>';
@@ -1693,7 +1696,6 @@ function toggleLeadExpand(id) {
   if (!el) return;
   if (el.style.display === 'none') {
     el.style.display = 'block';
-    if (!data.leadComments[id]) loadComments(id);
     // Articles: if already loaded, just render immediately; otherwise fetch
     if (data.leadArticles[id]) {
       renderArticlesSection(id);
@@ -1737,8 +1739,7 @@ function renderArticlesSection(leadId) {
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Кол-во</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Цена</th>' +
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Сумма</th>' +
-      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Статус</th>' +
-      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Выкупщик</th>' +
+
       '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center"></th>' +
       '</tr></thead><tbody>';
     var totalSum = 0;
@@ -1756,22 +1757,20 @@ function renderArticlesSection(leadId) {
         '<td style="padding:6px 8px;text-align:center;color:#e2e8f0;font-weight:600">' + (art.quantity || 1) + '</td>' +
         '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(art.price_per_unit||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
         '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(art.total_price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
-        '<td style="padding:6px 8px;text-align:center">' +
-          '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;background:' + artColor + '22;color:' + artColor + ';border:1px solid ' + artColor + '44">' + (articleStatusLabels[art.status] || art.status) + '</span></td>' +
-        '<td style="padding:6px 8px;text-align:center;font-size:0.72rem;color:#94a3b8">' + escHtml(art.buyer_name || '—') + '</td>' +
+
         '<td style="padding:6px 8px;text-align:center;white-space:nowrap">' +
           '<button style="background:none;border:none;color:#a78bfa;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="showArticleModal(' + leadId + ',' + art.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>' +
           '<button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="deleteArticle(' + art.id + ',' + leadId + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
         '</td></tr>';
       // Show notes if any
       if (art.notes) {
-        h += '<tr style="border-bottom:1px solid #1e293b"><td colspan="10" style="padding:2px 8px 6px 8px;font-size:0.72rem;color:#64748b;font-style:italic"><i class="fas fa-sticky-note" style="margin-right:4px;color:#fbbf24"></i>' + escHtml(art.notes) + '</td></tr>';
+        h += '<tr style="border-bottom:1px solid #1e293b"><td colspan="7" style="padding:2px 8px 6px 8px;font-size:0.72rem;color:#64748b;font-style:italic"><i class="fas fa-sticky-note" style="margin-right:4px;color:#fbbf24"></i>' + escHtml(art.notes) + '</td></tr>';
       }
     }
     h += '</tbody>' +
-      '<tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="6" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО артикулы:</td>' +
-      '<td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;font-size:0.9rem;white-space:nowrap">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
-      '<td colspan="3" style="padding:8px;text-align:center"><button class="btn btn-success" style="padding:4px 12px;font-size:0.75rem;white-space:nowrap" onclick="recalcLeadTotal(' + leadId + ')" title="Обновить сумму лида из артикулов"><i class="fas fa-calculator" style="margin-right:4px"></i>Пересчитать</button></td></tr></tfoot></table></div>';
+      '<tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="5" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО артикулы:</td>' +
+      '<td colspan="2" style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;font-size:0.9rem;white-space:nowrap">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+      '</tr></tfoot></table></div>';
   }
   h += '</div>';
   el.innerHTML = h;
@@ -1887,10 +1886,51 @@ async function recalcLeadTotal(leadId) {
     // Re-expand and reload articles
     setTimeout(function() {
       var el = document.getElementById('lead-detail-' + leadId);
-      if (el) { el.style.display = 'block'; loadArticles(leadId); loadComments(leadId); }
+      if (el) { el.style.display = 'block'; loadArticles(leadId); }
     }, 100);
   } else {
     toast('Ошибка пересчёта', 'error');
+  }
+}
+
+// Save all lead changes: notes + recalculate total
+async function saveLeadAll(leadId) {
+  // 1. Save notes
+  var notesEl = document.getElementById('lead-notes-' + leadId);
+  if (notesEl) {
+    await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ notes: notesEl.value }) });
+    var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+    if (lead) lead.notes = notesEl.value;
+  }
+  // 2. Recalculate total (articles + services)
+  var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+  if (res && res.success) {
+    toast('Все изменения сохранены. Итого: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏');
+  } else {
+    toast('Заметка сохранена');
+  }
+  // 3. Refresh
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); }
+  }, 100);
+}
+
+// Generate KP (PDF) for lead without calculator data
+async function generateLeadKP(leadId) {
+  toast('Генерация КП...', 'info');
+  var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+  if (res && res.success) {
+    toast('КП создано! Открываю...', 'success');
+    var resLeads = await api('/leads?limit=500');
+    data.leads = resLeads || { leads: [], total: 0 };
+    render();
+    window.open('/pdf/' + leadId, '_blank');
+  } else {
+    toast('Ошибка создания КП', 'error');
   }
 }
 
