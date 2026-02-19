@@ -57,7 +57,7 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {} };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {} };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -1333,7 +1333,7 @@ function renderLeads() {
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
   
   // --- Analytics mini-dashboard with per-status sums ---
-  var stats = { new: {c:0,a:0}, contacted: {c:0,a:0}, in_progress: {c:0,a:0}, done: {c:0,a:0}, rejected: {c:0,a:0} };
+  var stats = { new: {c:0,a:0}, contacted: {c:0,a:0}, in_progress: {c:0,a:0}, collecting: {c:0,a:0}, buying: {c:0,a:0}, delivering: {c:0,a:0}, checking: {c:0,a:0}, done: {c:0,a:0}, rejected: {c:0,a:0} };
   var todayCount = 0, todayAmount = 0, totalAmount = 0;
   var today = new Date().toISOString().slice(0,10);
   for (var ai = 0; ai < leads.length; ai++) {
@@ -1341,6 +1341,7 @@ function renderLeads() {
     var amt = Number(al.total_amount || 0);
     totalAmount += amt;
     if (stats[al.status]) { stats[al.status].c++; stats[al.status].a += amt; }
+    else { stats[al.status] = {c:1, a:amt}; }
     if ((al.created_at||'').startsWith(today)) { todayCount++; todayAmount += amt; }
   }
   
@@ -1387,6 +1388,13 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
     '<div style="color:#fbbf24;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div></div>';
+  // Collecting
+  var collectingSum = (stats.collecting.c||0) + (stats.buying.c||0) + (stats.delivering.c||0) + (stats.checking.c||0);
+  var collectingAmt = (stats.collecting.a||0) + (stats.buying.a||0) + (stats.delivering.a||0) + (stats.checking.a||0);
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(249,115,22,0.12),rgba(249,115,22,0.04));border-color:rgba(249,115,22,0.25)" onclick="setLeadsFilter(\\'status\\',\\'collecting\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F97316">' + collectingSum + '</span><span style="font-size:1.4rem">📦</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Выкуп-процесс</div>' +
+    '<div style="color:#fb923c;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(collectingAmt) + '</div></div>';
   // Done
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#8B5CF6">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
@@ -1417,6 +1425,10 @@ function renderLeads() {
       '<option value="new"' + (leadsFilter.status==='new'?' selected':'') + '>🟢 Новый</option>' +
       '<option value="contacted"' + (leadsFilter.status==='contacted'?' selected':'') + '>💬 Связались</option>' +
       '<option value="in_progress"' + (leadsFilter.status==='in_progress'?' selected':'') + '>🔄 В работе</option>' +
+      '<option value="collecting"' + (leadsFilter.status==='collecting'?' selected':'') + '>📋 Сбор артикулов</option>' +
+      '<option value="buying"' + (leadsFilter.status==='buying'?' selected':'') + '>🛒 Выкуп</option>' +
+      '<option value="delivering"' + (leadsFilter.status==='delivering'?' selected':'') + '>🚚 Доставка</option>' +
+      '<option value="checking"' + (leadsFilter.status==='checking'?' selected':'') + '>🔍 Проверка</option>' +
       '<option value="done"' + (leadsFilter.status==='done'?' selected':'') + '>✅ Завершён</option>' +
       '<option value="rejected"' + (leadsFilter.status==='rejected'?' selected':'') + '>❌ Отклонён</option></select>' +
     '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'source\\',this.value)">' +
@@ -1446,7 +1458,7 @@ function renderLeads() {
       var calcData = null;
       if (isCalc && l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
       var leadAmt = Number(l.total_amount || 0);
-      var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', done:'#8B5CF6', rejected:'#EF4444' };
+      var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', collecting:'#F97316', buying:'#EC4899', delivering:'#06B6D4', checking:'#8B5CF6', done:'#8B5CF6', rejected:'#EF4444' };
       var statusBorderColor = statusColors[l.status] || '#334155';
       
       h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + '">' +
@@ -1457,6 +1469,7 @@ function renderLeads() {
               '<span class="badge badge-purple">' + (l.source || 'form') + '</span>' +
               (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
               (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '<span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.7rem">Не назначен</span>') +
+              (l.articles_count > 0 ? '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.7rem"><i class="fas fa-box" style="margin-right:3px"></i>' + (l.articles_done||0) + '/' + l.articles_count + ' арт.</span>' : '') +
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
@@ -1475,6 +1488,10 @@ function renderLeads() {
         '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новый</option>' +
         '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 Связались</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
+        '<option value="collecting"' + (l.status === 'collecting' ? ' selected' : '') + '>📋 Сбор артикулов</option>' +
+        '<option value="buying"' + (l.status === 'buying' ? ' selected' : '') + '>🛒 Выкуп</option>' +
+        '<option value="delivering"' + (l.status === 'delivering' ? ' selected' : '') + '>🚚 Доставка</option>' +
+        '<option value="checking"' + (l.status === 'checking' ? ' selected' : '') + '>🔍 Проверка</option>' +
         '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option>' +
         '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option></select>';
       
@@ -1520,6 +1537,8 @@ function renderLeads() {
         '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadNotes(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
       // Comments section (loaded dynamically)
       h += '<div id="comments-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка комментариев...</span></div></div>';
+      // Articles section (WB артикулы) — loaded dynamically
+      h += '<div id="articles-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка артикулов...</span></div></div>';
       h += '</div>';
       h += '</div>';
     }
@@ -1674,9 +1693,192 @@ function toggleLeadExpand(id) {
   if (el.style.display === 'none') {
     el.style.display = 'block';
     if (!data.leadComments[id]) loadComments(id);
+    if (!data.leadArticles[id]) loadArticles(id);
   } else {
     el.style.display = 'none';
   }
+}
+
+// ===== LEAD ARTICLES (WB артикулы) =====
+var articleStatusLabels = { pending:'⏳ Ожидает', ordered:'📦 Заказан', shipped:'🚚 Отправлен', delivered:'✅ Доставлен', completed:'🏁 Завершён', cancelled:'❌ Отменён', returned:'↩️ Возврат' };
+var articleStatusColors = { pending:'#F59E0B', ordered:'#3B82F6', shipped:'#06B6D4', delivered:'#10B981', completed:'#8B5CF6', cancelled:'#EF4444', returned:'#94a3b8' };
+
+async function loadArticles(leadId) {
+  const res = await api('/leads/' + leadId + '/articles');
+  data.leadArticles[leadId] = (res && res.articles) ? res.articles : [];
+  renderArticlesSection(leadId);
+}
+
+function renderArticlesSection(leadId) {
+  var el = document.getElementById('articles-' + leadId);
+  if (!el) return;
+  var articles = data.leadArticles[leadId] || [];
+  var h = '<div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+    '<span style="font-size:0.85rem;font-weight:700;color:#fb923c"><i class="fas fa-box" style="margin-right:6px"></i>Артикулы WB (' + articles.length + ')</span>' +
+    '<button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="showArticleModal(' + leadId + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
+    '</div>';
+  if (articles.length === 0) {
+    h += '<div style="text-align:center;padding:20px;color:#64748b;font-size:0.82rem"><i class="fas fa-inbox" style="margin-right:6px"></i>Нет артикулов. Добавьте первый.</div>';
+  } else {
+    // Table header
+    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:8px">' +
+      '<thead><tr style="background:#1e293b">' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left;white-space:nowrap">Артикул</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left">Товар</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Размер</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Цвет</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Кол-во</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Цена</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Сумма</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Статус</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Выкупщик</th>' +
+      '<th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center"></th>' +
+      '</tr></thead><tbody>';
+    var totalSum = 0;
+    for (var ai = 0; ai < articles.length; ai++) {
+      var art = articles[ai];
+      var artColor = articleStatusColors[art.status] || '#94a3b8';
+      totalSum += Number(art.total_price || 0);
+      h += '<tr style="border-bottom:1px solid #334155">' +
+        '<td style="padding:6px 8px">' +
+          (art.wb_link ? '<a href="' + escHtml(art.wb_link) + '" target="_blank" style="color:#a78bfa;text-decoration:none;font-weight:700">' + escHtml(art.wb_article || '—') + ' <i class="fas fa-external-link-alt" style="font-size:0.6rem"></i></a>' : '<span style="color:#e2e8f0;font-weight:700">' + escHtml(art.wb_article || '—') + '</span>') +
+        '</td>' +
+        '<td style="padding:6px 8px;color:#e2e8f0;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(art.product_name || '—') + '</td>' +
+        '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + escHtml(art.size || '—') + '</td>' +
+        '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + escHtml(art.color || '—') + '</td>' +
+        '<td style="padding:6px 8px;text-align:center;color:#e2e8f0;font-weight:600">' + (art.quantity || 1) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(art.price_per_unit||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(art.total_price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+        '<td style="padding:6px 8px;text-align:center">' +
+          '<select class="input" style="width:120px;padding:2px 4px;font-size:0.72rem;border-color:' + artColor + '" onchange="updateArticleStatus(' + art.id + ',' + leadId + ',this.value)">';
+      for (var sk in articleStatusLabels) {
+        h += '<option value="' + sk + '"' + (art.status === sk ? ' selected' : '') + '>' + articleStatusLabels[sk] + '</option>';
+      }
+      h += '</select></td>' +
+        '<td style="padding:6px 8px;text-align:center">' +
+          '<select class="input" style="width:110px;padding:2px 4px;font-size:0.72rem" onchange="updateArticleBuyer(' + art.id + ',' + leadId + ',this.value)">' +
+          '<option value="">—</option>';
+      for (var bj = 0; bj < (data.users||[]).length; bj++) {
+        var bu = data.users[bj];
+        h += '<option value="' + bu.id + '"' + (art.buyer_id==bu.id?' selected':'') + '>' + escHtml(bu.display_name) + '</option>';
+      }
+      h += '</select></td>' +
+        '<td style="padding:6px 8px;text-align:center;white-space:nowrap">' +
+          '<button style="background:none;border:none;color:#a78bfa;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="showArticleModal(' + leadId + ',' + art.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>' +
+          '<button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="deleteArticle(' + art.id + ',' + leadId + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
+        '</td></tr>';
+      // Show notes if any
+      if (art.notes) {
+        h += '<tr style="border-bottom:1px solid #1e293b"><td colspan="10" style="padding:2px 8px 6px 8px;font-size:0.72rem;color:#64748b;font-style:italic"><i class="fas fa-sticky-note" style="margin-right:4px;color:#fbbf24"></i>' + escHtml(art.notes) + '</td></tr>';
+      }
+    }
+    h += '</tbody>' +
+      '<tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="6" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО артикулы:</td>' +
+      '<td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;font-size:0.9rem;white-space:nowrap">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+      '<td colspan="3"></td></tr></tfoot></table></div>';
+  }
+  h += '</div>';
+  el.innerHTML = h;
+}
+
+function showArticleModal(leadId, articleId) {
+  var art = null;
+  if (articleId && data.leadArticles[leadId]) {
+    art = data.leadArticles[leadId].find(function(a) { return a.id === articleId; });
+  }
+  var isEdit = !!art;
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
+    '<div class="card" style="width:650px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-box" style="color:#fb923c;margin-right:8px"></i>' + (isEdit ? 'Редактировать артикул' : 'Добавить артикул WB') + '</h3>' +
+    '<form onsubmit="submitArticle(event,' + leadId + ',' + (articleId || 0) + ')">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Артикул WB *</label><input class="input" id="art_wb_article" required value="' + escHtml((art && art.wb_article) || '') + '" placeholder="123456789"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Ссылка WB</label><input class="input" id="art_wb_link" value="' + escHtml((art && art.wb_link) || '') + '" placeholder="https://www.wildberries.ru/catalog/..."></div></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Название товара</label><input class="input" id="art_product_name" value="' + escHtml((art && art.product_name) || '') + '" placeholder="Кроссовки Nike Air Max"></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Размер</label><input class="input" id="art_size" value="' + escHtml((art && art.size) || '') + '" placeholder="42"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Цвет</label><input class="input" id="art_color" value="' + escHtml((art && art.color) || '') + '" placeholder="Чёрный"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Кол-во *</label><input class="input" type="number" min="1" id="art_quantity" value="' + ((art && art.quantity) || 1) + '" required onchange="calcArticleTotal()"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Цена за шт (֏)</label><input class="input" type="number" min="0" id="art_price" value="' + ((art && art.price_per_unit) || 0) + '" onchange="calcArticleTotal()"></div></div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма (֏)</label><input class="input" id="art_total" value="' + ((art && art.total_price) || 0) + '" readonly style="background:#1e293b;color:#a78bfa;font-weight:700"></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Статус</label><select class="input" id="art_status">';
+  for (var sk in articleStatusLabels) {
+    h += '<option value="' + sk + '"' + ((art && art.status === sk) ? ' selected' : (!art && sk === 'pending' ? ' selected' : '')) + '>' + articleStatusLabels[sk] + '</option>';
+  }
+  h += '</select></div>' +
+      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Выкупщик</label><select class="input" id="art_buyer"><option value="">— Не назначен —</option>';
+  for (var bk = 0; bk < (data.users||[]).length; bk++) {
+    var ub = data.users[bk];
+    h += '<option value="' + ub.id + '"' + ((art && art.buyer_id==ub.id)?' selected':'') + '>' + escHtml(ub.display_name) + '</option>';
+  }
+  h += '</select></div></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Примечание</label><textarea class="input" id="art_notes" rows="2" placeholder="Особые пожелания клиента...">' + escHtml((art && art.notes) || '') + '</textarea></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (isEdit ? 'Сохранить' : 'Добавить') + '</button></div>' +
+    '</form></div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
+  document.getElementById('art_wb_article').focus();
+  calcArticleTotal();
+}
+
+function calcArticleTotal() {
+  var q = parseInt(document.getElementById('art_quantity').value) || 1;
+  var p = parseFloat(document.getElementById('art_price').value) || 0;
+  var totalEl = document.getElementById('art_total');
+  if (totalEl) totalEl.value = (q * p).toFixed(0);
+}
+
+async function submitArticle(e, leadId, articleId) {
+  e.preventDefault();
+  var payload = {
+    wb_article: document.getElementById('art_wb_article').value.trim(),
+    wb_link: document.getElementById('art_wb_link').value.trim(),
+    product_name: document.getElementById('art_product_name').value.trim(),
+    size: document.getElementById('art_size').value.trim(),
+    color: document.getElementById('art_color').value.trim(),
+    quantity: parseInt(document.getElementById('art_quantity').value) || 1,
+    price_per_unit: parseFloat(document.getElementById('art_price').value) || 0,
+    status: document.getElementById('art_status').value,
+    buyer_id: document.getElementById('art_buyer').value ? Number(document.getElementById('art_buyer').value) : null,
+    notes: document.getElementById('art_notes').value.trim()
+  };
+  if (articleId) {
+    await api('/leads/articles/' + articleId, { method: 'PUT', body: JSON.stringify(payload) });
+    toast('Артикул обновлён');
+  } else {
+    await api('/leads/' + leadId + '/articles', { method: 'POST', body: JSON.stringify(payload) });
+    toast('Артикул добавлен');
+  }
+  var modal = document.querySelector('[style*="fixed"][style*="z-index:999"]');
+  if (modal) modal.remove();
+  await loadArticles(leadId);
+  // Update lead data to refresh articles count badge
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+}
+
+async function updateArticleStatus(articleId, leadId, status) {
+  await api('/leads/articles/' + articleId, { method: 'PUT', body: JSON.stringify({ status: status }) });
+  toast('Статус артикула обновлён');
+  await loadArticles(leadId);
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+}
+
+async function updateArticleBuyer(articleId, leadId, buyerId) {
+  await api('/leads/articles/' + articleId, { method: 'PUT', body: JSON.stringify({ buyer_id: buyerId ? Number(buyerId) : null }) });
+  toast('Выкупщик назначен');
+  await loadArticles(leadId);
+}
+
+async function deleteArticle(articleId, leadId) {
+  if (!confirm('Удалить этот артикул?')) return;
+  await api('/leads/articles/' + articleId, { method: 'DELETE' });
+  toast('Артикул удалён');
+  await loadArticles(leadId);
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
 }
 
 // ===== LEADS ANALYTICS =====

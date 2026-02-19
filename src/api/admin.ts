@@ -987,6 +987,100 @@ api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== LEAD ARTICLES (WB артикулы привязанные к лидам) =====
+api.get('/leads/:id/articles', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const leadId = c.req.param('id');
+  const res = await db.prepare(`
+    SELECT la.*, u.display_name as buyer_name 
+    FROM lead_articles la 
+    LEFT JOIN users u ON la.buyer_id = u.id 
+    WHERE la.lead_id = ? 
+    ORDER BY la.sort_order, la.id
+  `).bind(leadId).all();
+  return c.json({ articles: res.results || [] });
+});
+
+api.post('/leads/:id/articles', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const leadId = c.req.param('id');
+  const d = await c.req.json();
+  const totalPrice = (Number(d.price_per_unit) || 0) * (Number(d.quantity) || 1);
+  await db.prepare(`INSERT INTO lead_articles (lead_id, wb_article, wb_link, product_name, size, color, quantity, price_per_unit, total_price, status, buyer_id, notes, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(leadId, d.wb_article || '', d.wb_link || '', d.product_name || '', d.size || '', d.color || '', d.quantity || 1, d.price_per_unit || 0, totalPrice, d.status || 'pending', d.buyer_id || null, d.notes || '', d.sort_order || 0).run();
+  // Update articles count on lead
+  await updateLeadArticlesCount(db, Number(leadId));
+  return c.json({ success: true });
+});
+
+api.put('/leads/articles/:articleId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const articleId = c.req.param('articleId');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.wb_article !== undefined) { fields.push('wb_article=?'); vals.push(d.wb_article); }
+  if (d.wb_link !== undefined) { fields.push('wb_link=?'); vals.push(d.wb_link); }
+  if (d.product_name !== undefined) { fields.push('product_name=?'); vals.push(d.product_name); }
+  if (d.size !== undefined) { fields.push('size=?'); vals.push(d.size); }
+  if (d.color !== undefined) { fields.push('color=?'); vals.push(d.color); }
+  if (d.quantity !== undefined) { fields.push('quantity=?'); vals.push(d.quantity); }
+  if (d.price_per_unit !== undefined) { fields.push('price_per_unit=?'); vals.push(d.price_per_unit); }
+  if (d.quantity !== undefined || d.price_per_unit !== undefined) {
+    // Recalculate total_price
+    const existing = await db.prepare('SELECT quantity, price_per_unit FROM lead_articles WHERE id = ?').bind(articleId).first();
+    const qty = d.quantity !== undefined ? Number(d.quantity) : Number(existing?.quantity || 1);
+    const ppu = d.price_per_unit !== undefined ? Number(d.price_per_unit) : Number(existing?.price_per_unit || 0);
+    fields.push('total_price=?'); vals.push(qty * ppu);
+  }
+  if (d.status !== undefined) { fields.push('status=?'); vals.push(d.status); }
+  if (d.buyer_id !== undefined) { fields.push('buyer_id=?'); vals.push(d.buyer_id || null); }
+  if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
+  if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
+  if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(articleId);
+  await db.prepare(`UPDATE lead_articles SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  // Update articles count on parent lead
+  const art = await db.prepare('SELECT lead_id FROM lead_articles WHERE id = ?').bind(articleId).first();
+  if (art) await updateLeadArticlesCount(db, art.lead_id as number);
+  return c.json({ success: true });
+});
+
+api.delete('/leads/articles/:articleId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const articleId = c.req.param('articleId');
+  const art = await db.prepare('SELECT lead_id FROM lead_articles WHERE id = ?').bind(articleId).first();
+  await db.prepare('DELETE FROM lead_articles WHERE id = ?').bind(articleId).run();
+  if (art) await updateLeadArticlesCount(db, art.lead_id as number);
+  return c.json({ success: true });
+});
+
+// Bulk update articles statuses
+api.post('/leads/:id/articles/bulk-status', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const leadId = c.req.param('id');
+  const { article_ids, status, buyer_id } = await c.req.json();
+  if (!article_ids || !Array.isArray(article_ids) || !status) return c.json({ error: 'article_ids and status required' }, 400);
+  for (const aid of article_ids) {
+    const updates = ['status=?', 'updated_at=CURRENT_TIMESTAMP'];
+    const params: any[] = [status];
+    if (buyer_id !== undefined) { updates.push('buyer_id=?'); params.push(buyer_id || null); }
+    params.push(aid);
+    await db.prepare(`UPDATE lead_articles SET ${updates.join(',')} WHERE id=? AND lead_id=${leadId}`).bind(...params).run();
+  }
+  await updateLeadArticlesCount(db, Number(leadId));
+  return c.json({ success: true });
+});
+
+// Helper: update articles count cache on leads table
+async function updateLeadArticlesCount(db: D1Database, leadId: number) {
+  const total = await db.prepare('SELECT COUNT(*) as cnt FROM lead_articles WHERE lead_id = ?').bind(leadId).first();
+  const done = await db.prepare("SELECT COUNT(*) as cnt FROM lead_articles WHERE lead_id = ? AND status IN ('delivered','completed')").bind(leadId).first();
+  await db.prepare('UPDATE leads SET articles_count = ?, articles_done = ? WHERE id = ?')
+    .bind(total?.cnt || 0, done?.cnt || 0, leadId).run();
+}
+
 // ===== ROLES CONFIG (for frontend) =====
 api.get('/roles-config', authMiddleware, async (c) => {
   return c.json({ roles: ALL_ROLES, sections: ALL_SECTIONS, role_labels: ROLE_LABELS, section_labels: SECTION_LABELS, default_permissions: DEFAULT_PERMISSIONS });

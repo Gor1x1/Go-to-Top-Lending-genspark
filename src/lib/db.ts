@@ -252,6 +252,31 @@ CREATE TABLE IF NOT EXISTS photo_blocks (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS lead_articles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_id INTEGER NOT NULL,
+  wb_article TEXT NOT NULL DEFAULT '',
+  wb_link TEXT DEFAULT '',
+  product_name TEXT DEFAULT '',
+  size TEXT DEFAULT '',
+  color TEXT DEFAULT '',
+  quantity INTEGER DEFAULT 1,
+  price_per_unit REAL DEFAULT 0,
+  total_price REAL DEFAULT 0,
+  status TEXT DEFAULT 'pending',
+  buyer_id INTEGER DEFAULT NULL,
+  notes TEXT DEFAULT '',
+  sort_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (lead_id) REFERENCES leads(id) ON DELETE CASCADE,
+  FOREIGN KEY (buyer_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_lead_articles_lead ON lead_articles(lead_id);
+CREATE INDEX IF NOT EXISTS idx_lead_articles_status ON lead_articles(status);
+CREATE INDEX IF NOT EXISTS idx_lead_articles_buyer ON lead_articles(buyer_id);
 `;
 
 export async function initDatabase(db: D1Database): Promise<void> {
@@ -275,6 +300,9 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE leads ADD COLUMN assigned_to INTEGER DEFAULT NULL").run(); } catch {}
   try { await db.prepare("ALTER TABLE leads ADD COLUMN total_amount REAL DEFAULT 0").run(); } catch {}
   try { await db.prepare("ALTER TABLE leads ADD COLUMN custom_fields TEXT DEFAULT ''").run(); } catch {}
+  // v3 Migrations: lead_articles support + articles_count cache on leads
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN articles_count INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN articles_done INTEGER DEFAULT 0").run(); } catch {}
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====
