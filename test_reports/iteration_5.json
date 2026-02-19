@@ -1,0 +1,67 @@
+{
+  "summary": "Complete testing of new features: Calculator modal in Leads page (service selection from DB, PDF generation) and Block Constructor (site parsing, import, drag-drop, new block creation). All 11 backend tests passed (100%), all frontend flows working correctly.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "passed_tests": [
+    "Backend: Health check endpoint (200 OK)",
+    "Backend: Admin login with admin/gototop2026",
+    "Backend: /api/calc-services-public returns tabs and services from DB",
+    "Backend: /api/generate-pdf creates PDF and attaches to lead",
+    "Backend: /api/site-blocks CRUD operations (list, create, delete)",
+    "Backend: /api/site-blocks/fetch-from-site parses blocks from gototop.win",
+    "Backend: /api/site-blocks/import saves multiple blocks",
+    "Backend: /api/site-blocks/reorder updates sort order",
+    "Backend: Leads with calc_data JSON persistence",
+    "Backend: /api/upload handles image uploads",
+    "Frontend: Login page with admin/gototop2026 credentials",
+    "Frontend: Navigate to Leads page (12 leads displayed)",
+    "Frontend: Expand lead card shows details",
+    "Frontend: 'Рассчитать стоимость' button appears for form leads",
+    "Frontend: Calculator modal opens with services from DB",
+    "Frontend: Service tabs displayed (Услуги продвижения)",
+    "Frontend: Services can be selected with checkboxes",
+    "Frontend: Quantity controls (+/-) work for selected services",
+    "Frontend: Total calculation updates dynamically (20,000 ֏)",
+    "Frontend: 'Сохранить и создать PDF' button generates PDF",
+    "Frontend: PDF link appears in lead card after generation",
+    "Frontend: 'Пересчитать' button available for leads with existing calc",
+    "Frontend: Navigate to Block Constructor page",
+    "Frontend: 'Загрузить с сайта' button opens fetch modal",
+    "Frontend: URL input defaults to https://gototop.win",
+    "Frontend: 'Загрузить' fetches 20 blocks from site",
+    "Frontend: Fetched blocks show preview with text/image/button counts",
+    "Frontend: 'Импортировать' button imports all blocks",
+    "Frontend: Imported blocks displayed with drag handles (GripVertical)",
+    "Frontend: 'Новый блок' button opens create modal",
+    "Frontend: Block edit modal has all fields (key, type, title RU/AM, texts, images, buttons)",
+    "Frontend: Save button saves new/edited block"
+  ],
+  "test_report_links": [
+    "/app/backend/tests/test_new_features.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/backend/tests/test_new_features.py"
+  ],
+  "success_rate": {
+    "backend": "100% (11/11 tests passed)",
+    "frontend": "100%"
+  },
+  "test_credentials": {
+    "username": "admin",
+    "password": "gototop2026"
+  },
+  "seed_data_creation": "Calculator services were created in calc_tabs and calc_services collections. 20 blocks imported from gototop.win.",
+  "retest_needed": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "All new features working: 1) Calculator modal in Leads - opens with services from /api/calc-services-public, allows selection with quantity controls, generates PDF via /api/generate-pdf and attaches to lead. 2) Block Constructor - fetches blocks from external URL via /api/site-blocks/fetch-from-site, imports via /api/site-blocks/import, supports drag-drop reordering and CRUD operations."
+}
