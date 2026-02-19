@@ -143,6 +143,12 @@ async function loadData() {
   data.photoBlocks = (photoBlocksData && photoBlocksData.blocks) || [];
   data.users = usersData || [];
   data.siteBlocks = (siteBlocksData && siteBlocksData.blocks) || [];
+  // Preload articles for leads that have them
+  var leadsWithArticles = ((data.leads && data.leads.leads) || []).filter(function(l) { return l.articles_count > 0; });
+  if (leadsWithArticles.length > 0) {
+    var artPromises = leadsWithArticles.map(function(l) { return api('/leads/' + l.id + '/articles').then(function(res) { data.leadArticles[l.id] = (res && res.articles) ? res.articles : []; }); });
+    await Promise.all(artPromises);
+  }
 }
 
 // ===== NAVIGATION =====
@@ -1410,11 +1416,6 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#a78bfa">' + todayCount + '</span><span style="font-size:1.4rem">📅</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Сегодня</div>' +
     '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(todayAmount) + '</div></div>';
-  // Total sum
-  h += '<div class="stat-card" style="padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.4rem;font-weight:900;color:#10B981">' + fmtA(totalAmount) + '</span><span style="font-size:1.4rem">💰</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Общая сумма</div>' +
-    '<div style="color:#34d399;font-size:0.82rem;font-weight:700;margin-top:2px">' + total + ' заявок</div></div>';
   h += '</div>';
   
   // Filters row
@@ -1693,7 +1694,12 @@ function toggleLeadExpand(id) {
   if (el.style.display === 'none') {
     el.style.display = 'block';
     if (!data.leadComments[id]) loadComments(id);
-    if (!data.leadArticles[id]) loadArticles(id);
+    // Articles: if already loaded, just render immediately; otherwise fetch
+    if (data.leadArticles[id]) {
+      renderArticlesSection(id);
+    } else {
+      loadArticles(id);
+    }
   } else {
     el.style.display = 'none';
   }
@@ -1751,19 +1757,8 @@ function renderArticlesSection(leadId) {
         '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(art.price_per_unit||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
         '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(art.total_price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
         '<td style="padding:6px 8px;text-align:center">' +
-          '<select class="input" style="width:120px;padding:2px 4px;font-size:0.72rem;border-color:' + artColor + '" onchange="updateArticleStatus(' + art.id + ',' + leadId + ',this.value)">';
-      for (var sk in articleStatusLabels) {
-        h += '<option value="' + sk + '"' + (art.status === sk ? ' selected' : '') + '>' + articleStatusLabels[sk] + '</option>';
-      }
-      h += '</select></td>' +
-        '<td style="padding:6px 8px;text-align:center">' +
-          '<select class="input" style="width:110px;padding:2px 4px;font-size:0.72rem" onchange="updateArticleBuyer(' + art.id + ',' + leadId + ',this.value)">' +
-          '<option value="">—</option>';
-      for (var bj = 0; bj < (data.users||[]).length; bj++) {
-        var bu = data.users[bj];
-        h += '<option value="' + bu.id + '"' + (art.buyer_id==bu.id?' selected':'') + '>' + escHtml(bu.display_name) + '</option>';
-      }
-      h += '</select></td>' +
+          '<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.7rem;font-weight:600;background:' + artColor + '22;color:' + artColor + ';border:1px solid ' + artColor + '44">' + (articleStatusLabels[art.status] || art.status) + '</span></td>' +
+        '<td style="padding:6px 8px;text-align:center;font-size:0.72rem;color:#94a3b8">' + escHtml(art.buyer_name || '—') + '</td>' +
         '<td style="padding:6px 8px;text-align:center;white-space:nowrap">' +
           '<button style="background:none;border:none;color:#a78bfa;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="showArticleModal(' + leadId + ',' + art.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>' +
           '<button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="deleteArticle(' + art.id + ',' + leadId + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
@@ -1776,7 +1771,7 @@ function renderArticlesSection(leadId) {
     h += '</tbody>' +
       '<tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="6" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО артикулы:</td>' +
       '<td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;font-size:0.9rem;white-space:nowrap">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
-      '<td colspan="3"></td></tr></tfoot></table></div>';
+      '<td colspan="3" style="padding:8px;text-align:center"><button class="btn btn-success" style="padding:4px 12px;font-size:0.75rem;white-space:nowrap" onclick="recalcLeadTotal(' + leadId + ')" title="Обновить сумму лида из артикулов"><i class="fas fa-calculator" style="margin-right:4px"></i>Пересчитать</button></td></tr></tfoot></table></div>';
   }
   h += '</div>';
   el.innerHTML = h;
@@ -1879,6 +1874,24 @@ async function deleteArticle(articleId, leadId) {
   await loadArticles(leadId);
   var resLeads = await api('/leads?limit=500');
   data.leads = resLeads || { leads: [], total: 0 };
+}
+
+async function recalcLeadTotal(leadId) {
+  var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+  if (res && res.success) {
+    toast('Сумма лида обновлена: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏');
+    // Refresh leads data to show new total
+    var resLeads = await api('/leads?limit=500');
+    data.leads = resLeads || { leads: [], total: 0 };
+    render();
+    // Re-expand and reload articles
+    setTimeout(function() {
+      var el = document.getElementById('lead-detail-' + leadId);
+      if (el) { el.style.display = 'block'; loadArticles(leadId); loadComments(leadId); }
+    }, 100);
+  } else {
+    toast('Ошибка пересчёта', 'error');
+  }
 }
 
 // ===== LEADS ANALYTICS =====
