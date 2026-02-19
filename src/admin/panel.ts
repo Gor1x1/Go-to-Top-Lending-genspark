@@ -1411,11 +1411,11 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Отказы</div>' +
     '<div style="color:#f87171;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.rejected.a) + '</div></div>';
-  // Today
+  // Total all time
   h += '<div class="stat-card" style="padding:14px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#a78bfa">' + todayCount + '</span><span style="font-size:1.4rem">📅</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Сегодня</div>' +
-    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(todayAmount) + '</div></div>';
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#a78bfa">' + leads.length + '</span><span style="font-size:1.4rem">📊</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Всего</div>' +
+    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(totalAmount) + '</div></div>';
   h += '</div>';
   
   // Filters row
@@ -1457,7 +1457,7 @@ function renderLeads() {
       var l = filtered[i];
       var isCalc = l.source === 'calculator_pdf';
       var calcData = null;
-      if (isCalc && l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
+      if (l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
       var leadAmt = Number(l.total_amount || 0);
       var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', collecting:'#F97316', buying:'#EC4899', delivering:'#06B6D4', checking:'#8B5CF6', done:'#8B5CF6', rejected:'#EF4444' };
       var statusBorderColor = statusColors[l.status] || '#334155';
@@ -1505,7 +1505,7 @@ function renderLeads() {
       }
       h += '</select>';
       
-      h += '<div style="font-size:0.78rem;color:#64748b">' + (l.created_at || '').substring(0, 16) + '</div>';
+      h += '<div style="font-size:0.78rem;color:#64748b">' + formatArmTime(l.created_at) + '</div>';
       h += '<div style="display:flex;gap:4px">';
       if (isCalc) {
         h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-file-pdf" style="margin-right:4px"></i>КП</a>';
@@ -1692,7 +1692,7 @@ function renderCommentSection(leadId) {
     h += '<div style="padding:8px 12px;background:#0f172a;border-radius:8px;margin-bottom:6px;border-left:3px solid #8B5CF6">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
         '<span style="font-size:0.78rem;font-weight:600;color:#a78bfa">' + escHtml(cm.user_name) + '</span>' +
-        '<div style="display:flex;gap:8px;align-items:center"><span style="font-size:0.7rem;color:#64748b">' + (cm.created_at||'').substring(0,16) + '</span>' +
+        '<div style="display:flex;gap:8px;align-items:center"><span style="font-size:0.7rem;color:#64748b">' + formatArmTime(cm.created_at) + '</span>' +
         '<button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.7rem;padding:2px" onclick="deleteComment(' + cm.id + ',' + leadId + ')"><i class="fas fa-times"></i></button></div></div>' +
       '<div style="font-size:0.85rem;color:#e2e8f0;white-space:pre-wrap">' + escHtml(cm.comment) + '</div></div>';
   }
@@ -1933,25 +1933,23 @@ async function saveLeadName(leadId) {
 }
 
 // ===== LEAD CALCULATOR MODAL (select services from DB) =====
+var _leadCalcSelected = {};
 function showLeadCalcModal(leadId) {
-  // Build service selector from calc data (same as in Calculator section)
+  _leadCalcSelected = {};
   var tabs = data.calcTabs || [];
   var services = data.calcServices || [];
-  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
+  var h = '<div id="leadCalcModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
     '<div class="card" style="width:750px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
-    '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:8px"></i>Выбрать услугу для лида #' + leadId + '</h3>';
+    '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:8px"></i>Выбрать услуги для лида #' + leadId + '</h3>';
 
   if (tabs.length === 0) {
-    h += '<div style="text-align:center;padding:24px;color:#64748b"><i class="fas fa-inbox" style="font-size:2rem;margin-bottom:12px;display:block"></i>Нет услуг в калькуляторе. Сначала добавьте услуги в разделе «Калькулятор».</div>';
+    h += '<div style="text-align:center;padding:24px;color:#64748b"><i class="fas fa-inbox" style="font-size:2rem;margin-bottom:12px;display:block"></i>Нет услуг в калькуляторе.</div>';
   } else {
-    // Tab buttons
     h += '<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
     for (var ti = 0; ti < tabs.length; ti++) {
       h += '<button class="tab-btn' + (ti === 0 ? ' active' : '') + '" onclick="switchLeadCalcTab(this,' + tabs[ti].id + ')">' + escHtml(tabs[ti].name_ru) + '</button>';
     }
     h += '</div>';
-
-    // Services grouped by tab
     for (var ti2 = 0; ti2 < tabs.length; ti2++) {
       var tab = tabs[ti2];
       var tabServices = services.filter(function(s) { return s.tab_id === tab.id; });
@@ -1965,26 +1963,88 @@ function showLeadCalcModal(leadId) {
           var tiers = [];
           if (isTiered) { try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; } }
           var defaultPrice = svc.price || 0;
-          
-          h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;margin-bottom:6px;flex-wrap:wrap">' +
-            '<div style="flex:1;min-width:200px"><div style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(svc.name_ru) + '</div>' +
+          h += '<div id="lc_row_' + svc.id + '" style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;margin-bottom:6px;flex-wrap:wrap;transition:border-color 0.2s">' +
+            '<input type="checkbox" id="lc_check_' + svc.id + '" style="accent-color:#8B5CF6;width:18px;height:18px;cursor:pointer" onchange="toggleLeadCalcSvc(' + svc.id + ')">' +
+            '<div style="flex:1;min-width:180px"><div style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(svc.name_ru) + '</div>' +
             (isTiered ? '<div style="font-size:0.72rem;color:#a78bfa">' + tiers.map(function(t){return t.min+'-'+t.max+': '+t.price+' ֏';}).join(' | ') + '</div>' : '<div style="font-size:0.72rem;color:#94a3b8">' + defaultPrice + ' ֏</div>') +
             '</div>' +
             '<div style="display:flex;align-items:center;gap:6px">' +
               '<label style="font-size:0.75rem;color:#94a3b8">Кол-во:</label>' +
-              '<input type="number" class="input" min="1" value="1" style="width:70px;padding:4px 8px;font-size:0.85rem" id="lc_qty_' + svc.id + '" onchange="updateLeadCalcPrice(' + svc.id + ',' + defaultPrice + ',' + (isTiered ? '1' : '0') + ')">' +
+              '<input type="number" class="input" min="1" value="1" style="width:70px;padding:4px 8px;font-size:0.85rem" id="lc_qty_' + svc.id + '" onchange="updateLeadCalcPrice(' + svc.id + ',' + defaultPrice + ',' + (isTiered ? '1' : '0') + ');toggleLeadCalcSvc(' + svc.id + ',true)">' +
             '</div>' +
             '<div style="min-width:80px;text-align:right"><span id="lc_price_' + svc.id + '" style="font-weight:700;color:#a78bfa">' + defaultPrice + ' ֏</span></div>' +
-            '<button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="addServiceToLead(' + leadId + ',' + svc.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
           '</div>';
         }
       }
       h += '</div>';
     }
   }
-  h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Закрыть</button></div>';
+  h += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #334155">' +
+    '<div id="lc_selected_summary" style="font-size:0.85rem;color:#94a3b8;margin-bottom:12px">Выберите услуги галочкой ☑ и нажмите «Добавить выбранные»</div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end">' +
+    '<button class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Закрыть</button>' +
+    '<button class="btn btn-success" style="padding:10px 24px;font-size:0.9rem" onclick="addSelectedServicesToLead(' + leadId + ')"><i class="fas fa-check" style="margin-right:6px"></i>Добавить выбранные (<span id="lc_sel_count">0</span>)</button>' +
+    '</div></div>';
   h += '</div></div>';
   document.body.insertAdjacentHTML('beforeend', h);
+}
+
+function toggleLeadCalcSvc(svcId, forceCheck) {
+  var cb = document.getElementById('lc_check_' + svcId);
+  if (!cb) return;
+  if (forceCheck) cb.checked = true;
+  var qtyEl = document.getElementById('lc_qty_' + svcId);
+  var qty = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
+  if (cb.checked) { _leadCalcSelected[svcId] = qty; } else { delete _leadCalcSelected[svcId]; }
+  var row = document.getElementById('lc_row_' + svcId);
+  if (row) row.style.borderColor = cb.checked ? '#8B5CF6' : '#334155';
+  var keys = Object.keys(_leadCalcSelected);
+  var countEl = document.getElementById('lc_sel_count');
+  if (countEl) countEl.textContent = keys.length;
+  var summaryEl = document.getElementById('lc_selected_summary');
+  if (summaryEl) {
+    if (keys.length === 0) { summaryEl.innerHTML = 'Выберите услуги галочкой ☑ и нажмите «Добавить выбранные»'; }
+    else {
+      var names = keys.map(function(k) { var s = data.calcServices.find(function(x){return x.id==k;}); return s ? s.name_ru : '?'; });
+      summaryEl.innerHTML = '<i class="fas fa-check-circle" style="color:#10B981;margin-right:4px"></i>Выбрано: <strong>' + names.join(', ') + '</strong>';
+    }
+  }
+}
+
+async function addSelectedServicesToLead(leadId) {
+  var keys = Object.keys(_leadCalcSelected);
+  if (keys.length === 0) { toast('Выберите хотя бы одну услугу', 'error'); return; }
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  var calcData = { items: [], total: 0 };
+  if (lead && lead.calc_data) { try { calcData = JSON.parse(lead.calc_data); } catch(e) { calcData = { items: [], total: 0 }; } }
+  if (!calcData.items) calcData.items = [];
+  for (var ki = 0; ki < keys.length; ki++) {
+    var svcId = parseInt(keys[ki]);
+    var svc = data.calcServices.find(function(s) { return s.id === svcId; });
+    if (!svc) continue;
+    var qty = _leadCalcSelected[keys[ki]] || 1;
+    var price = svc.price || 0;
+    if (svc.price_type === 'tiered' && svc.price_tiers_json) {
+      try { var tiers = JSON.parse(svc.price_tiers_json); for (var ti3 = 0; ti3 < tiers.length; ti3++) { if (qty >= tiers[ti3].min && qty <= tiers[ti3].max) { price = tiers[ti3].price; break; } } } catch(e) {}
+    }
+    calcData.items.push({ name: svc.name_ru, qty: qty, price: price, subtotal: price * qty });
+  }
+  var newTotal = 0;
+  for (var j = 0; j < calcData.items.length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
+  calcData.total = newTotal;
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
+  if (lead) { lead.calc_data = JSON.stringify(calcData); lead.total_amount = newTotal; }
+  toast(keys.length + ' услуг(а) добавлено');
+  _leadCalcSelected = {};
+  var modal = document.getElementById('leadCalcModal');
+  if (modal) modal.remove();
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); }
+  }, 100);
 }
 
 function switchLeadCalcTab(btn, tabId) {
@@ -2017,48 +2077,7 @@ function updateLeadCalcPrice(svcId, defaultPrice, isTiered) {
     }
   }
   priceEl.textContent = (price * qty) + ' ֏';
-}
-
-async function addServiceToLead(leadId, svcId) {
-  var svc = data.calcServices.find(function(s) { return s.id === svcId; });
-  if (!svc) { toast('Услуга не найдена', 'error'); return; }
-  var qtyEl = document.getElementById('lc_qty_' + svcId);
-  var qty = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
-  var price = svc.price || 0;
-  // Check tiered pricing
-  if (svc.price_type === 'tiered' && svc.price_tiers_json) {
-    try {
-      var tiers = JSON.parse(svc.price_tiers_json);
-      for (var i = 0; i < tiers.length; i++) {
-        if (qty >= tiers[i].min && qty <= tiers[i].max) { price = tiers[i].price; break; }
-      }
-    } catch(e) {}
-  }
-  // Get existing lead calc_data
-  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
-  var calcData = { items: [], total: 0 };
-  if (lead && lead.calc_data) { try { calcData = JSON.parse(lead.calc_data); } catch(e) { calcData = { items: [], total: 0 }; } }
-  if (!calcData.items) calcData.items = [];
-  // Add the service
-  calcData.items.push({ name: svc.name_ru, qty: qty, price: price, subtotal: price * qty });
-  // Recalculate total
-  var newTotal = 0;
-  for (var j = 0; j < calcData.items.length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
-  calcData.total = newTotal;
-  // Save to backend
-  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
-  if (lead) { lead.calc_data = JSON.stringify(calcData); lead.total_amount = newTotal; }
-  toast('Услуга «' + svc.name_ru + '» добавлена');
-  // Close modal and refresh
-  var modal = document.querySelector('[style*="fixed"][style*="z-index:999"]');
-  if (modal) modal.remove();
-  var resLeads = await api('/leads?limit=500');
-  data.leads = resLeads || { leads: [], total: 0 };
-  render();
-  setTimeout(function() {
-    var el = document.getElementById('lead-detail-' + leadId);
-    if (el) { el.style.display = 'block'; loadArticles(leadId); }
-  }, 100);
+  if (_leadCalcSelected[svcId] !== undefined) _leadCalcSelected[svcId] = qty;
 }
 
 async function removeLeadService(leadId, serviceIndex) {
@@ -2902,6 +2921,15 @@ async function savePhotoBlock(id) {
 function escHtml(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// Format date to Armenia timezone (UTC+4)
+function formatArmTime(dateStr) {
+  if (!dateStr) return '';
+  try {
+    var d = new Date(dateStr + (dateStr.indexOf('Z') < 0 && dateStr.indexOf('+') < 0 ? 'Z' : ''));
+    return d.toLocaleString('ru-RU', { timeZone: 'Asia/Yerevan', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch(e) { return (dateStr || '').substring(0, 16); }
 }
 
 // ===== EMPLOYEES PAGE =====
