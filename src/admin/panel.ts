@@ -1473,7 +1473,7 @@ function renderLeads() {
         }
       }
       
-      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + ';cursor:pointer" onclick="toggleLeadExpand(' + l.id + ')">' +
+      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + ';cursor:pointer" onclick="openLeadDetail(' + l.id + ')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
@@ -1485,7 +1485,6 @@ function renderLeads() {
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
-            (l.message ? '<div style="font-size:0.82rem;color:#94a3b8;margin-top:4px;max-width:400px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + escHtml(l.message).substring(0,80) + '</div>' : '') +
             // TG/TZ quick links on main card
             ((l.telegram_group || l.tz_link) ? '<div style="display:flex;gap:6px;margin-top:6px">' +
               (l.telegram_group ? '<a href="' + escHtml(l.telegram_group) + '" target="_blank" style="font-size:0.72rem;color:#0EA5E9;text-decoration:none"><i class="fab fa-telegram" style="margin-right:2px"></i>TG</a>' : '') +
@@ -1526,12 +1525,12 @@ function renderLeads() {
       
       h += '<div style="font-size:0.78rem;color:#64748b">' + formatArmTime(l.created_at) + '</div>';
       h += '<div style="display:flex;gap:4px">';
-      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="event.stopPropagation()" title="Детали"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="event.stopPropagation();closeLeadDetail(' + l.id + ')" title="Свернуть"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
       h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="event.stopPropagation();deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div></div></div>';
       
       // ========== EXPANDABLE DETAIL AREA ==========
-      h += '<div id="lead-detail-' + l.id + '" style="display:none">';
+      h += '<div id="lead-detail-' + l.id + '" style="display:none" onclick="event.stopPropagation()">';
       
       // --- 1. EDITABLE FIELDS: Name + Contact (phone) ---
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
@@ -1702,13 +1701,9 @@ async function deleteLead(id) {
 async function exportLeadsCSV() {
   var token = localStorage.getItem('admin_token') || '';
   try {
-    var resp = await fetch('/api/admin/leads/export?token=' + encodeURIComponent(token));
-    if (!resp.ok) { toast('Ошибка экспорта CSV', 'error'); return; }
-    var blob = await resp.blob();
-    var url = URL.createObjectURL(blob);
-    var a = document.createElement('a'); a.href = url; a.download = 'leads_export.csv'; a.click();
-    URL.revokeObjectURL(url);
-    toast('CSV скачан');
+    // Use window.open for maximum device compatibility (iOS Safari, Android, etc.)
+    window.open('/api/admin/leads/export?token=' + encodeURIComponent(token), '_blank');
+    toast('CSV экспорт запущен');
   } catch(e) { toast('Ошибка экспорта', 'error'); }
 }
 
@@ -1757,24 +1752,43 @@ async function deleteComment(commentId, leadId) {
   await loadComments(leadId);
 }
 
-function toggleLeadExpand(id) {
+function openLeadDetail(id) {
+  var el = document.getElementById('lead-detail-' + id);
+  var arrow = document.getElementById('lead-arrow-' + id);
+  if (!el) return;
+  // Only OPEN, never close from card click
+  if (el.style.display === 'none') {
+    el.style.display = 'block';
+    if (arrow) arrow.style.transform = 'rotate(180deg)';
+    if (data.leadArticles[id]) {
+      renderArticlesSection(id);
+    } else {
+      loadArticles(id);
+    }
+  }
+}
+
+function closeLeadDetail(id) {
   var el = document.getElementById('lead-detail-' + id);
   var arrow = document.getElementById('lead-arrow-' + id);
   if (!el) return;
   if (el.style.display === 'none') {
+    // If closed, open it (arrow click should also open)
     el.style.display = 'block';
     if (arrow) arrow.style.transform = 'rotate(180deg)';
-    // Articles: if already loaded, just render immediately; otherwise fetch
     if (data.leadArticles[id]) {
       renderArticlesSection(id);
     } else {
       loadArticles(id);
     }
   } else {
+    // If open, close it
     el.style.display = 'none';
     if (arrow) arrow.style.transform = 'rotate(0deg)';
   }
 }
+
+function toggleLeadExpand(id) { closeLeadDetail(id); }
 
 function toggleSection(bodyId, arrowId) {
   var body = document.getElementById(bodyId);

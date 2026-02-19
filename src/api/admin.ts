@@ -447,6 +447,32 @@ api.get('/leads', authMiddleware, async (c) => {
   return c.json({ leads: res.results, total: total?.count || 0 });
 });
 
+// CSV Export — token via query param for universal download support
+api.get('/leads/export', async (c) => {
+  const db = c.env.DB;
+  const token = c.req.header('Authorization')?.replace('Bearer ', '') || c.req.query('token') || '';
+  if (!token) return c.json({ error: 'Unauthorized' }, 401);
+  try {
+    const { verifyToken } = await import('../lib/auth');
+    const payload = await verifyToken(token);
+    if (!payload) return c.json({ error: 'Unauthorized' }, 401);
+  } catch { return c.json({ error: 'Unauthorized' }, 401); }
+  const res = await db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
+  const leads = res.results;
+  let csv = '\uFEFFID,Source,Name,Contact,Language,Status,Notes,Referral,Total,Refund,Created\n';
+  for (const l of leads) {
+    csv += [l.id, l.source, `"${(l.name as string || '').replace(/"/g, '""')}"`, `"${(l.contact as string || '').replace(/"/g, '""')}"`,
+      l.lang, l.status,
+      `"${(l.notes as string || '').replace(/"/g, '""')}"`, l.referral_code, l.total_amount, l.refund_amount || 0, l.created_at].join(',') + '\n';
+  }
+  return new Response(csv, {
+    headers: {
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': 'attachment; filename="leads_export.csv"'
+    }
+  });
+});
+
 api.put('/leads/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
@@ -634,30 +660,6 @@ api.delete('/leads/:id', authMiddleware, async (c) => {
   const id = c.req.param('id');
   await db.prepare('DELETE FROM leads WHERE id = ?').bind(id).run();
   return c.json({ success: true });
-});
-
-api.get('/leads/export', async (c) => {
-  // Allow auth via query parameter for direct download links
-  const db = c.env.DB;
-  const token = c.req.header('Authorization')?.replace('Bearer ', '') || c.req.query('token') || '';
-  if (!token) return c.json({ error: 'Unauthorized' }, 401);
-  try {
-    const { verifyToken } = await import('../lib/auth');
-    const payload = await verifyToken(token);
-    if (!payload) return c.json({ error: 'Unauthorized' }, 401);
-  } catch { return c.json({ error: 'Unauthorized' }, 401); }
-  const res = await db.prepare('SELECT * FROM leads ORDER BY created_at DESC').all();
-  const leads = res.results;
-  let csv = 'ID,Source,Name,Contact,Product,Service,Message,Language,Status,Notes,Referral,Created\n';
-  for (const l of leads) {
-    csv += [l.id, l.source, `"${(l.name as string || '').replace(/"/g, '""')}"`, `"${(l.contact as string || '').replace(/"/g, '""')}"`,
-      `"${(l.product as string || '').replace(/"/g, '""')}"`, `"${(l.service as string || '').replace(/"/g, '""')}"`,
-      `"${(l.message as string || '').replace(/"/g, '""')}"`, l.lang, l.status,
-      `"${(l.notes as string || '').replace(/"/g, '""')}"`, l.referral_code, l.created_at].join(',') + '\n';
-  }
-  return new Response(csv, {
-    headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename=leads_export.csv' }
-  });
 });
 
 // ===== SITE SETTINGS (webhook URLs, bot token, slot counter, etc.) =====
