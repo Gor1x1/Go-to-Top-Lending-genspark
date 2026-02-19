@@ -154,19 +154,27 @@ class GoToTopAPITester:
         return self.run_test("Reset User Password", "POST", f"/api/users/{self.test_user_id}/reset-password", 200)
 
     def test_create_lead(self):
-        """Test create lead endpoint"""
+        """Test create lead endpoint with enhanced fields"""
         lead_data = {
             "name": "Test Lead",
             "contact": "+374999999999",
             "product": "Test Product",
             "service": "Test Service",
             "message": "Test message for lead",
-            "source": "test"
+            "source": "manual",
+            "total_amount": 25000,
+            "calc_data": '{"items":[{"name":"SEO","qty":1,"price":25000,"sum":25000}],"total":25000}',
+            "custom_fields": '{"wb_link":"https://example.com","notes":"Test custom field"}'
         }
-        success, response = self.run_test("Create Lead", "POST", "/api/leads", 200, data=lead_data)
+        success, response = self.run_test("Create Lead (Enhanced)", "POST", "/api/leads", 200, data=lead_data)
         if success and 'id' in response:
             self.test_lead_id = response['id']
             print(f"📋 Created test lead with ID: {self.test_lead_id}")
+            # Verify lead_number is auto-generated
+            if 'lead_number' in response:
+                print(f"✅ Lead number auto-generated: #{response['lead_number']}")
+            else:
+                print(f"⚠️ Lead number not found in response")
         return success
 
     def test_list_leads(self):
