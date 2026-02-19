@@ -1473,7 +1473,7 @@ function renderLeads() {
         }
       }
       
-      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + ';cursor:pointer" onclick="openLeadDetail(' + l.id + ')">' +
+      h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + ';cursor:pointer" onclick="handleCardClick(event,' + l.id + ')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
@@ -1506,7 +1506,7 @@ function renderLeads() {
       }
       
       // Status selector — 6 statuses
-      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onclick="event.stopPropagation()" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
+      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
         '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новые лиды</option>' +
         '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 На связи</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
@@ -1515,7 +1515,7 @@ function renderLeads() {
         '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option></select>';
       
       // Assign to employee
-      h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onclick="event.stopPropagation()" onchange="assignLead(' + l.id + ', this.value)">' +
+      h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onchange="assignLead(' + l.id + ', this.value)">' +
         '<option value="">Ответственный...</option>';
       for (var uj = 0; uj < (data.users||[]).length; uj++) {
         var uu = data.users[uj];
@@ -1525,12 +1525,12 @@ function renderLeads() {
       
       h += '<div style="font-size:0.78rem;color:#64748b">' + formatArmTime(l.created_at) + '</div>';
       h += '<div style="display:flex;gap:4px">';
-      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="event.stopPropagation();closeLeadDetail(' + l.id + ')" title="Свернуть"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
-      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="event.stopPropagation();deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="closeLeadDetail(' + l.id + ')" title="Свернуть/Развернуть"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
+      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div></div></div>';
       
       // ========== EXPANDABLE DETAIL AREA ==========
-      h += '<div id="lead-detail-' + l.id + '" style="display:none" onclick="event.stopPropagation()">';
+      h += '<div id="lead-detail-' + l.id + '" style="display:none">';
       
       // --- 1. EDITABLE FIELDS: Name + Contact (phone) ---
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
@@ -1785,6 +1785,23 @@ function closeLeadDetail(id) {
     // If open, close it
     el.style.display = 'none';
     if (arrow) arrow.style.transform = 'rotate(0deg)';
+  }
+}
+
+function handleCardClick(e, id) {
+  // Only toggle if click target is a neutral element (not interactive)
+  var tag = e.target.tagName;
+  if (tag === 'SELECT' || tag === 'OPTION' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
+  // Also check parent — icon inside a button/link
+  var parent = e.target.parentElement;
+  if (parent && (parent.tagName === 'BUTTON' || parent.tagName === 'A' || parent.tagName === 'SELECT')) return;
+  // Check if click is inside the detail area
+  var detail = document.getElementById('lead-detail-' + id);
+  if (detail && detail.contains(e.target)) return;
+  // If detail is closed => open; if open => ignore (only arrow closes)
+  var el = document.getElementById('lead-detail-' + id);
+  if (el && el.style.display === 'none') {
+    openLeadDetail(id);
   }
 }
 
