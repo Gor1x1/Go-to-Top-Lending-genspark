@@ -55,7 +55,9 @@ export function getAdminHTML(): string {
 // ===== STATE =====
 let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [] };
+let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
+let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -99,7 +101,11 @@ async function doLogin(e) {
   }).then(r => r.json());
   if (res.token) {
     token = res.token;
+    currentUser = res.user;
+    rolesConfig = res.rolesConfig;
     localStorage.setItem('gtt_token', token);
+    localStorage.setItem('gtt_user', JSON.stringify(res.user));
+    localStorage.setItem('gtt_roles', JSON.stringify(res.rolesConfig));
     toast('Добро пожаловать, ' + (res.user.display_name || res.user.username));
     await loadData();
     render();
@@ -110,9 +116,10 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData] = await Promise.all([
+  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData, usersData, siteBlocksData] = await Promise.all([
     api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order'),
-    api('/leads?limit=50'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings'), api('/footer'), api('/photo-blocks')
+    api('/leads?limit=200'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings'), api('/footer'), api('/photo-blocks'),
+    api('/users'), api('/site-blocks')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -129,12 +136,16 @@ async function loadData() {
   data.settings = settings || {};
   data.footer = footerData || {};
   data.photoBlocks = (photoBlocksData && photoBlocksData.blocks) || [];
+  data.users = usersData || [];
+  data.siteBlocks = (siteBlocksData && siteBlocksData.blocks) || [];
 }
 
 // ===== NAVIGATION =====
 const pages = [
   { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Дашборд' },
   { id: 'leads', icon: 'fa-users', label: 'Лиды / CRM' },
+  { id: 'employees', icon: 'fa-user-friends', label: 'Сотрудники' },
+  { id: 'permissions', icon: 'fa-shield-alt', label: 'Доступы' },
   { id: 'blocks', icon: 'fa-cubes', label: 'Конструктор блоков' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
   { id: 'pdf', icon: 'fa-file-pdf', label: 'PDF шаблон' },
@@ -148,11 +159,22 @@ const pages = [
 ];
 
 function renderSidebar() {
+  const isAdmin = currentUser && currentUser.role === 'main_admin';
+  const userPerms = currentUser?.permissions || [];
   let h = '<div class="sidebar flex flex-col"><div style="padding:20px;border-bottom:1px solid #334155">' +
     '<div style="font-size:1.3rem;font-weight:800;color:#a78bfa">Go to Top</div>' +
-    '<div style="font-size:0.8rem;color:#64748b;margin-top:4px">Админ-панель</div></div><div style="padding:8px 0;flex:1">';
+    '<div style="font-size:0.8rem;color:#64748b;margin-top:4px">Админ-панель</div>';
+  if (currentUser) {
+    const rl = rolesConfig?.role_labels || {};
+    h += '<div style="margin-top:10px;padding:8px 12px;background:#0f172a;border-radius:8px;font-size:0.78rem">' +
+      '<div style="color:#e2e8f0;font-weight:600">' + esc(currentUser.display_name) + '</div>' +
+      '<div style="color:#8B5CF6;font-size:0.72rem">' + esc(rl[currentUser.role] || currentUser.role) + '</div></div>';
+  }
+  h += '</div><div style="padding:8px 0;flex:1">';
   for (const p of pages) {
-    h += '<div class="nav-item' + (currentPage === p.id ? ' active' : '') + '" onclick="navigate(&apos;' + p.id + '&apos;)">' +
+    // Check permissions: main_admin sees all, others see only allowed sections
+    if (!isAdmin && !userPerms.includes(p.id) && p.id !== 'dashboard') continue;
+    h += '<div class="nav-item' + (currentPage === p.id ? ' active' : '') + '" onclick="navigate(\\'' + p.id + '\\')">' +
       '<i class="' + (p.fab ? 'fab' : 'fas') + ' ' + p.icon + '"></i><span>' + p.label + '</span></div>';
   }
   h += '</div><div style="padding:16px;border-top:1px solid #334155">' +
@@ -164,7 +186,7 @@ function renderSidebar() {
 }
 
 function navigate(page) { currentPage = page; render(); }
-function doLogout() { token = ''; localStorage.removeItem('gtt_token'); render(); }
+function doLogout() { token = ''; currentUser = null; rolesConfig = null; localStorage.removeItem('gtt_token'); localStorage.removeItem('gtt_user'); localStorage.removeItem('gtt_roles'); render(); }
 function previewSite() {
   toast('Изменения применены! Сайт обновляется автоматически при каждой загрузке страницы.', 'success');
   window.open('/?_nocache=' + Date.now(), '_blank');
@@ -1298,31 +1320,110 @@ async function changePassword() {
 }
 
 // ===== LEADS / CRM =====
+let leadsFilter = { status: 'all', source: 'all', search: '', assignee: 'all' };
+
 function renderLeads() {
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
-  var h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Лиды / CRM</h1><p style="color:#94a3b8;margin-top:4px">Все заявки с сайта. Всего: ' + total + '</p></div>' +
-    '<a href="/api/admin/leads/export" target="_blank" class="btn btn-success" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>Экспорт CSV</a>' +
+  
+  // --- Analytics mini-dashboard ---
+  var statNew = 0, statContacted = 0, statInProgress = 0, statDone = 0, statRejected = 0, totalRevenue = 0, todayCount = 0;
+  var today = new Date().toISOString().slice(0,10);
+  for (var ai = 0; ai < leads.length; ai++) {
+    var al = leads[ai];
+    if (al.status === 'new') statNew++;
+    else if (al.status === 'contacted') statContacted++;
+    else if (al.status === 'in_progress') statInProgress++;
+    else if (al.status === 'done') statDone++;
+    else if (al.status === 'rejected') statRejected++;
+    if ((al.created_at||'').startsWith(today)) todayCount++;
+    if (al.calc_data) { try { var cd = JSON.parse(al.calc_data); if (cd.total) totalRevenue += Number(cd.total); } catch(e) {} }
+  }
+  
+  // --- Filter leads ---
+  var filtered = leads.filter(function(l) {
+    if (leadsFilter.status !== 'all' && l.status !== leadsFilter.status) return false;
+    if (leadsFilter.source !== 'all' && (l.source||'form') !== leadsFilter.source) return false;
+    if (leadsFilter.assignee !== 'all' && String(l.assigned_to||'') !== leadsFilter.assignee) return false;
+    if (leadsFilter.search) {
+      var q = leadsFilter.search.toLowerCase();
+      if (!((l.name||'').toLowerCase().includes(q) || (l.contact||'').toLowerCase().includes(q) || (l.message||'').toLowerCase().includes(q) || ('#'+l.id).includes(q))) return false;
+    }
+    return true;
+  });
+  
+  var h = '<div style="padding:32px">';
+  // Header
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Лиды / CRM</h1>' +
+    '<p style="color:#94a3b8;margin-top:4px">Все заявки с сайта. Всего: ' + total + ' | Показано: ' + filtered.length + '</p></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+      '<button class="btn btn-outline" onclick="loadLeadsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button>' +
+      '<a href="/api/admin/leads/export" target="_blank" class="btn btn-success" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>CSV</a>' +
+    '</div></div>';
+  
+  // Analytics cards
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:20px">' +
+    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'new\\')">' +
+      '<div style="font-size:1.5rem;font-weight:800;color:#10B981">🟢 ' + statNew + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Новые</div></div>' +
+    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'contacted\\')">' +
+      '<div style="font-size:1.5rem;font-weight:800;color:#3B82F6">💬 ' + statContacted + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Связались</div></div>' +
+    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
+      '<div style="font-size:1.5rem;font-weight:800;color:#F59E0B">🔄 ' + statInProgress + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">В работе</div></div>' +
+    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
+      '<div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">✅ ' + statDone + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Завершены</div></div>' +
+    '<div class="stat-card" style="cursor:pointer;padding:14px" onclick="setLeadsFilter(\\'status\\',\\'rejected\\')">' +
+      '<div style="font-size:1.5rem;font-weight:800;color:#EF4444">❌ ' + statRejected + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Отклонены</div></div>' +
+    '<div class="stat-card" style="padding:14px">' +
+      '<div style="font-size:1.5rem;font-weight:800;color:#a78bfa">' + todayCount + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Сегодня</div></div>' +
+    '<div class="stat-card" style="padding:14px">' +
+      '<div style="font-size:1.3rem;font-weight:800;color:#10B981">' + (totalRevenue > 0 ? Number(totalRevenue).toLocaleString('ru-RU') + ' ֏' : '—') + '</div><div style="color:#94a3b8;font-size:0.78rem;margin-top:2px">Общая сумма</div></div>' +
+  '</div>';
+  
+  // Filters row
+  h += '<div class="card" style="padding:14px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
+    '<i class="fas fa-filter" style="color:#64748b"></i>' +
+    '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'status\\',this.value)">' +
+      '<option value="all"' + (leadsFilter.status==='all'?' selected':'') + '>Все статусы</option>' +
+      '<option value="new"' + (leadsFilter.status==='new'?' selected':'') + '>🟢 Новый</option>' +
+      '<option value="contacted"' + (leadsFilter.status==='contacted'?' selected':'') + '>💬 Связались</option>' +
+      '<option value="in_progress"' + (leadsFilter.status==='in_progress'?' selected':'') + '>🔄 В работе</option>' +
+      '<option value="done"' + (leadsFilter.status==='done'?' selected':'') + '>✅ Завершён</option>' +
+      '<option value="rejected"' + (leadsFilter.status==='rejected'?' selected':'') + '>❌ Отклонён</option></select>' +
+    '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'source\\',this.value)">' +
+      '<option value="all"' + (leadsFilter.source==='all'?' selected':'') + '>Все источники</option>' +
+      '<option value="form"' + (leadsFilter.source==='form'?' selected':'') + '>Форма</option>' +
+      '<option value="popup"' + (leadsFilter.source==='popup'?' selected':'') + '>Попап</option>' +
+      '<option value="calculator_pdf"' + (leadsFilter.source==='calculator_pdf'?' selected':'') + '>Калькулятор</option></select>' +
+    '<select class="input" style="width:170px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'assignee\\',this.value)">' +
+      '<option value="all"' + (leadsFilter.assignee==='all'?' selected':'') + '>Все ответственные</option>' +
+      '<option value=""' + (leadsFilter.assignee===''?' selected':'') + '>Не назначен</option>';
+  for (var ui = 0; ui < (data.users||[]).length; ui++) {
+    var usr = data.users[ui];
+    h += '<option value="' + usr.id + '"' + (leadsFilter.assignee===String(usr.id)?' selected':'') + '>' + escHtml(usr.display_name) + '</option>';
+  }
+  h += '</select>' +
+    '<input class="input" style="flex:1;min-width:180px;padding:6px 10px;font-size:0.82rem" placeholder="Поиск по имени, контакту, #id..." value="' + escHtml(leadsFilter.search) + '" oninput="setLeadsFilter(\\'search\\',this.value)">' +
+    (leadsFilter.status!=='all'||leadsFilter.source!=='all'||leadsFilter.search||leadsFilter.assignee!=='all' ? '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="resetLeadsFilter()"><i class="fas fa-times" style="margin-right:4px"></i>Сбросить</button>' : '') +
   '</div>';
 
-  if (!leads.length) {
-    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i><p style="color:#94a3b8">Заявок пока нет.</p></div>';
+  if (!filtered.length) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fas fa-inbox" style="font-size:3rem;color:#475569;margin-bottom:16px"></i><p style="color:#94a3b8">' + (leads.length > 0 ? 'Нет заявок по выбранным фильтрам' : 'Заявок пока нет') + '</p></div>';
   } else {
-    for (var i = 0; i < leads.length; i++) {
-      var l = leads[i];
+    for (var i = 0; i < filtered.length; i++) {
+      var l = filtered[i];
       var isCalc = l.source === 'calculator_pdf';
       var calcData = null;
       if (isCalc && l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
-      var statusIcon = {'new':'🟢','contacted':'💬','in_progress':'🔄','done':'✅','rejected':'❌'}[l.status] || '⚪';
       
       h += '<div class="card" style="margin-bottom:12px">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
           '<div style="flex:1;min-width:200px">' +
-            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">' +
+            '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
               '<span style="font-size:1rem;font-weight:800;color:#a78bfa">#' + l.id + '</span>' +
               '<span class="badge badge-purple">' + (l.source || 'form') + '</span>' +
               (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
+              (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '') +
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
@@ -1330,18 +1431,28 @@ function renderLeads() {
           '</div>';
       
       // Right side: status + total + date + actions
-      h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:180px">';
+      h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:200px">';
       
       if (calcData && calcData.total) {
         h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(calcData.total).toLocaleString('ru-RU') + '&nbsp;֏</div>';
       }
       
+      // Status selector
       h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
         '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новый</option>' +
         '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 Связались</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
         '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option>' +
         '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option></select>';
+      
+      // Assign to employee
+      h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onchange="assignLead(' + l.id + ', this.value)">' +
+        '<option value="">Ответственный...</option>';
+      for (var uj = 0; uj < (data.users||[]).length; uj++) {
+        var uu = data.users[uj];
+        h += '<option value="' + uu.id + '"' + (l.assigned_to==uu.id?' selected':'') + '>' + escHtml(uu.display_name) + '</option>';
+      }
+      h += '</select>';
       
       h += '<div style="font-size:0.78rem;color:#64748b">' + (l.created_at || '').substring(0, 16) + '</div>';
       h += '<div style="display:flex;gap:4px">';
@@ -1373,9 +1484,40 @@ function renderLeads() {
   return h;
 }
 
+function getAssigneeName(id) {
+  var u = (data.users||[]).find(function(x) { return x.id == id; });
+  return u ? u.display_name : '—';
+}
+
+function setLeadsFilter(key, val) {
+  leadsFilter[key] = val;
+  render();
+}
+
+function resetLeadsFilter() {
+  leadsFilter = { status: 'all', source: 'all', search: '', assignee: 'all' };
+  render();
+}
+
+async function loadLeadsData() {
+  var res = await api('/leads?limit=500');
+  data.leads = res || { leads: [], total: 0 };
+  toast('Данные обновлены');
+  render();
+}
+
 async function updateLeadStatus(id, status) {
-  await api('/leads/' + id, { method: 'PUT', body: JSON.stringify({ status: status, notes: '' }) });
+  await api('/leads/' + id, { method: 'PUT', body: JSON.stringify({ status: status }) });
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
+  if (lead) lead.status = status;
   toast('Статус обновлён');
+}
+
+async function assignLead(id, userId) {
+  await api('/leads/' + id, { method: 'PUT', body: JSON.stringify({ assigned_to: userId ? Number(userId) : null }) });
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
+  if (lead) lead.assigned_to = userId ? Number(userId) : null;
+  toast('Ответственный назначен');
 }
 
 async function deleteLead(id) {
@@ -1901,6 +2043,350 @@ function escHtml(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+// ===== EMPLOYEES PAGE =====
+function renderEmployees() {
+  const isAdmin = currentUser && currentUser.role === 'main_admin';
+  const rl = rolesConfig?.role_labels || {};
+  const roles = rolesConfig?.roles || [];
+  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px"><div><h1 style="font-size:1.5rem;font-weight:800">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438</h1><p style="color:#94a3b8;font-size:0.85rem">\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u0439 \u2014 ' + data.users.length + ' \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a(\u043e\u0432)</p></div>';
+  if (isAdmin) {
+    h += '<button class="btn btn-primary" onclick="showEmployeeModal()"><i class="fas fa-user-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>';
+  }
+  h += '</div>';
+  h += '<div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u041b\u043e\u0433\u0438\u043d</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u0420\u043e\u043b\u044c</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u041a\u043e\u043d\u0442\u0430\u043a\u0442</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u0421\u0442\u0430\u0442\u0443\u0441</th>';
+  if (isAdmin) h += '<th style="padding:12px 16px;text-align:right;color:#94a3b8;font-size:0.78rem">\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f</th>';
+  h += '</tr></thead><tbody>';
+  for (const u of data.users) {
+    h += '<tr style="border-bottom:1px solid #1e293b">';
+    h += '<td style="padding:12px 16px;font-weight:600">' + escHtml(u.display_name) + '</td>';
+    h += '<td style="padding:12px 16px;font-family:monospace;font-size:0.82rem;color:#94a3b8">' + escHtml(u.username) + '</td>';
+    h += '<td style="padding:12px 16px"><span class="badge ' + (u.role==='main_admin'?'badge-purple':'badge-amber') + '">' + escHtml(rl[u.role]||u.role) + '</span></td>';
+    h += '<td style="padding:12px 16px;font-size:0.82rem;color:#94a3b8">' + (escHtml(u.phone)||escHtml(u.email)||'\u2014') + '</td>';
+    h += '<td style="padding:12px 16px"><span class="badge ' + (u.is_active?'badge-green':'bg-red-900 text-red-300') + '" style="cursor:pointer" onclick="toggleUserActive(' + u.id + ',' + (u.is_active?0:1) + ')">' + (u.is_active?'\u0410\u043a\u0442\u0438\u0432\u0435\u043d':'\u041e\u0442\u043a\u043b\u044e\u0447\u0451\u043d') + '</span></td>';
+    if (isAdmin) {
+      h += '<td style="padding:12px 16px;text-align:right">';
+      h += '<button class="btn btn-outline" style="padding:6px 10px;font-size:0.78rem;margin-right:4px" onclick="editEmployee(' + u.id + ')"><i class="fas fa-edit"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:6px 10px;font-size:0.78rem;margin-right:4px" onclick="resetEmployeePass(' + u.id + ',\\'' + escHtml(u.display_name) + '\\')"><i class="fas fa-key"></i></button>';
+      if (u.role !== 'main_admin') h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.78rem" onclick="deleteEmployee(' + u.id + ',\\'' + escHtml(u.display_name) + '\\')"><i class="fas fa-trash"></i></button>';
+      h += '</td>';
+    }
+    h += '</tr>';
+  }
+  h += '</tbody></table></div>';
+  h += '<div id="employeeModalArea"></div>';
+  return h + '</div>';
+}
+
+async function toggleUserActive(id, val) {
+  await api('/users/' + id, { method:'PUT', body: JSON.stringify({is_active: val}) });
+  data.users = await api('/users') || [];
+  render();
+}
+
+async function deleteEmployee(id, name) {
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430 "' + name + '"?')) return;
+  await api('/users/' + id, { method:'DELETE' });
+  data.users = await api('/users') || [];
+  toast('\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a \u0443\u0434\u0430\u043b\u0451\u043d');
+  render();
+}
+
+async function resetEmployeePass(id, name) {
+  if (!confirm('\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c \u0434\u043b\u044f "' + name + '"?')) return;
+  const res = await api('/users/' + id + '/reset-password', { method:'POST' });
+  if (res && res.new_password) {
+    alert('\u041d\u043e\u0432\u044b\u0439 \u043f\u0430\u0440\u043e\u043b\u044c \u0434\u043b\u044f ' + name + ':\\n\\n' + res.new_password + '\\n\\n\u0421\u043a\u043e\u043f\u0438\u0440\u0443\u0439\u0442\u0435 \u0438 \u043f\u0435\u0440\u0435\u0434\u0430\u0439\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0443.');
+  }
+}
+
+function showEmployeeModal(userId) {
+  const roles = rolesConfig?.roles || [];
+  const rl = rolesConfig?.role_labels || {};
+  const u = userId ? data.users.find(x => x.id === userId) : null;
+  let h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center" onclick="this.remove()">' +
+    '<div class="card" style="width:480px;max-width:90vw" onclick="event.stopPropagation()">' +
+    '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">' + (u ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c' : '\u041d\u043e\u0432\u044b\u0439 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a') + '</h3>' +
+    '<form onsubmit="saveEmployee(event,' + (u ? u.id : 'null') + ')">' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0418\u043c\u044f / \u0424\u0418\u041e *</label><input class="input" id="empName" value="' + escHtml(u?.display_name||'') + '" required></div>';
+  if (!u) {
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041b\u043e\u0433\u0438\u043d *</label><input class="input" id="empUser" required></div>' +
+      '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041f\u0430\u0440\u043e\u043b\u044c *</label><input class="input" type="password" id="empPass" required></div></div>';
+  }
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0420\u043e\u043b\u044c *</label><select class="input" id="empRole">';
+  for (const r of roles) { h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
+  h += '</select></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</label><input class="input" id="empPhone" value="' + escHtml(u?.phone||'') + '"></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Email</label><input class="input" id="empEmail" value="' + escHtml(u?.email||'') + '"></div></div>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (u?'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c':'\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div></form></div></div>';
+  const area = document.getElementById('employeeModalArea');
+  if (area) area.innerHTML = h;
+}
+
+function editEmployee(id) { showEmployeeModal(id); }
+
+async function saveEmployee(e, id) {
+  e.preventDefault();
+  const body = { display_name: document.getElementById('empName').value, role: document.getElementById('empRole').value, phone: document.getElementById('empPhone').value, email: document.getElementById('empEmail').value };
+  if (!id) {
+    body.username = document.getElementById('empUser').value;
+    body.password = document.getElementById('empPass').value;
+    await api('/users', { method:'POST', body: JSON.stringify(body) });
+  } else {
+    await api('/users/' + id, { method:'PUT', body: JSON.stringify(body) });
+  }
+  data.users = await api('/users') || [];
+  toast(id ? '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d' : '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a \u0441\u043e\u0437\u0434\u0430\u043d');
+  render();
+}
+
+// ===== PERMISSIONS PAGE =====
+function renderPermissions() {
+  const isAdmin = currentUser && currentUser.role === 'main_admin';
+  const rl = rolesConfig?.role_labels || {};
+  const sl = rolesConfig?.section_labels || {};
+  const allSections = rolesConfig?.sections || [];
+  let h = '<div style="padding:32px"><h1 style="font-size:1.5rem;font-weight:800;margin-bottom:8px">\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0434\u043e\u0441\u0442\u0443\u043f\u0430\u043c\u0438</h1><p style="color:#94a3b8;font-size:0.85rem;margin-bottom:24px">\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u0442\u0435, \u043a\u0430\u043a\u0438\u0435 \u0440\u0430\u0437\u0434\u0435\u043b\u044b \u0434\u043e\u0441\u0442\u0443\u043f\u043d\u044b \u043a\u0430\u0436\u0434\u043e\u043c\u0443 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0443</p>';
+  h += '<div style="display:grid;grid-template-columns:260px 1fr;gap:20px">';
+  // User list
+  h += '<div class="card" style="padding:0;overflow:hidden"><div style="padding:14px 20px;border-bottom:1px solid #334155;font-weight:700;font-size:0.88rem;color:#a78bfa">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438</div>';
+  for (const u of data.users) {
+    h += '<div style="padding:12px 20px;cursor:pointer;border-bottom:1px solid #1e293b;transition:all 0.2s;border-left:3px solid transparent" class="perm-user-item" data-uid="' + u.id + '" onclick="selectPermUser(' + u.id + ')">' +
+      '<div style="font-weight:600;font-size:0.88rem">' + escHtml(u.display_name) + '</div>' +
+      '<div style="font-size:0.75rem;color:#64748b">' + escHtml(rl[u.role]||u.role) + '</div></div>';
+  }
+  h += '</div>';
+  // Permissions grid
+  h += '<div class="card" id="permEditor"><div style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-shield-alt" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430</div></div>';
+  h += '</div></div>';
+  return h;
+}
+
+let selectedPermUserId = null;
+let selectedPermSections = [];
+
+async function selectPermUser(uid) {
+  selectedPermUserId = uid;
+  const res = await api('/permissions/' + uid);
+  selectedPermSections = (res && res.permissions) || [];
+  const u = data.users.find(x => x.id === uid);
+  const isMainAdmin = u && u.role === 'main_admin';
+  const isAdmin = currentUser && currentUser.role === 'main_admin';
+  const rl = rolesConfig?.role_labels || {};
+  const sl = rolesConfig?.section_labels || {};
+  const allSections = rolesConfig?.sections || [];
+  
+  // Highlight selected user
+  document.querySelectorAll('.perm-user-item').forEach(el => { el.style.borderLeftColor = el.dataset.uid == uid ? '#8B5CF6' : 'transparent'; el.style.background = el.dataset.uid == uid ? 'rgba(139,92,246,0.1)' : ''; });
+  
+  let h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><div><h3 style="font-weight:700;font-size:1.1rem">' + escHtml(u?.display_name) + '</h3><span class="badge badge-purple" style="margin-top:6px;display:inline-block">' + escHtml(rl[u?.role]||u?.role) + '</span></div>';
+  if (isAdmin && !isMainAdmin) h += '<button class="btn btn-primary" onclick="savePermissions()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>';
+  h += '</div>';
+  if (isMainAdmin) h += '<div style="padding:12px 16px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:8px;margin-bottom:16px;font-size:0.85rem;color:#a78bfa"><i class="fas fa-shield-alt" style="margin-right:6px"></i>\u0413\u043b\u0430\u0432\u043d\u044b\u0439 \u0430\u0434\u043c\u0438\u043d \u0438\u043c\u0435\u0435\u0442 \u0434\u043e\u0441\u0442\u0443\u043f \u043a\u043e \u0432\u0441\u0435\u043c \u0440\u0430\u0437\u0434\u0435\u043b\u0430\u043c</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px">';
+  for (const sec of allSections) {
+    const checked = isMainAdmin || selectedPermSections.includes(sec);
+    const disabled = !isAdmin || isMainAdmin;
+    h += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0f172a;border:1px solid ' + (checked?'#8B5CF6':'#334155') + ';border-radius:8px;cursor:' + (disabled?'default':'pointer') + ';opacity:' + (disabled?'0.6':'1') + '">' +
+      '<input type="checkbox" ' + (checked?'checked':'') + ' ' + (disabled?'disabled':'') + ' onchange="togglePermSection(\\'' + sec + '\\')" style="accent-color:#8B5CF6">' +
+      '<span style="font-size:0.85rem">' + escHtml(sl[sec]||sec) + '</span></label>';
+  }
+  h += '</div>';
+  document.getElementById('permEditor').innerHTML = h;
+}
+
+function togglePermSection(sec) {
+  const idx = selectedPermSections.indexOf(sec);
+  if (idx >= 0) selectedPermSections.splice(idx, 1);
+  else selectedPermSections.push(sec);
+}
+
+async function savePermissions() {
+  if (!selectedPermUserId) return;
+  await api('/permissions/' + selectedPermUserId, { method:'PUT', body: JSON.stringify({ sections: selectedPermSections }) });
+  toast('\u0414\u043e\u0441\u0442\u0443\u043f\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b');
+}
+
+// ===== SITE BLOCKS CONSTRUCTOR (emergent-style) =====
+function renderSiteBlocks() {
+  const blocks = data.siteBlocks || [];
+  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px"><div><h1 style="font-size:1.5rem;font-weight:800">\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 \u0431\u043b\u043e\u043a\u043e\u0432 v2</h1><p style="color:#94a3b8;font-size:0.85rem">\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0435 \u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0441\u0435\u043a\u0446\u0438\u0439 \u0441\u0430\u0439\u0442\u0430 (RU/AM)</p></div>' +
+    '<button class="btn btn-primary" onclick="createSiteBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a</button></div>';
+  if (blocks.length === 0) {
+    h += '<div class="card" style="text-align:center;padding:48px;color:#64748b"><i class="fas fa-cubes" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>\u0411\u043b\u043e\u043a\u0438 \u0435\u0449\u0451 \u043d\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b</p></div>';
+  } else {
+    h += '<div style="display:grid;gap:8px">';
+    blocks.forEach((b, idx) => {
+      const textsCount = (b.texts_ru?.length||0) + (b.texts_am?.length||0);
+      const imgsCount = b.images?.length||0;
+      const btnsCount = b.buttons?.length||0;
+      h += '<div class="card" draggable="true" ondragstart="sbDragStart(' + idx + ')" ondragover="sbDragOver(event,' + idx + ')" ondragend="sbDragEnd()" style="padding:0;overflow:hidden;opacity:' + (b.is_visible?'1':'0.5') + ';border-left:3px solid ' + (b.is_visible?'#8B5CF6':'#EF4444') + '">';
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;background:#1e293b" onclick="toggleSbExpand(' + b.id + ')">';
+      h += '<i class="fas fa-grip-vertical" style="color:#64748b;cursor:grab" onclick="event.stopPropagation()"></i>';
+      h += '<span style="color:#64748b;font-size:0.8rem;font-weight:700;min-width:28px">#' + (idx+1) + '</span>';
+      h += '<div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<span style="font-weight:700;color:' + (b.is_visible?'#e2e8f0':'#f87171') + '">' + escHtml(b.title_ru||b.block_key) + '</span>';
+      h += '<span class="badge badge-purple" style="font-size:0.7rem">' + escHtml(b.block_key) + '</span>';
+      if (textsCount > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.68rem">' + textsCount + ' \u0442\u0435\u043a\u0441\u0442</span>';
+      if (imgsCount > 0) h += '<span class="badge badge-green" style="font-size:0.68rem">' + imgsCount + ' \u0444\u043e\u0442\u043e</span>';
+      if (btnsCount > 0) h += '<span class="badge badge-amber" style="font-size:0.68rem">' + btnsCount + ' \u043a\u043d\u043e\u043f\u043e\u043a</span>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">';
+      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editSiteBlock(' + b.id + ')" title="\u0420\u0435\u0434."><i class="fas fa-edit"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="dupSiteBlock(' + b.id + ')" title="\u041a\u043e\u043f\u0438\u044f"><i class="fas fa-copy"></i></button>';
+      h += '<button class="btn ' + (b.is_visible?'btn-success':'btn-danger') + '" style="padding:4px 8px;font-size:0.75rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')">' + (b.is_visible?'<i class="fas fa-eye"></i>':'<i class="fas fa-eye-slash"></i>') + '</button>';
+      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="delSiteBlock(' + b.id + ')"><i class="fas fa-trash"></i></button>';
+      h += '</div>';
+      h += '<i class="fas fa-chevron-down" style="color:#64748b"></i></div>';
+      // Expanded preview
+      h += '<div id="sb-expand-' + b.id + '" style="display:none;padding:16px;border-top:1px solid #334155;background:#0f172a">';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px"><div><div style="font-size:0.75rem;font-weight:700;color:#8B5CF6;margin-bottom:6px">\u0422\u0435\u043a\u0441\u0442\u044b (RU)</div>';
+      (b.texts_ru||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
+      h += '</div><div><div style="font-size:0.75rem;font-weight:700;color:#fbbf24;margin-bottom:6px">\u0422\u0435\u043a\u0441\u0442\u044b (AM)</div>';
+      (b.texts_am||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
+      h += '</div></div>';
+      if ((b.buttons||[]).length > 0) {
+        h += '<div style="font-size:0.75rem;font-weight:700;color:#a78bfa;margin-bottom:6px">\u041a\u043d\u043e\u043f\u043a\u0438</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
+        (b.buttons||[]).forEach(btn => { h += '<span style="padding:6px 12px;background:#8B5CF6;color:white;border-radius:6px;font-size:0.82rem">' + escHtml(btn.text_ru) + '</span>'; });
+        h += '</div>';
+      }
+      h += '</div></div>';
+    });
+    h += '</div>';
+  }
+  h += '<div id="siteBlockModalArea"></div>';
+  return h + '</div>';
+}
+
+function toggleSbExpand(id) {
+  const el = document.getElementById('sb-expand-' + id);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+let sbDragIdx = null;
+function sbDragStart(idx) { sbDragIdx = idx; }
+function sbDragOver(e, idx) { e.preventDefault(); }
+async function sbDragEnd() {
+  // Save current order (simplified — full reorder happens on server)
+  const orders = (data.siteBlocks||[]).map((b, i) => ({ id: b.id, sort_order: i }));
+  await api('/site-blocks/reorder', { method:'POST', body: JSON.stringify({ orders }) });
+  sbDragIdx = null;
+}
+
+async function toggleSbVisible(id, val) {
+  await api('/site-blocks/' + id, { method:'PUT', body: JSON.stringify({is_visible: val}) });
+  const res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
+  render();
+}
+
+async function delSiteBlock(id) {
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0431\u043b\u043e\u043a?')) return;
+  await api('/site-blocks/' + id, { method:'DELETE' });
+  const res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
+  toast('\u0411\u043b\u043e\u043a \u0443\u0434\u0430\u043b\u0451\u043d');
+  render();
+}
+
+async function dupSiteBlock(id) {
+  await api('/site-blocks/duplicate/' + id, { method:'POST' });
+  const res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
+  toast('\u0411\u043b\u043e\u043a \u0434\u0443\u0431\u043b\u0438\u0440\u043e\u0432\u0430\u043d');
+  render();
+}
+
+let editingBlock = null;
+function createSiteBlock() {
+  editingBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: '\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], is_visible: true, custom_css: '', custom_html: '' };
+  showBlockEditor();
+}
+
+function editSiteBlock(id) {
+  const b = (data.siteBlocks||[]).find(x => x.id === id);
+  if (!b) return;
+  editingBlock = JSON.parse(JSON.stringify(b));
+  showBlockEditor();
+}
+
+function showBlockEditor() {
+  if (!editingBlock) return;
+  const b = editingBlock;
+  let h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="closeBlockEditor()">' +
+    '<div class="card" style="width:800px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1.1rem;font-weight:700">' + (b.id ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0431\u043b\u043e\u043a' : '\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a') + '</h3><button class="btn btn-outline" style="padding:6px 10px" onclick="closeBlockEditor()"><i class="fas fa-times"></i></button></div>';
+  // Basic fields
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">\u041a\u043b\u044e\u0447 \u0431\u043b\u043e\u043a\u0430</label><input class="input" id="sbKey" value="' + escHtml(b.block_key) + '"></div><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0438\u043f</label><select class="input" id="sbType"><option value="section" ' + (b.block_type==='section'?'selected':'') + '>\u0421\u0435\u043a\u0446\u0438\u044f</option><option value="hero" ' + (b.block_type==='hero'?'selected':'') + '>Hero</option><option value="features" ' + (b.block_type==='features'?'selected':'') + '>Features</option><option value="cta" ' + (b.block_type==='cta'?'selected':'') + '>CTA</option><option value="custom" ' + (b.block_type==='custom'?'selected':'') + '>\u041a\u0430\u0441\u0442\u043e\u043c</option></select></div></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#8B5CF6;display:block;margin-bottom:4px">\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (RU)</label><input class="input" id="sbTitleRu" value="' + escHtml(b.title_ru) + '"></div><div><label style="font-size:0.78rem;color:#fbbf24;display:block;margin-bottom:4px">\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '"></div></div>';
+  // Texts
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#8B5CF6;font-weight:700">\u0422\u0435\u043a\u0441\u0442\u044b (RU)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(\\'ru\\')"><i class="fas fa-plus"></i></button></div><div id="sbTextsRu">';
+  (b.texts_ru||[]).forEach((t, i) => { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_ru[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(\\'ru\\',' + i + ')"><i class="fas fa-times"></i></button></div>'; });
+  h += '</div></div><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#fbbf24;font-weight:700">\u0422\u0435\u043a\u0441\u0442\u044b (AM)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(\\'am\\')"><i class="fas fa-plus"></i></button></div><div id="sbTextsAm">';
+  (b.texts_am||[]).forEach((t, i) => { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_am[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(\\'am\\',' + i + ')"><i class="fas fa-times"></i></button></div>'; });
+  h += '</div></div></div>';
+  // Buttons
+  h += '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;font-weight:700;color:#a78bfa">\u041a\u043d\u043e\u043f\u043a\u0438</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbBtn()"><i class="fas fa-plus"></i> \u041a\u043d\u043e\u043f\u043a\u0430</button></div><div id="sbButtons">';
+  (b.buttons||[]).forEach((btn, i) => {
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 32px;gap:8px;margin-bottom:8px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid #334155"><div><label style="font-size:0.7rem;color:#8B5CF6">\u0422\u0435\u043a\u0441\u0442 (RU)</label><input class="input" style="font-size:0.82rem" value="' + escHtml(btn.text_ru) + '" onchange="editingBlock.buttons[' + i + '].text_ru=this.value"></div>' +
+      '<div><label style="font-size:0.7rem;color:#fbbf24">\u0422\u0435\u043a\u0441\u0442 (AM)</label><input class="input" style="font-size:0.82rem" value="' + escHtml(btn.text_am) + '" onchange="editingBlock.buttons[' + i + '].text_am=this.value"></div>' +
+      '<div><label style="font-size:0.7rem;color:#64748b">URL</label><input class="input" style="font-size:0.82rem" value="' + escHtml(btn.url) + '" onchange="editingBlock.buttons[' + i + '].url=this.value" placeholder="https://..."></div>' +
+      '<button class="tier-del-btn" style="align-self:end;margin-bottom:4px" onclick="rmSbBtn(' + i + ')"><i class="fas fa-times"></i></button></div>';
+  });
+  h += '</div></div>';
+  // Custom CSS/HTML
+  h += '<details style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;font-size:0.85rem;color:#64748b;margin-bottom:8px">\u0414\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u043e (HTML/CSS)</summary><div style="margin-bottom:8px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Custom CSS</label><textarea class="input" id="sbCss" style="font-family:monospace;font-size:0.82rem;min-height:60px">' + escHtml(b.custom_css) + '</textarea></div><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Custom HTML</label><textarea class="input" id="sbHtml" style="font-family:monospace;font-size:0.82rem;min-height:60px">' + escHtml(b.custom_html) + '</textarea></div></details>';
+  // Actions
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline" onclick="closeBlockEditor()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button class="btn btn-primary" onclick="saveSiteBlock()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button></div>';
+  h += '</div></div>';
+  const area = document.getElementById('siteBlockModalArea');
+  if (area) area.innerHTML = h;
+}
+
+function closeBlockEditor() { editingBlock = null; const area = document.getElementById('siteBlockModalArea'); if (area) area.innerHTML = ''; }
+
+function addSbText(lang) {
+  if (!editingBlock) return;
+  editingBlock['texts_' + lang].push('');
+  showBlockEditor();
+}
+function rmSbText(lang, idx) {
+  if (!editingBlock) return;
+  editingBlock['texts_' + lang].splice(idx, 1);
+  showBlockEditor();
+}
+function addSbBtn() {
+  if (!editingBlock) return;
+  editingBlock.buttons.push({ text_ru: '', text_am: '', url: '' });
+  showBlockEditor();
+}
+function rmSbBtn(idx) {
+  if (!editingBlock) return;
+  editingBlock.buttons.splice(idx, 1);
+  showBlockEditor();
+}
+
+async function saveSiteBlock() {
+  if (!editingBlock) return;
+  // Read current values from inputs
+  editingBlock.block_key = document.getElementById('sbKey')?.value || editingBlock.block_key;
+  editingBlock.block_type = document.getElementById('sbType')?.value || editingBlock.block_type;
+  editingBlock.title_ru = document.getElementById('sbTitleRu')?.value || '';
+  editingBlock.title_am = document.getElementById('sbTitleAm')?.value || '';
+  editingBlock.custom_css = document.getElementById('sbCss')?.value || '';
+  editingBlock.custom_html = document.getElementById('sbHtml')?.value || '';
+  
+  if (editingBlock.id) {
+    await api('/site-blocks/' + editingBlock.id, { method:'PUT', body: JSON.stringify(editingBlock) });
+  } else {
+    await api('/site-blocks', { method:'POST', body: JSON.stringify(editingBlock) });
+  }
+  closeBlockEditor();
+  const res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
+  toast('\u0411\u043b\u043e\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
+  render();
+}
+
 function render() {
   const app = document.getElementById('app');
   if (!token) { app.innerHTML = renderLogin(); return; }
@@ -1909,7 +2395,9 @@ function render() {
   switch (currentPage) {
     case 'dashboard': pageHtml = renderDashboard(); break;
     case 'leads': pageHtml = renderLeads(); break;
-    case 'blocks': pageHtml = renderBlocks(); break;
+    case 'employees': pageHtml = renderEmployees(); break;
+    case 'permissions': pageHtml = renderPermissions(); break;
+    case 'blocks': pageHtml = renderSiteBlocks(); break;
     case 'calculator': pageHtml = renderCalculator(); break;
     case 'pdf': pageHtml = renderPdfTemplate(); break;
     case 'referrals': pageHtml = renderReferrals(); break;

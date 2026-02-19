@@ -76,8 +76,21 @@ export async function initDefaultAdmin(db: D1Database): Promise<void> {
   const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind('admin').first();
   if (!existing) {
     const hash = await hashPassword(ADMIN_PASSWORD);
-    await db.prepare('INSERT INTO users (username, password_hash, role, display_name) VALUES (?, ?, ?, ?)')
-      .bind('admin', hash, 'admin', 'Администратор')
+    await db.prepare('INSERT INTO users (username, password_hash, role, display_name, is_active) VALUES (?, ?, ?, ?, 1)')
+      .bind('admin', hash, 'main_admin', 'Администратор')
       .run();
+  } else if (existing) {
+    // Migrate old 'admin' role to 'main_admin'
+    const user = await db.prepare('SELECT role FROM users WHERE username = ?').bind('admin').first();
+    if (user && user.role === 'admin') {
+      await db.prepare("UPDATE users SET role = 'main_admin' WHERE username = 'admin'").run();
+    }
   }
+}
+
+export function generatePassword(length = 10): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  const arr = new Uint8Array(length);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => chars[b % chars.length]).join('');
 }

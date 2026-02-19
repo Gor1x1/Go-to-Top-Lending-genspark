@@ -2,8 +2,8 @@
  * Admin API routes — full CRUD for all admin panel sections
  */
 import { Hono } from 'hono'
-import { verifyToken, hashPassword, verifyPassword, createToken, initDefaultAdmin } from '../lib/auth'
-import { initDatabase } from '../lib/db'
+import { verifyToken, hashPassword, verifyPassword, createToken, initDefaultAdmin, generatePassword } from '../lib/auth'
+import { initDatabase, ALL_ROLES, ALL_SECTIONS, ROLE_LABELS, SECTION_LABELS, DEFAULT_PERMISSIONS } from '../lib/db'
 
 type Bindings = { DB: D1Database }
 const api = new Hono<{ Bindings: Bindings }>()
@@ -34,12 +34,21 @@ api.post('/login', async (c) => {
   
   const user = await db.prepare('SELECT * FROM users WHERE username = ?').bind(username).first();
   if (!user) return c.json({ error: 'Invalid credentials' }, 401);
+  if (!user.is_active) return c.json({ error: 'Account deactivated' }, 401);
   
   const valid = await verifyPassword(password, user.password_hash as string);
   if (!valid) return c.json({ error: 'Invalid credentials' }, 401);
   
+  // Get user permissions
+  const permsRow = await db.prepare('SELECT sections_json FROM user_permissions WHERE user_id = ?').bind(user.id).first();
+  const userPerms = permsRow ? JSON.parse(permsRow.sections_json as string) : (DEFAULT_PERMISSIONS[user.role as string] || []);
+  
   const token = await createToken(user.id as number, user.role as string);
-  return c.json({ token, user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name } });
+  return c.json({ 
+    token, 
+    user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name, permissions: userPerms },
+    rolesConfig: { roles: ALL_ROLES, sections: ALL_SECTIONS, role_labels: ROLE_LABELS, section_labels: SECTION_LABELS, default_permissions: DEFAULT_PERMISSIONS }
+  });
 });
 
 api.post('/change-password', authMiddleware, async (c) => {
@@ -422,15 +431,16 @@ api.put('/section-order/seed', authMiddleware, async (c) => {
 api.get('/leads', authMiddleware, async (c) => {
   const db = c.env.DB;
   const status = c.req.query('status');
-  const limit = parseInt(c.req.query('limit') || '100');
+  const source = c.req.query('source');
+  const limit = parseInt(c.req.query('limit') || '200');
   const offset = parseInt(c.req.query('offset') || '0');
-  let sql = 'SELECT * FROM leads';
+  let sql = 'SELECT l.*, u.display_name as assigned_name FROM leads l LEFT JOIN users u ON l.assigned_to = u.id';
+  const conditions: string[] = [];
   const params: any[] = [];
-  if (status && status !== 'all') {
-    sql += ' WHERE status = ?';
-    params.push(status);
-  }
-  sql += ' ORDER BY created_at DESC LIMIT ? OFFSET ?';
+  if (status && status !== 'all') { conditions.push('l.status = ?'); params.push(status); }
+  if (source && source !== 'all') { conditions.push('l.source = ?'); params.push(source); }
+  if (conditions.length > 0) sql += ' WHERE ' + conditions.join(' AND ');
+  sql += ' ORDER BY l.created_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
   const res = await db.prepare(sql).bind(...params).all();
   const total = await db.prepare('SELECT COUNT(*) as count FROM leads').first();
@@ -440,9 +450,53 @@ api.get('/leads', authMiddleware, async (c) => {
 api.put('/leads/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
-  const { status, notes } = await c.req.json();
-  await db.prepare('UPDATE leads SET status=?, notes=? WHERE id=?').bind(status, notes || '', id).run();
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.status !== undefined) { fields.push('status=?'); vals.push(d.status); }
+  if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
+  if (d.assigned_to !== undefined) { fields.push('assigned_to=?'); vals.push(d.assigned_to || null); }
+  if (d.name !== undefined) { fields.push('name=?'); vals.push(d.name); }
+  if (d.contact !== undefined) { fields.push('contact=?'); vals.push(d.contact); }
+  if (d.product !== undefined) { fields.push('product=?'); vals.push(d.product); }
+  if (d.service !== undefined) { fields.push('service=?'); vals.push(d.service); }
+  if (d.message !== undefined) { fields.push('message=?'); vals.push(d.message); }
+  if (d.total_amount !== undefined) { fields.push('total_amount=?'); vals.push(d.total_amount); }
+  if (d.calc_data !== undefined) { fields.push('calc_data=?'); vals.push(d.calc_data); }
+  if (d.referral_code !== undefined) { fields.push('referral_code=?'); vals.push(d.referral_code); }
+  if (d.custom_fields !== undefined) { fields.push('custom_fields=?'); vals.push(d.custom_fields); }
+  if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
+  vals.push(id);
+  await db.prepare(`UPDATE leads SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
   return c.json({ success: true });
+});
+
+api.post('/leads', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  // Get next lead number
+  const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
+  const nextNum = ((lastLead?.max_num as number) || 0) + 1;
+  await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, total_amount, calc_data, referral_code, custom_fields) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(nextNum, d.source || 'manual', d.name || '', d.contact || '', d.product || '', d.service || '', d.message || '', d.lang || 'ru', d.total_amount || 0, d.calc_data || '', d.referral_code || '', d.custom_fields || '').run();
+  return c.json({ success: true });
+});
+
+api.get('/leads/analytics', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const total = await db.prepare('SELECT COUNT(*) as count FROM leads').first();
+  const totalAmount = await db.prepare('SELECT COALESCE(SUM(total_amount),0) as total FROM leads').first();
+  const todayCount = await db.prepare("SELECT COUNT(*) as count FROM leads WHERE date(created_at) = date('now')").first();
+  const todayAmount = await db.prepare("SELECT COALESCE(SUM(total_amount),0) as total FROM leads WHERE date(created_at) = date('now')").first();
+  // By status
+  const byStatusRes = await db.prepare("SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads GROUP BY status").all();
+  const byStatus: Record<string, any> = {};
+  for (const r of byStatusRes.results) { byStatus[r.status as string] = { count: r.count, amount: r.amount }; }
+  // By source
+  const bySourceRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads GROUP BY source").all();
+  const bySource: Record<string, any> = {};
+  for (const r of bySourceRes.results) { bySource[r.source as string] = { count: r.count, amount: r.amount }; }
+  return c.json({ total: total?.count || 0, total_amount: totalAmount?.total || 0, today_count: todayCount?.count || 0, today_amount: todayAmount?.total || 0, by_status: byStatus, by_source: bySource });
 });
 
 api.delete('/leads/:id', authMiddleware, async (c) => {
@@ -644,6 +698,192 @@ api.delete('/photo-blocks/:id', authMiddleware, async (c) => {
   const id = c.req.param('id');
   await db.prepare('DELETE FROM photo_blocks WHERE id = ?').bind(id).run();
   return c.json({ success: true });
+});
+
+// ===== USERS / EMPLOYEES =====
+api.get('/users', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT id, username, role, display_name, phone, email, is_active, created_at FROM users ORDER BY id').all();
+  return c.json(res.results);
+});
+
+api.post('/users', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can create users' }, 403);
+  const d = await c.req.json();
+  if (!d.username || !d.password || !d.display_name) return c.json({ error: 'username, password, display_name required' }, 400);
+  const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
+  if (existing) return c.json({ error: 'Username already exists' }, 400);
+  const hash = await hashPassword(d.password);
+  await db.prepare('INSERT INTO users (username, password_hash, role, display_name, phone, email, is_active) VALUES (?,?,?,?,?,?,1)')
+    .bind(d.username, hash, d.role || 'operator', d.display_name, d.phone || '', d.email || '').run();
+  // Set default permissions
+  const newUser = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
+  if (newUser) {
+    const defPerms = DEFAULT_PERMISSIONS[d.role || 'operator'] || ['dashboard'];
+    await db.prepare('INSERT INTO user_permissions (user_id, sections_json) VALUES (?,?)').bind(newUser.id, JSON.stringify(defPerms)).run();
+  }
+  return c.json({ success: true });
+});
+
+api.put('/users/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can edit users' }, 403);
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.display_name !== undefined) { fields.push('display_name=?'); vals.push(d.display_name); }
+  if (d.role !== undefined) { fields.push('role=?'); vals.push(d.role); }
+  if (d.phone !== undefined) { fields.push('phone=?'); vals.push(d.phone); }
+  if (d.email !== undefined) { fields.push('email=?'); vals.push(d.email); }
+  if (d.is_active !== undefined) { fields.push('is_active=?'); vals.push(d.is_active ? 1 : 0); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/users/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can delete users' }, 403);
+  const id = c.req.param('id');
+  // Don't allow deleting main_admin
+  const target = await db.prepare('SELECT role FROM users WHERE id = ?').bind(id).first();
+  if (target?.role === 'main_admin') return c.json({ error: 'Cannot delete main admin' }, 400);
+  await db.prepare('DELETE FROM user_permissions WHERE user_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+api.post('/users/:id/reset-password', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can reset passwords' }, 403);
+  const id = c.req.param('id');
+  const newPass = generatePassword(10);
+  const hash = await hashPassword(newPass);
+  await db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(hash, id).run();
+  return c.json({ success: true, new_password: newPass });
+});
+
+// ===== PERMISSIONS =====
+api.get('/permissions/:userId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId = c.req.param('userId');
+  const row = await db.prepare('SELECT sections_json FROM user_permissions WHERE user_id = ?').bind(userId).first();
+  const user = await db.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first();
+  if (row) {
+    return c.json({ permissions: JSON.parse(row.sections_json as string) });
+  }
+  // Return defaults based on role
+  const role = user?.role as string || 'operator';
+  return c.json({ permissions: DEFAULT_PERMISSIONS[role] || ['dashboard'] });
+});
+
+api.put('/permissions/:userId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can edit permissions' }, 403);
+  const userId = c.req.param('userId');
+  const { sections } = await c.req.json();
+  const existing = await db.prepare('SELECT id FROM user_permissions WHERE user_id = ?').bind(userId).first();
+  if (existing) {
+    await db.prepare('UPDATE user_permissions SET sections_json = ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+      .bind(JSON.stringify(sections || []), userId).run();
+  } else {
+    await db.prepare('INSERT INTO user_permissions (user_id, sections_json) VALUES (?,?)')
+      .bind(userId, JSON.stringify(sections || [])).run();
+  }
+  return c.json({ success: true });
+});
+
+// ===== SITE BLOCKS (unified block constructor) =====
+api.get('/site-blocks', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all();
+  const blocks = (res.results || []).map((b: any) => ({
+    ...b,
+    texts_ru: JSON.parse(b.texts_ru || '[]'),
+    texts_am: JSON.parse(b.texts_am || '[]'),
+    images: JSON.parse(b.images || '[]'),
+    buttons: JSON.parse(b.buttons || '[]'),
+  }));
+  return c.json({ blocks });
+});
+
+api.post('/site-blocks', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  const key = d.block_key || `block_${Date.now()}`;
+  await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(key, d.block_type || 'section', d.title_ru || '', d.title_am || '',
+      JSON.stringify(d.texts_ru || []), JSON.stringify(d.texts_am || []),
+      JSON.stringify(d.images || []), JSON.stringify(d.buttons || []),
+      d.custom_css || '', d.custom_html || '', d.is_visible !== false ? 1 : 0,
+      d.sort_order || 999).run();
+  return c.json({ success: true });
+});
+
+api.put('/site-blocks/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.block_key !== undefined) { fields.push('block_key=?'); vals.push(d.block_key); }
+  if (d.block_type !== undefined) { fields.push('block_type=?'); vals.push(d.block_type); }
+  if (d.title_ru !== undefined) { fields.push('title_ru=?'); vals.push(d.title_ru); }
+  if (d.title_am !== undefined) { fields.push('title_am=?'); vals.push(d.title_am); }
+  if (d.texts_ru !== undefined) { fields.push('texts_ru=?'); vals.push(JSON.stringify(d.texts_ru)); }
+  if (d.texts_am !== undefined) { fields.push('texts_am=?'); vals.push(JSON.stringify(d.texts_am)); }
+  if (d.images !== undefined) { fields.push('images=?'); vals.push(JSON.stringify(d.images)); }
+  if (d.buttons !== undefined) { fields.push('buttons=?'); vals.push(JSON.stringify(d.buttons)); }
+  if (d.custom_css !== undefined) { fields.push('custom_css=?'); vals.push(d.custom_css); }
+  if (d.custom_html !== undefined) { fields.push('custom_html=?'); vals.push(d.custom_html); }
+  if (d.is_visible !== undefined) { fields.push('is_visible=?'); vals.push(d.is_visible ? 1 : 0); }
+  if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE site_blocks SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/site-blocks/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM site_blocks WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+api.post('/site-blocks/reorder', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { orders } = await c.req.json();
+  for (const o of orders) {
+    await db.prepare('UPDATE site_blocks SET sort_order = ? WHERE id = ?').bind(o.sort_order, o.id).run();
+  }
+  return c.json({ success: true });
+});
+
+api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const orig = await db.prepare('SELECT * FROM site_blocks WHERE id = ?').bind(id).first();
+  if (!orig) return c.json({ error: 'Not found' }, 404);
+  const newKey = `${orig.block_key}_copy_${Date.now()}`;
+  await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(newKey, orig.block_type, orig.title_ru + ' (копия)', orig.title_am, orig.texts_ru, orig.texts_am, orig.images, orig.buttons, orig.custom_css, orig.custom_html, orig.is_visible, (orig.sort_order as number || 0) + 1).run();
+  return c.json({ success: true });
+});
+
+// ===== ROLES CONFIG (for frontend) =====
+api.get('/roles-config', authMiddleware, async (c) => {
+  return c.json({ roles: ALL_ROLES, sections: ALL_SECTIONS, role_labels: ROLE_LABELS, section_labels: SECTION_LABELS, default_permissions: DEFAULT_PERMISSIONS });
 });
 
 export default api

@@ -9,8 +9,46 @@ CREATE TABLE IF NOT EXISTS users (
   password_hash TEXT NOT NULL,
   role TEXT NOT NULL DEFAULT 'admin',
   display_name TEXT,
+  phone TEXT DEFAULT '',
+  email TEXT DEFAULT '',
+  is_active INTEGER DEFAULT 1,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_permissions (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  sections_json TEXT DEFAULT '[]',
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS site_blocks (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  block_key TEXT UNIQUE NOT NULL,
+  block_type TEXT DEFAULT 'section',
+  title_ru TEXT DEFAULT '',
+  title_am TEXT DEFAULT '',
+  texts_ru TEXT DEFAULT '[]',
+  texts_am TEXT DEFAULT '[]',
+  images TEXT DEFAULT '[]',
+  buttons TEXT DEFAULT '[]',
+  custom_css TEXT DEFAULT '',
+  custom_html TEXT DEFAULT '',
+  is_visible INTEGER DEFAULT 1,
+  sort_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS activity_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER,
+  user_name TEXT DEFAULT '',
+  action TEXT NOT NULL,
+  details TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS site_content (
@@ -102,6 +140,7 @@ CREATE TABLE IF NOT EXISTS referral_codes (
 
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
+  lead_number INTEGER DEFAULT 0,
   source TEXT NOT NULL DEFAULT 'form',
   name TEXT DEFAULT '',
   contact TEXT DEFAULT '',
@@ -112,7 +151,10 @@ CREATE TABLE IF NOT EXISTS leads (
   lang TEXT DEFAULT 'ru',
   status TEXT DEFAULT 'new',
   notes TEXT DEFAULT '',
+  assigned_to INTEGER DEFAULT NULL,
+  total_amount REAL DEFAULT 0,
   referral_code TEXT DEFAULT '',
+  custom_fields TEXT DEFAULT '',
   ip TEXT DEFAULT '',
   user_agent TEXT DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -215,7 +257,42 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_ru TEXT DEFAULT 'Скачать'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_am TEXT DEFAULT 'Ներբեռնdelays'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_telegram_url TEXT DEFAULT 'https://t.me/goo_to_top'").run(); } catch {}
+  // v2 Migrations: employee system + site blocks
+  try { await db.prepare("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN is_active INTEGER DEFAULT 1").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN lead_number INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN assigned_to INTEGER DEFAULT NULL").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN total_amount REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN custom_fields TEXT DEFAULT ''").run(); } catch {}
 }
+
+// ===== ROLES & PERMISSIONS CONFIG =====
+export const ALL_ROLES = ['main_admin', 'developer', 'analyst', 'operator', 'buyer', 'courier'] as const;
+export const ALL_SECTIONS = [
+  'dashboard', 'leads', 'employees', 'permissions',
+  'blocks', 'calculator', 'pdf', 'referrals', 'slots',
+  'footer', 'telegram', 'tgbot', 'scripts', 'settings'
+] as const;
+export const ROLE_LABELS: Record<string, string> = {
+  main_admin: 'Главный Админ', developer: 'Разработчик', analyst: 'Аналитик',
+  operator: 'Оператор', buyer: 'Выкупщик', courier: 'Курьер',
+};
+export const SECTION_LABELS: Record<string, string> = {
+  dashboard: 'Дашборд', leads: 'Лиды / CRM', employees: 'Сотрудники',
+  permissions: 'Управление доступами', blocks: 'Конструктор блоков',
+  calculator: 'Калькулятор', pdf: 'PDF шаблон', referrals: 'Реферальные коды',
+  slots: 'Счётчики слотов', footer: 'Футер сайта', telegram: 'TG сообщения',
+  tgbot: 'TG Бот / Уведомления', scripts: 'Скрипты', settings: 'Настройки',
+};
+export const DEFAULT_PERMISSIONS: Record<string, string[]> = {
+  main_admin: [...ALL_SECTIONS],
+  developer: ['dashboard', 'blocks', 'calculator', 'scripts', 'settings'],
+  analyst: ['dashboard', 'leads'],
+  operator: ['dashboard', 'leads'],
+  buyer: ['dashboard'],
+  courier: ['dashboard'],
+};
 
 export async function getAllContent(db: D1Database): Promise<Record<string, any>> {
   const rows = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
