@@ -174,6 +174,9 @@ def seed_admin():
 
 seed_admin()
 
+# Ensure all main_admin users have up-to-date permissions
+users_col.update_many({"role": "main_admin"}, {"$set": {"permissions": ALL_SECTIONS.copy()}})
+
 # ========== AUTH ==========
 @app.post("/api/auth/login")
 async def login(req: LoginRequest):
