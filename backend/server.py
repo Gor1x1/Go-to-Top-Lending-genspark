@@ -107,6 +107,15 @@ class UpdateLeadRequest(BaseModel):
     status: Optional[str] = None
     notes: Optional[str] = None
     assigned_to: Optional[str] = None
+    name: Optional[str] = None
+    contact: Optional[str] = None
+    product: Optional[str] = None
+    service: Optional[str] = None
+    message: Optional[str] = None
+    total_amount: Optional[float] = None
+    calc_data: Optional[str] = None  # JSON string
+    custom_fields: Optional[str] = None  # JSON string for extra links/texts
+    referral_code: Optional[str] = None
 
 class CreateLeadRequest(BaseModel):
     name: str = ""
@@ -116,6 +125,10 @@ class CreateLeadRequest(BaseModel):
     message: str = ""
     source: str = "manual"
     lang: str = "ru"
+    total_amount: float = 0
+    calc_data: str = ""  # JSON: [{name, qty, price, sum}]
+    referral_code: str = ""
+    custom_fields: str = ""  # JSON for extra data
 
 # ===== HELPERS =====
 def str_id(doc):
