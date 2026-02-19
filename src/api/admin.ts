@@ -465,6 +465,8 @@ api.put('/leads/:id', authMiddleware, async (c) => {
   if (d.calc_data !== undefined) { fields.push('calc_data=?'); vals.push(d.calc_data); }
   if (d.referral_code !== undefined) { fields.push('referral_code=?'); vals.push(d.referral_code); }
   if (d.custom_fields !== undefined) { fields.push('custom_fields=?'); vals.push(d.custom_fields); }
+  if (d.telegram_group !== undefined) { fields.push('telegram_group=?'); vals.push(d.telegram_group); }
+  if (d.tz_link !== undefined) { fields.push('tz_link=?'); vals.push(d.tz_link); }
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
   vals.push(id);
   await db.prepare(`UPDATE leads SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
@@ -517,22 +519,40 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
   // Daily breakdown (last 30 days)
   const dailyRes = await db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day").all();
   
-  // Service popularity — parse calc_data from all leads
-  const allLeadsRes = await db.prepare("SELECT calc_data, total_amount, status FROM leads WHERE calc_data != '' AND calc_data IS NOT NULL" + dateFilter).bind(...dateParams).all();
+  // Service popularity — parse calc_data from all leads + split services vs articles per status
+  const allLeadsRes = await db.prepare("SELECT id, calc_data, total_amount, status FROM leads WHERE 1=1" + dateFilter).bind(...dateParams).all();
   const serviceStats: Record<string, { count: number; qty: number; revenue: number }> = {};
+  // Per-status breakdown: services_amount and articles_amount
+  const statusAmounts: Record<string, { services: number; articles: number }> = {};
   for (const lead of allLeadsRes.results) {
+    const st = lead.status as string || 'new';
+    if (!statusAmounts[st]) statusAmounts[st] = { services: 0, articles: 0 };
     try {
-      const cd = JSON.parse(lead.calc_data as string);
+      const cd = JSON.parse((lead.calc_data as string) || '{}');
       if (cd.items && Array.isArray(cd.items)) {
         for (const item of cd.items) {
-          const name = item.name || 'Неизвестно';
-          if (!serviceStats[name]) serviceStats[name] = { count: 0, qty: 0, revenue: 0 };
-          serviceStats[name].count++;
-          serviceStats[name].qty += Number(item.qty || 1);
-          serviceStats[name].revenue += Number(item.subtotal || 0);
+          if (item.wb_article) {
+            statusAmounts[st].articles += Number(item.subtotal || 0);
+          } else {
+            const name = item.name || 'Неизвестно';
+            if (!serviceStats[name]) serviceStats[name] = { count: 0, qty: 0, revenue: 0 };
+            serviceStats[name].count++;
+            serviceStats[name].qty += Number(item.qty || 1);
+            serviceStats[name].revenue += Number(item.subtotal || 0);
+            statusAmounts[st].services += Number(item.subtotal || 0);
+          }
         }
       }
     } catch {}
+    // Also count articles from lead_articles table
+  }
+  // Get articles totals per lead from lead_articles table
+  const articlesPerLead = await db.prepare("SELECT la.lead_id, SUM(la.total_price) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE 1=1" + dateFilter.replace(/created_at/g, 'l.created_at') + " GROUP BY la.lead_id").bind(...dateParams).all();
+  for (const ar of articlesPerLead.results) {
+    const lead = allLeadsRes.results.find(l => l.id === ar.lead_id);
+    const st = (lead?.status as string) || 'new';
+    if (!statusAmounts[st]) statusAmounts[st] = { services: 0, articles: 0 };
+    statusAmounts[st].articles += Number(ar.art_total || 0);
   }
   const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
   
@@ -541,6 +561,7 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
     new: (byStatus.new?.count || 0),
     contacted: (byStatus.contacted?.count || 0),
     in_progress: (byStatus.in_progress?.count || 0),
+    checking: (byStatus.checking?.count || 0),
     done: (byStatus.done?.count || 0),
     rejected: (byStatus.rejected?.count || 0),
   };
@@ -560,6 +581,7 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
     by_assignee: byAssignee,
     daily: dailyRes.results,
     services: serviceList,
+    status_amounts: statusAmounts,
     conversion_rate: conversionRate,
     avg_check: avgCheck,
     referrals: refRes.results,

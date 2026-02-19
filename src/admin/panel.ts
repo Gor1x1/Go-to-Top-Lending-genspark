@@ -1338,17 +1338,26 @@ function renderLeads() {
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
   
-  // --- Analytics mini-dashboard with per-status sums ---
-  var stats = { new: {c:0,a:0}, contacted: {c:0,a:0}, in_progress: {c:0,a:0}, collecting: {c:0,a:0}, buying: {c:0,a:0}, delivering: {c:0,a:0}, checking: {c:0,a:0}, done: {c:0,a:0}, rejected: {c:0,a:0} };
-  var todayCount = 0, todayAmount = 0, totalAmount = 0;
-  var today = new Date().toISOString().slice(0,10);
+  // --- Analytics mini-dashboard with per-status sums + services/articles split ---
+  var stats = { new: {c:0,a:0,svc:0,art:0}, contacted: {c:0,a:0,svc:0,art:0}, in_progress: {c:0,a:0,svc:0,art:0}, checking: {c:0,a:0,svc:0,art:0}, done: {c:0,a:0,svc:0,art:0}, rejected: {c:0,a:0,svc:0,art:0} };
+  var totalAmount = 0;
   for (var ai = 0; ai < leads.length; ai++) {
     var al = leads[ai];
     var amt = Number(al.total_amount || 0);
     totalAmount += amt;
-    if (stats[al.status]) { stats[al.status].c++; stats[al.status].a += amt; }
-    else { stats[al.status] = {c:1, a:amt}; }
-    if ((al.created_at||'').startsWith(today)) { todayCount++; todayAmount += amt; }
+    var st = al.status || 'new';
+    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0};
+    stats[st].c++; stats[st].a += amt;
+    // Split services vs articles from calc_data
+    var cd = null;
+    if (al.calc_data) { try { cd = JSON.parse(al.calc_data); } catch(e) {} }
+    if (cd && cd.items) {
+      for (var ci = 0; ci < cd.items.length; ci++) {
+        var it = cd.items[ci];
+        if (it.wb_article) { stats[st].art += Number(it.subtotal||0); }
+        else { stats[st].svc += Number(it.subtotal||0); }
+      }
+    }
   }
   
   // --- Filter leads ---
@@ -1377,40 +1386,40 @@ function renderLeads() {
       '<a href="/api/admin/leads/export" target="_blank" class="btn btn-outline" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>CSV</a>' +
     '</div></div>';
   
-  // KPI cards with per-status sums
+  // KPI cards — 6 statuses + Total
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:20px">';
-  // New
+  // 1. Новые
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.04));border-color:rgba(16,185,129,0.25)" onclick="setLeadsFilter(\\'status\\',\\'new\\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.new.c + '</span><span style="font-size:1.4rem">🟢</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Новые</div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Новые лиды</div>' +
     '<div style="color:#34d399;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.new.a) + '</div></div>';
-  // Contacted
+  // 2. На связи
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(59,130,246,0.04));border-color:rgba(59,130,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'contacted\\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#3B82F6">' + stats.contacted.c + '</span><span style="font-size:1.4rem">💬</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">На связи</div>' +
     '<div style="color:#60a5fa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.contacted.a) + '</div></div>';
-  // In progress
+  // 3. В работе — total at top, services and articles below
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border-color:rgba(245,158,11,0.25)" onclick="setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
-    '<div style="color:#fbbf24;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div></div>';
-  // Collecting
-  var collectingSum = (stats.collecting.c||0) + (stats.buying.c||0) + (stats.delivering.c||0) + (stats.checking.c||0);
-  var collectingAmt = (stats.collecting.a||0) + (stats.buying.a||0) + (stats.delivering.a||0) + (stats.checking.a||0);
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(249,115,22,0.12),rgba(249,115,22,0.04));border-color:rgba(249,115,22,0.25)" onclick="setLeadsFilter(\\'status\\',\\'collecting\\')">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F97316">' + collectingSum + '</span><span style="font-size:1.4rem">📦</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Выкуп-процесс</div>' +
-    '<div style="color:#fb923c;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(collectingAmt) + '</div></div>';
-  // Done
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#8B5CF6">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершены</div>' +
-    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div></div>';
-  // Rejected
+    '<div style="color:#fbbf24;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div>' +
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span></div></div>';
+  // 4. Отклонен
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(\\'status\\',\\'rejected\\')">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
-    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Отказы</div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Отклонён</div>' +
     '<div style="color:#f87171;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.rejected.a) + '</div></div>';
+  // 5. Проверка
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'checking\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#8B5CF6">' + stats.checking.c + '</span><span style="font-size:1.4rem">🔍</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Проверка</div>' +
+    '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.checking.a) + '</div></div>';
+  // 6. Завершён — total (turnover) at top, services and articles below
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
+    '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
+    '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span></div></div>';
   // Total all time
   h += '<div class="stat-card" style="padding:14px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#a78bfa">' + leads.length + '</span><span style="font-size:1.4rem">📊</span></div>' +
@@ -1418,20 +1427,17 @@ function renderLeads() {
     '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(totalAmount) + '</div></div>';
   h += '</div>';
   
-  // Filters row
+  // Filters row — 6 statuses only
   h += '<div class="card" style="padding:14px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
     '<i class="fas fa-filter" style="color:#64748b"></i>' +
     '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'status\\',this.value)">' +
       '<option value="all"' + (leadsFilter.status==='all'?' selected':'') + '>Все статусы</option>' +
-      '<option value="new"' + (leadsFilter.status==='new'?' selected':'') + '>🟢 Новый</option>' +
-      '<option value="contacted"' + (leadsFilter.status==='contacted'?' selected':'') + '>💬 Связались</option>' +
+      '<option value="new"' + (leadsFilter.status==='new'?' selected':'') + '>🟢 Новые лиды</option>' +
+      '<option value="contacted"' + (leadsFilter.status==='contacted'?' selected':'') + '>💬 На связи</option>' +
       '<option value="in_progress"' + (leadsFilter.status==='in_progress'?' selected':'') + '>🔄 В работе</option>' +
-      '<option value="collecting"' + (leadsFilter.status==='collecting'?' selected':'') + '>📋 Сбор артикулов</option>' +
-      '<option value="buying"' + (leadsFilter.status==='buying'?' selected':'') + '>🛒 Выкуп</option>' +
-      '<option value="delivering"' + (leadsFilter.status==='delivering'?' selected':'') + '>🚚 Доставка</option>' +
+      '<option value="rejected"' + (leadsFilter.status==='rejected'?' selected':'') + '>❌ Отклонён</option>' +
       '<option value="checking"' + (leadsFilter.status==='checking'?' selected':'') + '>🔍 Проверка</option>' +
-      '<option value="done"' + (leadsFilter.status==='done'?' selected':'') + '>✅ Завершён</option>' +
-      '<option value="rejected"' + (leadsFilter.status==='rejected'?' selected':'') + '>❌ Отклонён</option></select>' +
+      '<option value="done"' + (leadsFilter.status==='done'?' selected':'') + '>✅ Завершён</option></select>' +
     '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'source\\',this.value)">' +
       '<option value="all"' + (leadsFilter.source==='all'?' selected':'') + '>Все источники</option>' +
       '<option value="form"' + (leadsFilter.source==='form'?' selected':'') + '>Форма</option>' +
@@ -1459,7 +1465,7 @@ function renderLeads() {
       var calcData = null;
       if (l.calc_data) { try { calcData = JSON.parse(l.calc_data); } catch(e) {} }
       var leadAmt = Number(l.total_amount || 0);
-      var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', collecting:'#F97316', buying:'#EC4899', delivering:'#06B6D4', checking:'#8B5CF6', done:'#8B5CF6', rejected:'#EF4444' };
+      var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', checking:'#8B5CF6', done:'#10B981', rejected:'#EF4444' };
       var statusBorderColor = statusColors[l.status] || '#334155';
       
       h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + '">' +
@@ -1484,17 +1490,14 @@ function renderLeads() {
         h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + '&nbsp;֏</div>';
       }
       
-      // Status selector
+      // Status selector — 6 statuses
       h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
-        '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новый</option>' +
-        '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 Связались</option>' +
+        '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>🟢 Новые лиды</option>' +
+        '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>💬 На связи</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>🔄 В работе</option>' +
-        '<option value="collecting"' + (l.status === 'collecting' ? ' selected' : '') + '>📋 Сбор артикулов</option>' +
-        '<option value="buying"' + (l.status === 'buying' ? ' selected' : '') + '>🛒 Выкуп</option>' +
-        '<option value="delivering"' + (l.status === 'delivering' ? ' selected' : '') + '>🚚 Доставка</option>' +
+        '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option>' +
         '<option value="checking"' + (l.status === 'checking' ? ' selected' : '') + '>🔍 Проверка</option>' +
-        '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option>' +
-        '<option value="rejected"' + (l.status === 'rejected' ? ' selected' : '') + '>❌ Отклонён</option></select>';
+        '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>✅ Завершён</option></select>';
       
       // Assign to employee
       h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onchange="assignLead(' + l.id + ', this.value)">' +
@@ -1520,8 +1523,39 @@ function renderLeads() {
       // ===== EDITABLE LEAD NAME =====
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
         '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя лида (клиент):</div>' +
-        '<div style="display:flex;gap:8px"><input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="flex:1;font-size:0.88rem;padding:8px" placeholder="Имя клиента...">' +
-        '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadName(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
+        '<input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..."></div>';
+
+      // ===== TELEGRAM GROUP & TZ LINKS =====
+      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Telegram группа:</div>' +
+        '<input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..."></div>' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента:</div>' +
+        '<input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..."></div></div>';
+      // Quick links if set
+      if (l.telegram_group || l.tz_link) {
+        h += '<div style="margin-top:6px;display:flex;gap:8px">';
+        if (l.telegram_group) h += '<a href="' + escHtml(l.telegram_group) + '" target="_blank" class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fab fa-telegram" style="margin-right:4px"></i>TG группа</a>';
+        if (l.tz_link) h += '<a href="' + escHtml(l.tz_link) + '" target="_blank" class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:4px"></i>ТЗ</a>';
+        h += '</div>';
+      }
+
+      // ===== SERVICES & ARTICLES BREAKDOWN =====
+      var svcAmt = 0, artAmt = 0;
+      if (calcData && calcData.items) {
+        for (var bi = 0; bi < calcData.items.length; bi++) {
+          if (calcData.items[bi].wb_article) artAmt += Number(calcData.items[bi].subtotal||0);
+          else svcAmt += Number(calcData.items[bi].subtotal||0);
+        }
+      }
+      if (svcAmt > 0 || artAmt > 0) {
+        h += '<div style="margin-top:10px;display:flex;gap:16px;flex-wrap:wrap">' +
+          '<div style="background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:8px;padding:10px 16px;flex:1;min-width:120px;text-align:center">' +
+            '<div style="font-size:0.72rem;color:#94a3b8">Услуги</div>' +
+            '<div style="font-size:1.1rem;font-weight:800;color:#a78bfa">' + Number(svcAmt).toLocaleString('ru-RU') + '&nbsp;֏</div></div>' +
+          '<div style="background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.2);border-radius:8px;padding:10px 16px;flex:1;min-width:120px;text-align:center">' +
+            '<div style="font-size:0.72rem;color:#94a3b8">Закупки</div>' +
+            '<div style="font-size:1.1rem;font-weight:800;color:#fb923c">' + Number(artAmt).toLocaleString('ru-RU') + '&nbsp;֏</div></div></div>';
+      }
 
       // ===== SERVICES FROM CALCULATOR (BUILT-IN) =====
       h += '<div id="lead-services-' + l.id + '" style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
@@ -1560,11 +1594,10 @@ function renderLeads() {
         (isCalc ? '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>' : '') +
       '</div>';
 
-      // Notes — editable
+      // Notes — editable (no individual save button)
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
         '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
-        '<div style="display:flex;gap:8px"><textarea class="input" id="lead-notes-' + l.id + '" style="flex:1;min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea>' +
-        '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadNotes(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
+        '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea></div>';
       // Save all lead changes button
       h += '<div style="margin-top:14px;border-top:1px solid #334155;padding-top:14px;display:flex;justify-content:flex-end;gap:8px">' +
         '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button></div>';
@@ -1579,22 +1612,16 @@ function renderLeads() {
   return h;
 }
 
-// Create lead modal
+// Create lead modal — simplified: name, contact, notes only
 function showCreateLeadModal() {
   var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
-    '<div class="card" style="width:600px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
+    '<div class="card" style="width:500px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
     '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-user-plus" style="color:#8B5CF6;margin-right:8px"></i>Новый лид</h3>' +
     '<form onsubmit="submitCreateLead(event)">' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Имя *</label><input class="input" id="nl_name" required></div>' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Контакт *</label><input class="input" id="nl_contact" required placeholder="+374..."></div></div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
-      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Продукт</label><input class="input" id="nl_product"></div>' +
-      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Услуга</label><input class="input" id="nl_service"></div></div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
-      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма (֏)</label><input class="input" type="number" id="nl_amount" value="0"></div>' +
-      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Источник</label><select class="input" id="nl_source"><option value="manual">Ручной ввод</option><option value="form">Форма</option><option value="popup">Попап</option></select></div></div>' +
-    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Сообщение / описание</label><textarea class="input" id="nl_message" rows="3" placeholder="Дополнительная информация..."></textarea></div>' +
+    '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Заметка</label><textarea class="input" id="nl_message" rows="3" placeholder="Дополнительная информация..."></textarea></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>Создать</button></div>' +
     '</form></div></div>';
   var area = document.getElementById('createLeadModalArea');
@@ -1609,11 +1636,8 @@ async function submitCreateLead(e) {
   await api('/leads', { method:'POST', body: JSON.stringify({
     name: document.getElementById('nl_name').value.trim(),
     contact: document.getElementById('nl_contact').value.trim(),
-    product: document.getElementById('nl_product').value.trim(),
-    service: document.getElementById('nl_service').value.trim(),
-    total_amount: parseFloat(document.getElementById('nl_amount').value) || 0,
-    source: document.getElementById('nl_source').value,
-    message: document.getElementById('nl_message').value.trim()
+    message: document.getElementById('nl_message').value.trim(),
+    source: 'manual'
   }) });
   toast('Лид создан');
   var modal = document.querySelector('[style*="fixed"][style*="z-index:999"]');
@@ -2112,20 +2136,26 @@ async function removeLeadService(leadId, serviceIndex) {
   }, 100);
 }
 
-// Save all lead changes: name + notes + recalculate total
+// Save all lead changes: name + notes + telegram + tz + recalculate total
 async function saveLeadAll(leadId) {
-  // 1. Save name + notes
+  // 1. Save name + notes + telegram_group + tz_link
   var nameEl = document.getElementById('lead-name-' + leadId);
   var notesEl = document.getElementById('lead-notes-' + leadId);
+  var tgEl = document.getElementById('lead-tg-' + leadId);
+  var tzEl = document.getElementById('lead-tz-' + leadId);
   var updateData = {};
   if (nameEl) updateData.name = nameEl.value;
   if (notesEl) updateData.notes = notesEl.value;
+  if (tgEl) updateData.telegram_group = tgEl.value;
+  if (tzEl) updateData.tz_link = tzEl.value;
   if (Object.keys(updateData).length > 0) {
     await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify(updateData) });
     var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
     if (lead) {
       if (nameEl) lead.name = nameEl.value;
       if (notesEl) lead.notes = notesEl.value;
+      if (tgEl) lead.telegram_group = tgEl.value;
+      if (tzEl) lead.tz_link = tzEl.value;
     }
   }
   // 2. Recalculate total (articles + services)
@@ -2206,6 +2236,7 @@ function renderLeadsAnalytics() {
   
   // ===== KPI CARDS =====
   var bs = d.by_status || {};
+  var sa = d.status_amounts || {};
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">';
   // Total  
   h += '<div class="stat-card" style="padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));border-color:rgba(139,92,246,0.3)">' +
@@ -2214,7 +2245,7 @@ function renderLeadsAnalytics() {
     '<div style="font-size:1.1rem;font-weight:700;color:#a78bfa;margin-top:4px">' + fmtAmt(d.total?.amount) + '</div></div>';
   // New
   h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'new\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🟢 Новые</div>' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🟢 Новые лиды</div>' +
     '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.new?.count||0) + '</div>' +
     '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.new?.amount) + '</div></div>';
   // Contacted
@@ -2222,29 +2253,37 @@ function renderLeadsAnalytics() {
     '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">💬 На связи</div>' +
     '<div style="font-size:2rem;font-weight:900;color:#3B82F6">' + (bs.contacted?.count||0) + '</div>' +
     '<div style="font-size:1.1rem;font-weight:700;color:#60a5fa;margin-top:4px">' + fmtAmt(bs.contacted?.amount) + '</div></div>';
-  // In progress
+  // In progress — with services/articles breakdown
   h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(245,158,11,0.05));border-color:rgba(245,158,11,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
     '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🔄 В работе</div>' +
     '<div style="font-size:2rem;font-weight:900;color:#F59E0B">' + (bs.in_progress?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#fbbf24;margin-top:4px">' + fmtAmt(bs.in_progress?.amount) + '</div></div>';
-  // Done
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'done\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">✅ Завершены</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.done?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.done?.amount) + '</div></div>';
+    '<div style="font-size:1.1rem;font-weight:700;color:#fbbf24;margin-top:4px">' + fmtAmt(bs.in_progress?.amount) + '</div>' +
+    '<div style="margin-top:4px;font-size:0.72rem;color:#94a3b8">Усл: <span style="color:#a78bfa">' + fmtAmt(sa.in_progress?.services) + '</span><br>Зак: <span style="color:#fb923c">' + fmtAmt(sa.in_progress?.articles) + '</span></div></div>';
   // Rejected
   h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.05));border-color:rgba(239,68,68,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'rejected\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">❌ Отказы</div>' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">❌ Отклонён</div>' +
     '<div style="font-size:2rem;font-weight:900;color:#EF4444">' + (bs.rejected?.count||0) + '</div>' +
     '<div style="font-size:1.1rem;font-weight:700;color:#f87171;margin-top:4px">' + fmtAmt(bs.rejected?.amount) + '</div></div>';
+  // Checking
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'checking\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🔍 Проверка</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + (bs.checking?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#a78bfa;margin-top:4px">' + fmtAmt(bs.checking?.amount) + '</div></div>';
+  // Done — with services/articles breakdown (total cost = turnover)
+  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'done\\')">' +
+    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">✅ Завершён</div>' +
+    '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.done?.count||0) + '</div>' +
+    '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.done?.amount) + '</div>' +
+    '<div style="margin-top:4px;font-size:0.72rem;color:#94a3b8">Усл: <span style="color:#a78bfa">' + fmtAmt(sa.done?.services) + '</span><br>Зак: <span style="color:#fb923c">' + fmtAmt(sa.done?.articles) + '</span></div></div>';
   h += '</div>';
   
   // ===== CONVERSION FUNNEL =====
   var funnelTotal = d.total?.count || 1;
   var funnelSteps = [
     { label: 'Всего заявок', count: d.total?.count||0, color: '#8B5CF6', icon: '📥' },
-    { label: 'На связи', count: (bs.contacted?.count||0) + (bs.in_progress?.count||0) + (bs.done?.count||0), color: '#3B82F6', icon: '💬' },
-    { label: 'В работе', count: (bs.in_progress?.count||0) + (bs.done?.count||0), color: '#F59E0B', icon: '🔄' },
+    { label: 'На связи', count: (bs.contacted?.count||0) + (bs.in_progress?.count||0) + (bs.checking?.count||0) + (bs.done?.count||0), color: '#3B82F6', icon: '💬' },
+    { label: 'В работе', count: (bs.in_progress?.count||0) + (bs.checking?.count||0) + (bs.done?.count||0), color: '#F59E0B', icon: '🔄' },
+    { label: 'Проверка', count: (bs.checking?.count||0) + (bs.done?.count||0), color: '#8B5CF6', icon: '🔍' },
     { label: 'Завершены', count: bs.done?.count||0, color: '#10B981', icon: '✅' }
   ];
   h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка конверсии</h3>' +
