@@ -191,7 +191,6 @@ app.get('/api/slots', async (c) => {
 app.post('/api/generate-pdf', async (c) => {
   try {
     const db = c.env.DB;
-    await initDatabase(db);
     const body = await c.req.json();
     const lang = body.lang || 'ru';
     const items = body.items || [];
@@ -200,7 +199,12 @@ app.post('/api/generate-pdf', async (c) => {
     const clientContact = body.clientContact || '';
     const referralCode = body.referralCode || '';
 
-    let tpl = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+    // Run template fetch and lead number in parallel for speed
+    const [tplRow, lastLead] = await Promise.all([
+      db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first(),
+      db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first()
+    ]);
+    let tpl: any = tplRow;
     if (!tpl) tpl = { header_ru: '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435', header_am: '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f', intro_ru: '', intro_am: '', outro_ru: '', outro_am: '', footer_ru: '', footer_am: '', company_name: 'Go to Top', company_phone: '', company_email: '', company_address: '' };
 
     const isAm = lang === 'am';
@@ -214,9 +218,8 @@ app.post('/api/generate-pdf', async (c) => {
       rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
 
-    // Save lead with unique ID
+    // Save lead with unique ID (using pre-fetched lastLead)
     const ua = c.req.header('User-Agent') || '';
-    const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
     const nextNum = ((lastLead?.max_num as number) || 0) + 1;
     const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(nextNum, 'calculator_pdf', clientName, clientContact, JSON.stringify({ items, total, referralCode }), lang, referralCode, ua.substring(0,200), total).run();
@@ -232,7 +235,8 @@ app.post('/api/generate-pdf', async (c) => {
     if (referralCode) tgLines.push('\ud83c\udff7 ' + (isAm ? '\u054a\u0580\u0578\u0574\u0578: ' : '\u041f\u0440\u043e\u043c\u043e: ') + referralCode);
     tgLines.push((isAm ? '\ud83d\udcc4 \u0550\u0561\u0577\u057e\u0561\u0580\u056f:' : '\ud83d\udcc4 \u0420\u0430\u0441\u0447\u0451\u0442:'));
     for (const it of items) { tgLines.push('  \u2022 ' + it.name + ' \u00d7 ' + it.qty + ' = ' + Number(it.subtotal).toLocaleString('ru-RU') + ' \u058f'); }
-    notifyTelegram(db, { name: clientName, contact: clientContact, source: 'calculator_pdf', message: tgLines.join('\n'), lang });
+    // Fire and forget — don't wait for TG notification
+    notifyTelegram(db, { name: clientName, contact: clientContact, source: 'calculator_pdf', message: tgLines.join('\n'), lang }).catch(() => {});
 
     // Build labels ONLY in current language (no mixing)
     const L = isAm

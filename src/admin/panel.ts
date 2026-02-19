@@ -1509,30 +1509,57 @@ function renderLeads() {
       h += '<div style="display:flex;gap:4px">';
       if (isCalc) {
         h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;text-decoration:none"><i class="fas fa-file-pdf" style="margin-right:4px"></i>КП</a>';
-      } else {
-        h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;color:#F59E0B;border-color:#F59E0B" onclick="generateLeadKP(' + l.id + ')" title="Создать коммерческое предложение"><i class="fas fa-file-invoice-dollar" style="margin-right:4px"></i>КП</button>';
       }
-      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="toggleLeadExpand(' + l.id + ')" title="Детали и комментарии"><i class="fas fa-chevron-down"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="toggleLeadExpand(' + l.id + ')" title="Детали, услуги и калькулятор"><i class="fas fa-chevron-down"></i></button>';
       h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div></div></div>';
       
       // Expandable detail area (services + notes + comments)
       h += '<div id="lead-detail-' + l.id + '" style="display:none">';
-      // Services breakdown
-      if (calcData && calcData.items && calcData.items.length > 0) {
-        h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
-          '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-receipt" style="margin-right:4px;color:#a78bfa"></i>Выбранные услуги:</div>' +
-          '<div style="display:grid;grid-template-columns:1fr auto auto auto;gap:4px 12px;font-size:0.82rem">' +
-          '<div style="color:#64748b;font-weight:600">Услуга</div><div style="color:#64748b;font-weight:600;text-align:center">Кол-во</div><div style="color:#64748b;font-weight:600;text-align:right">Цена</div><div style="color:#64748b;font-weight:600;text-align:right">Сумма</div>';
-        for (var ci = 0; ci < calcData.items.length; ci++) {
-          var item = calcData.items[ci];
-          h += '<div style="color:#e2e8f0">' + escHtml(item.name || '') + '</div>' +
-            '<div style="text-align:center;color:#94a3b8">' + (item.qty || 1) + '</div>' +
-            '<div style="text-align:right;color:#94a3b8;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '&nbsp;֏</div>' +
-            '<div style="text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '&nbsp;֏</div>';
-        }
-        h += '</div></div>';
+      
+      // ===== EDITABLE LEAD NAME =====
+      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
+        '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя лида (клиент):</div>' +
+        '<div style="display:flex;gap:8px"><input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="flex:1;font-size:0.88rem;padding:8px" placeholder="Имя клиента...">' +
+        '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadName(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
+
+      // ===== SERVICES FROM CALCULATOR (BUILT-IN) =====
+      h += '<div id="lead-services-' + l.id + '" style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
+      // Services breakdown from existing calc_data
+      var serviceItems = [];
+      if (calcData && calcData.items) {
+        serviceItems = calcData.items.filter(function(it) { return !it.wb_article; });
       }
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+        '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ')</span>' +
+        '<button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить услугу</button>' +
+      '</div>';
+      if (serviceItems.length > 0) {
+        h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:8px">' +
+          '<thead><tr style="background:#1e293b"><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:left">Услуга</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:center">Кол-во</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Цена</th><th style="padding:6px 8px;color:#94a3b8;font-weight:600;text-align:right">Сумма</th><th style="padding:6px 8px"></th></tr></thead><tbody>';
+        var svcTotal = 0;
+        for (var si3 = 0; si3 < serviceItems.length; si3++) {
+          var si = serviceItems[si3];
+          svcTotal += Number(si.subtotal || 0);
+          h += '<tr style="border-bottom:1px solid #334155">' +
+            '<td style="padding:6px 8px;color:#e2e8f0">' + escHtml(si.name) + '</td>' +
+            '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + (si.qty||1) + '</td>' +
+            '<td style="padding:6px 8px;text-align:right;color:#94a3b8;white-space:nowrap">' + Number(si.price||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+            '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(si.subtotal||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
+            '<td style="padding:6px 8px;text-align:center"><button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="removeLeadService(' + l.id + ',' + si3 + ')" title="Удалить"><i class="fas fa-trash"></i></button></td></tr>';
+        }
+        h += '</tbody><tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="3" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО услуги:</td><td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</td><td></td></tr></tfoot></table></div>';
+      } else {
+        h += '<div style="text-align:center;padding:14px;color:#64748b;font-size:0.82rem;background:#0f172a;border-radius:8px"><i class="fas fa-info-circle" style="margin-right:6px"></i>Нет услуг. Нажмите «Добавить услугу» чтобы выбрать из калькулятора.</div>';
+      }
+      h += '</div>';
+
+      // ===== GENERATE PDF BUTTON =====
+      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>' +
+        (isCalc ? '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>' : '') +
+      '</div>';
+
       // Notes — editable
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
         '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
@@ -1540,7 +1567,7 @@ function renderLeads() {
         '<button class="btn btn-success" style="padding:8px 14px;font-size:0.78rem;white-space:nowrap" onclick="saveLeadNotes(' + l.id + ')"><i class="fas fa-save"></i></button></div></div>';
       // Save all lead changes button
       h += '<div style="margin-top:14px;border-top:1px solid #334155;padding-top:14px;display:flex;justify-content:flex-end;gap:8px">' +
-        '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить изменения</button></div>';
+        '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button></div>';
       // Articles section (WB артикулы) — loaded dynamically
       h += '<div id="articles-' + l.id + '"><div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка артикулов...</span></div></div>';
       h += '</div>';
@@ -1795,13 +1822,15 @@ function showArticleModal(leadId, articleId) {
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Цвет</label><input class="input" id="art_color" value="' + escHtml((art && art.color) || '') + '" placeholder="Чёрный"></div>' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Кол-во *</label><input class="input" type="number" min="1" id="art_quantity" value="' + ((art && art.quantity) || 1) + '" required onchange="calcArticleTotal()"></div>' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Цена за шт (֏)</label><input class="input" type="number" min="0" id="art_price" value="' + ((art && art.price_per_unit) || 0) + '" onchange="calcArticleTotal()"></div></div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div style="display:grid;grid-template-columns:' + (isEdit ? '1fr 1fr 1fr' : '1fr 1fr') + ';gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма (֏)</label><input class="input" id="art_total" value="' + ((art && art.total_price) || 0) + '" readonly style="background:#1e293b;color:#a78bfa;font-weight:700"></div>' +
-      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Статус</label><select class="input" id="art_status">';
-  for (var sk in articleStatusLabels) {
-    h += '<option value="' + sk + '"' + ((art && art.status === sk) ? ' selected' : (!art && sk === 'pending' ? ' selected' : '')) + '>' + articleStatusLabels[sk] + '</option>';
+      (isEdit ? '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Статус</label><select class="input" id="art_status">' : '');
+  if (isEdit) {
+    for (var sk in articleStatusLabels) {
+      h += '<option value="' + sk + '"' + ((art && art.status === sk) ? ' selected' : '') + '>' + articleStatusLabels[sk] + '</option>';
+    }
   }
-  h += '</select></div>' +
+  h += (isEdit ? '</select></div>' : '') +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Выкупщик</label><select class="input" id="art_buyer"><option value="">— Не назначен —</option>';
   for (var bk = 0; bk < (data.users||[]).length; bk++) {
     var ub = data.users[bk];
@@ -1833,7 +1862,7 @@ async function submitArticle(e, leadId, articleId) {
     color: document.getElementById('art_color').value.trim(),
     quantity: parseInt(document.getElementById('art_quantity').value) || 1,
     price_per_unit: parseFloat(document.getElementById('art_price').value) || 0,
-    status: document.getElementById('art_status').value,
+    status: document.getElementById('art_status') ? document.getElementById('art_status').value : 'pending',
     buyer_id: document.getElementById('art_buyer').value ? Number(document.getElementById('art_buyer').value) : null,
     notes: document.getElementById('art_notes').value.trim()
   };
@@ -1893,21 +1922,199 @@ async function recalcLeadTotal(leadId) {
   }
 }
 
-// Save all lead changes: notes + recalculate total
+// Save lead name
+async function saveLeadName(leadId) {
+  var nameEl = document.getElementById('lead-name-' + leadId);
+  if (!nameEl) return;
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ name: nameEl.value }) });
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (lead) lead.name = nameEl.value;
+  toast('Имя лида обновлено');
+}
+
+// ===== LEAD CALCULATOR MODAL (select services from DB) =====
+function showLeadCalcModal(leadId) {
+  // Build service selector from calc data (same as in Calculator section)
+  var tabs = data.calcTabs || [];
+  var services = data.calcServices || [];
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="this.remove()">' +
+    '<div class="card" style="width:750px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
+    '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:8px"></i>Выбрать услугу для лида #' + leadId + '</h3>';
+
+  if (tabs.length === 0) {
+    h += '<div style="text-align:center;padding:24px;color:#64748b"><i class="fas fa-inbox" style="font-size:2rem;margin-bottom:12px;display:block"></i>Нет услуг в калькуляторе. Сначала добавьте услуги в разделе «Калькулятор».</div>';
+  } else {
+    // Tab buttons
+    h += '<div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">';
+    for (var ti = 0; ti < tabs.length; ti++) {
+      h += '<button class="tab-btn' + (ti === 0 ? ' active' : '') + '" onclick="switchLeadCalcTab(this,' + tabs[ti].id + ')">' + escHtml(tabs[ti].name_ru) + '</button>';
+    }
+    h += '</div>';
+
+    // Services grouped by tab
+    for (var ti2 = 0; ti2 < tabs.length; ti2++) {
+      var tab = tabs[ti2];
+      var tabServices = services.filter(function(s) { return s.tab_id === tab.id; });
+      h += '<div class="lead-calc-tab" data-tab-id="' + tab.id + '" style="' + (ti2 > 0 ? 'display:none' : '') + '">';
+      if (tabServices.length === 0) {
+        h += '<p style="color:#64748b;font-size:0.85rem">Нет услуг в этом разделе.</p>';
+      } else {
+        for (var si = 0; si < tabServices.length; si++) {
+          var svc = tabServices[si];
+          var isTiered = svc.price_type === 'tiered' && svc.price_tiers_json;
+          var tiers = [];
+          if (isTiered) { try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; } }
+          var defaultPrice = svc.price || 0;
+          
+          h += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#0f172a;border:1px solid #334155;border-radius:8px;margin-bottom:6px;flex-wrap:wrap">' +
+            '<div style="flex:1;min-width:200px"><div style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(svc.name_ru) + '</div>' +
+            (isTiered ? '<div style="font-size:0.72rem;color:#a78bfa">' + tiers.map(function(t){return t.min+'-'+t.max+': '+t.price+' ֏';}).join(' | ') + '</div>' : '<div style="font-size:0.72rem;color:#94a3b8">' + defaultPrice + ' ֏</div>') +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:6px">' +
+              '<label style="font-size:0.75rem;color:#94a3b8">Кол-во:</label>' +
+              '<input type="number" class="input" min="1" value="1" style="width:70px;padding:4px 8px;font-size:0.85rem" id="lc_qty_' + svc.id + '" onchange="updateLeadCalcPrice(' + svc.id + ',' + defaultPrice + ',' + (isTiered ? '1' : '0') + ')">' +
+            '</div>' +
+            '<div style="min-width:80px;text-align:right"><span id="lc_price_' + svc.id + '" style="font-weight:700;color:#a78bfa">' + defaultPrice + ' ֏</span></div>' +
+            '<button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="addServiceToLead(' + leadId + ',' + svc.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
+          '</div>';
+        }
+      }
+      h += '</div>';
+    }
+  }
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Закрыть</button></div>';
+  h += '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', h);
+}
+
+function switchLeadCalcTab(btn, tabId) {
+  // Switch active tab button
+  var buttons = btn.parentElement.querySelectorAll('.tab-btn');
+  for (var i = 0; i < buttons.length; i++) buttons[i].className = 'tab-btn';
+  btn.className = 'tab-btn active';
+  // Switch visible tab content
+  var tabs = document.querySelectorAll('.lead-calc-tab');
+  for (var j = 0; j < tabs.length; j++) {
+    tabs[j].style.display = tabs[j].dataset.tabId == tabId ? 'block' : 'none';
+  }
+}
+
+function updateLeadCalcPrice(svcId, defaultPrice, isTiered) {
+  var qtyEl = document.getElementById('lc_qty_' + svcId);
+  var priceEl = document.getElementById('lc_price_' + svcId);
+  if (!qtyEl || !priceEl) return;
+  var qty = parseInt(qtyEl.value) || 1;
+  var price = defaultPrice;
+  if (isTiered) {
+    var svc = data.calcServices.find(function(s) { return s.id === svcId; });
+    if (svc && svc.price_tiers_json) {
+      try {
+        var tiers = JSON.parse(svc.price_tiers_json);
+        for (var i = 0; i < tiers.length; i++) {
+          if (qty >= tiers[i].min && qty <= tiers[i].max) { price = tiers[i].price; break; }
+        }
+      } catch(e) {}
+    }
+  }
+  priceEl.textContent = (price * qty) + ' ֏';
+}
+
+async function addServiceToLead(leadId, svcId) {
+  var svc = data.calcServices.find(function(s) { return s.id === svcId; });
+  if (!svc) { toast('Услуга не найдена', 'error'); return; }
+  var qtyEl = document.getElementById('lc_qty_' + svcId);
+  var qty = qtyEl ? (parseInt(qtyEl.value) || 1) : 1;
+  var price = svc.price || 0;
+  // Check tiered pricing
+  if (svc.price_type === 'tiered' && svc.price_tiers_json) {
+    try {
+      var tiers = JSON.parse(svc.price_tiers_json);
+      for (var i = 0; i < tiers.length; i++) {
+        if (qty >= tiers[i].min && qty <= tiers[i].max) { price = tiers[i].price; break; }
+      }
+    } catch(e) {}
+  }
+  // Get existing lead calc_data
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  var calcData = { items: [], total: 0 };
+  if (lead && lead.calc_data) { try { calcData = JSON.parse(lead.calc_data); } catch(e) { calcData = { items: [], total: 0 }; } }
+  if (!calcData.items) calcData.items = [];
+  // Add the service
+  calcData.items.push({ name: svc.name_ru, qty: qty, price: price, subtotal: price * qty });
+  // Recalculate total
+  var newTotal = 0;
+  for (var j = 0; j < calcData.items.length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
+  calcData.total = newTotal;
+  // Save to backend
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
+  if (lead) { lead.calc_data = JSON.stringify(calcData); lead.total_amount = newTotal; }
+  toast('Услуга «' + svc.name_ru + '» добавлена');
+  // Close modal and refresh
+  var modal = document.querySelector('[style*="fixed"][style*="z-index:999"]');
+  if (modal) modal.remove();
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); }
+  }, 100);
+}
+
+async function removeLeadService(leadId, serviceIndex) {
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (!lead || !lead.calc_data) return;
+  var calcData = { items: [], total: 0 };
+  try { calcData = JSON.parse(lead.calc_data); } catch(e) { return; }
+  if (!calcData.items) return;
+  // Filter to only service items (no wb_article), remove the one at serviceIndex
+  var serviceItems = [];
+  var otherItems = [];
+  for (var i = 0; i < calcData.items.length; i++) {
+    if (calcData.items[i].wb_article) otherItems.push(calcData.items[i]);
+    else serviceItems.push(calcData.items[i]);
+  }
+  if (serviceIndex < 0 || serviceIndex >= serviceItems.length) return;
+  serviceItems.splice(serviceIndex, 1);
+  calcData.items = serviceItems.concat(otherItems);
+  // Recalculate total
+  var newTotal = 0;
+  for (var j = 0; j < calcData.items.length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
+  calcData.total = newTotal;
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
+  if (lead) { lead.calc_data = JSON.stringify(calcData); lead.total_amount = newTotal; }
+  toast('Услуга удалена');
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); }
+  }, 100);
+}
+
+// Save all lead changes: name + notes + recalculate total
 async function saveLeadAll(leadId) {
-  // 1. Save notes
+  // 1. Save name + notes
+  var nameEl = document.getElementById('lead-name-' + leadId);
   var notesEl = document.getElementById('lead-notes-' + leadId);
-  if (notesEl) {
-    await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ notes: notesEl.value }) });
+  var updateData = {};
+  if (nameEl) updateData.name = nameEl.value;
+  if (notesEl) updateData.notes = notesEl.value;
+  if (Object.keys(updateData).length > 0) {
+    await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify(updateData) });
     var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
-    if (lead) lead.notes = notesEl.value;
+    if (lead) {
+      if (nameEl) lead.name = nameEl.value;
+      if (notesEl) lead.notes = notesEl.value;
+    }
   }
   // 2. Recalculate total (articles + services)
   var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   if (res && res.success) {
     toast('Все изменения сохранены. Итого: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏');
   } else {
-    toast('Заметка сохранена');
+    toast('Данные сохранены');
   }
   // 3. Refresh
   var resLeads = await api('/leads?limit=500');
