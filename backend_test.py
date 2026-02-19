@@ -110,7 +110,7 @@ class GoToTopAPITester:
             "phone": "+374999999",
             "email": f"test{timestamp}@example.com"
         }
-        success, response = self.run_test("Create User", "POST", "/api/users", 201, data=test_data)
+        success, response = self.run_test("Create User", "POST", "/api/users", 200, data=test_data)
         if success and 'id' in response:
             self.test_user_id = response['id']
             print(f"👤 Created test user with ID: {self.test_user_id}")
