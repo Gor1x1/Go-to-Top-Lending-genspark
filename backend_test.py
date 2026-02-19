@@ -198,6 +198,23 @@ class GoToTopAPITester:
         }
         return self.run_test("Update Lead", "PUT", f"/api/leads/{self.test_lead_id}", 200, data=update_data)
 
+    def test_leads_analytics(self):
+        """Test leads analytics endpoint"""
+        success, response = self.run_test("Leads Analytics", "GET", "/api/leads/analytics", 200)
+        if success:
+            required_fields = ['total', 'total_amount', 'today_count', 'today_amount', 'by_status', 'by_source']
+            missing_fields = [field for field in required_fields if field not in response]
+            if missing_fields:
+                print(f"⚠️ Missing analytics fields: {missing_fields}")
+            else:
+                print(f"✅ Analytics data complete: {response.get('total', 0)} leads, {response.get('total_amount', 0)} total amount")
+        return success
+
+    def test_leads_export(self):
+        """Test leads CSV export"""
+        success, _ = self.run_test("Leads CSV Export", "GET", "/api/leads/export", 200)
+        return success
+
     def test_public_lead_submission(self):
         """Test public lead submission endpoint"""
         lead_data = {
