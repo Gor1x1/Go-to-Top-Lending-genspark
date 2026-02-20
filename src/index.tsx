@@ -302,6 +302,8 @@ app.get('/pdf/:id', async (c) => {
     try { calcData = JSON.parse(lead.calc_data as string); } catch { calcData = { items: [], total: 0 }; }
     const items = calcData.items || [];
     const total = calcData.total || 0;
+    // subtotal = sum of all items BEFORE refund deduction; falls back to total for backward compat
+    const subtotal = calcData.subtotal || total;
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
     const refundAmount = Number(lead.refund_amount) || 0;
@@ -369,6 +371,9 @@ app.get('/pdf/:id', async (c) => {
     const companyEmail = String(tpl.company_email || '');
     const companyAddress = String(tpl.company_address || '');
     const dateStr = new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU');
+    // subtotalFormatted = sum of all items BEFORE refund (always shows as ИТОГО)
+    const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
+    // totalFormatted = final amount after refund deduction
     const totalFormatted = Number(total).toLocaleString('ru-RU');
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
@@ -417,9 +422,9 @@ app.get('/pdf/:id', async (c) => {
       + (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '')
       + (cleanIntro ? '<div class="intro">' + cleanIntro + '</div>' : '')
       + '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
-      + '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>'
-      + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="3" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442 \u0441\u0440\u0435\u0434\u0441\u0442\u0432:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>'
-        + '<tr style="background:#f0fdf4"><td colspan="3" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0442\u043e\u0433 \u0441 \u0432\u043e\u0437\u0432\u0440\u0430\u0442\u043e\u043c:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + Number(total).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
+      + '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
+      + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="3" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>'
+        + '<tr style="background:#f0fdf4"><td colspan="3" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0442\u043e\u0433\u043e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'
       + (cleanOutro ? '<div class="outro">' + cleanOutro + '</div>' : '')
       + (cleanFooter ? '<div class="ftr">' + cleanFooter + '</div>' : '')

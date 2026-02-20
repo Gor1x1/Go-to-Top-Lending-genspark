@@ -1794,17 +1794,16 @@ function handleCardClick(e, id) {
   // Only toggle if click target is a neutral element (not interactive)
   var tag = e.target.tagName;
   if (tag === 'SELECT' || tag === 'OPTION' || tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'BUTTON' || tag === 'A') return;
-  // Also check parent — icon inside a button/link
+  // Also check parent and grandparent — icon inside a button/link
   var parent = e.target.parentElement;
   if (parent && (parent.tagName === 'BUTTON' || parent.tagName === 'A' || parent.tagName === 'SELECT')) return;
-  // Check if click is inside the detail area
+  var gp = parent ? parent.parentElement : null;
+  if (gp && (gp.tagName === 'BUTTON' || gp.tagName === 'A')) return;
+  // Check if click is inside the detail area (expanded content) — don't close from there
   var detail = document.getElementById('lead-detail-' + id);
-  if (detail && detail.contains(e.target)) return;
-  // If detail is closed => open; if open => ignore (only arrow closes)
-  var el = document.getElementById('lead-detail-' + id);
-  if (el && el.style.display === 'none') {
-    openLeadDetail(id);
-  }
+  if (detail && detail.style.display !== 'none' && detail.contains(e.target)) return;
+  // Toggle: if closed => open; if open => close
+  closeLeadDetail(id);
 }
 
 function toggleLeadExpand(id) { closeLeadDetail(id); }

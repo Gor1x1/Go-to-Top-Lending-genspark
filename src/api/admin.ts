@@ -1092,13 +1092,15 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     });
   }
   
-  // Total = services + articles - refund
+  // Total = services + articles; subtotal is WITHOUT refund, total_amount is WITH refund deducted
   const refundAmount = Number(leadRow.refund_amount) || 0;
-  const totalAmount = servicesTotalAmount + articlesTotalAmount - refundAmount;
+  const subtotalAmount = servicesTotalAmount + articlesTotalAmount;
+  const totalAmount = subtotalAmount - refundAmount;
   const allItems = [...serviceItems, ...articleItems];
   
   // Update lead total_amount and calc_data (for PDF)
-  const calcData = JSON.stringify({ items: allItems, total: totalAmount, refund: refundAmount, referralCode: existingCalcData?.referralCode || '' });
+  // subtotal = raw sum of all items (before refund), total = final amount after refund
+  const calcData = JSON.stringify({ items: allItems, subtotal: subtotalAmount, total: totalAmount, refund: refundAmount, referralCode: existingCalcData?.referralCode || '' });
   await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
     .bind(totalAmount, calcData, leadId).run();
   // Set source to calculator_pdf so PDF route works
