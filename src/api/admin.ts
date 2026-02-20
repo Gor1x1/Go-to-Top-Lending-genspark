@@ -514,6 +514,7 @@ api.post('/leads', authMiddleware, async (c) => {
 
 api.get('/leads/analytics', authMiddleware, async (c) => {
   const db = c.env.DB;
+  try {
   const url = new URL(c.req.url);
   const dateFrom = url.searchParams.get('from') || '';
   const dateTo = url.searchParams.get('to') || '';
@@ -523,36 +524,49 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
   if (dateFrom) { dateFilter += " AND date(created_at) >= ?"; dateParams.push(dateFrom); }
   if (dateTo) { dateFilter += " AND date(created_at) <= ?"; dateParams.push(dateTo); }
   
-  // Total stats
-  const total = await db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1' + dateFilter).bind(...dateParams).first();
-  const todayCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) = date('now')").first();
-  const weekCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-7 days')").first();
-  const monthCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days')").first();
+  // Total stats — use simple queries with fallbacks for missing columns
+  const total = await db.prepare('SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1' + dateFilter).bind(...dateParams).first().catch(() => ({ count: 0, amount: 0 }));
+  const todayCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) = date('now')").first().catch(() => ({ count: 0, amount: 0 }));
+  const weekCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-7 days')").first().catch(() => ({ count: 0, amount: 0 }));
+  const monthCount = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days')").first().catch(() => ({ count: 0, amount: 0 }));
   
   // By status (with date filter)
-  const byStatusRes = await db.prepare("SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1" + dateFilter + " GROUP BY status").bind(...dateParams).all();
-  const byStatus: Record<string, any> = {};
-  for (const r of byStatusRes.results) { byStatus[r.status as string] = { count: r.count, amount: r.amount }; }
+  let byStatus: Record<string, any> = {};
+  try {
+    const byStatusRes = await db.prepare("SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1" + dateFilter + " GROUP BY status").bind(...dateParams).all();
+    for (const r of byStatusRes.results) { byStatus[r.status as string] = { count: r.count, amount: r.amount }; }
+  } catch {}
   
   // By source (with date filter)
-  const bySourceRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1" + dateFilter + " GROUP BY source").bind(...dateParams).all();
-  const bySource: Record<string, any> = {};
-  for (const r of bySourceRes.results) { bySource[r.source as string] = { count: r.count, amount: r.amount }; }
+  let bySource: Record<string, any> = {};
+  try {
+    const bySourceRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1" + dateFilter + " GROUP BY source").bind(...dateParams).all();
+    for (const r of bySourceRes.results) { bySource[r.source as string] = { count: r.count, amount: r.amount }; }
+  } catch {}
   
   // By assignee (with date filter)
-  const byAssigneeRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE 1=1" + dateFilter.replace(/created_at/g, 'l.created_at') + " GROUP BY l.assigned_to").bind(...dateParams).all();
   const byAssignee: any[] = [];
-  for (const r of byAssigneeRes.results) { byAssignee.push({ user_id: r.assigned_to, name: r.display_name || 'Не назначен', count: r.count, amount: r.amount }); }
+  try {
+    const byAssigneeRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE 1=1" + dateFilter.replace(/created_at/g, 'l.created_at') + " GROUP BY l.assigned_to").bind(...dateParams).all();
+    for (const r of byAssigneeRes.results) { byAssignee.push({ user_id: r.assigned_to, name: r.display_name || 'Не назначен', count: r.count, amount: r.amount }); }
+  } catch {}
   
   // Daily breakdown (last 30 days)
-  const dailyRes = await db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day").all();
+  let dailyResults: any[] = [];
+  try {
+    const dailyRes = await db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day").all();
+    dailyResults = dailyRes.results || [];
+  } catch {}
   
   // Service popularity — parse calc_data from all leads + split services vs articles per status
-  const allLeadsRes = await db.prepare("SELECT id, calc_data, total_amount, status FROM leads WHERE 1=1" + dateFilter).bind(...dateParams).all();
+  let allLeadsResults: any[] = [];
+  try {
+    const allLeadsRes = await db.prepare("SELECT id, calc_data, total_amount, status FROM leads WHERE 1=1" + dateFilter).bind(...dateParams).all();
+    allLeadsResults = allLeadsRes.results || [];
+  } catch {}
   const serviceStats: Record<string, { count: number; qty: number; revenue: number }> = {};
-  // Per-status breakdown: services_amount and articles_amount
   const statusAmounts: Record<string, { services: number; articles: number }> = {};
-  for (const lead of allLeadsRes.results) {
+  for (const lead of allLeadsResults) {
     const st = lead.status as string || 'new';
     if (!statusAmounts[st]) statusAmounts[st] = { services: 0, articles: 0 };
     try {
@@ -572,16 +586,17 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
         }
       }
     } catch {}
-    // Also count articles from lead_articles table
   }
   // Get articles totals per lead from lead_articles table
-  const articlesPerLead = await db.prepare("SELECT la.lead_id, SUM(la.total_price) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE 1=1" + dateFilter.replace(/created_at/g, 'l.created_at') + " GROUP BY la.lead_id").bind(...dateParams).all();
-  for (const ar of articlesPerLead.results) {
-    const lead = allLeadsRes.results.find(l => l.id === ar.lead_id);
-    const st = (lead?.status as string) || 'new';
-    if (!statusAmounts[st]) statusAmounts[st] = { services: 0, articles: 0 };
-    statusAmounts[st].articles += Number(ar.art_total || 0);
-  }
+  try {
+    const articlesPerLead = await db.prepare("SELECT la.lead_id, SUM(la.total_price) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE 1=1" + dateFilter.replace(/created_at/g, 'l.created_at') + " GROUP BY la.lead_id").bind(...dateParams).all();
+    for (const ar of articlesPerLead.results) {
+      const lead = allLeadsResults.find((l: any) => l.id === ar.lead_id);
+      const st = (lead?.status as string) || 'new';
+      if (!statusAmounts[st]) statusAmounts[st] = { services: 0, articles: 0 };
+      statusAmounts[st].articles += Number(ar.art_total || 0);
+    }
+  } catch {}
   const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
   
   // Conversion funnel
@@ -597,7 +612,11 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
   const avgCheck = statusCounts.done > 0 ? Math.round((byStatus.done?.amount || 0) / statusCounts.done) : 0;
   
   // Referral stats
-  const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dateFilter + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
+  let refResults: any[] = [];
+  try {
+    const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dateFilter + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
+    refResults = refRes.results || [];
+  } catch {}
   
   return c.json({
     total: { count: total?.count || 0, amount: total?.amount || 0 },
@@ -607,15 +626,26 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
     by_status: byStatus,
     by_source: bySource,
     by_assignee: byAssignee,
-    daily: dailyRes.results,
+    daily: dailyResults,
     services: serviceList,
     status_amounts: statusAmounts,
     conversion_rate: conversionRate,
     avg_check: avgCheck,
-    referrals: refRes.results,
+    referrals: refResults,
     date_from: dateFrom,
     date_to: dateTo,
   });
+  } catch (err: any) {
+    // Top-level catch: if the whole analytics crashes, return empty data instead of 500
+    console.error('Analytics error:', err?.message || err);
+    return c.json({
+      total: { count: 0, amount: 0 }, today: { count: 0, amount: 0 },
+      week: { count: 0, amount: 0 }, month: { count: 0, amount: 0 },
+      by_status: {}, by_source: {}, by_assignee: [], daily: [],
+      services: [], status_amounts: {}, conversion_rate: '0', avg_check: 0,
+      referrals: [], date_from: '', date_to: '', error: 'Analytics temporarily unavailable: ' + (err?.message || 'unknown error')
+    });
+  }
 });
 
 // ===== LEAD COMMENTS =====
@@ -1174,6 +1204,63 @@ async function updateLeadArticlesCount(db: D1Database, leadId: number) {
 // ===== ROLES CONFIG (for frontend) =====
 api.get('/roles-config', authMiddleware, async (c) => {
   return c.json({ roles: ALL_ROLES, sections: ALL_SECTIONS, role_labels: ROLE_LABELS, section_labels: SECTION_LABELS, default_permissions: DEFAULT_PERMISSIONS });
+});
+
+// ===== COMPANY ROLES MANAGEMENT =====
+api.get('/company-roles', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare('SELECT * FROM company_roles ORDER BY sort_order, id').all();
+    return c.json({ roles: res.results || [] });
+  } catch {
+    return c.json({ roles: [] });
+  }
+});
+
+api.post('/company-roles', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage roles' }, 403);
+  const d = await c.req.json();
+  if (!d.role_key || !d.role_name) return c.json({ error: 'role_key and role_name required' }, 400);
+  const existing = await db.prepare('SELECT id FROM company_roles WHERE role_key = ?').bind(d.role_key).first();
+  if (existing) return c.json({ error: 'Role key already exists' }, 400);
+  await db.prepare('INSERT INTO company_roles (role_key, role_name, description, default_sections, color, is_system, sort_order) VALUES (?,?,?,?,?,0,?)')
+    .bind(d.role_key, d.role_name, d.description || '', JSON.stringify(d.default_sections || ['dashboard']), d.color || '#8B5CF6', d.sort_order || 99).run();
+  return c.json({ success: true });
+});
+
+api.put('/company-roles/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage roles' }, 403);
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.role_name !== undefined) { fields.push('role_name=?'); vals.push(d.role_name); }
+  if (d.description !== undefined) { fields.push('description=?'); vals.push(d.description); }
+  if (d.default_sections !== undefined) { fields.push('default_sections=?'); vals.push(JSON.stringify(d.default_sections)); }
+  if (d.color !== undefined) { fields.push('color=?'); vals.push(d.color); }
+  if (d.is_active !== undefined) { fields.push('is_active=?'); vals.push(d.is_active ? 1 : 0); }
+  if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
+  if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE company_roles SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/company-roles/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage roles' }, 403);
+  const id = c.req.param('id');
+  // Don't allow deleting system roles
+  const role = await db.prepare('SELECT is_system FROM company_roles WHERE id = ?').bind(id).first();
+  if (role?.is_system) return c.json({ error: 'Cannot delete system roles' }, 400);
+  await db.prepare('DELETE FROM company_roles WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
 });
 
 export default api

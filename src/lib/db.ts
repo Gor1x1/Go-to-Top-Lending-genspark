@@ -277,6 +277,20 @@ CREATE TABLE IF NOT EXISTS lead_articles (
 CREATE INDEX IF NOT EXISTS idx_lead_articles_lead ON lead_articles(lead_id);
 CREATE INDEX IF NOT EXISTS idx_lead_articles_status ON lead_articles(status);
 CREATE INDEX IF NOT EXISTS idx_lead_articles_buyer ON lead_articles(buyer_id);
+
+CREATE TABLE IF NOT EXISTS company_roles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  role_key TEXT UNIQUE NOT NULL,
+  role_name TEXT NOT NULL DEFAULT '',
+  description TEXT DEFAULT '',
+  default_sections TEXT DEFAULT '["dashboard"]',
+  color TEXT DEFAULT '#8B5CF6',
+  is_system INTEGER DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
+  sort_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 export async function initDatabase(db: D1Database): Promise<void> {
@@ -308,12 +322,30 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE leads ADD COLUMN tz_link TEXT DEFAULT ''").run(); } catch {}
   // v5 Migrations: refund_amount for leads
   try { await db.prepare("ALTER TABLE leads ADD COLUMN refund_amount REAL DEFAULT 0").run(); } catch {}
+  // v6 Migrations: seed default company_roles
+  try {
+    const rolesCount = await db.prepare('SELECT COUNT(*) as cnt FROM company_roles').first();
+    if (!rolesCount || (rolesCount.cnt as number) === 0) {
+      const defaultRoles = [
+        { key: 'main_admin', name: 'Главный Админ', desc: 'Полный доступ ко всем разделам', sections: JSON.stringify([...ALL_SECTIONS]), color: '#8B5CF6', system: 1, order: 0 },
+        { key: 'developer', name: 'Разработчик', desc: 'Доступ к блокам, калькулятору, скриптам, настройкам', sections: JSON.stringify(['dashboard','blocks','calculator','scripts','settings']), color: '#3B82F6', system: 1, order: 1 },
+        { key: 'analyst', name: 'Аналитик', desc: 'Доступ к лидам и аналитике', sections: JSON.stringify(['dashboard','leads','analytics']), color: '#10B981', system: 1, order: 2 },
+        { key: 'operator', name: 'Оператор', desc: 'Работа с лидами / CRM', sections: JSON.stringify(['dashboard','leads']), color: '#F59E0B', system: 1, order: 3 },
+        { key: 'buyer', name: 'Выкупщик', desc: 'Базовый доступ', sections: JSON.stringify(['dashboard']), color: '#EF4444', system: 1, order: 4 },
+        { key: 'courier', name: 'Курьер', desc: 'Базовый доступ', sections: JSON.stringify(['dashboard']), color: '#6366F1', system: 1, order: 5 },
+      ];
+      for (const r of defaultRoles) {
+        await db.prepare('INSERT OR IGNORE INTO company_roles (role_key, role_name, description, default_sections, color, is_system, sort_order) VALUES (?,?,?,?,?,?,?)')
+          .bind(r.key, r.name, r.desc, r.sections, r.color, r.system, r.order).run();
+      }
+    }
+  } catch {}
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====
 export const ALL_ROLES = ['main_admin', 'developer', 'analyst', 'operator', 'buyer', 'courier'] as const;
 export const ALL_SECTIONS = [
-  'dashboard', 'leads', 'analytics', 'employees', 'permissions',
+  'dashboard', 'leads', 'analytics', 'employees', 'permissions', 'company_roles',
   'blocks', 'calculator', 'pdf', 'referrals', 'slots',
   'footer', 'telegram', 'tgbot', 'scripts', 'settings'
 ] as const;
@@ -323,7 +355,7 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 export const SECTION_LABELS: Record<string, string> = {
   dashboard: 'Дашборд', leads: 'Лиды / CRM', analytics: 'Аналитика лидов', employees: 'Сотрудники',
-  permissions: 'Управление доступами', blocks: 'Конструктор блоков',
+  permissions: 'Управление доступами', company_roles: 'Роли компании', blocks: 'Конструктор блоков',
   calculator: 'Калькулятор', pdf: 'PDF шаблон', referrals: 'Реферальные коды',
   slots: 'Счётчики слотов', footer: 'Футер сайта', telegram: 'TG сообщения',
   tgbot: 'TG Бот / Уведомления', scripts: 'Скрипты', settings: 'Настройки',

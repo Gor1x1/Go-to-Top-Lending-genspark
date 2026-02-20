@@ -57,7 +57,7 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {} };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [] };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -121,10 +121,10 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData, usersData, siteBlocksData] = await Promise.all([
+  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData, usersData, siteBlocksData, companyRolesData] = await Promise.all([
     api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order'),
     api('/leads?limit=200'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings'), api('/footer'), api('/photo-blocks'),
-    api('/users'), api('/site-blocks')
+    api('/users'), api('/site-blocks'), api('/company-roles')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -143,6 +143,7 @@ async function loadData() {
   data.photoBlocks = (photoBlocksData && photoBlocksData.blocks) || [];
   data.users = usersData || [];
   data.siteBlocks = (siteBlocksData && siteBlocksData.blocks) || [];
+  data.companyRoles = (companyRolesData && companyRolesData.roles) || [];
   // Preload articles for leads that have them
   var leadsWithArticles = ((data.leads && data.leads.leads) || []).filter(function(l) { return l.articles_count > 0; });
   if (leadsWithArticles.length > 0) {
@@ -158,6 +159,7 @@ const pages = [
   { id: 'analytics', icon: 'fa-chart-bar', label: 'Аналитика лидов' },
   { id: 'employees', icon: 'fa-user-friends', label: 'Сотрудники' },
   { id: 'permissions', icon: 'fa-shield-alt', label: 'Доступы' },
+  { id: 'company_roles', icon: 'fa-user-tag', label: 'Роли компании' },
   { id: 'blocks', icon: 'fa-cubes', label: 'Конструктор блоков' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
   { id: 'pdf', icon: 'fa-file-pdf', label: 'PDF шаблон' },
@@ -3118,15 +3120,20 @@ function editEmployee(id) { showEmployeeModal(id); }
 async function saveEmployee(e, id) {
   e.preventDefault();
   const body = { display_name: document.getElementById('empName').value, role: document.getElementById('empRole').value, phone: document.getElementById('empPhone').value, email: document.getElementById('empEmail').value };
+  var res;
   if (!id) {
     body.username = document.getElementById('empUser').value;
     body.password = document.getElementById('empPass').value;
-    await api('/users', { method:'POST', body: JSON.stringify(body) });
+    res = await api('/users', { method:'POST', body: JSON.stringify(body) });
   } else {
-    await api('/users/' + id, { method:'PUT', body: JSON.stringify(body) });
+    res = await api('/users/' + id, { method:'PUT', body: JSON.stringify(body) });
+  }
+  if (!res || res.error) {
+    toast(res?.error || 'Ошибка при сохранении сотрудника', 'error');
+    return;
   }
   data.users = await api('/users') || [];
-  toast(id ? '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d' : '\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a \u0441\u043e\u0437\u0434\u0430\u043d');
+  toast(id ? 'Сотрудник обновлён' : 'Сотрудник создан');
   render();
 }
 
@@ -3195,6 +3202,136 @@ async function savePermissions() {
   if (!selectedPermUserId) return;
   await api('/permissions/' + selectedPermUserId, { method:'PUT', body: JSON.stringify({ sections: selectedPermSections }) });
   toast('\u0414\u043e\u0441\u0442\u0443\u043f\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b');
+}
+
+// ===== COMPANY ROLES MANAGEMENT =====
+function renderCompanyRoles() {
+  var isAdmin = currentUser && currentUser.role === 'main_admin';
+  var roles = data.companyRoles || [];
+  var sl = rolesConfig?.section_labels || {};
+  var h = '<div style="padding:32px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">';
+  h += '<div><h1 style="font-size:1.5rem;font-weight:800"><i class="fas fa-user-tag" style="color:#8B5CF6;margin-right:10px"></i>\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u0440\u043e\u043b\u044f\u043c\u0438 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438</h1>';
+  h += '<p style="color:#94a3b8;font-size:0.85rem;margin-top:4px">\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u0442\u0435 \u0440\u043e\u043b\u0438, \u0438\u0445 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f, \u0446\u0432\u0435\u0442\u0430 \u0438 \u0434\u043e\u0441\u0442\u0443\u043f\u044b \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e</p></div>';
+  if (isAdmin) {
+    h += '<button class="btn btn-primary" onclick="showCompanyRoleModal()"><i class="fas fa-plus" style="margin-right:6px"></i>\u041d\u043e\u0432\u0430\u044f \u0440\u043e\u043b\u044c</button>';
+  }
+  h += '</div>';
+
+  if (roles.length === 0) {
+    h += '<div class="card" style="text-align:center;padding:48px;color:#64748b"><i class="fas fa-user-tag" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>\u0420\u043e\u043b\u0438 \u0435\u0449\u0451 \u043d\u0435 \u043d\u0430\u0441\u0442\u0440\u043e\u0435\u043d\u044b</p></div>';
+  } else {
+    h += '<div style="display:grid;gap:12px">';
+    for (var i = 0; i < roles.length; i++) {
+      var r = roles[i];
+      var sections = [];
+      try { sections = JSON.parse(r.default_sections || '[]'); } catch { sections = []; }
+      var sectionNames = sections.map(function(s) { return sl[s] || s; }).join(', ');
+      h += '<div class="card" style="padding:20px;border-left:4px solid ' + escHtml(r.color || '#8B5CF6') + '">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">';
+      h += '<div style="flex:1;min-width:200px">';
+      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+      h += '<span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:' + escHtml(r.color || '#8B5CF6') + '"></span>';
+      h += '<span style="font-size:1.1rem;font-weight:700">' + escHtml(r.role_name) + '</span>';
+      h += '<span style="font-family:monospace;font-size:0.75rem;color:#64748b;background:#0f172a;padding:2px 8px;border-radius:4px">' + escHtml(r.role_key) + '</span>';
+      if (r.is_system) h += '<span class="badge badge-purple" style="font-size:0.65rem">\u0421\u0438\u0441\u0442\u0435\u043c\u043d\u0430\u044f</span>';
+      if (!r.is_active) h += '<span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171;font-size:0.65rem">\u041d\u0435\u0430\u043a\u0442\u0438\u0432\u043d\u0430</span>';
+      h += '</div>';
+      if (r.description) h += '<p style="color:#94a3b8;font-size:0.82rem;margin-bottom:8px">' + escHtml(r.description) + '</p>';
+      h += '<div style="font-size:0.78rem;color:#64748b"><i class="fas fa-key" style="margin-right:6px;color:#8B5CF6"></i>\u0414\u043e\u0441\u0442\u0443\u043f\u044b: <span style="color:#a78bfa">' + (sectionNames || '\u043d\u0435\u0442') + '</span></div>';
+      h += '</div>';
+      if (isAdmin) {
+        h += '<div style="display:flex;gap:6px;flex-shrink:0">';
+        h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.82rem" onclick="showCompanyRoleModal(' + r.id + ')"><i class="fas fa-edit"></i></button>';
+        if (!r.is_system) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',\\'' + escHtml(r.role_name) + '\\')"><i class="fas fa-trash"></i></button>';
+        h += '</div>';
+      }
+      h += '</div></div>';
+    }
+    h += '</div>';
+  }
+  h += '<div id="companyRoleModalArea"></div>';
+  h += '</div>';
+  return h;
+}
+
+function showCompanyRoleModal(roleId) {
+  var r = roleId ? (data.companyRoles || []).find(function(x) { return x.id === roleId; }) : null;
+  var sl = rolesConfig?.section_labels || {};
+  var allSections = rolesConfig?.sections || [];
+  var existingSections = [];
+  if (r) { try { existingSections = JSON.parse(r.default_sections || '[]'); } catch { existingSections = []; } }
+  else { existingSections = ['dashboard']; }
+
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px" onclick="this.remove()">';
+  h += '<div class="card" style="width:580px;max-width:95vw;max-height:90vh;overflow-y:auto" onclick="event.stopPropagation()">';
+  h += '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-user-tag" style="color:#8B5CF6;margin-right:8px"></i>' + (r ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0440\u043e\u043b\u044c' : '\u041d\u043e\u0432\u0430\u044f \u0440\u043e\u043b\u044c') + '</h3>';
+  h += '<form onsubmit="saveCompanyRole(event,' + (r ? r.id : 'null') + ')">';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0440\u043e\u043b\u0438 *</label><input class="input" id="crRoleName" value="' + escHtml(r?.role_name || '') + '" required></div>';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041a\u043b\u044e\u0447 \u0440\u043e\u043b\u0438 *' + (r ? ' (\u043d\u0435\u043b\u044c\u0437\u044f \u043c\u0435\u043d\u044f\u0442\u044c)' : '') + '</label><input class="input" id="crRoleKey" value="' + escHtml(r?.role_key || '') + '" ' + (r ? 'readonly style="opacity:0.6"' : '') + ' required pattern="[a-z_]+" title="\u0422\u043e\u043b\u044c\u043a\u043e \u043b\u0430\u0442\u0438\u043d\u0441\u043a\u0438\u0435 \u0431\u0443\u043a\u0432\u044b \u0438 \u043f\u043e\u0434\u0447\u0451\u0440\u043a\u0438\u0432\u0430\u043d\u0438\u0435"></div>';
+  h += '</div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435</label><input class="input" id="crRoleDesc" value="' + escHtml(r?.description || '') + '"></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0426\u0432\u0435\u0442</label><input type="color" id="crRoleColor" value="' + (r?.color || '#8B5CF6') + '" style="width:100%;height:40px;border:1px solid #334155;border-radius:8px;background:#0f172a;cursor:pointer"></div>';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041f\u043e\u0440\u044f\u0434\u043e\u043a</label><input type="number" class="input" id="crRoleOrder" value="' + (r?.sort_order || 0) + '"></div>';
+  h += '</div>';
+  h += '<div style="margin-bottom:16px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:8px"><i class="fas fa-key" style="margin-right:4px"></i>\u0420\u0430\u0437\u0434\u0435\u043b\u044b \u043f\u043e \u0443\u043c\u043e\u043b\u0447\u0430\u043d\u0438\u044e</label>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px">';
+  for (var j = 0; j < allSections.length; j++) {
+    var sec = allSections[j];
+    var checked = existingSections.indexOf(sec) >= 0;
+    h += '<label style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:#0f172a;border:1px solid ' + (checked ? '#8B5CF6' : '#334155') + ';border-radius:6px;cursor:pointer;font-size:0.82rem">';
+    h += '<input type="checkbox" class="crSectionCheck" value="' + sec + '" ' + (checked ? 'checked' : '') + ' style="accent-color:#8B5CF6">';
+    h += (sl[sec] || sec) + '</label>';
+  }
+  h += '</div></div>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button>';
+  h += '<button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (r ? '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' : '\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div>';
+  h += '</form></div></div>';
+  var area = document.getElementById('companyRoleModalArea');
+  if (area) area.innerHTML = h;
+}
+
+async function saveCompanyRole(e, id) {
+  e.preventDefault();
+  var sectionChecks = document.querySelectorAll('.crSectionCheck');
+  var sections = [];
+  for (var i = 0; i < sectionChecks.length; i++) {
+    if (sectionChecks[i].checked) sections.push(sectionChecks[i].value);
+  }
+  var body = {
+    role_name: document.getElementById('crRoleName').value,
+    role_key: document.getElementById('crRoleKey').value,
+    description: document.getElementById('crRoleDesc').value,
+    color: document.getElementById('crRoleColor').value,
+    sort_order: parseInt(document.getElementById('crRoleOrder').value) || 0,
+    default_sections: sections
+  };
+  var res;
+  if (id) {
+    res = await api('/company-roles/' + id, { method: 'PUT', body: JSON.stringify(body) });
+  } else {
+    res = await api('/company-roles', { method: 'POST', body: JSON.stringify(body) });
+  }
+  if (!res || res.error) {
+    toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u0440\u043e\u043b\u0438', 'error');
+    return;
+  }
+  var rolesRes = await api('/company-roles');
+  data.companyRoles = (rolesRes && rolesRes.roles) || [];
+  toast(id ? '\u0420\u043e\u043b\u044c \u043e\u0431\u043d\u043e\u0432\u043b\u0435\u043d\u0430' : '\u0420\u043e\u043b\u044c \u0441\u043e\u0437\u0434\u0430\u043d\u0430');
+  render();
+}
+
+async function deleteCompanyRole(id, name) {
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0440\u043e\u043b\u044c "' + name + '"?')) return;
+  var res = await api('/company-roles/' + id, { method: 'DELETE' });
+  if (!res || res.error) { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0438\u044f', 'error'); return; }
+  var rolesRes = await api('/company-roles');
+  data.companyRoles = (rolesRes && rolesRes.roles) || [];
+  toast('\u0420\u043e\u043b\u044c \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
+  render();
 }
 
 // ===== SITE BLOCKS CONSTRUCTOR (emergent-style) =====
@@ -3389,6 +3526,7 @@ function render() {
     case 'analytics': pageHtml = renderLeadsAnalytics(); break;
     case 'employees': pageHtml = renderEmployees(); break;
     case 'permissions': pageHtml = renderPermissions(); break;
+    case 'company_roles': pageHtml = renderCompanyRoles(); break;
     case 'blocks': pageHtml = renderSiteBlocks(); break;
     case 'calculator': pageHtml = renderCalculator(); break;
     case 'pdf': pageHtml = renderPdfTemplate(); break;
