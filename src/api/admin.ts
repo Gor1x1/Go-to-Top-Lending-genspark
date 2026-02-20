@@ -8,6 +8,12 @@ import { initDatabase, ALL_ROLES, ALL_SECTIONS, ROLE_LABELS, SECTION_LABELS, DEF
 type Bindings = { DB: D1Database }
 const api = new Hono<{ Bindings: Bindings }>()
 
+// Global error handler - return JSON instead of "Internal Server Error"
+api.onError((err, c) => {
+  console.error('API Error:', err?.message, err?.stack);
+  return c.json({ error: 'Server error: ' + (err?.message || 'Unknown') }, 500);
+})
+
 // ===== AUTH MIDDLEWARE =====
 async function authMiddleware(c: any, next: () => Promise<void>) {
   const authHeader = c.req.header('Authorization');
@@ -25,30 +31,35 @@ async function authMiddleware(c: any, next: () => Promise<void>) {
 
 // ===== AUTH =====
 api.post('/login', async (c) => {
-  const { username, password } = await c.req.json();
-  const db = c.env.DB;
-  
-  // Init DB and default admin on first request
-  await initDatabase(db);
-  await initDefaultAdmin(db);
-  
-  const user = await db.prepare('SELECT * FROM users WHERE username = ?').bind(username).first();
-  if (!user) return c.json({ error: 'Invalid credentials' }, 401);
-  if (!user.is_active) return c.json({ error: 'Account deactivated' }, 401);
-  
-  const valid = await verifyPassword(password, user.password_hash as string);
-  if (!valid) return c.json({ error: 'Invalid credentials' }, 401);
-  
-  // Get user permissions
-  const permsRow = await db.prepare('SELECT sections_json FROM user_permissions WHERE user_id = ?').bind(user.id).first();
-  const userPerms = permsRow ? JSON.parse(permsRow.sections_json as string) : (DEFAULT_PERMISSIONS[user.role as string] || []);
-  
-  const token = await createToken(user.id as number, user.role as string);
-  return c.json({ 
-    token, 
-    user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name, permissions: userPerms },
-    rolesConfig: { roles: ALL_ROLES, sections: ALL_SECTIONS, role_labels: ROLE_LABELS, section_labels: SECTION_LABELS, default_permissions: DEFAULT_PERMISSIONS }
-  });
+  try {
+    const { username, password } = await c.req.json();
+    const db = c.env.DB;
+    
+    // Init DB and default admin on first request
+    try { await initDatabase(db); } catch(dbErr: any) { console.error('initDatabase error:', dbErr?.message || dbErr); }
+    try { await initDefaultAdmin(db); } catch(adminErr: any) { console.error('initDefaultAdmin error:', adminErr?.message || adminErr); }
+    
+    const user = await db.prepare('SELECT * FROM users WHERE username = ?').bind(username).first();
+    if (!user) return c.json({ error: 'Invalid credentials' }, 401);
+    if (!user.is_active) return c.json({ error: 'Account deactivated' }, 401);
+    
+    const valid = await verifyPassword(password, user.password_hash as string);
+    if (!valid) return c.json({ error: 'Invalid credentials' }, 401);
+    
+    // Get user permissions
+    const permsRow = await db.prepare('SELECT sections_json FROM user_permissions WHERE user_id = ?').bind(user.id).first();
+    const userPerms = permsRow ? JSON.parse(permsRow.sections_json as string) : (DEFAULT_PERMISSIONS[user.role as string] || []);
+    
+    const token = await createToken(user.id as number, user.role as string);
+    return c.json({ 
+      token, 
+      user: { id: user.id, username: user.username, role: user.role, display_name: user.display_name, permissions: userPerms },
+      rolesConfig: { roles: ALL_ROLES, sections: ALL_SECTIONS, role_labels: ROLE_LABELS, section_labels: SECTION_LABELS, default_permissions: DEFAULT_PERMISSIONS }
+    });
+  } catch(err: any) {
+    console.error('Login error:', err?.message || err, err?.stack);
+    return c.json({ error: 'Login failed: ' + (err?.message || 'Unknown error') }, 500);
+  }
 });
 
 api.post('/change-password', authMiddleware, async (c) => {

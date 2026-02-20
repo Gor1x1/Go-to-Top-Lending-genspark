@@ -363,7 +363,23 @@ CREATE INDEX IF NOT EXISTS idx_bonuses_user ON employee_bonuses(user_id);
 CREATE INDEX IF NOT EXISTS idx_snapshots_period ON period_snapshots(period_type, period_key);
 `;
 
+let dbInitialized = false;
+
 export async function initDatabase(db: D1Database): Promise<void> {
+  // Quick check: if already initialized in this worker instance, skip
+  if (dbInitialized) return;
+  
+  // Quick check: if key tables exist, mark as initialized and skip heavy init
+  try {
+    const check = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='period_snapshots'").first();
+    if (check) {
+      dbInitialized = true;
+      // Still run seeds in case they're missing
+      await runSeeds(db);
+      return;
+    }
+  } catch {}
+  
   const statements = SCHEMA.split(';').filter(s => s.trim());
   for (const stmt of statements) {
     await db.prepare(stmt + ';').run();
@@ -396,6 +412,12 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE users ADD COLUMN salary REAL DEFAULT 0").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN salary_type TEXT DEFAULT 'monthly'").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN position_title TEXT DEFAULT ''").run(); } catch {}
+  // Run seeds
+  await runSeeds(db);
+  dbInitialized = true;
+}
+
+async function runSeeds(db: D1Database): Promise<void> {
   // v8 Migrations: seed default expense categories
   try {
     const catCount = await db.prepare('SELECT COUNT(*) as cnt FROM expense_categories').first();

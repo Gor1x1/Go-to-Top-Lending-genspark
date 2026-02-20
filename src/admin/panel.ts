@@ -7,6 +7,7 @@ export function getAdminHTML(): string {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='6' fill='%238B5CF6'/><text x='16' y='22' font-size='18' font-weight='bold' fill='white' text-anchor='middle'>G</text></svg>">
 <title>Go to Top — Админ-панель</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
@@ -4152,9 +4153,17 @@ function render() {
 }
 
 // ===== INIT =====
+window.onerror = function(msg, url, line, col) { 
+  console.error('JS_ERROR:', msg, 'line:', line, 'col:', col);
+  try { toast('Ошибка: ' + msg, 'error'); } catch(e) {}
+};
+window.addEventListener('unhandledrejection', function(e) {
+  console.error('PROMISE_ERROR:', e.reason);
+  try { toast('Async ошибка: ' + (e.reason?.message || e.reason), 'error'); } catch(ex) {}
+});
 (async function() {
   if (token) {
-    try { await loadData(); } catch { token = ''; localStorage.removeItem('gtt_token'); }
+    try { await loadData(); } catch(err) { console.error('loadData error:', err); token = ''; localStorage.removeItem('gtt_token'); }
   }
   render();
 })();
