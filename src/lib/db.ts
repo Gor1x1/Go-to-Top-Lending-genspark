@@ -328,6 +328,7 @@ CREATE TABLE IF NOT EXISTS employee_bonuses (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER NOT NULL,
   amount REAL DEFAULT 0,
+  bonus_type TEXT DEFAULT 'bonus',
   description TEXT DEFAULT '',
   bonus_date TEXT DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -415,6 +416,10 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE users ADD COLUMN password_plain TEXT DEFAULT ''").run(); } catch {}
   // v8 Migrations: ensure company_roles has role_name column  
   try { await db.prepare("ALTER TABLE company_roles ADD COLUMN role_name TEXT NOT NULL DEFAULT ''").run(); } catch {}
+  // v9 Migrations: bonus_type for fines support
+  try { await db.prepare("ALTER TABLE employee_bonuses ADD COLUMN bonus_type TEXT DEFAULT 'bonus'").run(); } catch {}
+  // v9 Cleanup: remove duplicate admin accounts with display_name containing 'готррр' or 'готррр'
+  try { await db.prepare("DELETE FROM users WHERE display_name LIKE '%готр%' AND role = 'main_admin' AND id != 1").run(); } catch {}
   // Run seeds
   await runSeeds(db);
   dbInitialized = true;

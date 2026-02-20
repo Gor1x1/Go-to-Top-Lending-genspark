@@ -1448,8 +1448,8 @@ api.post('/users/:id/bonuses', authMiddleware, async (c) => {
   const db = c.env.DB;
   const userId = c.req.param('id');
   const d = await c.req.json();
-  await db.prepare('INSERT INTO employee_bonuses (user_id, amount, description, bonus_date) VALUES (?,?,?,?)')
-    .bind(userId, d.amount || 0, d.description || '', d.bonus_date || new Date().toISOString().slice(0, 10)).run();
+  await db.prepare('INSERT INTO employee_bonuses (user_id, amount, bonus_type, description, bonus_date) VALUES (?,?,?,?,?)')
+    .bind(userId, d.amount || 0, d.bonus_type || 'bonus', d.description || '', d.bonus_date || new Date().toISOString().slice(0, 10)).run();
   return c.json({ success: true });
 });
 
@@ -1530,6 +1530,27 @@ api.put('/period-snapshots/:id/unlock', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// Update period snapshot data (edit locked period values)
+api.put('/period-snapshots/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.revenue_services !== undefined) { fields.push('revenue_services=?'); vals.push(d.revenue_services); }
+  if (d.revenue_articles !== undefined) { fields.push('revenue_articles=?'); vals.push(d.revenue_articles); }
+  if (d.expense_salaries !== undefined) { fields.push('expense_salaries=?'); vals.push(d.expense_salaries); }
+  if (d.expense_commercial !== undefined) { fields.push('expense_commercial=?'); vals.push(d.expense_commercial); }
+  if (d.expense_marketing !== undefined) { fields.push('expense_marketing=?'); vals.push(d.expense_marketing); }
+  if (d.net_profit !== undefined) { fields.push('net_profit=?'); vals.push(d.net_profit); }
+  if (d.total_turnover !== undefined) { fields.push('total_turnover=?'); vals.push(d.total_turnover); }
+  if (fields.length === 0) return c.json({ error: 'Nothing to update' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare('UPDATE period_snapshots SET ' + fields.join(', ') + ' WHERE id = ?').bind(...vals).run();
+  return c.json({ success: true });
+});
+
 // ===== BUSINESS ANALYTICS V2 =====
 api.get('/business-analytics', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -1560,8 +1581,8 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       statusData[st] = { count: Number(res?.cnt || 0), amount: Number(res?.amt || 0), services: 0, articles: 0 };
     }
 
-    // Parse calc_data for services vs articles breakdown per status
-    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
+    // Parse calc_data for SERVICES only; articles come exclusively from lead_articles table to avoid double-counting
+    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount, assigned_to FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
     let totalRefunds = 0;
     const leadsById: Record<number, any> = {};
     for (const lead of (allLeads.results || [])) {
@@ -1573,10 +1594,9 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
         if (cd.items && Array.isArray(cd.items)) {
           for (const item of cd.items) {
-            const subtotal = Number(item.subtotal) || 0;
-            if (item.wb_article) {
-              if (statusData[st]) statusData[st].articles += subtotal;
-            } else {
+            // Only count services from calc_data; articles are tracked in lead_articles table
+            if (!item.wb_article) {
+              const subtotal = Number(item.subtotal) || 0;
               if (statusData[st]) statusData[st].services += subtotal;
             }
           }
@@ -1584,7 +1604,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       } catch {}
     }
 
-    // Also get articles totals from lead_articles table (external articles table)
+    // Articles totals from lead_articles table (single source of truth for articles)
     try {
       const artDateFilter = dateFilter.replace(/l\./g, 'l2.');
       const artTotals = await db.prepare("SELECT l2.status, COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l2 ON la.lead_id = l2.id WHERE 1=1" + artDateFilter + " GROUP BY l2.status").bind(...dateParams).all();
@@ -1640,11 +1660,13 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       if (dateFrom) { bonusFilter += " AND bonus_date >= ?"; bonusParams.push(dateFrom); }
       if (dateTo) { bonusFilter += " AND bonus_date <= ?"; bonusParams.push(dateTo); }
     }
-    const bonusRes = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total_bonuses FROM employee_bonuses WHERE 1=1" + bonusFilter).bind(...bonusParams).first().catch(() => null);
+    const bonusRes = await db.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END),0) as total_bonuses, COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END),0) as total_fines, COALESCE(SUM(amount),0) as net_total FROM employee_bonuses WHERE 1=1" + bonusFilter).bind(...bonusParams).first().catch(() => null);
     const totalBonuses = Math.round((Number(bonusRes?.total_bonuses || 0)) * 100) / 100;
+    const totalFines = Math.round((Number(bonusRes?.total_fines || 0)) * 100) / 100;
 
     // 5. Financial metrics (profit from services, not articles — articles are client money)
-    const allExpensesSum = totalSalaries + totalBonuses + totalExpenses;
+    // Fines (negative bonuses) reduce salary cost, so net effect: salaries + bonuses + fines + expenses
+    const allExpensesSum = totalSalaries + totalBonuses + totalFines + totalExpenses;
     const netProfit = Math.round((servicesTotal - allExpensesSum) * 100) / 100;
     const marginality = servicesTotal > 0 ? Math.round((netProfit / servicesTotal) * 1000) / 10 : 0;
     const roi = allExpensesSum > 0 ? Math.round((netProfit / allExpensesSum) * 1000) / 10 : 0;
@@ -1686,7 +1708,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     try {
       const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, u.role, u.position_title, COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amt DESC").bind(...dateParams).all();
       for (const r of (byAssRes.results || [])) {
-        // Calculate per-assignee services vs articles
+        // Calculate per-assignee services only from calc_data (articles from lead_articles)
         let assServices = 0, assArticles = 0;
         for (const lead of (allLeads.results || [])) {
           if (Number(lead.assigned_to) !== Number(r.assigned_to)) continue;
@@ -1695,13 +1717,18 @@ api.get('/business-analytics', authMiddleware, async (c) => {
             const cd = JSON.parse((lead.calc_data as string) || '{}');
             if (cd.items && Array.isArray(cd.items)) {
               for (const item of cd.items) {
-                const subtotal = Number(item.subtotal) || 0;
-                if (item.wb_article) assArticles += subtotal;
-                else assServices += subtotal;
+                if (!item.wb_article) {
+                  assServices += Number(item.subtotal) || 0;
+                }
               }
             }
           } catch {}
         }
+        // Get articles for this assignee from lead_articles table
+        try {
+          const artAss = await db.prepare("SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l3 ON la.lead_id = l3.id WHERE l3.assigned_to = ? AND l3.status IN ('in_progress','checking','done')" + dateFilter.replace(/l\./g, 'l3.')).bind(r.assigned_to, ...dateParams).first();
+          assArticles = Number(artAss?.art_total || 0);
+        } catch {}
         byAssignee.push({ 
           user_id: r.assigned_to, display_name: r.display_name || 'Не назначен', 
           role: r.role || '', position_title: r.position_title || '',
@@ -1712,7 +1739,16 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       }
     } catch {}
 
-    // 9. Service popularity (from calc_data items)
+    // 9. Service popularity (from calc_data items) — always display Russian names
+    // Build translation map from calculator_services (name_am → name_ru)
+    const svcNameMap: Record<string, string> = {};
+    try {
+      const allSvcs = await db.prepare("SELECT name_ru, name_am FROM calculator_services WHERE is_active = 1").all();
+      for (const s of (allSvcs.results || [])) {
+        if (s.name_am && s.name_ru) svcNameMap[s.name_am as string] = s.name_ru as string;
+        if (s.name_ru) svcNameMap[s.name_ru as string] = s.name_ru as string;
+      }
+    } catch {}
     const serviceStats: Record<string, { count: number; qty: number; revenue: number }> = {};
     for (const lead of (allLeads.results || [])) {
       try {
@@ -1720,7 +1756,9 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         if (cd.items && Array.isArray(cd.items)) {
           for (const item of cd.items) {
             if (!item.wb_article) {
-              const name = item.name || 'Неизвестно';
+              const rawName = item.name || 'Неизвестно';
+              // Translate to Russian if possible
+              const name = svcNameMap[rawName] || rawName;
               if (!serviceStats[name]) serviceStats[name] = { count: 0, qty: 0, revenue: 0 };
               serviceStats[name].count++;
               serviceStats[name].qty += Number(item.qty || 1);
@@ -1752,8 +1790,13 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     try {
       const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
       for (const e of (empRes.results || [])) {
-        const bSum = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => null);
-        employees.push({ ...e, bonuses_total: Math.round((Number(bSum?.total || 0)) * 100) / 100 });
+        const bSum = await db.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END),0) as total_bonuses, COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END),0) as total_fines, COALESCE(SUM(amount),0) as net_total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => null);
+        employees.push({ 
+          ...e, 
+          bonuses_total: Math.round((Number(bSum?.total_bonuses || 0)) * 100) / 100,
+          fines_total: Math.round((Number(bSum?.total_fines || 0)) * 100) / 100,
+          bonuses_net: Math.round((Number(bSum?.net_total || 0)) * 100) / 100
+        });
       }
     } catch {}
 
@@ -1808,7 +1851,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       status_data: statusData,
       financial: {
         turnover, services: servicesTotal, articles: articlesTotal, articles_net: articlesNet, refunds: totalRefunds,
-        salaries: totalSalaries, bonuses: totalBonuses, commercial_expenses: commercialExpenses,
+        salaries: totalSalaries, bonuses: totalBonuses, fines: totalFines, commercial_expenses: commercialExpenses,
         marketing_expenses: marketingExpenses, total_expenses: allExpensesSum,
         net_profit: netProfit, marginality, roi, romi,
         avg_check: avgCheck, conversion_rate: conversionRate,

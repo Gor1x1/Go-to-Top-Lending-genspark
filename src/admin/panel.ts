@@ -2279,6 +2279,8 @@ let analyticsData = null;
 let bizAnalyticsTab = 'overview';
 let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
+let addBonusType = 'bonus';
+let editingMonthKey = '';
 let showAddCategoryForm = false;
 let showAddFreqTypeForm = false;
 let expandedMonth = ''; // for month drill-down
@@ -2361,6 +2363,7 @@ function recalcFinancials(sd, fin) {
     net_profit: Number(fin.net_profit) || 0,
     salaries: Number(fin.salaries) || 0,
     bonuses: Number(fin.bonuses) || 0,
+    fines: Number(fin.fines) || 0,
     commercial_expenses: Number(fin.commercial_expenses) || 0,
     marketing_expenses: Number(fin.marketing_expenses) || 0,
     total_expenses: Number(fin.total_expenses) || 0,
@@ -2741,51 +2744,67 @@ function renderBizCostsV2(d, sd, fin) {
   // ---- SECTION: Salaries ----
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-users-cog" style="color:#3B82F6;margin-right:8px"></i>Зарплаты и бонусы</h3>';
-  var users = data.users || [];
+  // Use employees from analytics API (auto-pulled from Employees section)
   var employees = d.employees || [];
   var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', hourly: 'Почасовая', per_task: 'За работу' };
-  var totalSalary = 0; var totalBonus = 0;
-  for (var si3 = 0; si3 < users.length; si3++) {
-    var sal = Number(users[si3].salary) || 0;
-    var empMatch = employees.find(function(e) { return e.id === users[si3].id; });
-    totalSalary += sal; totalBonus += (empMatch ? empMatch.bonuses_total || 0 : 0);
+  var totalSalary = 0; var totalBonus = 0; var totalFines = 0; var totalNetPay = 0;
+  for (var si3 = 0; si3 < employees.length; si3++) {
+    var empSal = Number(employees[si3].salary) || 0;
+    var empBon = Number(employees[si3].bonuses_total) || 0;
+    var empFin = Number(employees[si3].fines_total) || 0;
+    totalSalary += empSal; totalBonus += empBon; totalFines += empFin;
+    totalNetPay += empSal + empBon + empFin;
   }
-  // Summary cards
-  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">';
-  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.8rem;color:#94a3b8">ФОТ (зарплаты)</div><div style="font-size:1.4rem;font-weight:700;color:#3B82F6">' + fmtAmt(totalSalary) + '</div></div>';
-  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.8rem;color:#94a3b8">Бонусы</div><div style="font-size:1.4rem;font-weight:700;color:#F59E0B">' + fmtAmt(totalBonus) + '</div></div>';
-  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.8rem;color:#94a3b8">ИТОГО ЗП</div><div style="font-size:1.4rem;font-weight:700;color:#EF4444">' + fmtAmt(totalSalary + totalBonus) + '</div></div>';
+  // Summary cards (4 indicators including new one)
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">ФОТ (зарплаты)</div><div style="font-size:1.3rem;font-weight:700;color:#3B82F6">' + fmtAmt(totalSalary) + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">Бонусы</div><div style="font-size:1.3rem;font-weight:700;color:#22C55E">' + fmtAmt(totalBonus) + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">Штрафы</div><div style="font-size:1.3rem;font-weight:700;color:#EF4444">' + fmtAmt(Math.abs(totalFines)) + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center;border:1px solid ' + (totalNetPay >= 0 ? '#8B5CF633' : '#EF444433') + '"><div style="font-size:0.75rem;color:#94a3b8">ИТОГО к выплате</div><div style="font-size:1.3rem;font-weight:700;color:' + (totalNetPay >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(totalNetPay) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:2px">ЗП + Бонусы \u2212 Штрафы</div></div>';
   h += '</div>';
-  // Employee salary table
-  if (users.length > 0) {
-    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:right;color:#94a3b8">Бонусы</th><th style="padding:10px;width:60px"></th></tr></thead><tbody>';
-    for (var ui = 0; ui < users.length; ui++) {
-      var u = users[ui]; var empU = employees.find(function(e) { return e.id === u.id; });
-      var uBonus = empU ? empU.bonuses_total || 0 : 0; var uSal = Number(u.salary) || 0;
-      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><div style="font-weight:600">' + escHtml(u.display_name||u.username) + '</div><div style="font-size:0.7rem;color:#64748b">' + escHtml(u.role) + '</div></td>';
-      h += '<td style="padding:10px"><input type="text" class="input" style="width:100%;padding:4px 8px;font-size:0.78rem" value="' + escHtml(u.position_title||'') + '" onchange="updateUserSalary(' + u.id + ',\\'position_title\\',this.value)" placeholder="Должность"></td>';
-      h += '<td style="padding:10px"><select class="input" style="padding:4px 8px;font-size:0.78rem" onchange="updateUserSalary(' + u.id + ',\\'salary_type\\',this.value)">';
-      var stypes = ['monthly', 'biweekly', 'hourly', 'per_task'];
-      for (var sti2 = 0; sti2 < stypes.length; sti2++) {
-        h += '<option value="' + stypes[sti2] + '"' + ((u.salary_type||'monthly') === stypes[sti2] ? ' selected' : '') + '>' + (salaryTypeLabels[stypes[sti2]]||stypes[sti2]) + '</option>';
-      }
-      h += '</select></td>';
-      h += '<td style="padding:10px;text-align:right"><input type="number" class="input" style="width:100px;padding:4px 8px;font-size:0.82rem;text-align:right" value="' + uSal + '" onchange="updateUserSalary(' + u.id + ',\\'salary\\',Number(this.value))"></td>';
-      h += '<td style="padding:10px;text-align:right;color:#a78bfa;font-weight:600">' + fmtAmt(uBonus) + '</td>';
-      h += '<td style="padding:10px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem" onclick="showAddBonusUserId=' + u.id + ';render()"><i class="fas fa-plus"></i></button></td></tr>';
-      // Bonus form
+  // Employee salary table — data auto-pulled from Employees
+  if (employees.length > 0) {
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип оплаты</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:right;color:#22C55E">Бонусы</th><th style="padding:10px;text-align:right;color:#EF4444">Штрафы</th><th style="padding:10px;text-align:right;color:#a78bfa">Итого</th><th style="padding:10px;width:90px"></th></tr></thead><tbody>';
+    for (var ui = 0; ui < employees.length; ui++) {
+      var u = employees[ui];
+      var uSal = Number(u.salary) || 0;
+      var uBonus = Number(u.bonuses_total) || 0;
+      var uFines = Number(u.fines_total) || 0;
+      var uNet = uSal + uBonus + uFines;
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><div style="font-weight:600">' + escHtml(u.display_name||u.username||'—') + '</div><div style="font-size:0.68rem;color:#64748b">' + escHtml(u.role||'') + '</div></td>';
+      h += '<td style="padding:10px;color:#94a3b8;font-size:0.8rem">' + escHtml(u.position_title||'\u2014') + '</td>';
+      h += '<td style="padding:10px;font-size:0.78rem;color:#64748b">' + (salaryTypeLabels[u.salary_type||'monthly']||(u.salary_type||'monthly')) + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:600;color:#3B82F6">' + fmtAmt(uSal) + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:600;color:#22C55E">' + (uBonus > 0 ? '+' + fmtAmt(uBonus) : '\u2014') + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:600;color:#EF4444">' + (uFines < 0 ? '\u2212' + fmtAmt(Math.abs(uFines)) : '\u2014') + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (uNet >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(uNet) + '</td>';
+      h += '<td style="padding:10px"><div style="display:flex;gap:4px">';
+      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#22C55E;border-color:#22C55E44" onclick="showAddBonusUserId=' + u.id + ';addBonusType=\\'bonus\\';render()" title="Добавить бонус"><i class="fas fa-plus"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#EF4444;border-color:#EF444444" onclick="showAddBonusUserId=' + u.id + ';addBonusType=\\'fine\\';render()" title="Добавить штраф"><i class="fas fa-minus"></i></button>';
+      h += '</div></td></tr>';
+      // Bonus/fine form
       if (showAddBonusUserId === u.id) {
-        h += '<tr><td colspan="6" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
-        h += '<input class="input" id="bonus-amount-' + u.id + '" type="number" placeholder="Сумма" style="width:120px;padding:6px 10px">';
-        h += '<input class="input" id="bonus-desc-' + u.id + '" placeholder="Описание" style="flex:1;padding:6px 10px;min-width:120px">';
+        var isFine = (typeof addBonusType !== 'undefined' && addBonusType === 'fine');
+        h += '<tr><td colspan="8" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+        h += '<span style="font-size:0.78rem;font-weight:600;color:' + (isFine ? '#EF4444' : '#22C55E') + '">' + (isFine ? '\u0428\u0442\u0440\u0430\u0444' : '\u0411\u043e\u043d\u0443\u0441') + ':</span>';
+        h += '<input class="input" id="bonus-amount-' + u.id + '" type="number" placeholder="Сумма" style="width:120px;padding:6px 10px" min="0">';
+        h += '<input class="input" id="bonus-desc-' + u.id + '" placeholder="' + (isFine ? 'Причина штрафа' : 'Описание бонуса') + '" style="flex:1;padding:6px 10px;min-width:120px">';
         h += '<input class="input" id="bonus-date-' + u.id + '" type="date" style="width:140px;padding:6px 10px">';
-        h += '<button class="btn btn-success" style="padding:6px 12px" onclick="saveBonus(' + u.id + ')"><i class="fas fa-check"></i></button>';
+        h += '<button class="btn ' + (isFine ? 'btn-outline' : 'btn-success') + '" style="padding:6px 12px;' + (isFine ? 'color:#EF4444;border-color:#EF4444' : '') + '" onclick="saveBonus(' + u.id + ',\\'' + (isFine ? 'fine' : 'bonus') + '\\')"><i class="fas fa-check"></i></button>';
         h += '<button class="btn btn-outline" style="padding:6px 12px" onclick="showAddBonusUserId=0;render()"><i class="fas fa-times"></i></button>';
         h += '</div></td></tr>';
       }
     }
+    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td colspan="2"></td>';
+    h += '<td style="padding:10px;text-align:right;color:#3B82F6">' + fmtAmt(totalSalary) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#22C55E">' + fmtAmt(totalBonus) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (totalFines < 0 ? '\u2212' + fmtAmt(Math.abs(totalFines)) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(totalNetPay) + '</td>';
+    h += '<td></td></tr>';
     h += '</tbody></table></div>';
+  } else {
+    h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-user-slash" style="margin-right:8px"></i>Нет сотрудников с установленной зарплатой. Добавьте через раздел «Сотрудники».</div>';
   }
   h += '</div>';
 
@@ -2859,33 +2878,6 @@ function renderBizFunnelV2(d, sd, fin) {
       h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(Number(rl2.total_amount)||0) + '</td>';
       h += '<td style="padding:8px;color:#e2e8f0;max-width:300px;overflow:hidden;text-overflow:ellipsis">' + escHtml(rl2.notes||'\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u0430') + '</td></tr>';
     }
-    h += '</tbody></table></div></div>';
-  }
-
-  // ---- SECTION: By assignee with services/articles breakdown ----
-  var byAssignee = d.by_assignee || [];
-  if (byAssignee.length > 0) {
-    h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-user-tie" style="color:#3B82F6;margin-right:8px"></i>\u041f\u043e \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u043c</h3>';
-    h += '<div style="font-size:0.68rem;color:#64748b;margin-bottom:12px">Цепочка ответственности: Оператор (принимает заявку) \u2192 Закупщик (выполняет выкуп). Один клиент может пройти через нескольких сотрудников.</div>';
-    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:center;color:#94a3b8">Лидов</th><th style="padding:10px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:10px;text-align:right;color:#8B5CF6">Услуги</th><th style="padding:10px;text-align:right;color:#F59E0B">Выкупы</th></tr></thead><tbody>';
-    var totalAssLds = 0, totalAssSvc = 0, totalAssArt = 0, totalAssAmt = 0;
-    for (var ai = 0; ai < byAssignee.length; ai++) {
-      var asg = byAssignee[ai];
-      var assName = escHtml(asg.display_name || '\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d');
-      var assPos = escHtml(asg.position_title || asg.role || '');
-      var assCnt = Number(asg.count)||0; var assAmt = Number(asg.amount)||0;
-      var assSvc = Number(asg.services)||0; var assArt = Number(asg.articles)||0;
-      totalAssLds += assCnt; totalAssAmt += assAmt; totalAssSvc += assSvc; totalAssArt += assArt;
-      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px;font-weight:600">' + assName + '</td>';
-      h += '<td style="padding:10px;color:#64748b;font-size:0.8rem">' + assPos + '</td>';
-      h += '<td style="padding:10px;text-align:center">' + assCnt + '</td>';
-      h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(assAmt) + '</td>';
-      h += '<td style="padding:10px;text-align:right;color:#8B5CF6;font-weight:600">' + fmtAmt(assSvc) + '</td>';
-      h += '<td style="padding:10px;text-align:right;color:#F59E0B;font-weight:600">' + fmtAmt(assArt) + '</td></tr>';
-    }
-    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td></td><td style="padding:10px;text-align:center">' + totalAssLds + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAssAmt) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(totalAssSvc) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(totalAssArt) + '</td></tr>';
     h += '</tbody></table></div></div>';
   }
 
@@ -2964,13 +2956,25 @@ function renderBizPeriodsV2(d, sd, fin) {
     var isPast = mi3 < currentMonth;
     var isFuture = mi3 > currentMonth;
     var isLocked = mSnap && mSnap.is_locked;
-    // Use snapshot data if locked, otherwise live data
+    var isEditing = editingMonthKey === mKey;
+    // Use snapshot data if locked, live fin data for current month, otherwise live leads data
     var mLeads = isLocked ? (mSnap.leads_count||0) : (mData ? Number(mData.count)||0 : 0);
     var mTurnover = isLocked ? (Number(mSnap.total_turnover)||0) : (mData ? Number(mData.amount)||0 : 0);
-    var mSvc = isLocked ? (Number(mSnap.revenue_services)||0) : 0;
-    var mArt = isLocked ? (Number(mSnap.revenue_articles)||0) : 0;
-    var mExp = isLocked ? ((Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0)) : 0;
-    var mProfit = isLocked ? (Number(mSnap.net_profit)||0) : 0;
+    var mSvc, mArt, mExp, mProfit;
+    if (isLocked) {
+      mSvc = Number(mSnap.revenue_services)||0;
+      mArt = Number(mSnap.revenue_articles)||0;
+      mExp = (Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0);
+      mProfit = Number(mSnap.net_profit)||0;
+    } else if (isCurrent) {
+      // Real-time data for current month from live analytics
+      mSvc = Number(fin.services)||0;
+      mArt = Number(fin.articles)||0;
+      mExp = Number(fin.total_expenses)||0;
+      mProfit = Number(fin.net_profit)||0;
+    } else {
+      mSvc = 0; mArt = 0; mExp = 0; mProfit = 0;
+    }
     yearTotals.leads += mLeads; yearTotals.turnover += mTurnover;
     yearTotals.services += mSvc; yearTotals.articles += mArt;
     yearTotals.expenses += mExp; yearTotals.profit += mProfit;
@@ -2984,10 +2988,10 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
     h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
     h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (mExp ? fmtAmt(mExp) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (mProfit ? fmtAmt(mProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (mProfit || isCurrent ? fmtAmt(mProfit) : '\u2014') + '</td>';
     h += '<td style="padding:10px;text-align:center">';
     if (isLocked) h += '<span style="color:#22C55E;font-size:0.72rem"><i class="fas fa-lock"></i> Закрыт</span>';
-    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.72rem"><i class="fas fa-spinner"></i> Текущий</span>';
+    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.72rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.55rem;margin-right:3px"></i>Текущий</span>';
     else if (isPast) h += '<span style="color:#F59E0B;font-size:0.72rem">Открыт</span>';
     else h += '<span style="color:#334155;font-size:0.72rem">\u2014</span>';
     h += '</td>';
@@ -2995,14 +2999,29 @@ function renderBizPeriodsV2(d, sd, fin) {
     if (isPast || isCurrent) {
       h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="expandedMonth=\\'' + mKey + '\\';analyticsData=null;loadAnalyticsData()" title="Развернуть"><i class="fas fa-expand"></i></button> ';
     }
-    if (isPast && !isLocked) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)"><i class="fas fa-lock"></i></button>';
+    if (isLocked) {
+      // Editable: click pencil to edit, unlock to reopen
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render()" title="Редактировать"><i class="fas fa-pencil-alt"></i></button> ';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.6rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')" title="Разблокировать"><i class="fas fa-unlock"></i></button>';
+    } else if (isPast) {
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)" title="Закрыть"><i class="fas fa-lock"></i></button>';
     } else if (isCurrent) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)"><i class="fas fa-save"></i></button>';
-    } else if (isLocked) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.6rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')"><i class="fas fa-unlock"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)" title="Сохранить снимок"><i class="fas fa-save"></i></button>';
     }
     h += '</td></tr>';
+    // Editable inline form for locked months
+    if (isEditing && isLocked) {
+      h += '<tr style="background:#0f172a"><td colspan="9" style="padding:12px 16px">';
+      h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + mSnap.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
+      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=\\'\\';render()">Отмена</button></div>';
+      h += '</td></tr>';
+    }
   }
   h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px 16px">ИТОГО ' + currentYear + '</td>';
   h += '<td style="padding:10px;text-align:right">' + yearTotals.leads + '</td>';
@@ -3215,17 +3234,43 @@ async function updateUserSalary(userId, field, value) {
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
-async function saveBonus(userId) {
+async function saveBonus(userId, bonusType) {
   var amount = Number(document.getElementById('bonus-amount-' + userId)?.value) || 0;
   var desc = document.getElementById('bonus-desc-' + userId)?.value || '';
   var bdate = document.getElementById('bonus-date-' + userId)?.value || '';
-  if (!amount) { toast('Введите сумму бонуса', 'error'); return; }
-  var res = await api('/users/' + userId + '/bonuses', 'POST', { amount: amount, description: desc, bonus_date: bdate });
-  if (res && res.success) { toast('Бонус добавлен'); showAddBonusUserId = 0; analyticsData = null; loadAnalyticsData(); }
+  if (!amount) { toast('Введите сумму', 'error'); return; }
+  // For fines, send negative amount
+  var actualAmount = bonusType === 'fine' ? -Math.abs(amount) : Math.abs(amount);
+  var res = await api('/users/' + userId + '/bonuses', 'POST', { amount: actualAmount, bonus_type: bonusType || 'bonus', description: desc, bonus_date: bdate });
+  if (res && res.success) { toast(bonusType === 'fine' ? 'Штраф добавлен' : 'Бонус добавлен'); showAddBonusUserId = 0; analyticsData = null; loadAnalyticsData(); }
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
 // ===== PERIOD ACTIONS =====
+async function saveEditedMonth(monthKey, snapshotId) {
+  var svc = Number(document.getElementById('edit-svc-' + monthKey)?.value) || 0;
+  var art = Number(document.getElementById('edit-art-' + monthKey)?.value) || 0;
+  var exp = Number(document.getElementById('edit-exp-' + monthKey)?.value) || 0;
+  var profit = svc - exp;
+  var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
+    revenue_services: svc,
+    revenue_articles: art,
+    expense_salaries: 0,
+    expense_commercial: exp,
+    expense_marketing: 0,
+    net_profit: profit,
+    total_turnover: svc + art
+  });
+  if (res && res.success) {
+    toast('Данные за ' + monthKey + ' обновлены');
+    editingMonthKey = '';
+    try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
+    render();
+  } else {
+    toast(res?.error || 'Ошибка сохранения', 'error');
+  }
+}
+
 async function closePeriodAction(periodType, periodKey, lock) {
   if (lock && !confirm('Закрыть период ' + periodKey + '?')) return;
   var d = analyticsData;
@@ -3239,7 +3284,7 @@ async function closePeriodAction(periodType, periodKey, lock) {
     revenue_articles: fin.articles || 0,
     total_turnover: fin.turnover || 0,
     refunds: fin.refunds || 0,
-    expense_salaries: (fin.salaries || 0) + (fin.bonuses || 0),
+    expense_salaries: (fin.salaries || 0) + (fin.bonuses || 0) + (fin.fines || 0),
     expense_commercial: fin.commercial_expenses || 0,
     expense_marketing: fin.marketing_expenses || 0,
     net_profit: fin.net_profit || 0,
