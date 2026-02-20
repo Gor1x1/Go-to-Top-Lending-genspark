@@ -57,13 +57,20 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [] };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [] };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
-async function api(path, opts = {}) {
+async function api(path, methodOrOpts, bodyData) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
+  var opts = {};
+  if (typeof methodOrOpts === 'string') {
+    opts = { method: methodOrOpts };
+    if (bodyData !== undefined) opts.body = JSON.stringify(bodyData);
+  } else if (methodOrOpts) {
+    opts = methodOrOpts;
+  }
   const res = await fetch(API + path, { ...opts, headers });
   if (res.status === 401) { token = ''; localStorage.removeItem('gtt_token'); render(); return null; }
   return res.json();
@@ -121,10 +128,10 @@ async function doLogin(e) {
 
 // ===== DATA LOADING =====
 async function loadData() {
-  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData, usersData, siteBlocksData, companyRolesData] = await Promise.all([
+  const [content, tabs, services, telegram, scripts, stats, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounterRes, settings, footerData, photoBlocksData, usersData, siteBlocksData, companyRolesData, expenseCategoriesData, expenseFreqTypesData, expensesData] = await Promise.all([
     api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/stats'), api('/referrals'), api('/section-order'),
     api('/leads?limit=200'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/settings'), api('/footer'), api('/photo-blocks'),
-    api('/users'), api('/site-blocks'), api('/company-roles')
+    api('/users'), api('/site-blocks'), api('/company-roles'), api('/expense-categories'), api('/expense-frequency-types'), api('/expenses')
   ]);
   data.content = content || [];
   data.calcTabs = tabs || [];
@@ -144,6 +151,11 @@ async function loadData() {
   data.users = usersData || [];
   data.siteBlocks = (siteBlocksData && siteBlocksData.blocks) || [];
   data.companyRoles = (companyRolesData && companyRolesData.roles) || [];
+  data.expenseCategories = (expenseCategoriesData && expenseCategoriesData.categories) || [];
+  data.expenseFreqTypes = (expenseFreqTypesData && expenseFreqTypesData.types) || [];
+  data.expenses = (expensesData && expensesData.expenses) || [];
+  // Load period snapshots
+  try { var snapshotsData = await api('/period-snapshots'); data.periodSnapshots = (snapshotsData && snapshotsData.snapshots) || []; } catch(e) { data.periodSnapshots = []; }
   // Preload articles for leads that have them
   var leadsWithArticles = ((data.leads && data.leads.leads) || []).filter(function(l) { return l.articles_count > 0; });
   if (leadsWithArticles.length > 0) {
@@ -156,7 +168,7 @@ async function loadData() {
 const pages = [
   { id: 'dashboard', icon: 'fa-tachometer-alt', label: 'Дашборд' },
   { id: 'leads', icon: 'fa-users', label: 'Лиды / CRM' },
-  { id: 'analytics', icon: 'fa-chart-bar', label: 'Аналитика лидов' },
+  { id: 'analytics', icon: 'fa-chart-line', label: 'Бизнес-аналитика' },
   { id: 'employees', icon: 'fa-user-friends', label: 'Сотрудники' },
   { id: 'permissions', icon: 'fa-shield-alt', label: 'Доступы' },
   { id: 'company_roles', icon: 'fa-user-tag', label: 'Роли компании' },
@@ -2258,245 +2270,841 @@ async function generateLeadKP(leadId) {
   }
 }
 
-// ===== LEADS ANALYTICS =====
+// ===== BUSINESS ANALYTICS =====
 let analyticsDateFrom = '';
 let analyticsDateTo = '';
 let analyticsData = null;
+let bizAnalyticsTab = 'overview';
+let showAddExpenseForm = false;
+let showAddBonusUserId = 0;
+let showAddCategoryForm = false;
+let showAddFreqTypeForm = false;
 
 async function loadAnalyticsData() {
   var params = '';
   if (analyticsDateFrom) params += '&from=' + analyticsDateFrom;
   if (analyticsDateTo) params += '&to=' + analyticsDateTo;
-  analyticsData = await api('/leads/analytics?' + params.replace(/^&/,''));
+  analyticsData = await api('/business-analytics?' + params.replace(/^&/,''));
   render();
 }
 
-function fmtAmt(n) { return n ? Number(n).toLocaleString('ru-RU') + '\\u00a0֏' : '0 ֏'; }
+function fmtAmt(n) { return n ? Number(n).toLocaleString('ru-RU') + '\\u00a0\\u058f' : '0 \\u058f'; }
+function fmtPct(n) { return (n || 0).toFixed(1) + '%'; }
 
 function renderLeadsAnalytics() {
   var d = analyticsData;
   if (!d) {
-    // Load on first render
     loadAnalyticsData();
-    return '<div style="padding:32px;text-align:center"><div class="spinner" style="width:40px;height:40px;margin:60px auto"></div><p style="color:#94a3b8;margin-top:16px">Загрузка аналитики...</p></div>';
+    return '<div style="padding:32px;text-align:center"><div class="spinner" style="width:40px;height:40px;margin:60px auto"></div><p style="color:#94a3b8;margin-top:16px">Загрузка бизнес-аналитики...</p></div>';
   }
   
-  var h = '<div style="padding:32px">';
-  // Header
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:10px"></i>Аналитика лидов</h1>' +
-    '<p style="color:#94a3b8;margin-top:4px">Детальный анализ заявок, конверсий и выручки</p></div>' +
-    '<button class="btn btn-outline" onclick="analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button></div>';
-  
-  // Date filter
-  h += '<div class="card" style="padding:16px;margin-bottom:24px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
-    '<i class="fas fa-calendar-alt" style="color:#8B5CF6"></i>' +
-    '<span style="font-size:0.85rem;color:#94a3b8;font-weight:600">Период:</span>' +
-    '<input type="date" class="input" style="width:160px;padding:6px 10px;font-size:0.82rem" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">' +
-    '<span style="color:#64748b">—</span>' +
-    '<input type="date" class="input" style="width:160px;padding:6px 10px;font-size:0.82rem" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">' +
-    '<div style="display:flex;gap:4px;margin-left:8px">' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'today\\')">Сегодня</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'week\\')">7 дней</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'month\\')">30 дней</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="setAnalyticsPeriod(\\'all\\')">Все</button>' +
-    '</div></div>';
-  
-  // ===== KPI CARDS =====
-  var bs = d.by_status || {};
-  var sa = d.status_amounts || {};
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">';
+  var sd = d.status_data || {};
+  var fin = d.financial || {};
+  var h = '<div style="padding:24px">';
 
-  // New
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05));border-color:rgba(16,185,129,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'new\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🟢 Новые лиды</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.new?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.new?.amount) + '</div></div>';
-  // Contacted
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(59,130,246,0.05));border-color:rgba(59,130,246,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'contacted\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">💬 На связи</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#3B82F6">' + (bs.contacted?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#60a5fa;margin-top:4px">' + fmtAmt(bs.contacted?.amount) + '</div></div>';
-  // In progress — with services/articles breakdown
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(245,158,11,0.15),rgba(245,158,11,0.05));border-color:rgba(245,158,11,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🔄 В работе</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#F59E0B">' + (bs.in_progress?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#fbbf24;margin-top:4px">' + fmtAmt(bs.in_progress?.amount) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.72rem;color:#94a3b8">Усл: <span style="color:#a78bfa">' + fmtAmt(sa.in_progress?.services) + '</span><br>Зак: <span style="color:#fb923c">' + fmtAmt(sa.in_progress?.articles) + '</span></div></div>';
-  // Rejected
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.05));border-color:rgba(239,68,68,0.3)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'rejected\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">❌ Отклонён</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#EF4444">' + (bs.rejected?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#f87171;margin-top:4px">' + fmtAmt(bs.rejected?.amount) + '</div></div>';
-  // Checking
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'checking\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">🔍 Проверка</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + (bs.checking?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#a78bfa;margin-top:4px">' + fmtAmt(bs.checking?.amount) + '</div></div>';
-  // Done — with services/articles breakdown (total cost = turnover)
-  h += '<div class="stat-card" style="padding:20px;cursor:pointer;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'done\\')">' +
-    '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">✅ Завершён</div>' +
-    '<div style="font-size:2rem;font-weight:900;color:#10B981">' + (bs.done?.count||0) + '</div>' +
-    '<div style="font-size:1.1rem;font-weight:700;color:#34d399;margin-top:4px">' + fmtAmt(bs.done?.amount) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.72rem;color:#94a3b8">Усл: <span style="color:#a78bfa">' + fmtAmt(sa.done?.services) + '</span><br>Зак: <span style="color:#fb923c">' + fmtAmt(sa.done?.articles) + '</span></div></div>';
-  h += '</div>';
-  
-  // ===== CONVERSION FUNNEL =====
-  var funnelTotal = d.total?.count || 1;
-  var funnelSteps = [
-    { label: 'Всего заявок', count: d.total?.count||0, color: '#8B5CF6', icon: '📥' },
-    { label: 'На связи', count: (bs.contacted?.count||0) + (bs.in_progress?.count||0) + (bs.checking?.count||0) + (bs.done?.count||0), color: '#3B82F6', icon: '💬' },
-    { label: 'В работе', count: (bs.in_progress?.count||0) + (bs.checking?.count||0) + (bs.done?.count||0), color: '#F59E0B', icon: '🔄' },
-    { label: 'Проверка', count: (bs.checking?.count||0) + (bs.done?.count||0), color: '#8B5CF6', icon: '🔍' },
-    { label: 'Завершены', count: bs.done?.count||0, color: '#10B981', icon: '✅' }
+  // ===== HEADER =====
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>' +
+    '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>' +
+    '<button class="btn btn-outline" onclick="analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button></div>';
+
+  // ===== DATE FILTER =====
+  h += '<div class="card" style="padding:14px;margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+    '<i class="fas fa-calendar-alt" style="color:#8B5CF6"></i>' +
+    '<span style="font-size:0.82rem;color:#94a3b8;font-weight:600">Период:</span>' +
+    '<input type="date" class="input" style="width:150px;padding:5px 8px;font-size:0.8rem" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">' +
+    '<span style="color:#64748b">—</span>' +
+    '<input type="date" class="input" style="width:150px;padding:5px 8px;font-size:0.8rem" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">' +
+    '<div style="display:flex;gap:4px;margin-left:4px">' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'today\\')">Сегодня</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'week\\')">7 дн</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'14d\\')">14 дн</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'month\\')">30 дн</button>' +
+      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'all\\')">Все</button>' +
+    '</div></div>';
+
+  // ===== TABS =====
+  var tabs = [
+    { id: 'overview', icon: 'fa-tachometer-alt', label: 'Обзор' },
+    { id: 'finance', icon: 'fa-coins', label: 'Финансы' },
+    { id: 'expenses', icon: 'fa-receipt', label: 'Затраты' },
+    { id: 'salaries', icon: 'fa-users-cog', label: 'Зарплаты' },
+    { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка' },
+    { id: 'periods', icon: 'fa-calendar-check', label: 'Периоды' },
+    { id: 'details', icon: 'fa-list-alt', label: 'Детали' },
   ];
-  h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка конверсии</h3>' +
-    '<div style="display:flex;gap:0;align-items:center">';
-  for (var fi = 0; fi < funnelSteps.length; fi++) {
-    var fs = funnelSteps[fi];
-    var fPct = funnelTotal > 0 ? Math.round((fs.count / funnelTotal) * 100) : 0;
-    var widthPct = Math.max(15, funnelTotal > 0 ? Math.round((fs.count / funnelTotal) * 100) : 15);
-    h += '<div style="flex:' + widthPct + ';text-align:center;padding:16px 8px;background:' + fs.color + '20;border-top:3px solid ' + fs.color + ';' + (fi === 0 ? 'border-radius:8px 0 0 8px;' : fi === funnelSteps.length-1 ? 'border-radius:0 8px 8px 0;' : '') + '">' +
-      '<div style="font-size:1.5rem">' + fs.icon + '</div>' +
-      '<div style="font-size:1.3rem;font-weight:900;color:' + fs.color + '">' + fs.count + '</div>' +
-      '<div style="font-size:0.72rem;color:#94a3b8;margin-top:2px">' + fs.label + '</div>' +
-      '<div style="font-size:0.7rem;font-weight:700;color:' + fs.color + '">' + fPct + '%</div>' +
-    '</div>';
-    if (fi < funnelSteps.length - 1) h += '<div style="font-size:1.2rem;color:#475569;padding:0 4px">→</div>';
+  h += '<div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;border-bottom:2px solid #1e293b;padding-bottom:0">';
+  for (var ti = 0; ti < tabs.length; ti++) {
+    var t = tabs[ti];
+    var isActive = bizAnalyticsTab === t.id;
+    h += '<button onclick="bizAnalyticsTab=\\'' + t.id + '\\';render()" style="padding:10px 16px;font-size:0.82rem;font-weight:600;border:none;cursor:pointer;' +
+      'background:' + (isActive ? '#8B5CF6' : 'transparent') + ';color:' + (isActive ? '#fff' : '#94a3b8') + ';border-radius:8px 8px 0 0;' +
+      'transition:all 0.2s"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
   }
-  h += '</div></div>';
-  
-  // ===== CONVERSION & AVG CHECK CARDS =====
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">' +
-    '<div class="card" style="text-align:center;padding:24px">' +
-      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-percentage" style="margin-right:6px"></i>Конверсия</div>' +
-      '<div style="font-size:2.5rem;font-weight:900;color:#8B5CF6">' + (d.conversion_rate||'0') + '%</div>' +
-      '<div style="font-size:0.75rem;color:#64748b;margin-top:4px">в завершённые сделки</div></div>' +
-    '<div class="card" style="text-align:center;padding:24px">' +
-      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-receipt" style="margin-right:6px"></i>Средний чек</div>' +
-      '<div style="font-size:2.2rem;font-weight:900;color:#10B981">' + fmtAmt(d.avg_check) + '</div>' +
-      '<div style="font-size:0.75rem;color:#64748b;margin-top:4px">по завершённым сделкам</div></div>' +
-    '<div class="card" style="text-align:center;padding:24px">' +
-      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-calendar-day" style="margin-right:6px"></i>Сегодня</div>' +
-      '<div style="font-size:2rem;font-weight:900;color:#F59E0B">' + (d.today?.count||0) + ' <span style="font-size:0.9rem;color:#94a3b8">заявок</span></div>' +
-      '<div style="font-size:1rem;font-weight:600;color:#fbbf24;margin-top:4px">' + fmtAmt(d.today?.amount) + '</div></div>' +
-    '<div class="card" style="text-align:center;padding:24px">' +
-      '<div style="font-size:0.85rem;color:#94a3b8;margin-bottom:8px"><i class="fas fa-ban" style="margin-right:6px"></i>Процент отказов</div>' +
-      '<div style="font-size:2.5rem;font-weight:900;color:#EF4444">' + ((d.total?.count||0) > 0 ? (((bs.rejected?.count||0) / (d.total?.count||1)) * 100).toFixed(1) : '0') + '%</div>' +
-      '<div style="font-size:0.75rem;color:#64748b;margin-top:4px">' + (bs.rejected?.count||0) + ' из ' + (d.total?.count||0) + '</div></div>' +
-  '</div>';
-  
-  // ===== DAILY CHART =====
+  h += '</div>';
+
+  // ===== STATUS CARDS (always shown) =====
+  var statuses = [
+    { key: 'new', label: '\\u{1F7E2} Новые лиды', color: '#10B981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)' },
+    { key: 'contacted', label: '\\u{1F4AC} На связи', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)' },
+    { key: 'in_progress', label: '\\u{1F504} В работе', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)' },
+    { key: 'rejected', label: '\\u274C Отклонён', color: '#EF4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)' },
+    { key: 'checking', label: '\\u{1F50D} Проверка', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' },
+    { key: 'done', label: '\\u2705 Завершён', color: '#10B981', bg: 'rgba(16,185,129,0.18)', border: 'rgba(16,185,129,0.4)' },
+  ];
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px">';
+  for (var si = 0; si < statuses.length; si++) {
+    var s = statuses[si];
+    var ss = sd[s.key] || {};
+    h += '<div class="stat-card" style="padding:16px;cursor:pointer;background:linear-gradient(135deg,' + s.bg + ',' + s.bg.replace('0.12','0.04').replace('0.18','0.06') + ');border-color:' + s.border + '" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + s.key + '\\')">' +
+      '<div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">' + s.label + '</div>' +
+      '<div style="font-size:1.8rem;font-weight:900;color:' + s.color + '">' + (ss.count||0) + '</div>' +
+      '<div style="font-size:0.95rem;font-weight:700;color:' + s.color + ';opacity:0.8;margin-top:2px">' + fmtAmt(ss.amount) + '</div>' +
+      '<div style="margin-top:4px;font-size:0.68rem;color:#94a3b8">' +
+        'Усл: <span style="color:#a78bfa">' + fmtAmt(ss.services) + '</span><br>' +
+        'Зак: <span style="color:#fb923c">' + fmtAmt(ss.articles) + '</span></div></div>';
+  }
+  h += '</div>';
+
+  // ===== TAB CONTENT =====
+  if (bizAnalyticsTab === 'overview') {
+    h += renderBizOverview(d, sd, fin);
+  } else if (bizAnalyticsTab === 'finance') {
+    h += renderBizFinance(d, sd, fin);
+  } else if (bizAnalyticsTab === 'expenses') {
+    h += renderBizExpenses(d);
+  } else if (bizAnalyticsTab === 'salaries') {
+    h += renderBizSalaries(d);
+  } else if (bizAnalyticsTab === 'funnel') {
+    h += renderBizFunnel(d, sd);
+  } else if (bizAnalyticsTab === 'periods') {
+    h += renderBizPeriods(d);
+  } else if (bizAnalyticsTab === 'details') {
+    h += renderBizDetails(d, sd);
+  }
+
+  h += '</div>';
+  return h;
+}
+
+// ===== OVERVIEW TAB =====
+function renderBizOverview(d, sd, fin) {
+  var h = '';
+  // Key metrics row
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">';
+  var metrics = [
+    { label: 'Оборот', value: fmtAmt(fin.turnover), icon: 'fa-money-bill-wave', color: '#10B981', desc: 'В работе + Проверка + Завершён' },
+    { label: 'Доход (услуги)', value: fmtAmt(fin.services), icon: 'fa-hand-holding-usd', color: '#8B5CF6', desc: 'Моя прибыль' },
+    { label: 'Выкупы (артикулы)', value: fmtAmt(fin.articles), icon: 'fa-shopping-cart', color: '#F59E0B', desc: 'Деньги клиентов' },
+    { label: 'Возвраты', value: fmtAmt(fin.refunds), icon: 'fa-undo-alt', color: '#EF4444', desc: 'Возвращено клиентам' },
+    { label: 'Чистая прибыль', value: fmtAmt(fin.net_profit), icon: 'fa-gem', color: fin.net_profit >= 0 ? '#10B981' : '#EF4444', desc: 'Доход - Все расходы' },
+    { label: 'Все расходы', value: fmtAmt(fin.total_expenses), icon: 'fa-file-invoice-dollar', color: '#F97316', desc: 'Зарплаты + Затраты' },
+  ];
+  for (var mi = 0; mi < metrics.length; mi++) {
+    var m = metrics[mi];
+    h += '<div class="card" style="padding:16px;text-align:center">' +
+      '<div style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px"><i class="fas ' + m.icon + '" style="margin-right:4px;color:' + m.color + '"></i>' + m.label + '</div>' +
+      '<div style="font-size:1.5rem;font-weight:900;color:' + m.color + '">' + m.value + '</div>' +
+      '<div style="font-size:0.65rem;color:#64748b;margin-top:2px">' + m.desc + '</div></div>';
+  }
+  h += '</div>';
+
+  // ROI / ROMI / Margins / Avg check / Conversion
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">';
+  var kpis = [
+    { label: 'Конверсия', value: fmtPct(fin.conversion_rate), color: '#8B5CF6' },
+    { label: 'Средний чек', value: fmtAmt(fin.avg_check), color: '#10B981' },
+    { label: 'Маржинальность', value: fmtPct(fin.marginality), color: fin.marginality >= 0 ? '#10B981' : '#EF4444' },
+    { label: 'ROI', value: fmtPct(fin.roi), color: fin.roi >= 0 ? '#10B981' : '#EF4444' },
+    { label: 'ROMI', value: fmtPct(fin.romi), color: fin.romi >= 0 ? '#10B981' : '#EF4444' },
+    { label: 'Среднее выполнение', value: (fin.avg_fulfillment_days || 0) + ' дн', color: '#3B82F6' },
+    { label: 'Break-even', value: fmtAmt(fin.break_even), color: '#F59E0B' },
+    { label: '% Отказов', value: (d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%', color: '#EF4444' },
+  ];
+  for (var ki = 0; ki < kpis.length; ki++) {
+    var kp = kpis[ki];
+    h += '<div class="card" style="padding:14px;text-align:center">' +
+      '<div style="font-size:0.7rem;color:#94a3b8;margin-bottom:4px">' + kp.label + '</div>' +
+      '<div style="font-size:1.4rem;font-weight:900;color:' + kp.color + '">' + kp.value + '</div></div>';
+  }
+  h += '</div>';
+
+  // Daily chart
   var daily = d.daily || [];
   if (daily.length > 0) {
     var maxVal = Math.max.apply(null, daily.map(function(x) { return x.count || 1; }));
-    h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-chart-area" style="color:#8B5CF6;margin-right:8px"></i>Заявки по дням (30 дней)</h3>' +
-      '<div style="display:flex;gap:4px;align-items:flex-end;height:140px;padding:0 4px">';
+    h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.95rem"><i class="fas fa-chart-area" style="color:#8B5CF6;margin-right:8px"></i>Заявки по дням (30 дней)</h3>' +
+      '<div style="display:flex;gap:3px;align-items:flex-end;height:120px;padding:0 4px">';
     for (var di = 0; di < daily.length; di++) {
       var dd = daily[di];
-      var barH = Math.max(8, Math.round((dd.count / maxVal) * 120));
-      var dayLabel = (dd.day||'').slice(5);
+      var barH = Math.max(6, Math.round((dd.count / maxVal) * 100));
       h += '<div style="flex:1;text-align:center;min-width:0">' +
-        '<div title="' + dd.day + ': ' + dd.count + ' заявок, ' + fmtAmt(dd.amount) + '" style="background:linear-gradient(to top,#8B5CF6,#a78bfa);height:' + barH + 'px;border-radius:4px 4px 0 0;margin:0 auto;cursor:pointer;max-width:40px;min-width:8px"></div>' +
-        '<div style="font-size:0.6rem;color:#64748b;margin-top:2px;overflow:hidden;text-overflow:ellipsis">' + dayLabel + '</div>' +
-        '<div style="font-size:0.65rem;font-weight:700;color:#e2e8f0">' + dd.count + '</div></div>';
+        '<div title="' + dd.day + ': ' + dd.count + ' заявок, ' + fmtAmt(dd.amount) + '" style="background:linear-gradient(to top,#8B5CF6,#a78bfa);height:' + barH + 'px;border-radius:3px 3px 0 0;margin:0 auto;cursor:pointer;max-width:36px;min-width:6px"></div>' +
+        '<div style="font-size:0.55rem;color:#64748b;margin-top:1px;overflow:hidden;text-overflow:ellipsis">' + (dd.day||'').slice(5) + '</div></div>';
     }
     h += '</div></div>';
   }
-  
-  // ===== SERVICES POPULARITY =====
+  return h;
+}
+
+// ===== FINANCE TAB =====
+function renderBizFinance(d, sd, fin) {
+  var h = '';
+  // Revenue breakdown by status
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-coins" style="color:#F59E0B;margin-right:8px"></i>Финансовый отчёт по статусам</h3>';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
+    '<th style="padding:10px;text-align:left;color:#94a3b8">Статус</th>' +
+    '<th style="padding:10px;text-align:right;color:#94a3b8">Лидов</th>' +
+    '<th style="padding:10px;text-align:right;color:#94a3b8">Общая сумма</th>' +
+    '<th style="padding:10px;text-align:right;color:#94a3b8">Услуги</th>' +
+    '<th style="padding:10px;text-align:right;color:#94a3b8">Артикулы</th>' +
+    '</tr></thead><tbody>';
+  var statusLabels = { new: 'Новые', contacted: 'На связи', in_progress: 'В работе', checking: 'Проверка', done: 'Завершён', rejected: 'Отклонён' };
+  var statusColors = { new: '#10B981', contacted: '#3B82F6', in_progress: '#F59E0B', checking: '#8B5CF6', done: '#10B981', rejected: '#EF4444' };
+  var totSvc = 0, totArt = 0, totAmt = 0, totCnt = 0;
+  var stOrder = ['in_progress', 'checking', 'done', 'new', 'contacted', 'rejected'];
+  for (var sti = 0; sti < stOrder.length; sti++) {
+    var stk = stOrder[sti];
+    var ss = sd[stk] || {};
+    var isActive = stk === 'in_progress' || stk === 'checking' || stk === 'done';
+    totSvc += Number(ss.services || 0); totArt += Number(ss.articles || 0); totAmt += Number(ss.amount || 0); totCnt += Number(ss.count || 0);
+    h += '<tr style="border-bottom:1px solid #1e293b;' + (isActive ? 'background:rgba(139,92,246,0.06)' : '') + '">' +
+      '<td style="padding:10px;font-weight:600;color:' + (statusColors[stk]||'#e2e8f0') + '">' + (statusLabels[stk]||stk) + (isActive ? ' <span style="font-size:0.65rem;color:#a78bfa">\\u{1F4B0}</span>' : '') + '</td>' +
+      '<td style="padding:10px;text-align:right;color:#e2e8f0">' + (ss.count||0) + '</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:700;color:#e2e8f0">' + fmtAmt(ss.amount) + '</td>' +
+      '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(ss.services) + '</td>' +
+      '<td style="padding:10px;text-align:right;color:#fb923c">' + fmtAmt(ss.articles) + '</td></tr>';
+  }
+  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px">ИТОГО</td>' +
+    '<td style="padding:10px;text-align:right;color:#e2e8f0">' + totCnt + '</td>' +
+    '<td style="padding:10px;text-align:right;color:#e2e8f0">' + fmtAmt(totAmt) + '</td>' +
+    '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(totSvc) + '</td>' +
+    '<td style="padding:10px;text-align:right;color:#fb923c">' + fmtAmt(totArt) + '</td></tr>';
+  h += '</tbody></table></div>';
+
+  // P&L Summary
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-balance-scale" style="color:#10B981;margin-right:8px"></i>Прибыли и убытки (P&L)</h3>';
+  h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+  var plRows = [
+    { label: 'Доход (услуги)', value: fin.services, color: '#10B981', bold: true },
+    { label: '  Зарплаты сотрудников', value: -(fin.salaries + fin.bonuses), color: '#EF4444' },
+    { label: '  Коммерческие затраты', value: -fin.commercial_expenses, color: '#EF4444' },
+    { label: '  Маркетинг / Реклама', value: -fin.marketing_expenses, color: '#EF4444' },
+    { label: 'ИТОГО расходов', value: -fin.total_expenses, color: '#F97316', bold: true },
+    { label: 'ЧИСТАЯ ПРИБЫЛЬ', value: fin.net_profit, color: fin.net_profit >= 0 ? '#10B981' : '#EF4444', bold: true, big: true },
+  ];
+  for (var pi = 0; pi < plRows.length; pi++) {
+    var pr = plRows[pi];
+    h += '<tr style="border-bottom:1px solid #1e293b' + (pr.big ? ';border-top:2px solid #8B5CF6' : '') + '">' +
+      '<td style="padding:10px;' + (pr.bold ? 'font-weight:800;' : 'color:#94a3b8;padding-left:20px;') + (pr.big ? 'font-size:1.1rem;' : '') + '">' + pr.label + '</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:' + (pr.bold ? '800' : '600') + ';color:' + pr.color + ';' + (pr.big ? 'font-size:1.2rem;' : '') + '">' + fmtAmt(Math.abs(pr.value || 0)) + (pr.value < 0 ? '' : '') + '</td></tr>';
+  }
+  h += '</table></div>';
+
+  // Refunds info
+  if (fin.refunds > 0) {
+    h += '<div class="card" style="margin-bottom:20px;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3)">' +
+      '<div style="display:flex;align-items:center;gap:12px;padding:4px">' +
+      '<i class="fas fa-exclamation-triangle" style="color:#EF4444;font-size:1.2rem"></i>' +
+      '<div><div style="font-weight:700;color:#f87171">Возвраты средств</div>' +
+      '<div style="font-size:0.82rem;color:#94a3b8">Общая сумма возвратов клиентам: <strong style="color:#EF4444">' + fmtAmt(fin.refunds) + '</strong> (снимается из стоимости артикулов)</div></div></div></div>';
+  }
+  return h;
+}
+
+// ===== EXPENSES TAB =====
+function renderBizExpenses(d) {
+  var h = '';
+  var cats = data.expenseCategories || [];
+  var freqs = data.expenseFreqTypes || [];
+  var exps = data.expenses || [];
+
+  // Categories management
+  h += '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-tags" style="color:#8B5CF6;margin-right:8px"></i>Категории затрат</h3>' +
+    '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="showAddCategoryForm=!showAddCategoryForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button></div>';
+  if (showAddCategoryForm) {
+    h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#0f172a;border-radius:8px">' +
+      '<input type="text" id="new-cat-name" class="input" style="flex:1;min-width:150px;padding:6px 10px;font-size:0.82rem" placeholder="Название категории">' +
+      '<input type="color" id="new-cat-color" value="#8B5CF6" style="width:40px;height:32px;border:none;cursor:pointer">' +
+      '<label style="font-size:0.78rem;color:#94a3b8;display:flex;align-items:center;gap:4px"><input type="checkbox" id="new-cat-marketing"> Маркетинг</label>' +
+      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveNewCategory()">Сохранить</button>' +
+      '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddCategoryForm=false;render()">Отмена</button></div>';
+  }
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  for (var ci = 0; ci < cats.length; ci++) {
+    var cat = cats[ci];
+    h += '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;background:' + (cat.color||'#8B5CF6') + '20;color:' + (cat.color||'#8B5CF6') + ';border:1px solid ' + (cat.color||'#8B5CF6') + '40">' +
+      '<span style="width:8px;height:8px;border-radius:50%;background:' + (cat.color||'#8B5CF6') + '"></span>' + escHtml(cat.name) +
+      (cat.is_marketing ? ' <i class="fas fa-bullhorn" style="font-size:0.65rem"></i>' : '') +
+      '<button onclick="deleteExpenseCategory(' + cat.id + ')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.7rem;padding:0 2px"><i class="fas fa-times"></i></button></span>';
+  }
+  h += '</div></div>';
+
+  // Frequency types
+  h += '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-clock" style="color:#3B82F6;margin-right:8px"></i>Типы периодичности</h3>' +
+    '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="showAddFreqTypeForm=!showAddFreqTypeForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button></div>';
+  if (showAddFreqTypeForm) {
+    h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#0f172a;border-radius:8px">' +
+      '<input type="text" id="new-freq-name" class="input" style="flex:1;min-width:150px;padding:6px 10px;font-size:0.82rem" placeholder="Название типа">' +
+      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveNewFreqType()">Сохранить</button>' +
+      '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddFreqTypeForm=false;render()">Отмена</button></div>';
+  }
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  for (var fi = 0; fi < freqs.length; fi++) {
+    var fr = freqs[fi];
+    h += '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3)">' + escHtml(fr.name) +
+      '<button onclick="deleteFreqType(' + fr.id + ')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.7rem;padding:0 2px"><i class="fas fa-times"></i></button></span>';
+  }
+  h += '</div></div>';
+
+  // Expenses list
+  h += '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-receipt" style="color:#F59E0B;margin-right:8px"></i>Коммерческие затраты</h3>' +
+    '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.8rem" onclick="showAddExpenseForm=!showAddExpenseForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить затрату</button></div>';
+  if (showAddExpenseForm) {
+    h += '<div style="padding:16px;background:#0f172a;border-radius:8px;margin-bottom:16px">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Название</label>' +
+        '<input type="text" id="new-exp-name" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem" placeholder="Напр: Google Ads"></div>' +
+        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма (\\u058f)</label>' +
+        '<input type="number" id="new-exp-amount" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem" placeholder="0"></div>' +
+        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Категория</label>' +
+        '<select id="new-exp-category" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem"><option value="">— Без категории —</option>';
+    for (var cci = 0; cci < cats.length; cci++) { h += '<option value="' + cats[cci].id + '">' + escHtml(cats[cci].name) + '</option>'; }
+    h += '</select></div>' +
+        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Периодичность</label>' +
+        '<select id="new-exp-freq" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem"><option value="">— Тип —</option>';
+    for (var ffi = 0; ffi < freqs.length; ffi++) { h += '<option value="' + freqs[ffi].id + '">' + escHtml(freqs[ffi].name) + '</option>'; }
+    h += '</select></div></div>' +
+      '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Заметка</label>' +
+      '<input type="text" id="new-exp-notes" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem" placeholder="Комментарий (опционально)"></div>' +
+      '<div style="display:flex;gap:8px;margin-top:12px">' +
+        '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="saveNewExpense()">Сохранить</button>' +
+        '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem" onclick="showAddExpenseForm=false;render()">Отмена</button></div></div>';
+  }
+  // Table
+  if (exps.length > 0) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Название</th>' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Категория</th>' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Тип</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">Действия</th>' +
+      '</tr></thead><tbody>';
+    var totalExp = 0;
+    for (var ei = 0; ei < exps.length; ei++) {
+      var ex = exps[ei];
+      totalExp += Number(ex.amount || 0);
+      h += '<tr style="border-bottom:1px solid #1e293b">' +
+        '<td style="padding:8px;font-weight:600;color:#e2e8f0">' + escHtml(ex.name) + (ex.notes ? '<div style="font-size:0.7rem;color:#64748b">' + escHtml(ex.notes) + '</div>' : '') + '</td>' +
+        '<td style="padding:8px"><span style="padding:3px 8px;border-radius:12px;font-size:0.72rem;background:' + (ex.category_color||'#64748b') + '20;color:' + (ex.category_color||'#94a3b8') + '">' + escHtml(ex.category_name||'—') + '</span></td>' +
+        '<td style="padding:8px;color:#94a3b8;font-size:0.78rem">' + escHtml(ex.frequency_name||'—') + '</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:700;color:#f87171">' + fmtAmt(ex.amount) + '</td>' +
+        '<td style="padding:8px;text-align:center"><button onclick="deleteExpense(' + ex.id + ')" class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem;color:#f87171"><i class="fas fa-trash"></i></button></td></tr>';
+    }
+    h += '<tr style="border-top:2px solid #8B5CF6"><td colspan="3" style="padding:10px;font-weight:800">ИТОГО</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:900;color:#f87171;font-size:1rem">' + fmtAmt(totalExp) + '</td><td></td></tr>';
+    h += '</tbody></table>';
+  } else {
+    h += '<p style="color:#64748b;text-align:center;padding:20px">Нет затрат. Нажмите "Добавить затрату" для создания.</p>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ===== SALARIES TAB =====
+function renderBizSalaries(d) {
+  var h = '';
+  var users = data.users || [];
+  var employees = d.employees || [];
+
+  h += '<div class="card" style="margin-bottom:16px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-users-cog" style="color:#10B981;margin-right:8px"></i>Зарплаты сотрудников</h3>';
+  var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', hourly: 'Почасовая', per_task: 'За работу' };
+  if (users.length > 0) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Сотрудник</th>' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Должность</th>' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Тип оплаты</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Зарплата</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Бонусы</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">Действия</th>' +
+      '</tr></thead><tbody>';
+    var totalSal = 0, totalBon = 0;
+    for (var ui = 0; ui < users.length; ui++) {
+      var u = users[ui];
+      var emp = employees.find(function(e) { return e.id === u.id; });
+      var bonusTotal = emp ? emp.bonuses_total || 0 : 0;
+      var sal = Number(u.salary) || 0;
+      totalSal += sal; totalBon += bonusTotal;
+      h += '<tr style="border-bottom:1px solid #1e293b">' +
+        '<td style="padding:8px"><div style="font-weight:600;color:#e2e8f0">' + escHtml(u.display_name||u.username) + '</div>' +
+          '<div style="font-size:0.7rem;color:#64748b">' + escHtml(u.role) + '</div></td>' +
+        '<td style="padding:8px"><input type="text" class="input" style="width:100%;padding:4px 8px;font-size:0.78rem" value="' + escHtml(u.position_title||'') + '" onchange="updateUserSalary(' + u.id + ',\\'position_title\\',this.value)" placeholder="Должность"></td>' +
+        '<td style="padding:8px"><select class="input" style="padding:4px 8px;font-size:0.78rem" onchange="updateUserSalary(' + u.id + ',\\'salary_type\\',this.value)">';
+      var stypes = ['monthly', 'biweekly', 'hourly', 'per_task'];
+      for (var sti2 = 0; sti2 < stypes.length; sti2++) {
+        h += '<option value="' + stypes[sti2] + '"' + ((u.salary_type||'monthly') === stypes[sti2] ? ' selected' : '') + '>' + salaryTypeLabels[stypes[sti2]] + '</option>';
+      }
+      h += '</select></td>' +
+        '<td style="padding:8px;text-align:right"><input type="number" class="input" style="width:100px;padding:4px 8px;font-size:0.82rem;text-align:right" value="' + sal + '" onchange="updateUserSalary(' + u.id + ',\\'salary\\',Number(this.value))"></td>' +
+        '<td style="padding:8px;text-align:right;color:#a78bfa;font-weight:600">' + fmtAmt(bonusTotal) + '</td>' +
+        '<td style="padding:8px;text-align:center"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem" onclick="showAddBonusUserId=' + u.id + ';render()"><i class="fas fa-plus"></i> Бонус</button></td></tr>';
+      // Bonus add form
+      if (showAddBonusUserId === u.id) {
+        h += '<tr style="background:#0f172a"><td colspan="6" style="padding:12px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
+          '<span style="font-size:0.78rem;color:#94a3b8">Бонус для ' + escHtml(u.display_name||u.username) + ':</span>' +
+          '<input type="number" id="bonus-amount-' + u.id + '" class="input" style="width:100px;padding:4px 8px;font-size:0.82rem" placeholder="Сумма">' +
+          '<input type="text" id="bonus-desc-' + u.id + '" class="input" style="flex:1;min-width:150px;padding:4px 8px;font-size:0.82rem" placeholder="Описание">' +
+          '<input type="date" id="bonus-date-' + u.id + '" class="input" style="padding:4px 8px;font-size:0.82rem" value="' + new Date().toISOString().slice(0,10) + '">' +
+          '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveBonus(' + u.id + ')">Добавить</button>' +
+          '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddBonusUserId=0;render()">Отмена</button>' +
+          '</div></td></tr>';
+      }
+    }
+    h += '<tr style="border-top:2px solid #8B5CF6"><td colspan="3" style="padding:10px;font-weight:800">ИТОГО</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:900;color:#f87171;font-size:1rem">' + fmtAmt(totalSal) + '</td>' +
+      '<td style="padding:10px;text-align:right;font-weight:900;color:#a78bfa">' + fmtAmt(totalBon) + '</td><td></td></tr>';
+    h += '</tbody></table>';
+  } else {
+    h += '<p style="color:#64748b;text-align:center;padding:20px">Нет сотрудников. Добавьте в разделе "Сотрудники".</p>';
+  }
+  h += '</div>';
+  return h;
+}
+
+// ===== FUNNEL TAB =====
+function renderBizFunnel(d, sd) {
+  var h = '';
+  var totalLeads = d.total_leads || 1;
+  var funnelSteps = [
+    { label: 'Всего заявок', count: d.total_leads||0, color: '#8B5CF6', icon: '\\u{1F4E5}' },
+    { label: 'На связи+', count: (sd.contacted?.count||0) + (sd.in_progress?.count||0) + (sd.checking?.count||0) + (sd.done?.count||0), color: '#3B82F6', icon: '\\u{1F4AC}' },
+    { label: 'В работе+', count: (sd.in_progress?.count||0) + (sd.checking?.count||0) + (sd.done?.count||0), color: '#F59E0B', icon: '\\u{1F504}' },
+    { label: 'Проверка+', count: (sd.checking?.count||0) + (sd.done?.count||0), color: '#8B5CF6', icon: '\\u{1F50D}' },
+    { label: 'Завершены', count: sd.done?.count||0, color: '#10B981', icon: '\\u2705' }
+  ];
+  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка конверсии</h3>';
+  h += '<div style="display:flex;gap:0;align-items:center">';
+  for (var fi = 0; fi < funnelSteps.length; fi++) {
+    var fs = funnelSteps[fi];
+    var fPct = totalLeads > 0 ? Math.round((fs.count / totalLeads) * 100) : 0;
+    var widthPct = Math.max(15, fPct);
+    h += '<div style="flex:' + widthPct + ';text-align:center;padding:14px 6px;background:' + fs.color + '20;border-top:3px solid ' + fs.color + ';' + (fi === 0 ? 'border-radius:8px 0 0 8px;' : fi === funnelSteps.length-1 ? 'border-radius:0 8px 8px 0;' : '') + '">' +
+      '<div style="font-size:1.3rem">' + fs.icon + '</div>' +
+      '<div style="font-size:1.2rem;font-weight:900;color:' + fs.color + '">' + fs.count + '</div>' +
+      '<div style="font-size:0.68rem;color:#94a3b8;margin-top:2px">' + fs.label + '</div>' +
+      '<div style="font-size:0.65rem;font-weight:700;color:' + fs.color + '">' + fPct + '%</div></div>';
+    if (fi < funnelSteps.length - 1) {
+      var dropoff = fi > 0 ? funnelSteps[fi].count - funnelSteps[fi+1].count : 0;
+      h += '<div style="font-size:1rem;color:#475569;padding:0 2px">\\u2192' + (dropoff > 0 ? '<div style="font-size:0.6rem;color:#EF4444">-' + dropoff + '</div>' : '') + '</div>';
+    }
+  }
+  h += '</div></div>';
+
+  // Conversion metrics
+  var fin = d.financial || {};
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
+  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>Конверсия в завершённые</div>' +
+    '<div style="font-size:2.2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div></div>';
+  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>Процент отказов</div>' +
+    '<div style="font-size:2.2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%</div></div>';
+  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>Время выполнения</div>' +
+    '<div style="font-size:2.2rem;font-weight:900;color:#3B82F6">' + (fin.avg_fulfillment_days||0) + ' <span style="font-size:0.9rem">дн</span></div></div>';
+  h += '</div>';
+  return h;
+}
+
+// ===== DETAILS TAB =====
+function renderBizDetails(d, sd) {
+  var h = '';
+  // Services popularity
   var services = d.services || [];
   if (services.length > 0) {
-    h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:16px;font-size:1rem"><i class="fas fa-star" style="color:#F59E0B;margin-right:8px"></i>Популярность услуг</h3>';
-    h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">' +
-      '<thead><tr style="border-bottom:2px solid #334155">' +
-        '<th style="padding:10px 12px;text-align:left;color:#94a3b8;font-size:0.78rem">#</th>' +
-        '<th style="padding:10px 12px;text-align:left;color:#94a3b8;font-size:0.78rem">Услуга</th>' +
-        '<th style="padding:10px 12px;text-align:center;color:#94a3b8;font-size:0.78rem">Заказов</th>' +
-        '<th style="padding:10px 12px;text-align:center;color:#94a3b8;font-size:0.78rem">Кол-во ед.</th>' +
-        '<th style="padding:10px 12px;text-align:right;color:#94a3b8;font-size:0.78rem">Выручка</th>' +
-        '<th style="padding:10px 12px;text-align:right;color:#94a3b8;font-size:0.78rem">% от общей</th>' +
-      '</tr></thead><tbody>';
-    var totalServiceRev = services.reduce(function(a, s) { return a + (s.revenue||0); }, 0);
-    for (var si = 0; si < services.length; si++) {
-      var sv = services[si];
-      var pct = totalServiceRev > 0 ? ((sv.revenue / totalServiceRev) * 100).toFixed(1) : '0';
-      var barW = totalServiceRev > 0 ? Math.round((sv.revenue / totalServiceRev) * 100) : 0;
-      h += '<tr style="border-bottom:1px solid #1e293b">' +
-        '<td style="padding:10px 12px;color:#64748b;font-weight:700">' + (si+1) + '</td>' +
-        '<td style="padding:10px 12px;font-weight:600;color:#e2e8f0">' + escHtml(sv.name) + '</td>' +
-        '<td style="padding:10px 12px;text-align:center;color:#94a3b8">' + sv.count + '</td>' +
-        '<td style="padding:10px 12px;text-align:center;color:#94a3b8">' + sv.qty + '</td>' +
-        '<td style="padding:10px 12px;text-align:right;font-weight:700;color:#a78bfa;white-space:nowrap">' + fmtAmt(sv.revenue) + '</td>' +
-        '<td style="padding:10px 12px;text-align:right"><div style="display:flex;align-items:center;gap:8px;justify-content:flex-end"><div style="width:80px;height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.8rem;font-weight:600;color:#e2e8f0;min-width:40px;text-align:right">' + pct + '%</span></div></td>' +
-      '</tr>';
+    h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.95rem"><i class="fas fa-star" style="color:#F59E0B;margin-right:8px"></i>Популярность услуг</h3>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">#</th><th style="padding:8px;text-align:left;color:#94a3b8">Услуга</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">Заказов</th><th style="padding:8px;text-align:center;color:#94a3b8">Кол-во</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Выручка</th><th style="padding:8px;text-align:right;color:#94a3b8">%</th></tr></thead><tbody>';
+    var totalSvcRev = services.reduce(function(a, s) { return a + (s.revenue||0); }, 0);
+    for (var sii = 0; sii < services.length; sii++) {
+      var sv = services[sii];
+      var pct = totalSvcRev > 0 ? ((sv.revenue / totalSvcRev) * 100).toFixed(1) : '0';
+      var barW = totalSvcRev > 0 ? Math.round((sv.revenue / totalSvcRev) * 100) : 0;
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px;color:#64748b">' + (sii+1) + '</td>' +
+        '<td style="padding:8px;font-weight:600;color:#e2e8f0">' + escHtml(sv.name) + '</td>' +
+        '<td style="padding:8px;text-align:center;color:#94a3b8">' + sv.count + '</td>' +
+        '<td style="padding:8px;text-align:center;color:#94a3b8">' + sv.qty + '</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(sv.revenue) + '</td>' +
+        '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600;color:#e2e8f0">' + pct + '%</span></div></td></tr>';
     }
-    h += '</tbody></table></div></div>';
+    h += '</tbody></table></div>';
   }
-  
-  // ===== BY SOURCE & BY ASSIGNEE =====
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">';
-  // By source
+
+  // By source & By assignee
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">';
   var bSrc = d.by_source || {};
   var srcKeys = Object.keys(bSrc);
-  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:1rem"><i class="fas fa-broadcast-tower" style="color:#3B82F6;margin-right:8px"></i>По источнику</h3>';
+  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.9rem"><i class="fas fa-broadcast-tower" style="color:#3B82F6;margin-right:8px"></i>По источнику</h3>';
   if (srcKeys.length > 0) {
-    var srcLabels = { form: 'Форма на сайте', popup: 'Попап', calculator_pdf: 'Калькулятор / PDF' };
+    var srcLabels = { form: 'Форма на сайте', popup: 'Попап', calculator_pdf: 'Калькулятор / PDF', manual: 'Вручную' };
     for (var ski = 0; ski < srcKeys.length; ski++) {
       var sk = srcKeys[ski];
       var sv2 = bSrc[sk];
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e293b">' +
-        '<div><div style="font-weight:600;font-size:0.88rem">' + escHtml(srcLabels[sk]||sk) + '</div>' +
-        '<div style="font-size:0.78rem;color:#94a3b8">' + (sv2.count||0) + ' заявок</div></div>' +
-        '<div style="text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(sv2.amount) + '</div></div>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
+        '<div><div style="font-weight:600;font-size:0.85rem">' + escHtml(srcLabels[sk]||sk) + '</div><div style="font-size:0.72rem;color:#94a3b8">' + (sv2.count||0) + ' заявок</div></div>' +
+        '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(sv2.amount) + '</div></div>';
     }
-  } else { h += '<p style="color:#64748b;font-size:0.85rem">Нет данных</p>'; }
+  } else { h += '<p style="color:#64748b;font-size:0.82rem">Нет данных</p>'; }
   h += '</div>';
-  // By assignee
+
   var assigns = d.by_assignee || [];
-  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:1rem"><i class="fas fa-user-tie" style="color:#10B981;margin-right:8px"></i>По ответственному</h3>';
+  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.9rem"><i class="fas fa-user-tie" style="color:#10B981;margin-right:8px"></i>Топ сотрудников</h3>';
   if (assigns.length > 0) {
     for (var ai2 = 0; ai2 < assigns.length; ai2++) {
       var as = assigns[ai2];
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid #1e293b">' +
-        '<div><div style="font-weight:600;font-size:0.88rem">' + escHtml(as.name) + '</div>' +
-        '<div style="font-size:0.78rem;color:#94a3b8">' + as.count + ' заявок</div></div>' +
-        '<div style="text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(as.amount) + '</div></div>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
+        '<div><div style="font-weight:600;font-size:0.85rem">' + escHtml(as.name) + '</div><div style="font-size:0.72rem;color:#94a3b8">' + as.count + ' заявок</div></div>' +
+        '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(as.amount) + '</div></div>';
     }
-  } else { h += '<p style="color:#64748b;font-size:0.85rem">Нет данных</p>'; }
+  } else { h += '<p style="color:#64748b;font-size:0.82rem">Нет данных</p>'; }
   h += '</div></div>';
-  
-  // ===== REFERRAL PERFORMANCE =====
+
+  // Referrals
   var refs = d.referrals || [];
   if (refs.length > 0) {
-    h += '<div class="card" style="margin-bottom:24px"><h3 style="font-weight:700;margin-bottom:12px;font-size:1rem"><i class="fas fa-gift" style="color:#F59E0B;margin-right:8px"></i>Реферальные коды</h3>';
+    h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.9rem"><i class="fas fa-gift" style="color:#F59E0B;margin-right:8px"></i>Реферальные коды</h3>';
     for (var ri = 0; ri < refs.length; ri++) {
       var rf = refs[ri];
       h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
-        '<div style="display:flex;align-items:center;gap:8px"><span class="badge badge-amber" style="font-family:monospace">' + escHtml(rf.referral_code) + '</span><span style="font-size:0.82rem;color:#94a3b8">' + rf.count + ' заявок</span></div>' +
+        '<div style="display:flex;align-items:center;gap:8px"><span class="badge badge-amber" style="font-family:monospace">' + escHtml(rf.referral_code) + '</span><span style="font-size:0.78rem;color:#94a3b8">' + rf.count + ' заявок</span></div>' +
         '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(rf.amount) + '</div></div>';
     }
     h += '</div>';
   }
-  
-  // ===== TIME PERIOD CARDS =====
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:24px">' +
-    '<div class="card" style="text-align:center;padding:20px">' +
-      '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">Сегодня</div>' +
-      '<div style="font-size:1.8rem;font-weight:900;color:#F59E0B">' + (d.today?.count||0) + '</div>' +
-      '<div style="font-size:0.9rem;color:#fbbf24;margin-top:2px">' + fmtAmt(d.today?.amount) + '</div></div>' +
-    '<div class="card" style="text-align:center;padding:20px">' +
-      '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">7 дней</div>' +
-      '<div style="font-size:1.8rem;font-weight:900;color:#3B82F6">' + (d.week?.count||0) + '</div>' +
-      '<div style="font-size:0.9rem;color:#60a5fa;margin-top:2px">' + fmtAmt(d.week?.amount) + '</div></div>' +
-    '<div class="card" style="text-align:center;padding:20px">' +
-      '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">30 дней</div>' +
-      '<div style="font-size:1.8rem;font-weight:900;color:#10B981">' + (d.month?.count||0) + '</div>' +
-      '<div style="font-size:0.9rem;color:#34d399;margin-top:2px">' + fmtAmt(d.month?.amount) + '</div></div>' +
-  '</div>';
-  
-  h += '</div>';
   return h;
+}
+
+// ===== ANALYTICS HELPER FUNCTIONS =====
+async function saveNewCategory() {
+  var name = document.getElementById('new-cat-name')?.value;
+  var color = document.getElementById('new-cat-color')?.value || '#8B5CF6';
+  var isMkt = document.getElementById('new-cat-marketing')?.checked || false;
+  if (!name) { toast('Введите название', 'error'); return; }
+  var res = await api('/expense-categories', 'POST', { name: name, color: color, is_marketing: isMkt });
+  if (res && res.success) { toast('Категория создана'); showAddCategoryForm = false; var r = await api('/expense-categories'); data.expenseCategories = (r&&r.categories)||[]; analyticsData = null; loadAnalyticsData(); }
+  else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function deleteExpenseCategory(id) {
+  if (!confirm('Удалить категорию?')) return;
+  await api('/expense-categories/' + id, 'DELETE');
+  var r = await api('/expense-categories'); data.expenseCategories = (r&&r.categories)||[]; analyticsData = null; loadAnalyticsData();
+}
+
+async function saveNewFreqType() {
+  var name = document.getElementById('new-freq-name')?.value;
+  if (!name) { toast('Введите название', 'error'); return; }
+  var res = await api('/expense-frequency-types', 'POST', { name: name });
+  if (res && res.success) { toast('Тип создан'); showAddFreqTypeForm = false; var r = await api('/expense-frequency-types'); data.expenseFreqTypes = (r&&r.types)||[]; render(); }
+  else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function deleteFreqType(id) {
+  if (!confirm('Удалить тип периодичности?')) return;
+  await api('/expense-frequency-types/' + id, 'DELETE');
+  var r = await api('/expense-frequency-types'); data.expenseFreqTypes = (r&&r.types)||[]; render();
+}
+
+async function saveNewExpense() {
+  var name = document.getElementById('new-exp-name')?.value;
+  var amount = Number(document.getElementById('new-exp-amount')?.value) || 0;
+  var categoryId = document.getElementById('new-exp-category')?.value || null;
+  var freqId = document.getElementById('new-exp-freq')?.value || null;
+  var notes = document.getElementById('new-exp-notes')?.value || '';
+  if (!name) { toast('Введите название', 'error'); return; }
+  var res = await api('/expenses', 'POST', { name: name, amount: amount, category_id: categoryId ? Number(categoryId) : null, frequency_type_id: freqId ? Number(freqId) : null, notes: notes });
+  if (res && res.success) { toast('Затрата добавлена'); showAddExpenseForm = false; var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData(); }
+  else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function deleteExpense(id) {
+  if (!confirm('Удалить затрату?')) return;
+  await api('/expenses/' + id, 'DELETE');
+  var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData();
+}
+
+async function updateUserSalary(userId, field, value) {
+  var body = {};
+  body[field] = value;
+  var res = await api('/users/' + userId + '/salary', 'PUT', body);
+  if (res && res.success) { toast('Обновлено'); var r = await api('/users'); data.users = r || []; }
+  else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function saveBonus(userId) {
+  var amount = Number(document.getElementById('bonus-amount-' + userId)?.value) || 0;
+  var desc = document.getElementById('bonus-desc-' + userId)?.value || '';
+  var bdate = document.getElementById('bonus-date-' + userId)?.value || '';
+  if (!amount) { toast('Введите сумму бонуса', 'error'); return; }
+  var res = await api('/users/' + userId + '/bonuses', 'POST', { amount: amount, description: desc, bonus_date: bdate });
+  if (res && res.success) { toast('Бонус добавлен'); showAddBonusUserId = 0; analyticsData = null; loadAnalyticsData(); }
+  else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+// ===== PERIODS TAB (Close Month/Quarter/Year) =====
+function renderBizPeriods(d) {
+  var h = '';
+  var fin = d.financial || {};
+  var snapshots = data.periodSnapshots || [];
+  
+  // Current period info
+  var now = new Date();
+  var curYear = now.getFullYear();
+  var curMonth = now.getMonth() + 1;
+  var curQuarter = Math.ceil(curMonth / 3);
+  var monthKey = curYear + '-' + String(curMonth).padStart(2, '0');
+  var quarterKey = curYear + '-Q' + curQuarter;
+  var yearKey = String(curYear);
+  
+  var monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+  
+  // Check which periods are already closed
+  function getSnapshot(type, key) {
+    return snapshots.find(function(s) { return s.period_type === type && s.period_key === key; });
+  }
+  var monthSnap = getSnapshot('month', monthKey);
+  var quarterSnap = getSnapshot('quarter', quarterKey);
+  var yearSnap = getSnapshot('year', yearKey);
+  
+  // Header
+  h += '<div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(59,130,246,0.05))">' +
+    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
+    '<i class="fas fa-calendar-check" style="font-size:1.5rem;color:#8B5CF6"></i>' +
+    '<div><h3 style="font-weight:800;font-size:1.1rem;margin:0">Закрытие периодов</h3>' +
+    '<p style="color:#94a3b8;font-size:0.78rem;margin:4px 0 0">Фиксируйте финансовые итоги за месяц, квартал и год. Закрытый период блокируется от изменений.</p></div></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+    '<span style="padding:4px 10px;border-radius:12px;font-size:0.72rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)"><i class="fas fa-lock" style="margin-right:4px"></i>Заблокирован = данные зафиксированы</span>' +
+    '<span style="padding:4px 10px;border-radius:12px;font-size:0.72rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)"><i class="fas fa-lock-open" style="margin-right:4px"></i>Открыт = можно перезаписать</span>' +
+    '</div></div>';
+  
+  // ===== CLOSE MONTH =====
+  h += '<div class="card" style="margin-bottom:16px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;gap:10px"><i class="fas fa-calendar-day" style="font-size:1.2rem;color:#3B82F6"></i>' +
+    '<div><h3 style="font-weight:700;font-size:0.95rem;margin:0">Закрыть месяц</h3>' +
+    '<p style="color:#94a3b8;font-size:0.72rem;margin:2px 0 0">' + monthNames[curMonth] + ' ' + curYear + ' (' + monthKey + ')</p></div></div>';
+  if (monthSnap && monthSnap.is_locked) {
+    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)">' +
+      '<i class="fas fa-lock"></i> Заблокирован</span>';
+  } else if (monthSnap) {
+    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)">' +
+      '<i class="fas fa-check-circle"></i> Сохранён (не заблокирован)</span>';
+  } else {
+    h += '<span style="font-size:0.78rem;color:#64748b">Ещё не закрыт</span>';
+  }
+  h += '</div>';
+  // Preview data
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px;padding:12px;background:#0f172a;border-radius:8px">';
+  var mMetrics = [
+    { label: 'Услуги', value: fmtAmt(fin.services), color: '#10B981' },
+    { label: 'Артикулы', value: fmtAmt(fin.articles), color: '#F59E0B' },
+    { label: 'Оборот', value: fmtAmt(fin.turnover), color: '#8B5CF6' },
+    { label: 'Возвраты', value: fmtAmt(fin.refunds), color: '#EF4444' },
+    { label: 'Зарплаты', value: fmtAmt(fin.salaries + fin.bonuses), color: '#f87171' },
+    { label: 'Комм. затраты', value: fmtAmt(fin.commercial_expenses), color: '#F97316' },
+    { label: 'Маркетинг', value: fmtAmt(fin.marketing_expenses), color: '#EF4444' },
+    { label: 'Чист. прибыль', value: fmtAmt(fin.net_profit), color: fin.net_profit >= 0 ? '#10B981' : '#EF4444' },
+  ];
+  for (var mi = 0; mi < mMetrics.length; mi++) {
+    var mm = mMetrics[mi];
+    h += '<div style="text-align:center"><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">' + mm.label + '</div>' +
+      '<div style="font-size:0.85rem;font-weight:700;color:' + mm.color + '">' + mm.value + '</div></div>';
+  }
+  h += '</div>';
+  // Actions
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  if (!monthSnap) {
+    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',false)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить итоги месяца</button>' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть и заблокировать</button>';
+  } else if (!monthSnap.is_locked) {
+    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',false)"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить итоги</button>' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Заблокировать</button>';
+  } else {
+    h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem;color:#F59E0B;border-color:rgba(245,158,11,0.4)" onclick="unlockPeriod(' + monthSnap.id + ')"><i class="fas fa-lock-open" style="margin-right:6px"></i>Разблокировать</button>';
+  }
+  h += '</div></div>';
+  
+  // ===== CLOSE QUARTER =====
+  h += '<div class="card" style="margin-bottom:16px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;gap:10px"><i class="fas fa-calendar-week" style="font-size:1.2rem;color:#8B5CF6"></i>' +
+    '<div><h3 style="font-weight:700;font-size:0.95rem;margin:0">Закрыть квартал</h3>' +
+    '<p style="color:#94a3b8;font-size:0.72rem;margin:2px 0 0">Q' + curQuarter + ' ' + curYear + ' (' + quarterKey + ')</p></div></div>';
+  if (quarterSnap && quarterSnap.is_locked) {
+    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)">' +
+      '<i class="fas fa-lock"></i> Заблокирован</span>';
+  } else if (quarterSnap) {
+    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)">' +
+      '<i class="fas fa-check-circle"></i> Сохранён (не заблокирован)</span>';
+  } else {
+    h += '<span style="font-size:0.78rem;color:#64748b">Ещё не закрыт</span>';
+  }
+  h += '</div>';
+  // Quarter months info
+  var qStartMonth = (curQuarter - 1) * 3 + 1;
+  var qMonths = [monthNames[qStartMonth], monthNames[qStartMonth+1], monthNames[qStartMonth+2]];
+  h += '<div style="margin-bottom:12px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-info-circle" style="margin-right:6px;color:#8B5CF6"></i>Месяцы квартала: <strong style="color:#e2e8f0">' + qMonths.join(', ') + '</strong>';
+  // Check if all quarter months are closed
+  var qMonthsClosed = 0;
+  for (var qm = qStartMonth; qm <= qStartMonth + 2; qm++) {
+    var qmKey = curYear + '-' + String(qm).padStart(2, '0');
+    var qmSnap = getSnapshot('month', qmKey);
+    if (qmSnap && qmSnap.is_locked) qMonthsClosed++;
+  }
+  h += ' <span style="margin-left:8px;color:' + (qMonthsClosed === 3 ? '#10B981' : '#F59E0B') + '">(' + qMonthsClosed + '/3 закрыто)</span></div>';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  if (!quarterSnap) {
+    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',false)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить итоги квартала</button>' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть и заблокировать</button>';
+  } else if (!quarterSnap.is_locked) {
+    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',false)"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить итоги</button>' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Заблокировать</button>';
+  } else {
+    h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem;color:#F59E0B;border-color:rgba(245,158,11,0.4)" onclick="unlockPeriod(' + quarterSnap.id + ')"><i class="fas fa-lock-open" style="margin-right:6px"></i>Разблокировать</button>';
+  }
+  h += '</div></div>';
+  
+  // ===== CLOSE YEAR =====
+  h += '<div class="card" style="margin-bottom:16px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+    '<div style="display:flex;align-items:center;gap:10px"><i class="fas fa-calendar-alt" style="font-size:1.2rem;color:#10B981"></i>' +
+    '<div><h3 style="font-weight:700;font-size:0.95rem;margin:0">Закрыть год</h3>' +
+    '<p style="color:#94a3b8;font-size:0.72rem;margin:2px 0 0">' + curYear + ' (' + yearKey + ')</p></div></div>';
+  if (yearSnap && yearSnap.is_locked) {
+    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)">' +
+      '<i class="fas fa-lock"></i> Заблокирован</span>';
+  } else if (yearSnap) {
+    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)">' +
+      '<i class="fas fa-check-circle"></i> Сохранён (не заблокирован)</span>';
+  } else {
+    h += '<span style="font-size:0.78rem;color:#64748b">Ещё не закрыт</span>';
+  }
+  h += '</div>';
+  // Year quarters info
+  var yearQuartersClosed = 0;
+  for (var yq = 1; yq <= 4; yq++) {
+    var yqKey = curYear + '-Q' + yq;
+    var yqSnap = getSnapshot('quarter', yqKey);
+    if (yqSnap && yqSnap.is_locked) yearQuartersClosed++;
+  }
+  h += '<div style="margin-bottom:12px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-info-circle" style="margin-right:6px;color:#10B981"></i>Кварталов закрыто: <strong style="color:' + (yearQuartersClosed === 4 ? '#10B981' : '#F59E0B') + '">' + yearQuartersClosed + '/4</strong></div>';
+  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  if (!yearSnap) {
+    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',false)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить итоги года</button>' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть и заблокировать</button>';
+  } else if (!yearSnap.is_locked) {
+    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',false)"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить итоги</button>' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Заблокировать</button>';
+  } else {
+    h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem;color:#F59E0B;border-color:rgba(245,158,11,0.4)" onclick="unlockPeriod(' + yearSnap.id + ')"><i class="fas fa-lock-open" style="margin-right:6px"></i>Разблокировать</button>';
+  }
+  h += '</div></div>';
+  
+  // ===== HISTORY TABLE =====
+  if (snapshots.length > 0) {
+    h += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+      '<h3 style="font-weight:700;font-size:0.95rem;margin:0"><i class="fas fa-history" style="color:#8B5CF6;margin-right:8px"></i>История закрытых периодов</h3>' +
+      '<span style="font-size:0.72rem;color:#64748b">' + snapshots.length + ' записей</span></div>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem"><thead><tr style="border-bottom:2px solid #334155">' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Тип</th>' +
+      '<th style="padding:8px;text-align:left;color:#94a3b8">Период</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Услуги</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Оборот</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Расходы</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Чист. прибыль</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">Статус</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Дата</th>' +
+      '</tr></thead><tbody>';
+    var typeLabels = { month: '📅 Месяц', quarter: '📊 Квартал', year: '📆 Год' };
+    var typeColors = { month: '#3B82F6', quarter: '#8B5CF6', year: '#10B981' };
+    for (var si = 0; si < snapshots.length; si++) {
+      var sn = snapshots[si];
+      var totalExp = Number(sn.expense_salaries || 0) + Number(sn.expense_commercial || 0) + Number(sn.expense_marketing || 0);
+      h += '<tr style="border-bottom:1px solid #1e293b">' +
+        '<td style="padding:8px;font-weight:600;color:' + (typeColors[sn.period_type] || '#e2e8f0') + '">' + (typeLabels[sn.period_type] || sn.period_type) + '</td>' +
+        '<td style="padding:8px;font-weight:700;color:#e2e8f0">' + escHtml(sn.period_key) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:#a78bfa">' + fmtAmt(sn.revenue_services) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:#e2e8f0;font-weight:600">' + fmtAmt(sn.total_turnover) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:#f87171">' + fmtAmt(totalExp) + '</td>' +
+        '<td style="padding:8px;text-align:right;font-weight:700;color:' + (Number(sn.net_profit) >= 0 ? '#10B981' : '#EF4444') + '">' + fmtAmt(sn.net_profit) + '</td>' +
+        '<td style="padding:8px;text-align:center">' + (sn.is_locked ? '<span style="color:#10B981"><i class="fas fa-lock"></i></span>' : '<span style="color:#F59E0B"><i class="fas fa-lock-open"></i></span>') + '</td>' +
+        '<td style="padding:8px;text-align:right;font-size:0.72rem;color:#64748b">' + (sn.closed_at ? new Date(sn.closed_at).toLocaleDateString('ru-RU') : '—') + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  
+  return h;
+}
+
+async function closePeriod(periodType, periodKey, lock) {
+  var confirmMsg = lock
+    ? 'Закрыть и ЗАБЛОКИРОВАТЬ ' + periodType + ' (' + periodKey + ')? Заблокированный период нельзя изменить без разблокировки.'
+    : 'Сохранить итоги ' + periodType + ' (' + periodKey + ')? Данные можно будет обновить позже.';
+  if (!confirm(confirmMsg)) return;
+  
+  // Get current analytics data
+  var d = analyticsData;
+  if (!d || !d.financial) { toast('Нет данных для сохранения. Обновите аналитику.', 'error'); return; }
+  var fin = d.financial;
+  
+  var body = {
+    period_type: periodType,
+    period_key: periodKey,
+    revenue_services: fin.services || 0,
+    revenue_articles: fin.articles || 0,
+    total_turnover: fin.turnover || 0,
+    refunds: fin.refunds || 0,
+    expense_salaries: (fin.salaries || 0) + (fin.bonuses || 0),
+    expense_commercial: fin.commercial_expenses || 0,
+    expense_marketing: fin.marketing_expenses || 0,
+    net_profit: fin.net_profit || 0,
+    leads_count: d.total_leads || 0,
+    leads_done: (d.status_data && d.status_data.done) ? d.status_data.done.count || 0 : 0,
+    avg_check: fin.avg_check || 0,
+    is_locked: lock,
+    custom_data: {
+      conversion_rate: fin.conversion_rate,
+      marginality: fin.marginality,
+      roi: fin.roi,
+      romi: fin.romi,
+      date_from: d.date_from,
+      date_to: d.date_to
+    }
+  };
+  
+  var res = await api('/period-snapshots', 'POST', body);
+  if (res && res.success) {
+    toast(lock ? 'Период заблокирован!' : 'Итоги сохранены!', 'success');
+    // Reload snapshots
+    try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
+    render();
+  } else {
+    toast(res?.error || 'Ошибка сохранения', 'error');
+  }
+}
+
+async function unlockPeriod(snapshotId) {
+  if (!confirm('Разблокировать период? Данные можно будет перезаписать.')) return;
+  var res = await api('/period-snapshots/' + snapshotId + '/unlock', 'PUT', {});
+  if (res && res.success) {
+    toast('Период разблокирован');
+    try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
+    render();
+  } else {
+    toast(res?.error || 'Ошибка', 'error');
+  }
 }
 
 function setAnalyticsPeriod(period) {
@@ -2504,6 +3112,7 @@ function setAnalyticsPeriod(period) {
   var fmt = function(d) { return d.toISOString().slice(0,10); };
   if (period === 'today') { analyticsDateFrom = fmt(now); analyticsDateTo = fmt(now); }
   else if (period === 'week') { var d7 = new Date(now); d7.setDate(d7.getDate()-7); analyticsDateFrom = fmt(d7); analyticsDateTo = fmt(now); }
+  else if (period === '14d') { var d14 = new Date(now); d14.setDate(d14.getDate()-14); analyticsDateFrom = fmt(d14); analyticsDateTo = fmt(now); }
   else if (period === 'month') { var d30 = new Date(now); d30.setDate(d30.getDate()-30); analyticsDateFrom = fmt(d30); analyticsDateTo = fmt(now); }
   else { analyticsDateFrom = ''; analyticsDateTo = ''; }
   analyticsData = null;

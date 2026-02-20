@@ -873,7 +873,7 @@ api.delete('/photo-blocks/:id', authMiddleware, async (c) => {
 // ===== USERS / EMPLOYEES =====
 api.get('/users', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const res = await db.prepare('SELECT id, username, role, display_name, phone, email, is_active, created_at FROM users ORDER BY id').all();
+  const res = await db.prepare('SELECT id, username, role, display_name, phone, email, is_active, salary, salary_type, position_title, created_at FROM users ORDER BY id').all();
   return c.json(res.results);
 });
 
@@ -1263,6 +1263,425 @@ api.delete('/company-roles/:id', authMiddleware, async (c) => {
   if (role?.is_system) return c.json({ error: 'Cannot delete system roles' }, 400);
   await db.prepare('DELETE FROM company_roles WHERE id = ?').bind(id).run();
   return c.json({ success: true });
+});
+
+// ===== EXPENSE CATEGORIES =====
+api.get('/expense-categories', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare('SELECT * FROM expense_categories ORDER BY sort_order, id').all();
+    return c.json({ categories: res.results || [] });
+  } catch { return c.json({ categories: [] }); }
+});
+
+api.post('/expense-categories', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  if (!d.name) return c.json({ error: 'name required' }, 400);
+  await db.prepare('INSERT INTO expense_categories (name, color, is_marketing, sort_order) VALUES (?,?,?,?)')
+    .bind(d.name, d.color || '#8B5CF6', d.is_marketing ? 1 : 0, d.sort_order || 99).run();
+  return c.json({ success: true });
+});
+
+api.put('/expense-categories/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  if (d.name !== undefined) { fields.push('name=?'); vals.push(d.name); }
+  if (d.color !== undefined) { fields.push('color=?'); vals.push(d.color); }
+  if (d.is_marketing !== undefined) { fields.push('is_marketing=?'); vals.push(d.is_marketing ? 1 : 0); }
+  if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  vals.push(id);
+  await db.prepare(`UPDATE expense_categories SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/expense-categories/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('UPDATE expenses SET category_id = NULL WHERE category_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM expense_categories WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== EXPENSE FREQUENCY TYPES =====
+api.get('/expense-frequency-types', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare('SELECT * FROM expense_frequency_types ORDER BY sort_order, id').all();
+    return c.json({ types: res.results || [] });
+  } catch { return c.json({ types: [] }); }
+});
+
+api.post('/expense-frequency-types', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  if (!d.name) return c.json({ error: 'name required' }, 400);
+  await db.prepare('INSERT INTO expense_frequency_types (name, multiplier_monthly, sort_order) VALUES (?,?,?)')
+    .bind(d.name, d.multiplier_monthly || 1, d.sort_order || 99).run();
+  return c.json({ success: true });
+});
+
+api.put('/expense-frequency-types/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  if (d.name !== undefined) { fields.push('name=?'); vals.push(d.name); }
+  if (d.multiplier_monthly !== undefined) { fields.push('multiplier_monthly=?'); vals.push(d.multiplier_monthly); }
+  if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  vals.push(id);
+  await db.prepare(`UPDATE expense_frequency_types SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/expense-frequency-types/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('UPDATE expenses SET frequency_type_id = NULL WHERE frequency_type_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM expense_frequency_types WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== EXPENSES (Commercial Costs) =====
+api.get('/expenses', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare(`SELECT e.*, ec.name as category_name, ec.color as category_color, ec.is_marketing,
+      eft.name as frequency_name, eft.multiplier_monthly
+      FROM expenses e
+      LEFT JOIN expense_categories ec ON e.category_id = ec.id
+      LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
+      ORDER BY e.created_at DESC`).all();
+    return c.json({ expenses: res.results || [] });
+  } catch { return c.json({ expenses: [] }); }
+});
+
+api.post('/expenses', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  if (!d.name) return c.json({ error: 'name required' }, 400);
+  await db.prepare('INSERT INTO expenses (name, amount, category_id, frequency_type_id, is_active, notes, start_date, end_date) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(d.name, d.amount || 0, d.category_id || null, d.frequency_type_id || null, d.is_active !== false ? 1 : 0, d.notes || '', d.start_date || '', d.end_date || '').run();
+  return c.json({ success: true });
+});
+
+api.put('/expenses/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  if (d.name !== undefined) { fields.push('name=?'); vals.push(d.name); }
+  if (d.amount !== undefined) { fields.push('amount=?'); vals.push(d.amount); }
+  if (d.category_id !== undefined) { fields.push('category_id=?'); vals.push(d.category_id || null); }
+  if (d.frequency_type_id !== undefined) { fields.push('frequency_type_id=?'); vals.push(d.frequency_type_id || null); }
+  if (d.is_active !== undefined) { fields.push('is_active=?'); vals.push(d.is_active ? 1 : 0); }
+  if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
+  if (d.start_date !== undefined) { fields.push('start_date=?'); vals.push(d.start_date); }
+  if (d.end_date !== undefined) { fields.push('end_date=?'); vals.push(d.end_date); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE expenses SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/expenses/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM expenses WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== EMPLOYEE BONUSES =====
+api.get('/users/:id/bonuses', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId = c.req.param('id');
+  try {
+    const res = await db.prepare('SELECT * FROM employee_bonuses WHERE user_id = ? ORDER BY bonus_date DESC, id DESC').bind(userId).all();
+    return c.json({ bonuses: res.results || [] });
+  } catch { return c.json({ bonuses: [] }); }
+});
+
+api.post('/users/:id/bonuses', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId = c.req.param('id');
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO employee_bonuses (user_id, amount, description, bonus_date) VALUES (?,?,?,?)')
+    .bind(userId, d.amount || 0, d.description || '', d.bonus_date || new Date().toISOString().slice(0, 10)).run();
+  return c.json({ success: true });
+});
+
+api.delete('/bonuses/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM employee_bonuses WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== SALARY UPDATE (extends users PUT) =====
+api.put('/users/:id/salary', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can edit salaries' }, 403);
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  if (d.salary !== undefined) { fields.push('salary=?'); vals.push(d.salary); }
+  if (d.salary_type !== undefined) { fields.push('salary_type=?'); vals.push(d.salary_type); }
+  if (d.position_title !== undefined) { fields.push('position_title=?'); vals.push(d.position_title); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE users SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+// ===== PERIOD SNAPSHOTS (Close month/quarter/year) =====
+api.get('/period-snapshots', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare('SELECT * FROM period_snapshots ORDER BY period_key DESC').all();
+    return c.json({ snapshots: res.results || [] });
+  } catch { return c.json({ snapshots: [] }); }
+});
+
+api.post('/period-snapshots', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can close periods' }, 403);
+  const d = await c.req.json();
+  if (!d.period_type || !d.period_key) return c.json({ error: 'period_type and period_key required' }, 400);
+  // Check if already exists
+  const existing = await db.prepare('SELECT id, is_locked FROM period_snapshots WHERE period_type = ? AND period_key = ?').bind(d.period_type, d.period_key).first();
+  if (existing && existing.is_locked) return c.json({ error: 'Period already locked' }, 400);
+  if (existing) {
+    // Update
+    await db.prepare(`UPDATE period_snapshots SET revenue_services=?, revenue_articles=?, total_turnover=?, refunds=?,
+      expense_salaries=?, expense_commercial=?, expense_marketing=?, net_profit=?,
+      leads_count=?, leads_done=?, avg_check=?, custom_data=?, is_locked=?, closed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+      WHERE id=?`).bind(
+      d.revenue_services || 0, d.revenue_articles || 0, d.total_turnover || 0, d.refunds || 0,
+      d.expense_salaries || 0, d.expense_commercial || 0, d.expense_marketing || 0, d.net_profit || 0,
+      d.leads_count || 0, d.leads_done || 0, d.avg_check || 0, JSON.stringify(d.custom_data || {}),
+      d.is_locked ? 1 : 0, existing.id
+    ).run();
+  } else {
+    await db.prepare(`INSERT INTO period_snapshots (period_type, period_key, revenue_services, revenue_articles, total_turnover, refunds,
+      expense_salaries, expense_commercial, expense_marketing, net_profit, leads_count, leads_done, avg_check, custom_data, is_locked, closed_at)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP)`).bind(
+      d.period_type, d.period_key,
+      d.revenue_services || 0, d.revenue_articles || 0, d.total_turnover || 0, d.refunds || 0,
+      d.expense_salaries || 0, d.expense_commercial || 0, d.expense_marketing || 0, d.net_profit || 0,
+      d.leads_count || 0, d.leads_done || 0, d.avg_check || 0, JSON.stringify(d.custom_data || {}),
+      d.is_locked ? 1 : 0
+    ).run();
+  }
+  return c.json({ success: true });
+});
+
+api.put('/period-snapshots/:id/unlock', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can unlock periods' }, 403);
+  const id = c.req.param('id');
+  await db.prepare('UPDATE period_snapshots SET is_locked = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== BUSINESS ANALYTICS V2 =====
+api.get('/business-analytics', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const url = new URL(c.req.url);
+    const dateFrom = url.searchParams.get('from') || '';
+    const dateTo = url.searchParams.get('to') || '';
+    let dateFilter = '';
+    const dateParams: string[] = [];
+    if (dateFrom) { dateFilter += " AND date(l.created_at) >= ?"; dateParams.push(dateFrom); }
+    if (dateTo) { dateFilter += " AND date(l.created_at) <= ?"; dateParams.push(dateTo); }
+
+    // 1. Lead stats by status with services/articles breakdown
+    const activeStatuses = ['in_progress', 'checking', 'done'];
+    const allStatuses = ['new', 'contacted', 'in_progress', 'rejected', 'checking', 'done'];
+    const statusData: Record<string, any> = {};
+    for (const st of allStatuses) {
+      const res = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first().catch(() => ({ count: 0, amount: 0 }));
+      statusData[st] = { count: res?.count || 0, amount: res?.amount || 0, services: 0, articles: 0 };
+    }
+
+    // Parse calc_data for services vs articles breakdown per status
+    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
+    let totalRefunds = 0;
+    for (const lead of (allLeads.results || [])) {
+      const st = lead.status as string || 'new';
+      totalRefunds += Number(lead.refund_amount) || 0;
+      try {
+        const cd = JSON.parse((lead.calc_data as string) || '{}');
+        if (cd.items && Array.isArray(cd.items)) {
+          for (const item of cd.items) {
+            if (item.wb_article) {
+              if (statusData[st]) statusData[st].articles += Number(item.subtotal || 0);
+            } else {
+              if (statusData[st]) statusData[st].services += Number(item.subtotal || 0);
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // Also get articles totals from lead_articles table
+    try {
+      const artTotals = await db.prepare("SELECT l.status, SUM(la.total_price) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE 1=1" + dateFilter + " GROUP BY l.status").bind(...dateParams).all();
+      for (const r of (artTotals.results || [])) {
+        const st = r.status as string;
+        if (statusData[st]) statusData[st].articles += Number(r.art_total || 0);
+      }
+    } catch {}
+
+    // 2. Financial summary (only active statuses: in_progress + checking + done)
+    let turnover = 0, servicesTotal = 0, articlesTotal = 0;
+    for (const st of activeStatuses) {
+      turnover += Number(statusData[st]?.amount || 0);
+      servicesTotal += Number(statusData[st]?.services || 0);
+      articlesTotal += Number(statusData[st]?.articles || 0);
+    }
+
+    // 3. Expenses
+    const expenseRes = await db.prepare(`SELECT e.*, ec.is_marketing, eft.name as freq_name
+      FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id
+      LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
+      WHERE e.is_active = 1`).all().catch(() => ({ results: [] }));
+    let totalExpenses = 0, marketingExpenses = 0, commercialExpenses = 0;
+    for (const exp of (expenseRes.results || [])) {
+      const amt = Number(exp.amount) || 0;
+      totalExpenses += amt;
+      if (exp.is_marketing) marketingExpenses += amt;
+      else commercialExpenses += amt;
+    }
+
+    // 4. Salaries
+    const salaryRes = await db.prepare("SELECT COALESCE(SUM(salary), 0) as total_salary FROM users WHERE is_active = 1 AND salary > 0").first().catch(() => ({ total_salary: 0 }));
+    const totalSalaries = Number(salaryRes?.total_salary || 0);
+
+    // Bonuses for period
+    let bonusFilter = '';
+    const bonusParams: string[] = [];
+    if (dateFrom) { bonusFilter += " AND bonus_date >= ?"; bonusParams.push(dateFrom); }
+    if (dateTo) { bonusFilter += " AND bonus_date <= ?"; bonusParams.push(dateTo); }
+    const bonusRes = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total_bonuses FROM employee_bonuses WHERE 1=1" + bonusFilter).bind(...bonusParams).first().catch(() => ({ total_bonuses: 0 }));
+    const totalBonuses = Number(bonusRes?.total_bonuses || 0);
+
+    // 5. Financial metrics
+    const allExpenses = totalSalaries + totalBonuses + totalExpenses;
+    const netProfit = servicesTotal - allExpenses;
+    const marginality = servicesTotal > 0 ? ((netProfit / servicesTotal) * 100) : 0;
+    const roi = allExpenses > 0 ? (((servicesTotal - allExpenses) / allExpenses) * 100) : 0;
+    const romi = marketingExpenses > 0 ? (((servicesTotal - marketingExpenses) / marketingExpenses) * 100) : 0;
+    const doneCount = Number(statusData.done?.count || 0);
+    const avgCheck = doneCount > 0 ? Math.round(turnover / doneCount) : 0;
+    const totalLeadsCount = Object.values(statusData).reduce((a: number, s: any) => a + (s.count || 0), 0);
+    const conversionRate = totalLeadsCount > 0 ? ((doneCount / totalLeadsCount) * 100) : 0;
+    const breakEven = allExpenses; // point where services revenue = expenses
+
+    // 6. Order fulfillment time (from creation to done status)
+    let avgFulfillmentDays = 0;
+    try {
+      const ftRes = await db.prepare("SELECT AVG(julianday('now') - julianday(created_at)) as avg_days FROM leads WHERE status = 'done'" + dateFilter.replace(/l\./g, '')).bind(...dateParams).first();
+      avgFulfillmentDays = Math.round(Number(ftRes?.avg_days || 0) * 10) / 10;
+    } catch {}
+
+    // 7. Daily breakdown
+    let dailyResults: any[] = [];
+    try {
+      const dailyRes = await db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day").all();
+      dailyResults = dailyRes.results || [];
+    } catch {}
+
+    // 8. By assignee
+    const byAssignee: any[] = [];
+    try {
+      const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amount DESC").bind(...dateParams).all();
+      for (const r of (byAssRes.results || [])) { byAssignee.push({ user_id: r.assigned_to, name: r.display_name || 'Не назначен', count: r.count, amount: r.amount }); }
+    } catch {}
+
+    // 9. Service popularity
+    const serviceStats: Record<string, { count: number; qty: number; revenue: number }> = {};
+    for (const lead of (allLeads.results || [])) {
+      try {
+        const cd = JSON.parse((lead.calc_data as string) || '{}');
+        if (cd.items && Array.isArray(cd.items)) {
+          for (const item of cd.items) {
+            if (!item.wb_article) {
+              const name = item.name || 'Неизвестно';
+              if (!serviceStats[name]) serviceStats[name] = { count: 0, qty: 0, revenue: 0 };
+              serviceStats[name].count++;
+              serviceStats[name].qty += Number(item.qty || 1);
+              serviceStats[name].revenue += Number(item.subtotal || 0);
+            }
+          }
+        }
+      } catch {}
+    }
+    const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
+
+    // 10. Referral stats
+    let refResults: any[] = [];
+    try {
+      const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dateFilter.replace(/l\./g, '') + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
+      refResults = refRes.results || [];
+    } catch {}
+
+    // 11. By source
+    let bySource: Record<string, any> = {};
+    try {
+      const bsRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads l WHERE 1=1" + dateFilter + " GROUP BY source").bind(...dateParams).all();
+      for (const r of (bsRes.results || [])) { bySource[r.source as string] = { count: r.count, amount: r.amount }; }
+    } catch {}
+
+    // 12. Employees with salaries for analytics
+    const employees: any[] = [];
+    try {
+      const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
+      for (const e of (empRes.results || [])) {
+        // Get bonuses sum
+        const bSum = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => ({ total: 0 }));
+        employees.push({ ...e, bonuses_total: Number(bSum?.total || 0) });
+      }
+    } catch {}
+
+    return c.json({
+      status_data: statusData,
+      financial: {
+        turnover, services: servicesTotal, articles: articlesTotal, refunds: totalRefunds,
+        salaries: totalSalaries, bonuses: totalBonuses, commercial_expenses: commercialExpenses,
+        marketing_expenses: marketingExpenses, total_expenses: allExpenses,
+        net_profit: netProfit, marginality: Math.round(marginality * 10) / 10,
+        roi: Math.round(roi * 10) / 10, romi: Math.round(romi * 10) / 10,
+        avg_check: avgCheck, conversion_rate: Math.round(conversionRate * 10) / 10,
+        break_even: breakEven, avg_fulfillment_days: avgFulfillmentDays,
+      },
+      daily: dailyResults,
+      by_assignee: byAssignee,
+      by_source: bySource,
+      services: serviceList,
+      referrals: refResults,
+      employees,
+      total_leads: totalLeadsCount,
+      date_from: dateFrom,
+      date_to: dateTo,
+    });
+  } catch (err: any) {
+    console.error('Business analytics error:', err?.message || err);
+    return c.json({
+      status_data: {}, financial: {}, daily: [], by_assignee: [], by_source: {},
+      services: [], referrals: [], employees: [], total_leads: 0,
+      date_from: '', date_to: '', error: 'Analytics error: ' + (err?.message || 'unknown')
+    });
+  }
 });
 
 export default api

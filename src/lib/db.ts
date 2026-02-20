@@ -291,6 +291,76 @@ CREATE TABLE IF NOT EXISTS company_roles (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS expense_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL DEFAULT '',
+  color TEXT DEFAULT '#8B5CF6',
+  is_marketing INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS expense_frequency_types (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL DEFAULT '',
+  multiplier_monthly REAL DEFAULT 1,
+  sort_order INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS expenses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL DEFAULT '',
+  amount REAL DEFAULT 0,
+  category_id INTEGER DEFAULT NULL,
+  frequency_type_id INTEGER DEFAULT NULL,
+  is_active INTEGER DEFAULT 1,
+  notes TEXT DEFAULT '',
+  start_date TEXT DEFAULT '',
+  end_date TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (category_id) REFERENCES expense_categories(id) ON DELETE SET NULL,
+  FOREIGN KEY (frequency_type_id) REFERENCES expense_frequency_types(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS employee_bonuses (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL,
+  amount REAL DEFAULT 0,
+  description TEXT DEFAULT '',
+  bonus_date TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS period_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  period_type TEXT NOT NULL DEFAULT 'month',
+  period_key TEXT NOT NULL DEFAULT '',
+  revenue_services REAL DEFAULT 0,
+  revenue_articles REAL DEFAULT 0,
+  total_turnover REAL DEFAULT 0,
+  refunds REAL DEFAULT 0,
+  expense_salaries REAL DEFAULT 0,
+  expense_commercial REAL DEFAULT 0,
+  expense_marketing REAL DEFAULT 0,
+  net_profit REAL DEFAULT 0,
+  leads_count INTEGER DEFAULT 0,
+  leads_done INTEGER DEFAULT 0,
+  avg_check REAL DEFAULT 0,
+  custom_data TEXT DEFAULT '{}',
+  is_locked INTEGER DEFAULT 0,
+  closed_at DATETIME DEFAULT NULL,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(period_type, period_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_freq ON expenses(frequency_type_id);
+CREATE INDEX IF NOT EXISTS idx_bonuses_user ON employee_bonuses(user_id);
+CREATE INDEX IF NOT EXISTS idx_snapshots_period ON period_snapshots(period_type, period_key);
 `;
 
 export async function initDatabase(db: D1Database): Promise<void> {
@@ -322,6 +392,42 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE leads ADD COLUMN tz_link TEXT DEFAULT ''").run(); } catch {}
   // v5 Migrations: refund_amount for leads
   try { await db.prepare("ALTER TABLE leads ADD COLUMN refund_amount REAL DEFAULT 0").run(); } catch {}
+  // v7 Migrations: salary fields on users
+  try { await db.prepare("ALTER TABLE users ADD COLUMN salary REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN salary_type TEXT DEFAULT 'monthly'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN position_title TEXT DEFAULT ''").run(); } catch {}
+  // v8 Migrations: seed default expense categories
+  try {
+    const catCount = await db.prepare('SELECT COUNT(*) as cnt FROM expense_categories').first();
+    if (!catCount || (catCount.cnt as number) === 0) {
+      const cats = [
+        { name: 'Реклама / Маркетинг', color: '#EF4444', marketing: 1, order: 0 },
+        { name: 'Аренда', color: '#3B82F6', marketing: 0, order: 1 },
+        { name: 'Софт / Подписки', color: '#8B5CF6', marketing: 0, order: 2 },
+        { name: 'Логистика', color: '#F59E0B', marketing: 0, order: 3 },
+        { name: 'Связь / Интернет', color: '#10B981', marketing: 0, order: 4 },
+        { name: 'Прочее', color: '#64748B', marketing: 0, order: 5 },
+      ];
+      for (const c of cats) {
+        await db.prepare('INSERT INTO expense_categories (name, color, is_marketing, sort_order) VALUES (?,?,?,?)').bind(c.name, c.color, c.marketing, c.order).run();
+      }
+    }
+  } catch {}
+  // v9 Migrations: seed default expense frequency types
+  try {
+    const freqCount = await db.prepare('SELECT COUNT(*) as cnt FROM expense_frequency_types').first();
+    if (!freqCount || (freqCount.cnt as number) === 0) {
+      const freqs = [
+        { name: 'Разовая', mult: 0, order: 0 },
+        { name: 'Ежемесячная', mult: 1, order: 1 },
+        { name: 'За 15 дней', mult: 2, order: 2 },
+        { name: 'Почасовая', mult: 0, order: 3 },
+      ];
+      for (const f of freqs) {
+        await db.prepare('INSERT INTO expense_frequency_types (name, multiplier_monthly, sort_order) VALUES (?,?,?)').bind(f.name, f.mult, f.order).run();
+      }
+    }
+  } catch {}
   // v6 Migrations: seed default company_roles
   try {
     const rolesCount = await db.prepare('SELECT COUNT(*) as cnt FROM company_roles').first();
@@ -354,7 +460,7 @@ export const ROLE_LABELS: Record<string, string> = {
   operator: 'Оператор', buyer: 'Выкупщик', courier: 'Курьер',
 };
 export const SECTION_LABELS: Record<string, string> = {
-  dashboard: 'Дашборд', leads: 'Лиды / CRM', analytics: 'Аналитика лидов', employees: 'Сотрудники',
+  dashboard: 'Дашборд', leads: 'Лиды / CRM', analytics: 'Бизнес-аналитика', employees: 'Сотрудники',
   permissions: 'Управление доступами', company_roles: 'Роли компании', blocks: 'Конструктор блоков',
   calculator: 'Калькулятор', pdf: 'PDF шаблон', referrals: 'Реферальные коды',
   slots: 'Счётчики слотов', footer: 'Футер сайта', telegram: 'TG сообщения',
