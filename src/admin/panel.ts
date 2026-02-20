@@ -1453,7 +1453,8 @@ function renderLeads() {
       '<option value="form"' + (leadsFilter.source==='form'?' selected':'') + '>Форма</option>' +
       '<option value="popup"' + (leadsFilter.source==='popup'?' selected':'') + '>Попап</option>' +
       '<option value="calculator_pdf"' + (leadsFilter.source==='calculator_pdf'?' selected':'') + '>Калькулятор</option>' +
-      '<option value="manual"' + (leadsFilter.source==='manual'?' selected':'') + '>Ручной</option></select>' +
+      '<option value="manual"' + (leadsFilter.source==='manual'?' selected':'') + '>Ручной</option>' +
+      '<option value="admin_panel"' + (leadsFilter.source==='admin_panel'?' selected':'') + '>Админ-панель</option></select>' +
     '<select class="input" style="width:170px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'assignee\\',this.value)">' +
       '<option value="all"' + (leadsFilter.assignee==='all'?' selected':'') + '>Все ответственные</option>' +
       '<option value=""' + (leadsFilter.assignee===''?' selected':'') + '>Не назначен</option>';
@@ -2283,6 +2284,9 @@ let showAddFreqTypeForm = false;
 let expandedMonth = ''; // for month drill-down
 let yearChartMetric = 'amount'; // amount | count | done_amount
 let yearChartMode = 'month'; // month | week | day
+let excludedStatuses = {}; // statuses excluded from calculations
+let comparePeriod1 = ''; // manual period comparison
+let comparePeriod2 = '';
 
 async function loadAnalyticsData() {
   var params = '';
@@ -2304,19 +2308,84 @@ function fmtAmt(n) {
 function fmtPct(n) { return (Number(n) || 0).toFixed(1) + '%'; }
 function fmtNum(n) { if (!n && n !== 0) return '0'; return Number(n).toLocaleString('ru-RU'); }
 
+function getActiveStatusData(sd) {
+  // Returns status data excluding user-excluded statuses
+  var result = {};
+  var allSt = ['new','contacted','in_progress','rejected','checking','done'];
+  for (var i = 0; i < allSt.length; i++) {
+    var k = allSt[i];
+    if (excludedStatuses[k]) {
+      result[k] = { count: 0, amount: 0, services: 0, articles: 0, excluded: true };
+    } else {
+      result[k] = sd[k] || { count: 0, amount: 0, services: 0, articles: 0 };
+    }
+  }
+  return result;
+}
+
+function recalcFinancials(sd, fin) {
+  // Recalculate financials based on active (non-excluded) statuses
+  var turnoverStatuses = ['in_progress','checking','done'];
+  var turnover = 0, svcTotal = 0, artTotal = 0;
+  for (var i = 0; i < turnoverStatuses.length; i++) {
+    var st = turnoverStatuses[i];
+    var v = sd[st] || {};
+    if (v.excluded) continue;
+    turnover += Number(v.amount) || 0;
+    svcTotal += Number(v.services) || 0;
+    artTotal += Number(v.articles) || 0;
+  }
+  var done = sd.done || {};
+  var doneCount = done.excluded ? 0 : (Number(done.count) || 0);
+  var doneSvc = done.excluded ? 0 : (Number(done.services) || 0);
+  // avg_check = services of completed leads only (no articles)
+  var avgCheck = doneCount > 0 ? Math.round(doneSvc / doneCount) : 0;
+  var totalLeads = 0;
+  var allSt = ['new','contacted','in_progress','rejected','checking','done'];
+  for (var j = 0; j < allSt.length; j++) {
+    var v2 = sd[allSt[j]] || {};
+    if (!v2.excluded) totalLeads += Number(v2.count) || 0;
+  }
+  var convRate = totalLeads > 0 ? Math.round((doneCount / totalLeads) * 1000) / 10 : 0;
+  return {
+    turnover: Math.max(0, Math.round(turnover * 100) / 100),
+    services: Math.max(0, Math.round(svcTotal * 100) / 100),
+    articles: Math.max(0, Math.round(artTotal * 100) / 100),
+    articles_net: Number(fin.articles_net) || 0,
+    refunds: Number(fin.refunds) || 0,
+    avg_check: avgCheck,
+    conversion_rate: convRate,
+    done_amount: done.excluded ? 0 : (Number(fin.done_amount) || 0),
+    done_services: doneSvc,
+    done_articles: done.excluded ? 0 : (Number(fin.done_articles) || 0),
+    net_profit: Number(fin.net_profit) || 0,
+    salaries: Number(fin.salaries) || 0,
+    bonuses: Number(fin.bonuses) || 0,
+    commercial_expenses: Number(fin.commercial_expenses) || 0,
+    marketing_expenses: Number(fin.marketing_expenses) || 0,
+    total_expenses: Number(fin.total_expenses) || 0,
+    marginality: Number(fin.marginality) || 0,
+    roi: Number(fin.roi) || 0,
+    romi: Number(fin.romi) || 0,
+    break_even: Number(fin.break_even) || 0,
+    avg_fulfillment_days: Number(fin.avg_fulfillment_days) || 0,
+    totalLeads: totalLeads
+  };
+}
+
 function renderLeadsAnalytics() {
   var d = analyticsData;
   if (!d) {
     loadAnalyticsData();
     return '<div style="padding:32px;text-align:center"><div class="spinner" style="width:40px;height:40px;margin:60px auto"></div><p style="color:#94a3b8;margin-top:16px">Загрузка бизнес-аналитики...</p></div>';
   }
-  var sd = d.status_data || {};
-  var fin = d.financial || {};
+  var sd = getActiveStatusData(d.status_data || {});
+  var fin = recalcFinancials(sd, d.financial || {});
   var tabs = [
     { id: 'overview', icon: 'fa-chart-pie', label: 'Обзор и Финансы' },
     { id: 'costs', icon: 'fa-wallet', label: 'Затраты и ЗП' },
     { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка и Детали' },
-    { id: 'periods', icon: 'fa-calendar-check', label: 'Периоды и Графики' },
+    { id: 'periods', icon: 'fa-list-ol', label: 'Детальные показатели' },
   ];
   var h = '<div style="padding:24px 32px">';
   // Header
@@ -2352,16 +2421,18 @@ function renderLeadsAnalytics() {
   var quickKpis = [
     {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)'},
     {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'},
-    {label:'Конверсия',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)'},
-    {label:'Средний чек',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)'},
-    {label:'Всего лидов',val:fmtNum(d.total_leads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)'},
+    {label:'Конверсия (завершено/все)',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)'},
+    {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Только стоимость услуг / кол-во завершённых'},
+    {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)'},
     {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)'},
   ];
   for (var qi = 0; qi < quickKpis.length; qi++) {
     var qk = quickKpis[qi];
     h += '<div class="card" style="padding:16px;background:' + qk.bg + ';border:1px solid ' + qk.color + '33">';
     h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><i class="fas ' + qk.icon + '" style="color:' + qk.color + ';font-size:0.85rem"></i><span style="font-size:0.75rem;color:#94a3b8">' + qk.label + '</span></div>';
-    h += '<div style="font-size:1.2rem;font-weight:800;color:' + qk.color + '">' + qk.val + '</div></div>';
+    h += '<div style="font-size:1.2rem;font-weight:800;color:' + qk.color + '">' + qk.val + '</div>';
+    if (qk.desc) h += '<div style="font-size:0.6rem;color:#475569;margin-top:3px">' + qk.desc + '</div>';
+    h += '</div>';
   }
   h += '</div>';
   // Tabs
@@ -2374,8 +2445,8 @@ function renderLeadsAnalytics() {
   // Tab content
   if (bizAnalyticsTab === 'overview') h += renderBizOverviewV2(d, sd, fin);
   else if (bizAnalyticsTab === 'costs') h += renderBizCostsV2(d, sd, fin);
-  else if (bizAnalyticsTab === 'funnel') h += renderBizFunnelV2(d, sd);
-  else if (bizAnalyticsTab === 'periods') h += renderBizPeriodsV2(d);
+  else if (bizAnalyticsTab === 'funnel') h += renderBizFunnelV2(d, sd, fin);
+  else if (bizAnalyticsTab === 'periods') h += renderBizPeriodsV2(d, sd, fin);
   h += '</div>';
   return h;
 }
@@ -2396,10 +2467,13 @@ function renderBizOverviewV2(d, sd, fin) {
   ];
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px">';
   for (var si = 0; si < statuses.length; si++) {
-    var st = statuses[si]; var v = sd[st.key] || {};
-    var cnt = Number(v.count) || 0; var amt = Number(v.amount) || 0;
-    var svcAmt = Number(v.services) || 0; var artAmt = Number(v.articles) || 0;
-    h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + st.key + '\\')">';
+    var st = statuses[si];
+    var rawV = (d.status_data || {})[st.key] || {};
+    var isExcl = !!excludedStatuses[st.key];
+    var cnt = Number(rawV.count) || 0; var amt = Number(rawV.amount) || 0;
+    var svcAmt = Number(rawV.services) || 0; var artAmt = Number(rawV.articles) || 0;
+    var opacity = isExcl ? '0.35' : '1';
+    h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer;opacity:' + opacity + '" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + st.key + '\\')">';
     h += '<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas ' + st.icon + '" style="color:' + st.color + ';margin-right:4px"></i>' + st.label + '</div>';
     h += '<div style="font-size:1.8rem;font-weight:800;color:' + st.color + '">' + cnt + '</div>';
     h += '<div style="font-size:0.82rem;color:#e2e8f0;margin-top:4px;font-weight:600">' + fmtAmt(amt) + '</div>';
@@ -2414,6 +2488,7 @@ function renderBizOverviewV2(d, sd, fin) {
   var turnover = Number(fin.turnover) || 0;
   var serviceRev = Number(fin.services) || 0;
   var articlesRev = Number(fin.articles) || 0;
+  var articlesNet = Number(fin.articles_net) || 0;
   var refunds = Number(fin.refunds) || 0;
   var netProfit = Number(fin.net_profit) || 0;
   var totalExpenses = Number(fin.total_expenses) || 0;
@@ -2460,15 +2535,17 @@ function renderBizOverviewV2(d, sd, fin) {
   }
   h += '</div></div>';
 
-  // Revenue detail row (services vs articles)
+  // Revenue detail row (services vs articles with refunds)
   h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px">';
   h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0414\u043e\u0445\u043e\u0434 (\u0443\u0441\u043b\u0443\u0433\u0438) \u2014 \u043c\u043e\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div></div>';
-  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b) \u2014 \u0434\u0435\u043d\u044c\u0433\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div><div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesRev) + '</div></div>';
-  h += '</div>';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b) \u2014 \u0434\u0435\u043d\u044c\u0433\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div>';
+  h += '<div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesNet) + '</div>';
+  if (refunds > 0) h += '<div style="font-size:0.68rem;color:#64748b;margin-top:4px">Брутто: ' + fmtAmt(articlesRev) + ' \u2212 Возвраты: <span style="color:#EF4444">' + fmtAmt(refunds) + '</span> = Нетто: <span style="color:#F59E0B">' + fmtAmt(articlesNet) + '</span></div>';
+  h += '</div></div>';
   if (refunds > 0) {
     h += '<div class="card" style="margin-bottom:16px;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3);padding:16px"><div style="display:flex;align-items:center;gap:12px">';
     h += '<i class="fas fa-exclamation-triangle" style="color:#EF4444;font-size:1.2rem"></i>';
-    h += '<div><div style="font-weight:700;color:#f87171">\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b \u0441\u0440\u0435\u0434\u0441\u0442\u0432</div><div style="font-size:0.82rem;color:#94a3b8">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430: <strong style="color:#EF4444">' + fmtAmt(refunds) + '</strong></div></div></div></div>';
+    h += '<div><div style="font-weight:700;color:#f87171">\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b \u0441\u0440\u0435\u0434\u0441\u0442\u0432</div><div style="font-size:0.82rem;color:#94a3b8">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430: <strong style="color:#EF4444">' + fmtAmt(refunds) + '</strong> (вычтена из выкупов)</div></div></div></div>';
   }
   h += '</div>';
 
@@ -2476,43 +2553,51 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-tachometer-alt" style="color:#10B981;margin-right:8px"></i>KPI \u043c\u0435\u0442\u0440\u0438\u043a\u0438</h3>';
   var kpis = [
-    {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',val:fmtPct(fin.conversion_rate),color:Number(fin.conversion_rate)>20?'#22C55E':Number(fin.conversion_rate)>10?'#F59E0B':'#EF4444',icon:'fa-percentage'},
-    {label:'\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0447\u0435\u043a',val:fmtAmt(fin.avg_check),color:'#8B5CF6',icon:'fa-shopping-cart'},
-    {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',val:fmtPct(fin.marginality),color:Number(fin.marginality)>0?'#22C55E':'#EF4444',icon:'fa-percentage'},
-    {label:'ROI',val:fmtPct(fin.roi),color:Number(fin.roi)>0?'#22C55E':'#EF4444',icon:'fa-chart-line'},
-    {label:'ROMI',val:fmtPct(fin.romi),color:Number(fin.romi)>0?'#22C55E':'#EF4444',icon:'fa-bullhorn'},
-    {label:'\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435',val:(Number(fin.avg_fulfillment_days)||0)+' \u0434\u043d',color:'#3B82F6',icon:'fa-clock'},
-    {label:'Break-even',val:fmtAmt(fin.break_even),color:'#F59E0B',icon:'fa-balance-scale'},
-    {label:'\u041e\u0442\u043a\u0430\u0437\u044b',val:(d.total_leads > 0 ? (((Number((sd.rejected||{}).count)||0) / d.total_leads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban'}
+    {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',val:fmtPct(fin.conversion_rate),color:Number(fin.conversion_rate)>20?'#22C55E':Number(fin.conversion_rate)>10?'#F59E0B':'#EF4444',icon:'fa-percentage',desc:'Завершённые / Все лиды за период'},
+    {label:'\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)',val:fmtAmt(fin.avg_check),color:'#8B5CF6',icon:'fa-shopping-cart',desc:'Сумма услуг завершённых / кол-во завершённых (без выкупов)'},
+    {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',val:fmtPct(fin.marginality),color:Number(fin.marginality)>0?'#22C55E':'#EF4444',icon:'fa-percentage',desc:'Прибыль / Доход услуг'},
+    {label:'ROI',val:fmtPct(fin.roi),color:Number(fin.roi)>0?'#22C55E':'#EF4444',icon:'fa-chart-line',desc:'Прибыль / Все расходы'},
+    {label:'ROMI',val:fmtPct(fin.romi),color:Number(fin.romi)>0?'#22C55E':'#EF4444',icon:'fa-bullhorn',desc:'(Доход услуг \u2212 маркетинг) / маркетинг'},
+    {label:'\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435',val:(Number(fin.avg_fulfillment_days)||0)+' \u0434\u043d',color:'#3B82F6',icon:'fa-clock',desc:'Среднее время выполнения заказа'},
+    {label:'Break-even',val:fmtAmt(fin.break_even),color:'#F59E0B',icon:'fa-balance-scale',desc:'Точка безубыточности (= все расходы)'},
+    {label:'\u041e\u0442\u043a\u0430\u0437\u044b',val:(fin.totalLeads > 0 ? (((Number((sd.rejected||{}).count)||0) / fin.totalLeads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban',desc:'Отклонённые / Все лиды'}
   ];
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">';
   for (var ki = 0; ki < kpis.length; ki++) {
     var kp = kpis[ki];
     h += '<div class="card" style="padding:14px;text-align:center"><i class="fas ' + kp.icon + '" style="color:' + kp.color + ';font-size:0.9rem;margin-bottom:6px;display:block"></i>';
     h += '<div style="font-size:1.3rem;font-weight:800;color:' + kp.color + '">' + kp.val + '</div>';
-    h += '<div style="font-size:0.7rem;color:#64748b;margin-top:2px">' + kp.label + '</div></div>';
+    h += '<div style="font-size:0.7rem;color:#64748b;margin-top:2px">' + kp.label + '</div>';
+    if (kp.desc) h += '<div style="font-size:0.58rem;color:#475569;margin-top:3px;line-height:1.2">' + kp.desc + '</div>';
+    h += '</div>';
   }
   h += '</div></div>';
 
-  // ---- SECTION: Status P&L table ----
+  // ---- SECTION: Status P&L table with exclude checkboxes ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-table" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0442\u0447\u0451\u0442 \u043f\u043e \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-table" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0442\u0447\u0451\u0442 \u043f\u043e \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c</h3>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:12px">Снимите галочку, чтобы исключить статус из расчётов. Исключённые статусы будут затемнены.</div>';
   h += '<div class="card" style="overflow-x:auto;padding:0"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
-  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">\u0421\u0442\u0430\u0442\u0443\u0441</th><th style="padding:12px;text-align:right;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0438</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b</th></tr></thead><tbody>';
+  h += '<th style="padding:12px 8px;text-align:center;color:#94a3b8;width:40px"><i class="fas fa-check-square" style="font-size:0.7rem"></i></th>';
+  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">\u0421\u0442\u0430\u0442\u0443\u0441</th><th style="padding:12px;text-align:right;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0438</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0412\u044b\u043a\u0443\u043f\u044b (нетто)</th></tr></thead><tbody>';
   var totalLeads2 = 0; var totalAmt2 = 0; var totalSvc = 0; var totalArt = 0;
   for (var si2 = 0; si2 < statuses.length; si2++) {
-    var s2 = statuses[si2]; var v2 = sd[s2.key] || {};
-    var cnt2 = Number(v2.count) || 0; var amt2 = Number(v2.amount) || 0;
-    var svc2 = Number(v2.services) || 0; var art2 = Number(v2.articles) || 0;
-    totalLeads2 += cnt2; totalAmt2 += amt2; totalSvc += svc2; totalArt += art2;
-    h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + s2.color + ';margin-right:8px"></span>' + s2.label + '</td>';
+    var s2 = statuses[si2]; var rawV2 = (d.status_data || {})[s2.key] || {};
+    var isExcl2 = !!excludedStatuses[s2.key];
+    var cnt2 = Number(rawV2.count) || 0; var amt2 = Number(rawV2.amount) || 0;
+    var svc2 = Number(rawV2.services) || 0; var art2 = Number(rawV2.articles) || 0;
+    if (!isExcl2) { totalLeads2 += cnt2; totalAmt2 += amt2; totalSvc += svc2; totalArt += art2; }
+    var rowOpacity = isExcl2 ? 'opacity:0.35;' : '';
+    h += '<tr style="border-bottom:1px solid #1e293b;' + rowOpacity + '">';
+    h += '<td style="padding:10px 8px;text-align:center"><input type="checkbox" ' + (isExcl2 ? '' : 'checked') + ' onchange="toggleExcludeStatus(\\'' + s2.key + '\\',this.checked)" style="cursor:pointer;accent-color:#8B5CF6"></td>';
+    h += '<td style="padding:10px 16px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + s2.color + ';margin-right:8px"></span>' + s2.label + '</td>';
     h += '<td style="padding:10px;text-align:right;font-weight:600">' + cnt2 + '</td>';
     h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(amt2) + '</td>';
     h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(svc2) + '</td>';
     h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(art2) + '</td></tr>';
   }
-  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">\u0418\u0422\u041e\u0413\u041e</td><td style="padding:10px;text-align:right">' + totalLeads2 + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAmt2) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(totalSvc) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(totalArt) + '</td></tr>';
+  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td></td><td style="padding:10px 16px">\u0418\u0422\u041e\u0413\u041e (активные)</td><td style="padding:10px;text-align:right">' + totalLeads2 + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAmt2) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(totalSvc) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(totalArt) + '</td></tr>';
   h += '</tbody></table></div>';
 
   // P&L table
@@ -2557,6 +2642,12 @@ function renderBizOverviewV2(d, sd, fin) {
   }
 
   return h;
+}
+
+function toggleExcludeStatus(statusKey, checked) {
+  if (checked) { delete excludedStatuses[statusKey]; }
+  else { excludedStatuses[statusKey] = true; }
+  render();
 }
 
 // ============ TAB 2: ЗАТРАТЫ И ЗП ============
@@ -2702,9 +2793,8 @@ function renderBizCostsV2(d, sd, fin) {
 }
 
 // ============ TAB 3: ВОРОНКА И ДЕТАЛИ ============
-function renderBizFunnelV2(d, sd) {
+function renderBizFunnelV2(d, sd, fin) {
   var h = '';
-  var fin = d.financial || {};
   var totalLeads = d.total_leads || 1;
   var stageTimings = d.stage_timings || {};
   // ---- SECTION: Visual funnel ----
@@ -2747,12 +2837,12 @@ function renderBizFunnelV2(d, sd) {
   h += '<span style="font-weight:700">' + rejCnt + ' (' + fmtAmt(Number(rejected.amount)||0) + ') <span style="font-size:0.72rem;color:#64748b">' + (totalLeads > 0 ? ((rejCnt / totalLeads * 100).toFixed(1) + '% \u043e\u0442\u043a\u0430\u0437\u043e\u0432') : '') + '</span></span></div>';
   h += '</div></div>';
 
-  // Conversion metrics
+  // Conversion metrics with clear descriptions
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px">';
-  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f</div><div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div></div>';
-  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>\u041e\u0442\u043a\u0430\u0437\u044b</div><div style="font-size:2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? ((rejCnt / d.total_leads) * 100).toFixed(1) : '0') + '%</div></div>';
-  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>\u0421\u0440. \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</div><div style="font-size:2rem;font-weight:900;color:#3B82F6">' + (Number(fin.avg_fulfillment_days)||0) + ' <span style="font-size:0.9rem">\u0434\u043d</span></div></div>';
-  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-shopping-cart" style="margin-right:4px"></i>\u0421\u0440. \u0447\u0435\u043a</div><div style="font-size:2rem;font-weight:900;color:#F59E0B">' + fmtAmt(fin.avg_check) + '</div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f</div><div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:4px">Завершённые \u00f7 Все лиды за период</div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>\u041e\u0442\u043a\u0430\u0437\u044b</div><div style="font-size:2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? ((rejCnt / d.total_leads) * 100).toFixed(1) : '0') + '%</div><div style="font-size:0.6rem;color:#475569;margin-top:4px">Отклонённые \u00f7 Все лиды</div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>\u0421\u0440. \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</div><div style="font-size:2rem;font-weight:900;color:#3B82F6">' + (Number(fin.avg_fulfillment_days)||0) + ' <span style="font-size:0.9rem">\u0434\u043d</span></div><div style="font-size:0.6rem;color:#475569;margin-top:4px">Среднее время от создания до завершения</div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-shopping-cart" style="margin-right:4px"></i>\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)</div><div style="font-size:2rem;font-weight:900;color:#F59E0B">' + fmtAmt(fin.avg_check) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:4px">Только услуги завершённых (без выкупов)</div></div>';
   h += '</div></div>';
 
   // ---- SECTION: Rejection reasons ----
@@ -2772,19 +2862,31 @@ function renderBizFunnelV2(d, sd) {
     h += '</tbody></table></div></div>';
   }
 
-  // ---- SECTION: By assignee ----
+  // ---- SECTION: By assignee with services/articles breakdown ----
   var byAssignee = d.by_assignee || [];
   if (byAssignee.length > 0) {
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-user-tie" style="color:#3B82F6;margin-right:8px"></i>\u041f\u043e \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u043c</h3>';
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+    h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-user-tie" style="color:#3B82F6;margin-right:8px"></i>\u041f\u043e \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u043c</h3>';
+    h += '<div style="font-size:0.68rem;color:#64748b;margin-bottom:12px">Цепочка ответственности: Оператор (принимает заявку) \u2192 Закупщик (выполняет выкуп). Один клиент может пройти через нескольких сотрудников.</div>';
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:center;color:#94a3b8">Лидов</th><th style="padding:10px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:10px;text-align:right;color:#8B5CF6">Услуги</th><th style="padding:10px;text-align:right;color:#F59E0B">Выкупы</th></tr></thead><tbody>';
+    var totalAssLds = 0, totalAssSvc = 0, totalAssArt = 0, totalAssAmt = 0;
     for (var ai = 0; ai < byAssignee.length; ai++) {
       var asg = byAssignee[ai];
-      h += '<div class="card" style="padding:14px"><div style="font-weight:700;margin-bottom:6px">' + escHtml(asg.display_name || '\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d') + '</div>';
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.8rem"><span style="color:#94a3b8">\u041b\u0438\u0434\u043e\u0432:</span><span style="font-weight:600;text-align:right">' + (Number(asg.count)||0) + '</span>';
-      h += '<span style="color:#94a3b8">\u0421\u0443\u043c\u043c\u0430:</span><span style="font-weight:600;text-align:right">' + fmtAmt(Number(asg.amount)||0) + '</span></div></div>';
+      var assName = escHtml(asg.display_name || '\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d');
+      var assPos = escHtml(asg.position_title || asg.role || '');
+      var assCnt = Number(asg.count)||0; var assAmt = Number(asg.amount)||0;
+      var assSvc = Number(asg.services)||0; var assArt = Number(asg.articles)||0;
+      totalAssLds += assCnt; totalAssAmt += assAmt; totalAssSvc += assSvc; totalAssArt += assArt;
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px;font-weight:600">' + assName + '</td>';
+      h += '<td style="padding:10px;color:#64748b;font-size:0.8rem">' + assPos + '</td>';
+      h += '<td style="padding:10px;text-align:center">' + assCnt + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(assAmt) + '</td>';
+      h += '<td style="padding:10px;text-align:right;color:#8B5CF6;font-weight:600">' + fmtAmt(assSvc) + '</td>';
+      h += '<td style="padding:10px;text-align:right;color:#F59E0B;font-weight:600">' + fmtAmt(assArt) + '</td></tr>';
     }
-    h += '</div></div>';
+    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td></td><td style="padding:10px;text-align:center">' + totalAssLds + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAssAmt) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(totalAssSvc) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(totalAssArt) + '</td></tr>';
+    h += '</tbody></table></div></div>';
   }
 
   // ---- SECTION: By source ----
@@ -2793,7 +2895,7 @@ function renderBizFunnelV2(d, sd) {
   if (sourceKeys.length > 0) {
     h += '<div style="margin-bottom:32px">';
     h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-globe" style="color:#F59E0B;margin-right:8px"></i>\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u0438</h3>';
-    var srcLabels = { form: '\u0424\u043e\u0440\u043c\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0435', popup: '\u041f\u043e\u043f\u0430\u043f', calculator_pdf: '\u041a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 / PDF', manual: '\u0412\u0440\u0443\u0447\u043d\u0443\u044e', direct: '\u041f\u0440\u044f\u043c\u043e\u0439' };
+    var srcLabels = { form: '\u0424\u043e\u0440\u043c\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0435', popup: '\u041f\u043e\u043f\u0430\u043f', calculator_pdf: '\u041a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 / PDF', manual: '\u0412\u0440\u0443\u0447\u043d\u0443\u044e', direct: '\u041f\u0440\u044f\u043c\u043e\u0439', admin_panel: '\u0410\u0434\u043c\u0438\u043d-\u043f\u0430\u043d\u0435\u043b\u044c (\u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a)' };
     h += '<div class="card" style="padding:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     for (var ski = 0; ski < sourceKeys.length; ski++) {
       var sk = sourceKeys[ski]; var sv = bySource[sk];
@@ -2826,8 +2928,8 @@ function renderBizFunnelV2(d, sd) {
   return h;
 }
 
-// ============ TAB 4: ПЕРИОДЫ И ГРАФИКИ ============
-function renderBizPeriodsV2(d) {
+// ============ TAB 4: ДЕТАЛЬНЫЕ ПОКАЗАТЕЛИ ============
+function renderBizPeriodsV2(d, sd, fin) {
   var h = '';
   var now = new Date();
   var currentYear = now.getFullYear();
@@ -2835,176 +2937,144 @@ function renderBizPeriodsV2(d) {
   var currentQ = Math.ceil(currentMonth / 3);
   var snapshots = data.periodSnapshots || [];
   var monthlyData = d.monthly_data || [];
-  var weeklyData = d.weekly_data || [];
-  var monthDailyData = d.month_daily_data || [];
 
-  // ---- SECTION: Yearly Efficiency Graph ----
+  // ---- SECTION: Year overview in numbers (no graphs) ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-area" style="color:#8B5CF6;margin-right:8px"></i>\u042d\u0444\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c ' + currentYear + '</h3>';
-  // Metric selector
-  h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
-  var metrics = [{id:'amount',label:'\u041e\u0431\u043e\u0440\u043e\u0442'},{id:'count',label:'\u041a\u043e\u043b-\u0432\u043e \u043b\u0438\u0434\u043e\u0432'},{id:'done_amount',label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043d\u044b\u0435'}];
-  for (var mi2 = 0; mi2 < metrics.length; mi2++) {
-    var m = metrics[mi2];
-    h += '<button class="tab-btn' + (yearChartMetric === m.id ? ' active' : '') + '" style="padding:6px 12px;font-size:0.78rem" onclick="yearChartMetric=\\'' + m.id + '\\';render()">' + m.label + '</button>';
-  }
-  h += '<span style="color:#334155;margin:0 4px">|</span>';
-  var modes = [{id:'month',label:'\u041c\u0435\u0441\u044f\u0446'},{id:'week',label:'\u041d\u0435\u0434\u0435\u043b\u044f'}];
-  for (var md2 = 0; md2 < modes.length; md2++) {
-    h += '<button class="tab-btn' + (yearChartMode === modes[md2].id ? ' active' : '') + '" style="padding:6px 12px;font-size:0.78rem" onclick="yearChartMode=\\'' + modes[md2].id + '\\';render()">' + modes[md2].label + '</button>';
-  }
-  h += '</div>';
-  // Chart
-  var chartData = yearChartMode === 'week' ? weeklyData : monthlyData;
-  if (chartData.length > 0) {
-    h += '<div class="card" style="padding:20px">';
-    var maxVal = 1;
-    for (var ci2 = 0; ci2 < chartData.length; ci2++) {
-      var cv = Number(chartData[ci2][yearChartMetric] || chartData[ci2].amount || chartData[ci2].count) || 0;
-      if (cv > maxVal) maxVal = cv;
-    }
-    h += '<div style="display:flex;gap:6px;align-items:flex-end;height:160px">';
-    for (var ci3 = 0; ci3 < chartData.length; ci3++) {
-      var cd = chartData[ci3];
-      var val = Number(cd[yearChartMetric] || cd.amount || cd.count) || 0;
-      var barHt = Math.max(6, Math.round((val / maxVal) * 140));
-      var isCurrentM = cd.month === (currentYear + '-' + String(currentMonth).padStart(2,'0'));
-      var bColor = isCurrentM ? '#8B5CF6' : '#4F46E5';
-      var label = cd.month ? cd.month.slice(5) : (cd.week ? cd.week.slice(5) : '');
-      h += '<div style="flex:1;text-align:center;min-width:0;cursor:pointer" onclick="expandMonthFromChart(\\'' + (cd.month||'') + '\\')">';
-      h += '<div style="font-size:0.58rem;color:#94a3b8;margin-bottom:4px">' + (yearChartMetric === 'count' ? val : fmtAmt(val).replace('\u00a0\u058f','')) + '</div>';
-      h += '<div style="background:' + bColor + ';height:' + barHt + 'px;border-radius:4px 4px 0 0;transition:all 0.3s;margin-bottom:4px" title="' + (cd.month||cd.week||'') + ': ' + val + '"></div>';
-      h += '<div style="font-size:0.62rem;color:#64748b">' + label + '</div></div>';
-    }
-    h += '</div></div>';
-  } else {
-    h += '<div class="card" style="padding:24px;text-align:center;color:#475569">\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445 \u0434\u043b\u044f \u0433\u0440\u0430\u0444\u0438\u043a\u0430</div>';
-  }
-  h += '</div>';
-
-  // ---- SECTION: Month detail (if expanded) ----
-  if (monthDailyData.length > 0 && expandedMonth) {
-    h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-day" style="color:#F59E0B;margin-right:8px"></i>\u0414\u0435\u0442\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f \u043f\u043e \u0434\u043d\u044f\u043c: ' + expandedMonth + '</h3>';
-    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
-    h += '<th style="padding:10px 16px;text-align:left;color:#94a3b8">\u0414\u0435\u043d\u044c</th>';
-    h += '<th style="padding:10px;text-align:center;color:#94a3b8">\u0412\u0441\u0435\u0433\u043e</th>';
-    h += '<th style="padding:10px;text-align:center;color:#22C55E">\u0417\u0430\u0432\u0435\u0440\u0448.</th>';
-    h += '<th style="padding:10px;text-align:center;color:#EF4444">\u041e\u0442\u043a\u043b.</th>';
-    h += '<th style="padding:10px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th>';
-    h += '<th style="padding:10px;text-align:right;color:#22C55E">\u0414\u043e\u043d\u0435 \u0441\u0443\u043c\u043c\u0430</th>';
-    h += '</tr></thead><tbody>';
-    var weekTotals = {count:0,done:0,rej:0,amount:0,doneAmt:0};
-    var monthTotals = {count:0,done:0,rej:0,amount:0,doneAmt:0};
-    for (var mdi = 0; mdi < monthDailyData.length; mdi++) {
-      var md = monthDailyData[mdi];
-      var mCnt = Number(md.count)||0; var mDone = Number(md.done_count)||0;
-      var mRej = Number(md.rejected_count)||0; var mAmt = Number(md.amount)||0;
-      var mDoneAmt = Number(md.done_amount)||0;
-      weekTotals.count += mCnt; weekTotals.done += mDone; weekTotals.rej += mRej;
-      weekTotals.amount += mAmt; weekTotals.doneAmt += mDoneAmt;
-      monthTotals.count += mCnt; monthTotals.done += mDone; monthTotals.rej += mRej;
-      monthTotals.amount += mAmt; monthTotals.doneAmt += mDoneAmt;
-      var dayName = '';
-      try { dayName = new Date(md.day + 'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'}); } catch {}
-      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;font-weight:600">' + (md.day||'').slice(8) + ' <span style="color:#64748b;font-weight:400">' + dayName + '</span></td>';
-      h += '<td style="padding:8px;text-align:center">' + mCnt + '</td>';
-      h += '<td style="padding:8px;text-align:center;color:#22C55E">' + mDone + '</td>';
-      h += '<td style="padding:8px;text-align:center;color:#EF4444">' + mRej + '</td>';
-      h += '<td style="padding:8px;text-align:right">' + fmtAmt(mAmt) + '</td>';
-      h += '<td style="padding:8px;text-align:right;color:#22C55E">' + fmtAmt(mDoneAmt) + '</td></tr>';
-      // Weekly subtotal every 7 days
-      var dayNum = parseInt((md.day||'').slice(8)) || 0;
-      if (dayNum % 7 === 0 && mdi < monthDailyData.length - 1) {
-        h += '<tr style="background:rgba(139,92,246,0.08);border-bottom:2px solid #334155"><td style="padding:6px 16px;font-weight:700;color:#a78bfa;font-size:0.78rem">\u041d\u0435\u0434\u0435\u043b\u044f</td>';
-        h += '<td style="padding:6px;text-align:center;font-weight:700;color:#a78bfa">' + weekTotals.count + '</td>';
-        h += '<td style="padding:6px;text-align:center;font-weight:700;color:#22C55E">' + weekTotals.done + '</td>';
-        h += '<td style="padding:6px;text-align:center;font-weight:700;color:#EF4444">' + weekTotals.rej + '</td>';
-        h += '<td style="padding:6px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(weekTotals.amount) + '</td>';
-        h += '<td style="padding:6px;text-align:right;font-weight:700;color:#22C55E">' + fmtAmt(weekTotals.doneAmt) + '</td></tr>';
-        weekTotals = {count:0,done:0,rej:0,amount:0,doneAmt:0};
-      }
-    }
-    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px 16px">\u0418\u0422\u041e\u0413\u041e</td>';
-    h += '<td style="padding:10px;text-align:center">' + monthTotals.count + '</td>';
-    h += '<td style="padding:10px;text-align:center;color:#22C55E">' + monthTotals.done + '</td>';
-    h += '<td style="padding:10px;text-align:center;color:#EF4444">' + monthTotals.rej + '</td>';
-    h += '<td style="padding:10px;text-align:right">' + fmtAmt(monthTotals.amount) + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#22C55E">' + fmtAmt(monthTotals.doneAmt) + '</td></tr>';
-    h += '</tbody></table></div></div>';
-  }
-
-  // ---- SECTION: Year month overview ----
-  h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-alt" style="color:#8B5CF6;margin-right:8px"></i>\u0413\u043e\u0434: ' + currentYear + '</h3>';
-  var monthNames = ['\u042f\u043d\u0432','\u0424\u0435\u0432','\u041c\u0430\u0440','\u0410\u043f\u0440','\u041c\u0430\u0439','\u0418\u044e\u043d','\u0418\u044e\u043b','\u0410\u0432\u0433','\u0421\u0435\u043d','\u041e\u043a\u0442','\u041d\u043e\u044f','\u0414\u0435\u043a'];
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-list-ol" style="color:#8B5CF6;margin-right:8px"></i>Показатели ' + currentYear + ' по месяцам</h3>';
+  // Numeric table of months
+  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
+  h += '<th style="padding:10px 16px;text-align:left;color:#94a3b8">Месяц</th>';
+  h += '<th style="padding:10px;text-align:right;color:#94a3b8">Лиды</th>';
+  h += '<th style="padding:10px;text-align:right;color:#8B5CF6">Приход (итого)</th>';
+  h += '<th style="padding:10px;text-align:right;color:#8B5CF6">Услуги</th>';
+  h += '<th style="padding:10px;text-align:right;color:#F59E0B">Выкупы</th>';
+  h += '<th style="padding:10px;text-align:right;color:#EF4444">Расходы</th>';
+  h += '<th style="padding:10px;text-align:right;color:#22C55E">Прибыль</th>';
+  h += '<th style="padding:10px;text-align:center;color:#94a3b8">Статус</th>';
+  h += '<th style="padding:10px;width:80px"></th>';
+  h += '</tr></thead><tbody>';
+  var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  var yearTotals = {leads:0, turnover:0, services:0, articles:0, expenses:0, profit:0};
   for (var mi3 = 1; mi3 <= 12; mi3++) {
     var mKey = currentYear + '-' + String(mi3).padStart(2,'0');
     var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
+    var mData = monthlyData.find(function(m){return m.month===mKey;});
     var isCurrent = mi3 === currentMonth;
     var isPast = mi3 < currentMonth;
+    var isFuture = mi3 > currentMonth;
     var isLocked = mSnap && mSnap.is_locked;
-    var borderColor = isCurrent ? '#8B5CF6' : isLocked ? '#22C55E' : isPast ? '#F59E0B' : '#334155';
-    var bgColor = isCurrent ? 'rgba(139,92,246,0.1)' : isLocked ? 'rgba(34,197,94,0.05)' : 'transparent';
-    h += '<div class="card" style="padding:12px;text-align:center;border:2px solid ' + borderColor + ';background:' + bgColor + ';position:relative">';
-    if (isCurrent) h += '<div style="position:absolute;top:-8px;right:8px;background:#8B5CF6;color:white;font-size:0.6rem;padding:1px 8px;border-radius:10px;font-weight:700">\u0421\u0415\u0419\u0427\u0410\u0421</div>';
-    if (isLocked) h += '<div style="position:absolute;top:-8px;left:8px;background:#22C55E;color:white;font-size:0.6rem;padding:1px 6px;border-radius:10px"><i class="fas fa-lock"></i></div>';
-    h += '<div style="font-weight:700;font-size:0.95rem;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi3-1] + '</div>';
-    if (mSnap) {
-      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">\u041f\u0440\u0438\u0431: ' + fmtAmt(mSnap.net_profit) + '</div>';
-      h += '<div style="font-size:0.65rem;color:#64748b">\u041b\u0438\u0434\u044b: ' + (mSnap.leads_count||0) + '</div>';
-    }
-    // Action buttons
-    h += '<div style="display:flex;gap:4px;justify-content:center;margin-top:8px;flex-wrap:wrap">';
-    // Expand month button
+    // Use snapshot data if locked, otherwise live data
+    var mLeads = isLocked ? (mSnap.leads_count||0) : (mData ? Number(mData.count)||0 : 0);
+    var mTurnover = isLocked ? (Number(mSnap.total_turnover)||0) : (mData ? Number(mData.amount)||0 : 0);
+    var mSvc = isLocked ? (Number(mSnap.revenue_services)||0) : 0;
+    var mArt = isLocked ? (Number(mSnap.revenue_articles)||0) : 0;
+    var mExp = isLocked ? ((Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0)) : 0;
+    var mProfit = isLocked ? (Number(mSnap.net_profit)||0) : 0;
+    yearTotals.leads += mLeads; yearTotals.turnover += mTurnover;
+    yearTotals.services += mSvc; yearTotals.articles += mArt;
+    yearTotals.expenses += mExp; yearTotals.profit += mProfit;
+    var rowBg = isCurrent ? 'background:rgba(139,92,246,0.06);' : isFuture ? 'opacity:0.4;' : '';
+    h += '<tr style="border-bottom:1px solid #1e293b;' + rowBg + '">';
+    h += '<td style="padding:10px 16px;font-weight:700;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi3-1];
+    if (isCurrent) h += ' <span style="font-size:0.6rem;padding:1px 6px;background:#8B5CF6;color:white;border-radius:8px;vertical-align:middle">СЕЙЧАС</span>';
+    h += '</td>';
+    h += '<td style="padding:10px;text-align:right">' + mLeads + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:600;color:#a78bfa">' + fmtAmt(mTurnover) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (mExp ? fmtAmt(mExp) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (mProfit ? fmtAmt(mProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:center">';
+    if (isLocked) h += '<span style="color:#22C55E;font-size:0.72rem"><i class="fas fa-lock"></i> Закрыт</span>';
+    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.72rem"><i class="fas fa-spinner"></i> Текущий</span>';
+    else if (isPast) h += '<span style="color:#F59E0B;font-size:0.72rem">Открыт</span>';
+    else h += '<span style="color:#334155;font-size:0.72rem">\u2014</span>';
+    h += '</td>';
+    h += '<td style="padding:10px;text-align:center">';
     if (isPast || isCurrent) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="expandedMonth=\\'' + mKey + '\\';analyticsData=null;loadAnalyticsData()" title="\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044c"><i class="fas fa-expand"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="expandedMonth=\\'' + mKey + '\\';analyticsData=null;loadAnalyticsData()" title="Развернуть"><i class="fas fa-expand"></i></button> ';
     }
     if (isPast && !isLocked) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)"><i class="fas fa-lock" style="margin-right:2px"></i>\u0417\u0430\u043a\u0440</button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)"><i class="fas fa-lock"></i></button>';
     } else if (isCurrent) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)"><i class="fas fa-save" style="margin-right:2px"></i>\u0421\u043e\u0445\u0440</button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)"><i class="fas fa-save"></i></button>';
     } else if (isLocked) {
       h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.6rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')"><i class="fas fa-unlock"></i></button>';
     }
-    h += '</div></div>';
+    h += '</td></tr>';
   }
-  h += '</div>';
+  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px 16px">ИТОГО ' + currentYear + '</td>';
+  h += '<td style="padding:10px;text-align:right">' + yearTotals.leads + '</td>';
+  h += '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(yearTotals.turnover) + '</td>';
+  h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
+  h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (yearTotals.articles ? fmtAmt(yearTotals.articles) : '\u2014') + '</td>';
+  h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? fmtAmt(yearTotals.expenses) : '\u2014') + '</td>';
+  h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (yearTotals.profit >= 0 ? '#22C55E' : '#EF4444') + '">' + (yearTotals.profit ? fmtAmt(yearTotals.profit) : '\u2014') + '</td>';
+  h += '<td colspan="2"></td></tr>';
+  h += '</tbody></table></div></div>';
 
-  // Quarters
-  h += '<h4 style="font-weight:700;margin-bottom:12px;color:#94a3b8">\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u044b ' + currentYear + '</h4>';
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">';
-  for (var qi2 = 1; qi2 <= 4; qi2++) {
-    var qKey = currentYear + '-Q' + qi2;
+  // ---- SECTION: Quarters (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec) ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-alt" style="color:#F59E0B;margin-right:8px"></i>\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u044b ' + currentYear + '</h3>';
+  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Квартал</th><th style="padding:10px;text-align:left;color:#94a3b8">Месяцы</th><th style="padding:10px;text-align:center;color:#94a3b8">Закрыто</th><th style="padding:10px;text-align:right;color:#94a3b8">Приход</th><th style="padding:10px;text-align:right;color:#8B5CF6">Услуги</th><th style="padding:10px;text-align:right;color:#F59E0B">Выкупы</th><th style="padding:10px;text-align:right;color:#EF4444">Расходы</th><th style="padding:10px;text-align:right;color:#22C55E">Прибыль</th><th style="padding:10px;width:60px"></th></tr></thead><tbody>';
+  var qMonthsMap = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]];
+  var qNames = ['Q1 (Янв\u2013Мар)','Q2 (Апр\u2013Июн)','Q3 (Июл\u2013Сен)','Q4 (Окт\u2013Дек)'];
+  for (var qi2 = 0; qi2 < 4; qi2++) {
+    var qNum = qi2 + 1;
+    var qKey = currentYear + '-Q' + qNum;
     var qSnap = snapshots.find(function(s){return s.period_type==='quarter' && s.period_key===qKey;});
-    var qIsCurrent = qi2 === currentQ;
+    var qIsCurrent = qNum === currentQ;
     var qLocked = qSnap && qSnap.is_locked;
-    var qMonths = [qi2*3-2, qi2*3-1, qi2*3]; var closedInQ = 0;
-    for (var qmi = 0; qmi < qMonths.length; qmi++) {
-      var qmk = currentYear + '-' + String(qMonths[qmi]).padStart(2,'0');
-      if (snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmk && s.is_locked;})) closedInQ++;
+    var closedInQ = 0;
+    var qTurnover = 0, qSvc = 0, qArt = 0, qExp = 0, qProfit = 0;
+    for (var qmi = 0; qmi < 3; qmi++) {
+      var qmNum = qMonthsMap[qi2][qmi];
+      var qmKey = currentYear + '-' + String(qmNum).padStart(2,'0');
+      var qmSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmKey && s.is_locked;});
+      if (qmSnap) {
+        closedInQ++;
+        qTurnover += Number(qmSnap.total_turnover)||0;
+        qSvc += Number(qmSnap.revenue_services)||0;
+        qArt += Number(qmSnap.revenue_articles)||0;
+        qExp += (Number(qmSnap.expense_salaries)||0)+(Number(qmSnap.expense_commercial)||0)+(Number(qmSnap.expense_marketing)||0);
+        qProfit += Number(qmSnap.net_profit)||0;
+      }
     }
-    h += '<div class="card" style="padding:16px;text-align:center;border:2px solid ' + (qIsCurrent ? '#F59E0B' : qLocked ? '#22C55E' : '#334155') + '">';
-    h += '<div style="font-weight:700;font-size:1.1rem;color:' + (qIsCurrent ? '#F59E0B' : '#e2e8f0') + '">Q' + qi2 + '</div>';
-    h += '<div style="font-size:0.72rem;color:#64748b;margin-top:4px">\u041c\u0435\u0441\u044f\u0446\u044b: ' + closedInQ + '/3 \u0437\u0430\u043a\u0440\u044b\u0442\u043e</div>';
-    if (qSnap) h += '<div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">\u041f\u0440\u0438\u0431: ' + fmtAmt(qSnap.net_profit) + '</div>';
-    if (qi2 < currentQ && closedInQ === 3 && !qLocked) {
-      h += '<button class="btn btn-primary" style="margin-top:8px;padding:4px 12px;font-size:0.75rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)">\u0417\u0430\u043a\u0440\u044b\u0442\u044c Q' + qi2 + '</button>';
+    // Use quarter snapshot if locked
+    if (qLocked) {
+      qTurnover = Number(qSnap.total_turnover)||0;
+      qSvc = Number(qSnap.revenue_services)||0;
+      qArt = Number(qSnap.revenue_articles)||0;
+      qExp = (Number(qSnap.expense_salaries)||0)+(Number(qSnap.expense_commercial)||0)+(Number(qSnap.expense_marketing)||0);
+      qProfit = Number(qSnap.net_profit)||0;
+    }
+    var qColor = qIsCurrent ? '#F59E0B' : qLocked ? '#22C55E' : '#e2e8f0';
+    h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px;font-weight:700;color:' + qColor + '">' + qNames[qi2] + '</td>';
+    h += '<td style="padding:10px;color:#64748b;font-size:0.78rem">' + qMonthsMap[qi2].map(function(m){return monthNames[m-1];}).join(', ') + '</td>';
+    h += '<td style="padding:10px;text-align:center">' + closedInQ + '/3</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:600">' + (qTurnover ? fmtAmt(qTurnover) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (qSvc ? fmtAmt(qSvc) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (qArt ? fmtAmt(qArt) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (qExp ? fmtAmt(qExp) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (qProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (qProfit ? fmtAmt(qProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:10px;text-align:center">';
+    if (qNum < currentQ && closedInQ === 3 && !qLocked) {
+      h += '<button class="btn btn-primary" style="padding:3px 10px;font-size:0.72rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)"><i class="fas fa-lock"></i></button>';
     } else if (qLocked) {
-      h += '<div style="margin-top:6px;font-size:0.7rem;color:#22C55E"><i class="fas fa-check-circle"></i> \u0417\u0430\u043a\u0440\u044b\u0442</div>';
+      h += '<span style="color:#22C55E;font-size:0.72rem"><i class="fas fa-check-circle"></i></span>';
     }
-    h += '</div>';
+    h += '</td></tr>';
   }
-  h += '</div>';
+  h += '</tbody></table></div>';
 
-  // Year
+  // Year total
   var yearKey = String(currentYear);
   var yearSnap = snapshots.find(function(s){return s.period_type==='year' && s.period_key===yearKey;});
   var closedQ = 0;
   for (var yqi = 1; yqi <= 4; yqi++) { if(snapshots.find(function(s){return s.period_type==='quarter' && s.period_key===currentYear+'-Q'+yqi && s.is_locked;})) closedQ++; }
-  h += '<div class="card" style="padding:20px;text-align:center;border:2px solid ' + (yearSnap && yearSnap.is_locked ? '#22C55E' : '#8B5CF6') + ';margin-bottom:20px">';
+  h += '<div class="card" style="padding:20px;text-align:center;border:2px solid ' + (yearSnap && yearSnap.is_locked ? '#22C55E' : '#8B5CF6') + ';margin-top:16px">';
   h += '<div style="font-size:1.3rem;font-weight:800;color:#a78bfa">\u0413\u043e\u0434 ' + currentYear + '</div>';
   h += '<div style="font-size:0.85rem;color:#64748b;margin-top:4px">\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u043e\u0432 \u0437\u0430\u043a\u0440\u044b\u0442\u043e: ' + closedQ + '/4</div>';
   if (yearSnap) h += '<div style="font-size:0.85rem;margin-top:8px">\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u0437\u0430 \u0433\u043e\u0434: <strong style="color:' + ((yearSnap.net_profit||0) >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearSnap.net_profit) + '</strong></div>';
@@ -3013,24 +3083,66 @@ function renderBizPeriodsV2(d) {
   }
   h += '</div></div>';
 
-  // ---- SECTION: Period comparison ----
+  // ---- SECTION: Manual Period Comparison ----
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#F59E0B;margin-right:8px"></i>\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432</h3>';
   var closedSnaps = snapshots.filter(function(s){return s.is_locked;}).sort(function(a,b){return a.period_key>b.period_key?-1:1;});
-  if (closedSnaps.length > 0) {
-    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">\u041f\u0435\u0440\u0438\u043e\u0434</th><th style="padding:10px;text-align:right;color:#94a3b8">\u041e\u0431\u043e\u0440\u043e\u0442</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0420\u0430\u0441\u0445\u043e\u0434\u044b</th><th style="padding:10px;text-align:right;color:#94a3b8">\u041f\u0440\u0438\u0431\u044b\u043b\u044c</th><th style="padding:10px;text-align:right;color:#94a3b8">\u041b\u0438\u0434\u044b</th></tr></thead><tbody>';
-    for (var csi = 0; csi < closedSnaps.length; csi++) {
-      var cs = closedSnaps[csi]; var pLabel = cs.period_type === 'month' ? cs.period_key : cs.period_type === 'quarter' ? cs.period_key : '\u0413\u043e\u0434 ' + cs.period_key;
-      var pColor = cs.period_type === 'year' ? '#8B5CF6' : cs.period_type === 'quarter' ? '#F59E0B' : '#64748b';
-      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><span style="color:' + pColor + ';font-weight:600">' + pLabel + '</span><span style="font-size:0.65rem;color:#475569;margin-left:6px">' + cs.period_type + '</span></td>';
-      h += '<td style="padding:10px;text-align:right">' + fmtAmt(cs.total_turnover) + '</td>';
-      var csTotalExp = (Number(cs.expense_salaries)||0)+(Number(cs.expense_commercial)||0)+(Number(cs.expense_marketing)||0);
-      h += '<td style="padding:10px;text-align:right;color:#f87171">' + fmtAmt(csTotalExp) + '</td>';
-      h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + ((Number(cs.net_profit)||0)>=0?'#22C55E':'#EF4444') + '">' + fmtAmt(cs.net_profit) + '</td>';
-      h += '<td style="padding:10px;text-align:right">' + (cs.leads_count||0) + '</td></tr>';
+  if (closedSnaps.length > 1) {
+    // Manual selection dropdowns
+    h += '<div class="card" style="padding:16px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
+    h += '<div style="font-size:0.82rem;color:#94a3b8;font-weight:600">Выберите периоды для сравнения:</div>';
+    h += '<select class="input" style="width:200px;padding:6px 10px;font-size:0.82rem" onchange="comparePeriod1=this.value;render()" id="cmpPeriod1">';
+    h += '<option value="">\u2014 Период 1 \u2014</option>';
+    for (var cs1 = 0; cs1 < closedSnaps.length; cs1++) {
+      var sn1 = closedSnaps[cs1]; var lbl1 = sn1.period_type === 'month' ? sn1.period_key : sn1.period_type === 'quarter' ? sn1.period_key : 'Год ' + sn1.period_key;
+      h += '<option value="' + sn1.id + '"' + (comparePeriod1 == sn1.id ? ' selected' : '') + '>' + lbl1 + ' (' + sn1.period_type + ')</option>';
     }
-    h += '</tbody></table></div>';
+    h += '</select>';
+    h += '<span style="color:#64748b">vs</span>';
+    h += '<select class="input" style="width:200px;padding:6px 10px;font-size:0.82rem" onchange="comparePeriod2=this.value;render()" id="cmpPeriod2">';
+    h += '<option value="">\u2014 Период 2 \u2014</option>';
+    for (var cs2 = 0; cs2 < closedSnaps.length; cs2++) {
+      var sn2 = closedSnaps[cs2]; var lbl2 = sn2.period_type === 'month' ? sn2.period_key : sn2.period_type === 'quarter' ? sn2.period_key : 'Год ' + sn2.period_key;
+      h += '<option value="' + sn2.id + '"' + (comparePeriod2 == sn2.id ? ' selected' : '') + '>' + lbl2 + ' (' + sn2.period_type + ')</option>';
+    }
+    h += '</select></div>';
+    // Show comparison if both selected
+    var snap1 = comparePeriod1 ? closedSnaps.find(function(s){return s.id == comparePeriod1;}) : null;
+    var snap2 = comparePeriod2 ? closedSnaps.find(function(s){return s.id == comparePeriod2;}) : null;
+    if (snap1 && snap2) {
+      var cmpMetrics = [
+        {label:'Оборот',key:'total_turnover',color:'#a78bfa'},
+        {label:'Услуги',key:'revenue_services',color:'#8B5CF6'},
+        {label:'Выкупы',key:'revenue_articles',color:'#F59E0B'},
+        {label:'Расходы',keyFn:function(s){return (Number(s.expense_salaries)||0)+(Number(s.expense_commercial)||0)+(Number(s.expense_marketing)||0);},color:'#EF4444'},
+        {label:'Прибыль',key:'net_profit',color:'#22C55E'},
+        {label:'Лиды',key:'leads_count',isCnt:true,color:'#3B82F6'},
+        {label:'Ср. чек',key:'avg_check',color:'#8B5CF6'},
+      ];
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Метрика</th>';
+      h += '<th style="padding:10px;text-align:right;color:#a78bfa">' + (snap1.period_key) + '</th>';
+      h += '<th style="padding:10px;text-align:right;color:#F59E0B">' + (snap2.period_key) + '</th>';
+      h += '<th style="padding:10px;text-align:right;color:#94a3b8">\u0394 Изменение</th></tr></thead><tbody>';
+      for (var cmi = 0; cmi < cmpMetrics.length; cmi++) {
+        var cm = cmpMetrics[cmi];
+        var v1 = cm.keyFn ? cm.keyFn(snap1) : (Number(snap1[cm.key])||0);
+        var v2 = cm.keyFn ? cm.keyFn(snap2) : (Number(snap2[cm.key])||0);
+        var diff = v1 - v2;
+        var diffPct = v2 !== 0 ? ((diff / Math.abs(v2)) * 100).toFixed(1) : (v1 > 0 ? '+\u221e' : '0');
+        var diffColor = diff > 0 ? '#22C55E' : diff < 0 ? '#EF4444' : '#64748b';
+        if (cm.label === 'Расходы') diffColor = diff < 0 ? '#22C55E' : diff > 0 ? '#EF4444' : '#64748b';
+        h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px;font-weight:600">' + cm.label + '</td>';
+        h += '<td style="padding:10px;text-align:right;font-weight:600">' + (cm.isCnt ? v1 : fmtAmt(v1)) + '</td>';
+        h += '<td style="padding:10px;text-align:right;font-weight:600">' + (cm.isCnt ? v2 : fmtAmt(v2)) + '</td>';
+        h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + diffColor + '">' + (diff > 0 ? '+' : '') + (cm.isCnt ? diff : fmtAmt(diff)) + ' (' + (typeof diffPct === 'string' ? diffPct : (diff > 0 ? '+' : '') + diffPct) + '%)</td></tr>';
+      }
+      h += '</tbody></table></div>';
+    } else {
+      h += '<div class="card" style="padding:20px;text-align:center;color:#475569"><i class="fas fa-arrows-alt-h" style="margin-right:8px"></i>Выберите два закрытых периода для сравнения</div>';
+    }
+  } else if (closedSnaps.length === 1) {
+    h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>Закройте минимум два периода для сравнения</div>';
   } else {
     h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>\u0417\u0430\u043a\u0440\u043e\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u043c\u0435\u0441\u044f\u0446 \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435</div>';
   }

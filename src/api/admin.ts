@@ -1649,10 +1649,14 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const marginality = servicesTotal > 0 ? Math.round((netProfit / servicesTotal) * 1000) / 10 : 0;
     const roi = allExpensesSum > 0 ? Math.round((netProfit / allExpensesSum) * 1000) / 10 : 0;
     const romi = marketingExpenses > 0 ? Math.round(((servicesTotal - marketingExpenses) / marketingExpenses) * 1000) / 10 : 0;
-    const avgCheck = doneCount > 0 ? Math.round(turnover / doneCount) : 0;
+    // AVG CHECK = only from services of completed leads (excluding purchases/articles)
+    const avgCheck = doneCount > 0 ? Math.round(doneServices / doneCount) : 0;
     const totalLeadsCount = Object.values(statusData).reduce((a: number, s: any) => a + (Number(s.count) || 0), 0);
     const conversionRate = totalLeadsCount > 0 ? Math.round((doneCount / totalLeadsCount) * 1000) / 10 : 0;
     const breakEven = allExpensesSum;
+
+    // Articles net (articles minus refunds)
+    const articlesNet = Math.max(0, Math.round((articlesTotal - totalRefunds) * 100) / 100);
 
     // 6. Order fulfillment time
     let avgFulfillmentDays = 0;
@@ -1677,12 +1681,34 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       }
     } catch {}
 
-    // 8. By assignee
+    // 8. By assignee — enhanced with services/articles/operator/buyer breakdown
     const byAssignee: any[] = [];
     try {
-      const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amt DESC").bind(...dateParams).all();
+      const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, u.role, u.position_title, COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amt DESC").bind(...dateParams).all();
       for (const r of (byAssRes.results || [])) {
-        byAssignee.push({ user_id: r.assigned_to, display_name: r.display_name || 'Не назначен', count: Number(r.cnt), amount: Number(r.amt) });
+        // Calculate per-assignee services vs articles
+        let assServices = 0, assArticles = 0;
+        for (const lead of (allLeads.results || [])) {
+          if (Number(lead.assigned_to) !== Number(r.assigned_to)) continue;
+          if (!['in_progress','checking','done'].includes(lead.status as string)) continue;
+          try {
+            const cd = JSON.parse((lead.calc_data as string) || '{}');
+            if (cd.items && Array.isArray(cd.items)) {
+              for (const item of cd.items) {
+                const subtotal = Number(item.subtotal) || 0;
+                if (item.wb_article) assArticles += subtotal;
+                else assServices += subtotal;
+              }
+            }
+          } catch {}
+        }
+        byAssignee.push({ 
+          user_id: r.assigned_to, display_name: r.display_name || 'Не назначен', 
+          role: r.role || '', position_title: r.position_title || '',
+          count: Number(r.cnt), amount: Number(r.amt),
+          services: Math.round(assServices * 100) / 100,
+          articles: Math.round(assArticles * 100) / 100
+        });
       }
     } catch {}
 
@@ -1781,7 +1807,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     return c.json({
       status_data: statusData,
       financial: {
-        turnover, services: servicesTotal, articles: articlesTotal, refunds: totalRefunds,
+        turnover, services: servicesTotal, articles: articlesTotal, articles_net: articlesNet, refunds: totalRefunds,
         salaries: totalSalaries, bonuses: totalBonuses, commercial_expenses: commercialExpenses,
         marketing_expenses: marketingExpenses, total_expenses: allExpensesSum,
         net_profit: netProfit, marginality, roi, romi,
