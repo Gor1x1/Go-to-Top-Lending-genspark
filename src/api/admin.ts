@@ -894,11 +894,16 @@ api.post('/users', authMiddleware, async (c) => {
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can create users' }, 403);
   const d = await c.req.json();
   if (!d.username || !d.password || !d.display_name) return c.json({ error: 'username, password, display_name required' }, 400);
+  // main_admin can only be one
+  if (d.role === 'main_admin') {
+    const existingAdmin = await db.prepare("SELECT id FROM users WHERE role = 'main_admin'").first();
+    if (existingAdmin) return c.json({ error: 'Главный Админ может быть только один' }, 400);
+  }
   const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
   if (existing) return c.json({ error: 'Username already exists' }, 400);
   const hash = await hashPassword(d.password);
-  await db.prepare('INSERT INTO users (username, password_hash, role, display_name, phone, email, is_active) VALUES (?,?,?,?,?,?,1)')
-    .bind(d.username, hash, d.role || 'operator', d.display_name, d.phone || '', d.email || '').run();
+  await db.prepare('INSERT INTO users (username, password_hash, password_plain, role, display_name, phone, email, is_active) VALUES (?,?,?,?,?,?,?,1)')
+    .bind(d.username, hash, d.password, d.role || 'operator', d.display_name, d.phone || '', d.email || '').run();
   // Set default permissions
   const newUser = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
   if (newUser) {
@@ -914,6 +919,11 @@ api.put('/users/:id', authMiddleware, async (c) => {
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can edit users' }, 403);
   const id = c.req.param('id');
   const d = await c.req.json();
+  // Protect: can't change role to main_admin if one already exists (and it's not this user)
+  if (d.role === 'main_admin') {
+    const existingAdmin = await db.prepare("SELECT id FROM users WHERE role = 'main_admin' AND id != ?").bind(id).first();
+    if (existingAdmin) return c.json({ error: 'Главный Админ может быть только один' }, 400);
+  }
   const fields: string[] = [];
   const vals: any[] = [];
   if (d.display_name !== undefined) { fields.push('display_name=?'); vals.push(d.display_name); }
@@ -921,6 +931,10 @@ api.put('/users/:id', authMiddleware, async (c) => {
   if (d.phone !== undefined) { fields.push('phone=?'); vals.push(d.phone); }
   if (d.email !== undefined) { fields.push('email=?'); vals.push(d.email); }
   if (d.is_active !== undefined) { fields.push('is_active=?'); vals.push(d.is_active ? 1 : 0); }
+  if (d.username !== undefined) { fields.push('username=?'); vals.push(d.username); }
+  if (d.salary !== undefined) { fields.push('salary=?'); vals.push(d.salary); }
+  if (d.salary_type !== undefined) { fields.push('salary_type=?'); vals.push(d.salary_type); }
+  if (d.position_title !== undefined) { fields.push('position_title=?'); vals.push(d.position_title); }
   if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
@@ -946,9 +960,10 @@ api.post('/users/:id/reset-password', authMiddleware, async (c) => {
   const caller = c.get('user');
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can reset passwords' }, 403);
   const id = c.req.param('id');
-  const newPass = generatePassword(10);
+  const body = await c.req.json().catch(() => ({}));
+  const newPass = body.new_password || generatePassword(10);
   const hash = await hashPassword(newPass);
-  await db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(hash, id).run();
+  await db.prepare('UPDATE users SET password_hash = ?, password_plain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(hash, newPass, id).run();
   return c.json({ success: true, new_password: newPass });
 });
 

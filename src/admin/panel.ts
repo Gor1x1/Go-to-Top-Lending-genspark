@@ -2289,8 +2289,9 @@ async function loadAnalyticsData() {
   render();
 }
 
-function fmtAmt(n) { return n ? Number(n).toLocaleString('ru-RU') + '\\u00a0\\u058f' : '0 \\u058f'; }
+function fmtAmt(n) { return n ? Number(n).toLocaleString('ru-RU') + '\u00a0\u058f' : '0 \u058f'; }
 function fmtPct(n) { return (n || 0).toFixed(1) + '%'; }
+function fmtNum(n) { return n ? Number(n).toLocaleString('ru-RU') : '0'; }
 
 function renderLeadsAnalytics() {
   var d = analyticsData;
@@ -2298,492 +2299,555 @@ function renderLeadsAnalytics() {
     loadAnalyticsData();
     return '<div style="padding:32px;text-align:center"><div class="spinner" style="width:40px;height:40px;margin:60px auto"></div><p style="color:#94a3b8;margin-top:16px">Загрузка бизнес-аналитики...</p></div>';
   }
-  
   var sd = d.status_data || {};
   var fin = d.financial || {};
-  var h = '<div style="padding:24px">';
-
-  // ===== HEADER =====
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>' +
-    '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>' +
-    '<button class="btn btn-outline" onclick="analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button></div>';
-
-  // ===== DATE FILTER =====
-  h += '<div class="card" style="padding:14px;margin-bottom:20px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
-    '<i class="fas fa-calendar-alt" style="color:#8B5CF6"></i>' +
-    '<span style="font-size:0.82rem;color:#94a3b8;font-weight:600">Период:</span>' +
-    '<input type="date" class="input" style="width:150px;padding:5px 8px;font-size:0.8rem" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">' +
-    '<span style="color:#64748b">—</span>' +
-    '<input type="date" class="input" style="width:150px;padding:5px 8px;font-size:0.8rem" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">' +
-    '<div style="display:flex;gap:4px;margin-left:4px">' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'today\\')">Сегодня</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'week\\')">7 дн</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'14d\\')">14 дн</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'month\\')">30 дн</button>' +
-      '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="setAnalyticsPeriod(\\'all\\')">Все</button>' +
-    '</div></div>';
-
-  // ===== TABS =====
   var tabs = [
-    { id: 'overview', icon: 'fa-tachometer-alt', label: 'Обзор' },
-    { id: 'finance', icon: 'fa-coins', label: 'Финансы' },
-    { id: 'expenses', icon: 'fa-receipt', label: 'Затраты' },
-    { id: 'salaries', icon: 'fa-users-cog', label: 'Зарплаты' },
-    { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка' },
+    { id: 'overview', icon: 'fa-chart-pie', label: 'Обзор и Финансы' },
+    { id: 'costs', icon: 'fa-wallet', label: 'Затраты и ЗП' },
+    { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка и Детали' },
     { id: 'periods', icon: 'fa-calendar-check', label: 'Периоды' },
-    { id: 'details', icon: 'fa-list-alt', label: 'Детали' },
   ];
-  h += '<div style="display:flex;gap:4px;margin-bottom:20px;flex-wrap:wrap;border-bottom:2px solid #1e293b;padding-bottom:0">';
+  var h = '<div style="padding:24px 32px">';
+  // Header
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">';
+  h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>';
+  h += '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>';
+  h += '<button class="btn btn-outline" onclick="analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить</button>';
+  h += '</div>';
+  // Date filter
+  h += '<div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  h += '<i class="fas fa-calendar" style="color:#8B5CF6"></i><span style="font-weight:600;color:#94a3b8">Период:</span>';
+  h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">';
+  h += '<span style="color:#475569">\u2014</span>';
+  h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">';
+  var periods = [{l:'Сегодня',v:'today'},{l:'7 дн',v:'week'},{l:'14 дн',v:'14d'},{l:'30 дн',v:'month'},{l:'Все',v:'all'}];
+  for (var pi = 0; pi < periods.length; pi++) {
+    h += '<button class="tab-btn" style="padding:6px 14px;font-size:0.8rem" onclick="setAnalyticsPeriod(\\'' + periods[pi].v + '\\')">' + periods[pi].l + '</button>';
+  }
+  h += '</div>';
+  // Tabs
+  h += '<div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">';
   for (var ti = 0; ti < tabs.length; ti++) {
     var t = tabs[ti];
-    var isActive = bizAnalyticsTab === t.id;
-    h += '<button onclick="bizAnalyticsTab=\\'' + t.id + '\\';render()" style="padding:10px 16px;font-size:0.82rem;font-weight:600;border:none;cursor:pointer;' +
-      'background:' + (isActive ? '#8B5CF6' : 'transparent') + ';color:' + (isActive ? '#fff' : '#94a3b8') + ';border-radius:8px 8px 0 0;' +
-      'transition:all 0.2s"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
+    h += '<button class="tab-btn' + (bizAnalyticsTab === t.id ? ' active' : '') + '" onclick="bizAnalyticsTab=\\'' + t.id + '\\';render()" style="padding:10px 20px"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
   }
   h += '</div>';
-
-  // ===== STATUS CARDS (always shown) =====
-  var statuses = [
-    { key: 'new', label: '\\u{1F7E2} Новые лиды', color: '#10B981', bg: 'rgba(16,185,129,0.12)', border: 'rgba(16,185,129,0.3)' },
-    { key: 'contacted', label: '\\u{1F4AC} На связи', color: '#3B82F6', bg: 'rgba(59,130,246,0.12)', border: 'rgba(59,130,246,0.3)' },
-    { key: 'in_progress', label: '\\u{1F504} В работе', color: '#F59E0B', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.3)' },
-    { key: 'rejected', label: '\\u274C Отклонён', color: '#EF4444', bg: 'rgba(239,68,68,0.12)', border: 'rgba(239,68,68,0.3)' },
-    { key: 'checking', label: '\\u{1F50D} Проверка', color: '#8B5CF6', bg: 'rgba(139,92,246,0.12)', border: 'rgba(139,92,246,0.25)' },
-    { key: 'done', label: '\\u2705 Завершён', color: '#10B981', bg: 'rgba(16,185,129,0.18)', border: 'rgba(16,185,129,0.4)' },
-  ];
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:20px">';
-  for (var si = 0; si < statuses.length; si++) {
-    var s = statuses[si];
-    var ss = sd[s.key] || {};
-    h += '<div class="stat-card" style="padding:16px;cursor:pointer;background:linear-gradient(135deg,' + s.bg + ',' + s.bg.replace('0.12','0.04').replace('0.18','0.06') + ');border-color:' + s.border + '" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + s.key + '\\')">' +
-      '<div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">' + s.label + '</div>' +
-      '<div style="font-size:1.8rem;font-weight:900;color:' + s.color + '">' + (ss.count||0) + '</div>' +
-      '<div style="font-size:0.95rem;font-weight:700;color:' + s.color + ';opacity:0.8;margin-top:2px">' + fmtAmt(ss.amount) + '</div>' +
-      '<div style="margin-top:4px;font-size:0.68rem;color:#94a3b8">' +
-        'Усл: <span style="color:#a78bfa">' + fmtAmt(ss.services) + '</span><br>' +
-        'Зак: <span style="color:#fb923c">' + fmtAmt(ss.articles) + '</span></div></div>';
-  }
-  h += '</div>';
-
-  // ===== TAB CONTENT =====
-  if (bizAnalyticsTab === 'overview') {
-    h += renderBizOverview(d, sd, fin);
-  } else if (bizAnalyticsTab === 'finance') {
-    h += renderBizFinance(d, sd, fin);
-  } else if (bizAnalyticsTab === 'expenses') {
-    h += renderBizExpenses(d);
-  } else if (bizAnalyticsTab === 'salaries') {
-    h += renderBizSalaries(d);
-  } else if (bizAnalyticsTab === 'funnel') {
-    h += renderBizFunnel(d, sd);
-  } else if (bizAnalyticsTab === 'periods') {
-    h += renderBizPeriods(d);
-  } else if (bizAnalyticsTab === 'details') {
-    h += renderBizDetails(d, sd);
-  }
-
+  // Tab content
+  if (bizAnalyticsTab === 'overview') h += renderBizOverviewV2(d, sd, fin);
+  else if (bizAnalyticsTab === 'costs') h += renderBizCostsV2(d, sd, fin);
+  else if (bizAnalyticsTab === 'funnel') h += renderBizFunnelV2(d, sd);
+  else if (bizAnalyticsTab === 'periods') h += renderBizPeriodsV2(d);
   h += '</div>';
   return h;
 }
 
-// ===== OVERVIEW TAB =====
-function renderBizOverview(d, sd, fin) {
+// ============ TAB 1: ОБЗОР И ФИНАНСЫ ============
+function renderBizOverviewV2(d, sd, fin) {
   var h = '';
-  // Key metrics row
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:20px">';
-  var metrics = [
-    { label: 'Оборот', value: fmtAmt(fin.turnover), icon: 'fa-money-bill-wave', color: '#10B981', desc: 'В работе + Проверка + Завершён' },
-    { label: 'Доход (услуги)', value: fmtAmt(fin.services), icon: 'fa-hand-holding-usd', color: '#8B5CF6', desc: 'Моя прибыль' },
-    { label: 'Выкупы (артикулы)', value: fmtAmt(fin.articles), icon: 'fa-shopping-cart', color: '#F59E0B', desc: 'Деньги клиентов' },
-    { label: 'Возвраты', value: fmtAmt(fin.refunds), icon: 'fa-undo-alt', color: '#EF4444', desc: 'Возвращено клиентам' },
-    { label: 'Чистая прибыль', value: fmtAmt(fin.net_profit), icon: 'fa-gem', color: fin.net_profit >= 0 ? '#10B981' : '#EF4444', desc: 'Доход - Все расходы' },
-    { label: 'Все расходы', value: fmtAmt(fin.total_expenses), icon: 'fa-file-invoice-dollar', color: '#F97316', desc: 'Зарплаты + Затраты' },
+  // ---- SECTION: Status cards ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:8px"></i>Статусы заявок</h3>';
+  var statuses = [
+    {key:'new',label:'Новые',color:'#10B981',icon:'fa-star'},
+    {key:'contacted',label:'На связи',color:'#3B82F6',icon:'fa-phone'},
+    {key:'in_progress',label:'В работе',color:'#F59E0B',icon:'fa-cog'},
+    {key:'rejected',label:'Отклонено',color:'#EF4444',icon:'fa-times'},
+    {key:'checking',label:'Проверка',color:'#8B5CF6',icon:'fa-search'},
+    {key:'done',label:'Завершено',color:'#22C55E',icon:'fa-check-circle'}
   ];
-  for (var mi = 0; mi < metrics.length; mi++) {
-    var m = metrics[mi];
-    h += '<div class="card" style="padding:16px;text-align:center">' +
-      '<div style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px"><i class="fas ' + m.icon + '" style="margin-right:4px;color:' + m.color + '"></i>' + m.label + '</div>' +
-      '<div style="font-size:1.5rem;font-weight:900;color:' + m.color + '">' + m.value + '</div>' +
-      '<div style="font-size:0.65rem;color:#64748b;margin-top:2px">' + m.desc + '</div></div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">';
+  for (var si = 0; si < statuses.length; si++) {
+    var st = statuses[si]; var v = sd[st.key] || {};
+    h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + st.key + '\\')">';
+    h += '<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas ' + st.icon + '" style="color:' + st.color + ';margin-right:4px"></i>' + st.label + '</div>';
+    h += '<div style="font-size:1.8rem;font-weight:800;color:' + st.color + '">' + (v.count || 0) + '</div>';
+    h += '<div style="font-size:0.8rem;color:#64748b;margin-top:4px">' + fmtAmt(v.amount) + '</div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.7rem;color:#475569"><span>Усл: ' + fmtAmt(v.services) + '</span><span>Зак: ' + fmtAmt(v.articles) + '</span></div>';
+    h += '</div>';
+  }
+  h += '</div></div>';
+
+  // ---- SECTION: Key financials ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-coins" style="color:#F59E0B;margin-right:8px"></i>Финансовые показатели</h3>';
+  var turnover = fin.turnover || 0; var serviceRev = fin.services || 0;
+  var articlesRev = fin.articles || 0; var refunds = fin.refunds || 0;
+  var netProfit = fin.net_profit || 0; var totalExpenses = fin.total_expenses || 0;
+  var profitColor = netProfit >= 0 ? '#22C55E' : '#EF4444';
+
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
+  // Turnover card
+  h += '<div class="card" style="padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));border:1px solid rgba(139,92,246,0.3)">';
+  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-chart-bar" style="margin-right:4px"></i>Оборот</div>';
+  h += '<div style="font-size:2rem;font-weight:800;color:#a78bfa">' + fmtAmt(turnover) + '</div>';
+  if (turnover > 0) {
+    var svcPct = Math.round(serviceRev / turnover * 100) || 0;
+    h += '<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:10px;background:#1e293b">';
+    h += '<div style="width:' + svcPct + '%;background:#8B5CF6" title="Услуги"></div>';
+    h += '<div style="width:' + (100 - svcPct) + '%;background:#F59E0B" title="Артикулы"></div>';
+    h += '</div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.72rem;color:#64748b"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B5CF6;margin-right:4px"></span>Услуги ' + fmtAmt(serviceRev) + '</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:4px"></span>Артикулы ' + fmtAmt(articlesRev) + '</span></div>';
+  }
+  h += '</div>';
+  // Net profit
+  h += '<div class="card" style="padding:20px;background:linear-gradient(135deg,rgba(' + (netProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.12),transparent);border:1px solid rgba(' + (netProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.3)">';
+  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-' + (netProfit >= 0 ? 'arrow-up' : 'arrow-down') + '" style="margin-right:4px"></i>Чистая прибыль</div>';
+  h += '<div style="font-size:2rem;font-weight:800;color:' + profitColor + '">' + fmtAmt(netProfit) + '</div>';
+  h += '<div style="font-size:0.75rem;color:#64748b;margin-top:6px">Доход \u2212 Все расходы</div>';
+  h += '</div>';
+  // Total expenses
+  h += '<div class="card" style="padding:20px;border-left:3px solid #EF4444">';
+  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-receipt" style="margin-right:4px"></i>Все расходы</div>';
+  h += '<div style="font-size:2rem;font-weight:800;color:#f87171">' + fmtAmt(totalExpenses) + '</div>';
+  var salaryExp = fin.salaries || 0; var bonusesExp = fin.bonuses || 0; var commExp = fin.commercial_expenses || 0; var mktExp = fin.marketing_expenses || 0;
+  h += '<div style="margin-top:8px;font-size:0.75rem;color:#64748b">';
+  h += '<div>ЗП: ' + fmtAmt(salaryExp + bonusesExp) + ' \u2022 Комм: ' + fmtAmt(commExp) + ' \u2022 Маркет: ' + fmtAmt(mktExp) + '</div></div>';
+  if (totalExpenses > 0) {
+    var sp = Math.round((salaryExp + bonusesExp) / totalExpenses * 100); var cp = Math.round(commExp / totalExpenses * 100);
+    h += '<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:8px;background:#1e293b">';
+    h += '<div style="width:' + sp + '%;background:#3B82F6" title="ЗП"></div>';
+    h += '<div style="width:' + cp + '%;background:#F59E0B" title="Комм"></div>';
+    h += '<div style="flex:1;background:#EF4444" title="Маркет"></div>';
+    h += '</div>';
+  }
+  h += '</div></div>';
+
+  // Revenue detail
+  h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px">';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">Доход (услуги)</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div><div style="font-size:0.72rem;color:#475569;margin-top:4px">Моя прибыль</div></div>';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">Выкупы (артикулы)</div><div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesRev) + '</div><div style="font-size:0.72rem;color:#475569;margin-top:4px">Деньги клиентов</div></div>';
+  h += '</div>';
+  // Refunds
+  if (refunds > 0) {
+    h += '<div class="card" style="margin-bottom:16px;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3);padding:16px"><div style="display:flex;align-items:center;gap:12px">';
+    h += '<i class="fas fa-exclamation-triangle" style="color:#EF4444;font-size:1.2rem"></i>';
+    h += '<div><div style="font-weight:700;color:#f87171">Возвраты средств</div><div style="font-size:0.82rem;color:#94a3b8">Общая сумма: <strong style="color:#EF4444">' + fmtAmt(refunds) + '</strong></div></div></div></div>';
   }
   h += '</div>';
 
-  // ROI / ROMI / Margins / Avg check / Conversion
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:20px">';
+  // ---- SECTION: KPI Metrics ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-tachometer-alt" style="color:#10B981;margin-right:8px"></i>KPI метрики</h3>';
   var kpis = [
-    { label: 'Конверсия', value: fmtPct(fin.conversion_rate), color: '#8B5CF6' },
-    { label: 'Средний чек', value: fmtAmt(fin.avg_check), color: '#10B981' },
-    { label: 'Маржинальность', value: fmtPct(fin.marginality), color: fin.marginality >= 0 ? '#10B981' : '#EF4444' },
-    { label: 'ROI', value: fmtPct(fin.roi), color: fin.roi >= 0 ? '#10B981' : '#EF4444' },
-    { label: 'ROMI', value: fmtPct(fin.romi), color: fin.romi >= 0 ? '#10B981' : '#EF4444' },
-    { label: 'Среднее выполнение', value: (fin.avg_fulfillment_days || 0) + ' дн', color: '#3B82F6' },
-    { label: 'Break-even', value: fmtAmt(fin.break_even), color: '#F59E0B' },
-    { label: '% Отказов', value: (d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%', color: '#EF4444' },
+    {label:'Конверсия',val:fmtPct(fin.conversion_rate),color:fin.conversion_rate>20?'#22C55E':fin.conversion_rate>10?'#F59E0B':'#EF4444',icon:'fa-percentage'},
+    {label:'Средний чек',val:fmtAmt(fin.avg_check),color:'#8B5CF6',icon:'fa-shopping-cart'},
+    {label:'Маржинальность',val:fmtPct(fin.marginality),color:fin.marginality>0?'#22C55E':'#EF4444',icon:'fa-percentage'},
+    {label:'ROI',val:fmtPct(fin.roi),color:fin.roi>0?'#22C55E':'#EF4444',icon:'fa-chart-line'},
+    {label:'ROMI',val:fmtPct(fin.romi),color:fin.romi>0?'#22C55E':'#EF4444',icon:'fa-bullhorn'},
+    {label:'Выполнение',val:(fin.avg_fulfillment_days||0)+' дн',color:'#3B82F6',icon:'fa-clock'},
+    {label:'Break-even',val:fmtAmt(fin.break_even),color:'#F59E0B',icon:'fa-balance-scale'},
+    {label:'Отказы',val:(d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban'}
   ];
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">';
   for (var ki = 0; ki < kpis.length; ki++) {
     var kp = kpis[ki];
-    h += '<div class="card" style="padding:14px;text-align:center">' +
-      '<div style="font-size:0.7rem;color:#94a3b8;margin-bottom:4px">' + kp.label + '</div>' +
-      '<div style="font-size:1.4rem;font-weight:900;color:' + kp.color + '">' + kp.value + '</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center">';
+    h += '<i class="fas ' + kp.icon + '" style="color:' + kp.color + ';font-size:0.9rem;margin-bottom:6px;display:block"></i>';
+    h += '<div style="font-size:1.3rem;font-weight:800;color:' + kp.color + '">' + kp.val + '</div>';
+    h += '<div style="font-size:0.7rem;color:#64748b;margin-top:2px">' + kp.label + '</div>';
+    h += '</div>';
   }
-  h += '</div>';
+  h += '</div></div>';
 
-  // Daily chart
+  // ---- SECTION: Financial table P&L ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-table" style="color:#3B82F6;margin-right:8px"></i>Отчёт по статусам (P&L)</h3>';
+  h += '<div class="card" style="overflow-x:auto;padding:0"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
+  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">Статус</th><th style="padding:12px;text-align:right;color:#94a3b8">Кол-во</th><th style="padding:12px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:12px;text-align:right;color:#94a3b8">Услуги</th><th style="padding:12px;text-align:right;color:#94a3b8">Артикулы</th></tr></thead><tbody>';
+  var totalLeads = 0; var totalAmt = 0;
+  for (var si2 = 0; si2 < statuses.length; si2++) {
+    var s2 = statuses[si2]; var v2 = sd[s2.key] || {};
+    totalLeads += (v2.count || 0); totalAmt += (v2.amount || 0);
+    h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + s2.color + ';margin-right:8px"></span>' + s2.label + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:600">' + (v2.count || 0) + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(v2.amount) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(v2.services) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(v2.articles) + '</td></tr>';
+  }
+  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td style="padding:10px;text-align:right">' + totalLeads + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAmt) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(serviceRev) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(articlesRev) + '</td></tr>';
+  h += '</tbody></table></div>';
+  // P&L table
+  h += '<div class="card" style="overflow-x:auto;padding:0;margin-top:16px"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8" colspan="2">Прибыли и убытки (P&L)</th></tr></thead><tbody>';
+  var plRows = [
+    { label: 'Доход (услуги)', value: serviceRev, color: '#10B981', bold: true },
+    { label: '\u00a0\u00a0Зарплаты сотрудников', value: -(salaryExp + bonusesExp), color: '#EF4444' },
+    { label: '\u00a0\u00a0Коммерческие затраты', value: -commExp, color: '#EF4444' },
+    { label: '\u00a0\u00a0Маркетинг / Реклама', value: -mktExp, color: '#EF4444' },
+    { label: 'ИТОГО расходов', value: -totalExpenses, color: '#F97316', bold: true },
+    { label: 'ЧИСТАЯ ПРИБЫЛЬ', value: netProfit, color: profitColor, bold: true, big: true },
+  ];
+  for (var pli = 0; pli < plRows.length; pli++) {
+    var pr = plRows[pli];
+    h += '<tr style="border-bottom:1px solid #1e293b' + (pr.big ? ';border-top:2px solid #8B5CF6' : '') + '">';
+    h += '<td style="padding:10px 16px;' + (pr.bold ? 'font-weight:800;' : 'color:#94a3b8;') + (pr.big ? 'font-size:1.1rem;' : '') + '">' + pr.label + '</td>';
+    h += '<td style="padding:10px 16px;text-align:right;font-weight:' + (pr.bold ? '800' : '600') + ';color:' + pr.color + ';' + (pr.big ? 'font-size:1.2rem;' : '') + '">' + fmtAmt(Math.abs(pr.value || 0)) + '</td></tr>';
+  }
+  h += '</tbody></table></div></div>';
+
+  // ---- SECTION: Daily chart ----
   var daily = d.daily || [];
   if (daily.length > 0) {
-    var maxVal = Math.max.apply(null, daily.map(function(x) { return x.count || 1; }));
-    h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.95rem"><i class="fas fa-chart-area" style="color:#8B5CF6;margin-right:8px"></i>Заявки по дням (30 дней)</h3>' +
-      '<div style="display:flex;gap:3px;align-items:flex-end;height:120px;padding:0 4px">';
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:8px"></i>Заявки по дням (30 дней)</h3>';
+    h += '<div class="card" style="padding:20px">';
+    h += '<div style="display:flex;gap:4px;align-items:flex-end;height:140px">';
+    var maxD = Math.max.apply(null, daily.map(function(x){return x.count||1;}));
     for (var di = 0; di < daily.length; di++) {
-      var dd = daily[di];
-      var barH = Math.max(6, Math.round((dd.count / maxVal) * 100));
-      h += '<div style="flex:1;text-align:center;min-width:0">' +
-        '<div title="' + dd.day + ': ' + dd.count + ' заявок, ' + fmtAmt(dd.amount) + '" style="background:linear-gradient(to top,#8B5CF6,#a78bfa);height:' + barH + 'px;border-radius:3px 3px 0 0;margin:0 auto;cursor:pointer;max-width:36px;min-width:6px"></div>' +
-        '<div style="font-size:0.55rem;color:#64748b;margin-top:1px;overflow:hidden;text-overflow:ellipsis">' + (dd.day||'').slice(5) + '</div></div>';
+      var dd = daily[di]; var barH = Math.max(8, Math.round((dd.count / maxD) * 120));
+      var barColor = dd.count > 0 ? (di === daily.length - 1 ? '#8B5CF6' : '#4F46E5') : '#1e293b';
+      h += '<div style="flex:1;text-align:center;min-width:0"><div style="background:' + barColor + ';height:' + barH + 'px;border-radius:4px 4px 0 0;margin-bottom:4px;transition:all 0.2s" title="' + (dd.day || '') + ': ' + dd.count + ' заявок"></div>';
+      if (daily.length <= 14) h += '<div style="font-size:0.6rem;color:#475569;white-space:nowrap;overflow:hidden">' + (dd.day||'').slice(5) + '</div>';
+      h += '</div>';
+    }
+    h += '</div>';
+    if (daily.length > 14) {
+      h += '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.65rem;color:#475569"><span>' + (daily[0]?.day||'').slice(5) + '</span><span>' + (daily[daily.length-1]?.day||'').slice(5) + '</span></div>';
     }
     h += '</div></div>';
   }
+
   return h;
 }
 
-// ===== FINANCE TAB =====
-function renderBizFinance(d, sd, fin) {
-  var h = '';
-  // Revenue breakdown by status
-  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-coins" style="color:#F59E0B;margin-right:8px"></i>Финансовый отчёт по статусам</h3>';
-  h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
-    '<th style="padding:10px;text-align:left;color:#94a3b8">Статус</th>' +
-    '<th style="padding:10px;text-align:right;color:#94a3b8">Лидов</th>' +
-    '<th style="padding:10px;text-align:right;color:#94a3b8">Общая сумма</th>' +
-    '<th style="padding:10px;text-align:right;color:#94a3b8">Услуги</th>' +
-    '<th style="padding:10px;text-align:right;color:#94a3b8">Артикулы</th>' +
-    '</tr></thead><tbody>';
-  var statusLabels = { new: 'Новые', contacted: 'На связи', in_progress: 'В работе', checking: 'Проверка', done: 'Завершён', rejected: 'Отклонён' };
-  var statusColors = { new: '#10B981', contacted: '#3B82F6', in_progress: '#F59E0B', checking: '#8B5CF6', done: '#10B981', rejected: '#EF4444' };
-  var totSvc = 0, totArt = 0, totAmt = 0, totCnt = 0;
-  var stOrder = ['in_progress', 'checking', 'done', 'new', 'contacted', 'rejected'];
-  for (var sti = 0; sti < stOrder.length; sti++) {
-    var stk = stOrder[sti];
-    var ss = sd[stk] || {};
-    var isActive = stk === 'in_progress' || stk === 'checking' || stk === 'done';
-    totSvc += Number(ss.services || 0); totArt += Number(ss.articles || 0); totAmt += Number(ss.amount || 0); totCnt += Number(ss.count || 0);
-    h += '<tr style="border-bottom:1px solid #1e293b;' + (isActive ? 'background:rgba(139,92,246,0.06)' : '') + '">' +
-      '<td style="padding:10px;font-weight:600;color:' + (statusColors[stk]||'#e2e8f0') + '">' + (statusLabels[stk]||stk) + (isActive ? ' <span style="font-size:0.65rem;color:#a78bfa">\\u{1F4B0}</span>' : '') + '</td>' +
-      '<td style="padding:10px;text-align:right;color:#e2e8f0">' + (ss.count||0) + '</td>' +
-      '<td style="padding:10px;text-align:right;font-weight:700;color:#e2e8f0">' + fmtAmt(ss.amount) + '</td>' +
-      '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(ss.services) + '</td>' +
-      '<td style="padding:10px;text-align:right;color:#fb923c">' + fmtAmt(ss.articles) + '</td></tr>';
-  }
-  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px">ИТОГО</td>' +
-    '<td style="padding:10px;text-align:right;color:#e2e8f0">' + totCnt + '</td>' +
-    '<td style="padding:10px;text-align:right;color:#e2e8f0">' + fmtAmt(totAmt) + '</td>' +
-    '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(totSvc) + '</td>' +
-    '<td style="padding:10px;text-align:right;color:#fb923c">' + fmtAmt(totArt) + '</td></tr>';
-  h += '</tbody></table></div>';
-
-  // P&L Summary
-  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-balance-scale" style="color:#10B981;margin-right:8px"></i>Прибыли и убытки (P&L)</h3>';
-  h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-  var plRows = [
-    { label: 'Доход (услуги)', value: fin.services, color: '#10B981', bold: true },
-    { label: '  Зарплаты сотрудников', value: -(fin.salaries + fin.bonuses), color: '#EF4444' },
-    { label: '  Коммерческие затраты', value: -fin.commercial_expenses, color: '#EF4444' },
-    { label: '  Маркетинг / Реклама', value: -fin.marketing_expenses, color: '#EF4444' },
-    { label: 'ИТОГО расходов', value: -fin.total_expenses, color: '#F97316', bold: true },
-    { label: 'ЧИСТАЯ ПРИБЫЛЬ', value: fin.net_profit, color: fin.net_profit >= 0 ? '#10B981' : '#EF4444', bold: true, big: true },
-  ];
-  for (var pi = 0; pi < plRows.length; pi++) {
-    var pr = plRows[pi];
-    h += '<tr style="border-bottom:1px solid #1e293b' + (pr.big ? ';border-top:2px solid #8B5CF6' : '') + '">' +
-      '<td style="padding:10px;' + (pr.bold ? 'font-weight:800;' : 'color:#94a3b8;padding-left:20px;') + (pr.big ? 'font-size:1.1rem;' : '') + '">' + pr.label + '</td>' +
-      '<td style="padding:10px;text-align:right;font-weight:' + (pr.bold ? '800' : '600') + ';color:' + pr.color + ';' + (pr.big ? 'font-size:1.2rem;' : '') + '">' + fmtAmt(Math.abs(pr.value || 0)) + (pr.value < 0 ? '' : '') + '</td></tr>';
-  }
-  h += '</table></div>';
-
-  // Refunds info
-  if (fin.refunds > 0) {
-    h += '<div class="card" style="margin-bottom:20px;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3)">' +
-      '<div style="display:flex;align-items:center;gap:12px;padding:4px">' +
-      '<i class="fas fa-exclamation-triangle" style="color:#EF4444;font-size:1.2rem"></i>' +
-      '<div><div style="font-weight:700;color:#f87171">Возвраты средств</div>' +
-      '<div style="font-size:0.82rem;color:#94a3b8">Общая сумма возвратов клиентам: <strong style="color:#EF4444">' + fmtAmt(fin.refunds) + '</strong> (снимается из стоимости артикулов)</div></div></div></div>';
-  }
-  return h;
-}
-
-// ===== EXPENSES TAB =====
-function renderBizExpenses(d) {
+// ============ TAB 2: ЗАТРАТЫ И ЗП ============
+function renderBizCostsV2(d, sd, fin) {
   var h = '';
   var cats = data.expenseCategories || [];
   var freqs = data.expenseFreqTypes || [];
   var exps = data.expenses || [];
 
+  // ---- SECTION: Expense management ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-receipt" style="color:#EF4444;margin-right:8px"></i>Коммерческие затраты</h3>';
   // Categories management
-  h += '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-    '<h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-tags" style="color:#8B5CF6;margin-right:8px"></i>Категории затрат</h3>' +
-    '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="showAddCategoryForm=!showAddCategoryForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button></div>';
+  h += '<div class="card" style="padding:16px;margin-bottom:16px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="font-weight:600;color:#94a3b8">Категории затрат</h4>';
+  h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="showAddCategoryForm=!showAddCategoryForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Категория</button></div>';
   if (showAddCategoryForm) {
-    h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#0f172a;border-radius:8px">' +
-      '<input type="text" id="new-cat-name" class="input" style="flex:1;min-width:150px;padding:6px 10px;font-size:0.82rem" placeholder="Название категории">' +
-      '<input type="color" id="new-cat-color" value="#8B5CF6" style="width:40px;height:32px;border:none;cursor:pointer">' +
-      '<label style="font-size:0.78rem;color:#94a3b8;display:flex;align-items:center;gap:4px"><input type="checkbox" id="new-cat-marketing"> Маркетинг</label>' +
-      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveNewCategory()">Сохранить</button>' +
-      '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddCategoryForm=false;render()">Отмена</button></div>';
+    h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#0f172a;border-radius:8px">';
+    h += '<input type="text" id="new-cat-name" class="input" style="flex:1;min-width:150px;padding:6px 10px;font-size:0.82rem" placeholder="Название категории">';
+    h += '<input type="color" id="new-cat-color" value="#8B5CF6" style="width:40px;height:32px;border:none;cursor:pointer">';
+    h += '<label style="font-size:0.78rem;color:#94a3b8;display:flex;align-items:center;gap:4px"><input type="checkbox" id="new-cat-marketing"> Маркетинг</label>';
+    h += '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveNewCategory()">Сохранить</button>';
+    h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddCategoryForm=false;render()">Отмена</button></div>';
   }
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  h += '<div style="display:flex;flex-wrap:wrap;gap:8px">';
   for (var ci = 0; ci < cats.length; ci++) {
     var cat = cats[ci];
-    h += '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;background:' + (cat.color||'#8B5CF6') + '20;color:' + (cat.color||'#8B5CF6') + ';border:1px solid ' + (cat.color||'#8B5CF6') + '40">' +
-      '<span style="width:8px;height:8px;border-radius:50%;background:' + (cat.color||'#8B5CF6') + '"></span>' + escHtml(cat.name) +
-      (cat.is_marketing ? ' <i class="fas fa-bullhorn" style="font-size:0.65rem"></i>' : '') +
-      '<button onclick="deleteExpenseCategory(' + cat.id + ')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.7rem;padding:0 2px"><i class="fas fa-times"></i></button></span>';
+    h += '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:0.8rem;font-weight:600;background:' + (cat.color||'#8B5CF6') + '22;color:' + (cat.color||'#8B5CF6') + ';border:1px solid ' + (cat.color||'#8B5CF6') + '44">';
+    h += '<span style="width:8px;height:8px;border-radius:50%;background:' + (cat.color||'#8B5CF6') + '"></span>' + escHtml(cat.name);
+    if (cat.is_marketing) h += ' <i class="fas fa-bullhorn" style="font-size:0.65rem"></i>';
+    h += ' <i class="fas fa-times" style="cursor:pointer;opacity:0.5;font-size:0.65rem" onclick="deleteExpenseCategory(' + cat.id + ')"></i></span>';
   }
   h += '</div></div>';
 
   // Frequency types
-  h += '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-    '<h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-clock" style="color:#3B82F6;margin-right:8px"></i>Типы периодичности</h3>' +
-    '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="showAddFreqTypeForm=!showAddFreqTypeForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button></div>';
+  h += '<div class="card" style="padding:16px;margin-bottom:16px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px"><h4 style="font-weight:600;color:#94a3b8">Типы периодичности</h4>';
+  h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="showAddFreqTypeForm=!showAddFreqTypeForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Тип</button></div>';
   if (showAddFreqTypeForm) {
-    h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#0f172a;border-radius:8px">' +
-      '<input type="text" id="new-freq-name" class="input" style="flex:1;min-width:150px;padding:6px 10px;font-size:0.82rem" placeholder="Название типа">' +
-      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveNewFreqType()">Сохранить</button>' +
-      '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddFreqTypeForm=false;render()">Отмена</button></div>';
+    h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center;padding:12px;background:#0f172a;border-radius:8px">';
+    h += '<input type="text" id="new-freq-name" class="input" style="flex:1;min-width:150px;padding:6px 10px;font-size:0.82rem" placeholder="Название типа">';
+    h += '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveNewFreqType()">Сохранить</button>';
+    h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddFreqTypeForm=false;render()">Отмена</button></div>';
   }
   h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
   for (var fi = 0; fi < freqs.length; fi++) {
     var fr = freqs[fi];
-    h += '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3)">' + escHtml(fr.name) +
-      '<button onclick="deleteFreqType(' + fr.id + ')" style="background:none;border:none;color:#64748b;cursor:pointer;font-size:0.7rem;padding:0 2px"><i class="fas fa-times"></i></button></span>';
+    h += '<span style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3)">' + escHtml(fr.name);
+    h += ' <i class="fas fa-times" style="cursor:pointer;opacity:0.5;font-size:0.65rem" onclick="deleteFreqType(' + fr.id + ')"></i></span>';
   }
   h += '</div></div>';
 
-  // Expenses list
-  h += '<div class="card" style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
-    '<h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-receipt" style="color:#F59E0B;margin-right:8px"></i>Коммерческие затраты</h3>' +
-    '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.8rem" onclick="showAddExpenseForm=!showAddExpenseForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить затрату</button></div>';
+  // Expense list with add form
+  h += '<div class="card" style="padding:16px;margin-bottom:16px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h4 style="font-weight:600;color:#94a3b8">Текущие затраты (' + exps.length + ')</h4>';
+  h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.85rem" onclick="showAddExpenseForm=!showAddExpenseForm;render()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить затрату</button></div>';
   if (showAddExpenseForm) {
-    h += '<div style="padding:16px;background:#0f172a;border-radius:8px;margin-bottom:16px">' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
-        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Название</label>' +
-        '<input type="text" id="new-exp-name" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem" placeholder="Напр: Google Ads"></div>' +
-        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма (\\u058f)</label>' +
-        '<input type="number" id="new-exp-amount" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem" placeholder="0"></div>' +
-        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Категория</label>' +
-        '<select id="new-exp-category" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem"><option value="">— Без категории —</option>';
-    for (var cci = 0; cci < cats.length; cci++) { h += '<option value="' + cats[cci].id + '">' + escHtml(cats[cci].name) + '</option>'; }
-    h += '</select></div>' +
-        '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Периодичность</label>' +
-        '<select id="new-exp-freq" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem"><option value="">— Тип —</option>';
-    for (var ffi = 0; ffi < freqs.length; ffi++) { h += '<option value="' + freqs[ffi].id + '">' + escHtml(freqs[ffi].name) + '</option>'; }
-    h += '</select></div></div>' +
-      '<div><label style="font-size:0.72rem;color:#94a3b8;display:block;margin-bottom:4px">Заметка</label>' +
-      '<input type="text" id="new-exp-notes" class="input" style="width:100%;padding:8px 10px;font-size:0.82rem" placeholder="Комментарий (опционально)"></div>' +
-      '<div style="display:flex;gap:8px;margin-top:12px">' +
-        '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="saveNewExpense()">Сохранить</button>' +
-        '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem" onclick="showAddExpenseForm=false;render()">Отмена</button></div></div>';
+    h += '<div style="padding:16px;background:#0f172a;border:2px solid #8B5CF6;border-radius:10px;margin-bottom:16px">';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+    h += '<div><label style="font-size:0.72rem;color:#64748b">Название *</label><input class="input" id="new-exp-name" placeholder="Напр: Аренда офиса"></div>';
+    h += '<div><label style="font-size:0.72rem;color:#64748b">Сумма (\u058f) *</label><input class="input" id="new-exp-amount" type="number" placeholder="0"></div>';
+    h += '<div><label style="font-size:0.72rem;color:#64748b">Категория</label><select class="input" id="new-exp-category"><option value="">— Без категории —</option>';
+    for (var ci2 = 0; ci2 < cats.length; ci2++) h += '<option value="' + cats[ci2].id + '">' + escHtml(cats[ci2].name) + '</option>';
+    h += '</select></div>';
+    h += '<div><label style="font-size:0.72rem;color:#64748b">Периодичность</label><select class="input" id="new-exp-freq"><option value="">— Тип —</option>';
+    for (var fi2 = 0; fi2 < freqs.length; fi2++) h += '<option value="' + freqs[fi2].id + '">' + escHtml(freqs[fi2].name) + '</option>';
+    h += '</select></div></div>';
+    h += '<div style="margin-bottom:10px"><label style="font-size:0.72rem;color:#64748b">Заметка</label><input class="input" id="new-exp-notes" placeholder="Комментарий (опционально)"></div>';
+    h += '<div style="display:flex;gap:8px"><button class="btn btn-success" onclick="saveNewExpense()"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
+    h += '<button class="btn btn-outline" onclick="showAddExpenseForm=false;render()">Отмена</button></div></div>';
   }
   // Table
   if (exps.length > 0) {
-    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Название</th>' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Категория</th>' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Тип</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th>' +
-      '<th style="padding:8px;text-align:center;color:#94a3b8">Действия</th>' +
-      '</tr></thead><tbody>';
     var totalExp = 0;
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr style="border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">Затрата</th><th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:8px;color:#94a3b8">Категория</th><th style="padding:8px;color:#94a3b8">Период</th><th style="padding:8px;width:40px"></th></tr></thead><tbody>';
     for (var ei = 0; ei < exps.length; ei++) {
-      var ex = exps[ei];
-      totalExp += Number(ex.amount || 0);
-      h += '<tr style="border-bottom:1px solid #1e293b">' +
-        '<td style="padding:8px;font-weight:600;color:#e2e8f0">' + escHtml(ex.name) + (ex.notes ? '<div style="font-size:0.7rem;color:#64748b">' + escHtml(ex.notes) + '</div>' : '') + '</td>' +
-        '<td style="padding:8px"><span style="padding:3px 8px;border-radius:12px;font-size:0.72rem;background:' + (ex.category_color||'#64748b') + '20;color:' + (ex.category_color||'#94a3b8') + '">' + escHtml(ex.category_name||'—') + '</span></td>' +
-        '<td style="padding:8px;color:#94a3b8;font-size:0.78rem">' + escHtml(ex.frequency_name||'—') + '</td>' +
-        '<td style="padding:8px;text-align:right;font-weight:700;color:#f87171">' + fmtAmt(ex.amount) + '</td>' +
-        '<td style="padding:8px;text-align:center"><button onclick="deleteExpense(' + ex.id + ')" class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem;color:#f87171"><i class="fas fa-trash"></i></button></td></tr>';
+      var exp = exps[ei]; totalExp += (exp.amount || 0);
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 12px;font-weight:600">' + escHtml(exp.name) + (exp.notes ? '<div style="font-size:0.7rem;color:#64748b">' + escHtml(exp.notes) + '</div>' : '') + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(exp.amount) + '</td>';
+      h += '<td style="padding:8px"><span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:' + (exp.category_color||'#475569') + '22;color:' + (exp.category_color||'#94a3b8') + '">' + escHtml(exp.category_name||'\u2014') + '</span></td>';
+      h += '<td style="padding:8px;font-size:0.8rem;color:#64748b">' + escHtml(exp.frequency_name||'\u2014') + '</td>';
+      h += '<td style="padding:8px"><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
     }
-    h += '<tr style="border-top:2px solid #8B5CF6"><td colspan="3" style="padding:10px;font-weight:800">ИТОГО</td>' +
-      '<td style="padding:10px;text-align:right;font-weight:900;color:#f87171;font-size:1rem">' + fmtAmt(totalExp) + '</td><td></td></tr>';
+    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 12px">ИТОГО</td><td style="padding:10px;text-align:right;color:#EF4444">' + fmtAmt(totalExp) + '</td><td colspan="3"></td></tr>';
     h += '</tbody></table>';
   } else {
-    h += '<p style="color:#64748b;text-align:center;padding:20px">Нет затрат. Нажмите "Добавить затрату" для создания.</p>';
-  }
-  h += '</div>';
-  return h;
-}
-
-// ===== SALARIES TAB =====
-function renderBizSalaries(d) {
-  var h = '';
-  var users = data.users || [];
-  var employees = d.employees || [];
-
-  h += '<div class="card" style="margin-bottom:16px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-users-cog" style="color:#10B981;margin-right:8px"></i>Зарплаты сотрудников</h3>';
-  var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', hourly: 'Почасовая', per_task: 'За работу' };
-  if (users.length > 0) {
-    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Сотрудник</th>' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Должность</th>' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Тип оплаты</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Зарплата</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Бонусы</th>' +
-      '<th style="padding:8px;text-align:center;color:#94a3b8">Действия</th>' +
-      '</tr></thead><tbody>';
-    var totalSal = 0, totalBon = 0;
-    for (var ui = 0; ui < users.length; ui++) {
-      var u = users[ui];
-      var emp = employees.find(function(e) { return e.id === u.id; });
-      var bonusTotal = emp ? emp.bonuses_total || 0 : 0;
-      var sal = Number(u.salary) || 0;
-      totalSal += sal; totalBon += bonusTotal;
-      h += '<tr style="border-bottom:1px solid #1e293b">' +
-        '<td style="padding:8px"><div style="font-weight:600;color:#e2e8f0">' + escHtml(u.display_name||u.username) + '</div>' +
-          '<div style="font-size:0.7rem;color:#64748b">' + escHtml(u.role) + '</div></td>' +
-        '<td style="padding:8px"><input type="text" class="input" style="width:100%;padding:4px 8px;font-size:0.78rem" value="' + escHtml(u.position_title||'') + '" onchange="updateUserSalary(' + u.id + ',\\'position_title\\',this.value)" placeholder="Должность"></td>' +
-        '<td style="padding:8px"><select class="input" style="padding:4px 8px;font-size:0.78rem" onchange="updateUserSalary(' + u.id + ',\\'salary_type\\',this.value)">';
-      var stypes = ['monthly', 'biweekly', 'hourly', 'per_task'];
-      for (var sti2 = 0; sti2 < stypes.length; sti2++) {
-        h += '<option value="' + stypes[sti2] + '"' + ((u.salary_type||'monthly') === stypes[sti2] ? ' selected' : '') + '>' + salaryTypeLabels[stypes[sti2]] + '</option>';
-      }
-      h += '</select></td>' +
-        '<td style="padding:8px;text-align:right"><input type="number" class="input" style="width:100px;padding:4px 8px;font-size:0.82rem;text-align:right" value="' + sal + '" onchange="updateUserSalary(' + u.id + ',\\'salary\\',Number(this.value))"></td>' +
-        '<td style="padding:8px;text-align:right;color:#a78bfa;font-weight:600">' + fmtAmt(bonusTotal) + '</td>' +
-        '<td style="padding:8px;text-align:center"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem" onclick="showAddBonusUserId=' + u.id + ';render()"><i class="fas fa-plus"></i> Бонус</button></td></tr>';
-      // Bonus add form
-      if (showAddBonusUserId === u.id) {
-        h += '<tr style="background:#0f172a"><td colspan="6" style="padding:12px"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">' +
-          '<span style="font-size:0.78rem;color:#94a3b8">Бонус для ' + escHtml(u.display_name||u.username) + ':</span>' +
-          '<input type="number" id="bonus-amount-' + u.id + '" class="input" style="width:100px;padding:4px 8px;font-size:0.82rem" placeholder="Сумма">' +
-          '<input type="text" id="bonus-desc-' + u.id + '" class="input" style="flex:1;min-width:150px;padding:4px 8px;font-size:0.82rem" placeholder="Описание">' +
-          '<input type="date" id="bonus-date-' + u.id + '" class="input" style="padding:4px 8px;font-size:0.82rem" value="' + new Date().toISOString().slice(0,10) + '">' +
-          '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="saveBonus(' + u.id + ')">Добавить</button>' +
-          '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="showAddBonusUserId=0;render()">Отмена</button>' +
-          '</div></td></tr>';
-      }
-    }
-    h += '<tr style="border-top:2px solid #8B5CF6"><td colspan="3" style="padding:10px;font-weight:800">ИТОГО</td>' +
-      '<td style="padding:10px;text-align:right;font-weight:900;color:#f87171;font-size:1rem">' + fmtAmt(totalSal) + '</td>' +
-      '<td style="padding:10px;text-align:right;font-weight:900;color:#a78bfa">' + fmtAmt(totalBon) + '</td><td></td></tr>';
-    h += '</tbody></table>';
-  } else {
-    h += '<p style="color:#64748b;text-align:center;padding:20px">Нет сотрудников. Добавьте в разделе "Сотрудники".</p>';
-  }
-  h += '</div>';
-  return h;
-}
-
-// ===== FUNNEL TAB =====
-function renderBizFunnel(d, sd) {
-  var h = '';
-  var totalLeads = d.total_leads || 1;
-  var funnelSteps = [
-    { label: 'Всего заявок', count: d.total_leads||0, color: '#8B5CF6', icon: '\\u{1F4E5}' },
-    { label: 'На связи+', count: (sd.contacted?.count||0) + (sd.in_progress?.count||0) + (sd.checking?.count||0) + (sd.done?.count||0), color: '#3B82F6', icon: '\\u{1F4AC}' },
-    { label: 'В работе+', count: (sd.in_progress?.count||0) + (sd.checking?.count||0) + (sd.done?.count||0), color: '#F59E0B', icon: '\\u{1F504}' },
-    { label: 'Проверка+', count: (sd.checking?.count||0) + (sd.done?.count||0), color: '#8B5CF6', icon: '\\u{1F50D}' },
-    { label: 'Завершены', count: sd.done?.count||0, color: '#10B981', icon: '\\u2705' }
-  ];
-  h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка конверсии</h3>';
-  h += '<div style="display:flex;gap:0;align-items:center">';
-  for (var fi = 0; fi < funnelSteps.length; fi++) {
-    var fs = funnelSteps[fi];
-    var fPct = totalLeads > 0 ? Math.round((fs.count / totalLeads) * 100) : 0;
-    var widthPct = Math.max(15, fPct);
-    h += '<div style="flex:' + widthPct + ';text-align:center;padding:14px 6px;background:' + fs.color + '20;border-top:3px solid ' + fs.color + ';' + (fi === 0 ? 'border-radius:8px 0 0 8px;' : fi === funnelSteps.length-1 ? 'border-radius:0 8px 8px 0;' : '') + '">' +
-      '<div style="font-size:1.3rem">' + fs.icon + '</div>' +
-      '<div style="font-size:1.2rem;font-weight:900;color:' + fs.color + '">' + fs.count + '</div>' +
-      '<div style="font-size:0.68rem;color:#94a3b8;margin-top:2px">' + fs.label + '</div>' +
-      '<div style="font-size:0.65rem;font-weight:700;color:' + fs.color + '">' + fPct + '%</div></div>';
-    if (fi < funnelSteps.length - 1) {
-      var dropoff = fi > 0 ? funnelSteps[fi].count - funnelSteps[fi+1].count : 0;
-      h += '<div style="font-size:1rem;color:#475569;padding:0 2px">\\u2192' + (dropoff > 0 ? '<div style="font-size:0.6rem;color:#EF4444">-' + dropoff + '</div>' : '') + '</div>';
-    }
+    h += '<div style="text-align:center;padding:24px;color:#475569"><i class="fas fa-inbox" style="font-size:1.5rem;margin-bottom:8px;display:block"></i>Затраты не добавлены</div>';
   }
   h += '</div></div>';
 
-  // Conversion metrics
-  var fin = d.financial || {};
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:20px">';
-  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>Конверсия в завершённые</div>' +
-    '<div style="font-size:2.2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div></div>';
-  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>Процент отказов</div>' +
-    '<div style="font-size:2.2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%</div></div>';
-  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>Время выполнения</div>' +
-    '<div style="font-size:2.2rem;font-weight:900;color:#3B82F6">' + (fin.avg_fulfillment_days||0) + ' <span style="font-size:0.9rem">дн</span></div></div>';
+  // ---- SECTION: Salaries ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-users-cog" style="color:#3B82F6;margin-right:8px"></i>Зарплаты и бонусы</h3>';
+  var users = data.users || [];
+  var employees = d.employees || [];
+  var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', hourly: 'Почасовая', per_task: 'За работу' };
+  var totalSalary = 0; var totalBonus = 0;
+  for (var si3 = 0; si3 < users.length; si3++) {
+    var sal = Number(users[si3].salary) || 0;
+    var empMatch = employees.find(function(e) { return e.id === users[si3].id; });
+    totalSalary += sal; totalBonus += (empMatch ? empMatch.bonuses_total || 0 : 0);
+  }
+  // Summary cards
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px">';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.8rem;color:#94a3b8">ФОТ (зарплаты)</div><div style="font-size:1.4rem;font-weight:700;color:#3B82F6">' + fmtAmt(totalSalary) + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.8rem;color:#94a3b8">Бонусы</div><div style="font-size:1.4rem;font-weight:700;color:#F59E0B">' + fmtAmt(totalBonus) + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.8rem;color:#94a3b8">ИТОГО ЗП</div><div style="font-size:1.4rem;font-weight:700;color:#EF4444">' + fmtAmt(totalSalary + totalBonus) + '</div></div>';
   h += '</div>';
-  return h;
-}
-
-// ===== DETAILS TAB =====
-function renderBizDetails(d, sd) {
-  var h = '';
-  // Services popularity
-  var services = d.services || [];
-  if (services.length > 0) {
-    h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.95rem"><i class="fas fa-star" style="color:#F59E0B;margin-right:8px"></i>Популярность услуг</h3>';
-    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="border-bottom:2px solid #334155">' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">#</th><th style="padding:8px;text-align:left;color:#94a3b8">Услуга</th>' +
-      '<th style="padding:8px;text-align:center;color:#94a3b8">Заказов</th><th style="padding:8px;text-align:center;color:#94a3b8">Кол-во</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Выручка</th><th style="padding:8px;text-align:right;color:#94a3b8">%</th></tr></thead><tbody>';
-    var totalSvcRev = services.reduce(function(a, s) { return a + (s.revenue||0); }, 0);
-    for (var sii = 0; sii < services.length; sii++) {
-      var sv = services[sii];
-      var pct = totalSvcRev > 0 ? ((sv.revenue / totalSvcRev) * 100).toFixed(1) : '0';
-      var barW = totalSvcRev > 0 ? Math.round((sv.revenue / totalSvcRev) * 100) : 0;
-      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px;color:#64748b">' + (sii+1) + '</td>' +
-        '<td style="padding:8px;font-weight:600;color:#e2e8f0">' + escHtml(sv.name) + '</td>' +
-        '<td style="padding:8px;text-align:center;color:#94a3b8">' + sv.count + '</td>' +
-        '<td style="padding:8px;text-align:center;color:#94a3b8">' + sv.qty + '</td>' +
-        '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(sv.revenue) + '</td>' +
-        '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600;color:#e2e8f0">' + pct + '%</span></div></td></tr>';
+  // Employee salary table
+  if (users.length > 0) {
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:right;color:#94a3b8">Бонусы</th><th style="padding:10px;width:60px"></th></tr></thead><tbody>';
+    for (var ui = 0; ui < users.length; ui++) {
+      var u = users[ui]; var empU = employees.find(function(e) { return e.id === u.id; });
+      var uBonus = empU ? empU.bonuses_total || 0 : 0; var uSal = Number(u.salary) || 0;
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><div style="font-weight:600">' + escHtml(u.display_name||u.username) + '</div><div style="font-size:0.7rem;color:#64748b">' + escHtml(u.role) + '</div></td>';
+      h += '<td style="padding:10px"><input type="text" class="input" style="width:100%;padding:4px 8px;font-size:0.78rem" value="' + escHtml(u.position_title||'') + '" onchange="updateUserSalary(' + u.id + ',\\'position_title\\',this.value)" placeholder="Должность"></td>';
+      h += '<td style="padding:10px"><select class="input" style="padding:4px 8px;font-size:0.78rem" onchange="updateUserSalary(' + u.id + ',\\'salary_type\\',this.value)">';
+      var stypes = ['monthly', 'biweekly', 'hourly', 'per_task'];
+      for (var sti2 = 0; sti2 < stypes.length; sti2++) {
+        h += '<option value="' + stypes[sti2] + '"' + ((u.salary_type||'monthly') === stypes[sti2] ? ' selected' : '') + '>' + (salaryTypeLabels[stypes[sti2]]||stypes[sti2]) + '</option>';
+      }
+      h += '</select></td>';
+      h += '<td style="padding:10px;text-align:right"><input type="number" class="input" style="width:100px;padding:4px 8px;font-size:0.82rem;text-align:right" value="' + uSal + '" onchange="updateUserSalary(' + u.id + ',\\'salary\\',Number(this.value))"></td>';
+      h += '<td style="padding:10px;text-align:right;color:#a78bfa;font-weight:600">' + fmtAmt(uBonus) + '</td>';
+      h += '<td style="padding:10px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem" onclick="showAddBonusUserId=' + u.id + ';render()"><i class="fas fa-plus"></i></button></td></tr>';
+      // Bonus form
+      if (showAddBonusUserId === u.id) {
+        h += '<tr><td colspan="6" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+        h += '<input class="input" id="bonus-amount-' + u.id + '" type="number" placeholder="Сумма" style="width:120px;padding:6px 10px">';
+        h += '<input class="input" id="bonus-desc-' + u.id + '" placeholder="Описание" style="flex:1;padding:6px 10px;min-width:120px">';
+        h += '<input class="input" id="bonus-date-' + u.id + '" type="date" style="width:140px;padding:6px 10px">';
+        h += '<button class="btn btn-success" style="padding:6px 12px" onclick="saveBonus(' + u.id + ')"><i class="fas fa-check"></i></button>';
+        h += '<button class="btn btn-outline" style="padding:6px 12px" onclick="showAddBonusUserId=0;render()"><i class="fas fa-times"></i></button>';
+        h += '</div></td></tr>';
+      }
     }
     h += '</tbody></table></div>';
   }
-
-  // By source & By assignee
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">';
-  var bSrc = d.by_source || {};
-  var srcKeys = Object.keys(bSrc);
-  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.9rem"><i class="fas fa-broadcast-tower" style="color:#3B82F6;margin-right:8px"></i>По источнику</h3>';
-  if (srcKeys.length > 0) {
-    var srcLabels = { form: 'Форма на сайте', popup: 'Попап', calculator_pdf: 'Калькулятор / PDF', manual: 'Вручную' };
-    for (var ski = 0; ski < srcKeys.length; ski++) {
-      var sk = srcKeys[ski];
-      var sv2 = bSrc[sk];
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
-        '<div><div style="font-weight:600;font-size:0.85rem">' + escHtml(srcLabels[sk]||sk) + '</div><div style="font-size:0.72rem;color:#94a3b8">' + (sv2.count||0) + ' заявок</div></div>' +
-        '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(sv2.amount) + '</div></div>';
-    }
-  } else { h += '<p style="color:#64748b;font-size:0.82rem">Нет данных</p>'; }
   h += '</div>';
 
-  var assigns = d.by_assignee || [];
-  h += '<div class="card"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.9rem"><i class="fas fa-user-tie" style="color:#10B981;margin-right:8px"></i>Топ сотрудников</h3>';
-  if (assigns.length > 0) {
-    for (var ai2 = 0; ai2 < assigns.length; ai2++) {
-      var as = assigns[ai2];
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
-        '<div><div style="font-weight:600;font-size:0.85rem">' + escHtml(as.name) + '</div><div style="font-size:0.72rem;color:#94a3b8">' + as.count + ' заявок</div></div>' +
-        '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(as.amount) + '</div></div>';
-    }
-  } else { h += '<p style="color:#64748b;font-size:0.82rem">Нет данных</p>'; }
+  return h;
+}
+
+// ============ TAB 3: ВОРОНКА И ДЕТАЛИ ============
+function renderBizFunnelV2(d, sd) {
+  var h = '';
+  var fin = d.financial || {};
+  var totalLeads = d.total_leads || 1;
+  // ---- SECTION: Visual funnel ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка продаж</h3>';
+  var funnelStages = [
+    {key:'new',label:'Новые лиды',color:'#10B981'},
+    {key:'contacted',label:'Контакт',color:'#3B82F6'},
+    {key:'in_progress',label:'В работе',color:'#F59E0B'},
+    {key:'checking',label:'Проверка',color:'#8B5CF6'},
+    {key:'done',label:'Завершено',color:'#22C55E'}
+  ];
+  var totalF = 0; for (var fi3 = 0; fi3 < funnelStages.length; fi3++) totalF += ((sd[funnelStages[fi3].key]||{}).count||0);
+  h += '<div class="card" style="padding:20px">';
+  for (var fi4 = 0; fi4 < funnelStages.length; fi4++) {
+    var fs = funnelStages[fi4]; var fv = sd[fs.key] || {};
+    var cnt = fv.count || 0; var widthPct = totalF > 0 ? Math.max(15, Math.round(cnt / totalF * 100)) : 15;
+    h += '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:0.85rem;font-weight:600;color:' + fs.color + '">' + fs.label + '</span><span style="font-size:0.85rem;font-weight:700">' + cnt + ' <span style="color:#64748b;font-weight:400">(' + fmtAmt(fv.amount) + ')</span></span></div>';
+    h += '<div style="height:28px;background:#0f172a;border-radius:6px;overflow:hidden"><div style="height:100%;width:' + widthPct + '%;background:linear-gradient(90deg,' + fs.color + ',' + fs.color + '88);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white;transition:width 0.5s">' + (cnt > 0 ? cnt : '') + '</div></div></div>';
+  }
+  // Rejected
+  var rejected = sd.rejected || {};
+  h += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155"><div style="display:flex;justify-content:space-between"><span style="color:#EF4444;font-weight:600"><i class="fas fa-times-circle" style="margin-right:4px"></i>Отклонено</span><span style="font-weight:700">' + (rejected.count||0) + ' (' + fmtAmt(rejected.amount) + ')</span></div></div>';
+  h += '</div>';
+  // Conversion metrics
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">';
+  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>Конверсия</div><div style="font-size:2.2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div></div>';
+  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>Отказы</div><div style="font-size:2.2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%</div></div>';
+  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>Выполнение</div><div style="font-size:2.2rem;font-weight:900;color:#3B82F6">' + (fin.avg_fulfillment_days||0) + ' <span style="font-size:0.9rem">дн</span></div></div>';
   h += '</div></div>';
 
-  // Referrals
-  var refs = d.referrals || [];
-  if (refs.length > 0) {
-    h += '<div class="card" style="margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:12px;font-size:0.9rem"><i class="fas fa-gift" style="color:#F59E0B;margin-right:8px"></i>Реферальные коды</h3>';
-    for (var ri = 0; ri < refs.length; ri++) {
-      var rf = refs[ri];
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #1e293b">' +
-        '<div style="display:flex;align-items:center;gap:8px"><span class="badge badge-amber" style="font-family:monospace">' + escHtml(rf.referral_code) + '</span><span style="font-size:0.78rem;color:#94a3b8">' + rf.count + ' заявок</span></div>' +
-        '<div style="font-weight:700;color:#a78bfa">' + fmtAmt(rf.amount) + '</div></div>';
+  // ---- SECTION: By assignee ----
+  var byAssignee = d.by_assignee || [];
+  if (byAssignee.length > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-user-tie" style="color:#3B82F6;margin-right:8px"></i>По ответственным</h3>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
+    for (var ai = 0; ai < byAssignee.length; ai++) {
+      var asg = byAssignee[ai];
+      h += '<div class="card" style="padding:14px"><div style="font-weight:700;margin-bottom:6px">' + escHtml(asg.display_name || 'Не назначен') + '</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.8rem"><span style="color:#94a3b8">Лидов:</span><span style="font-weight:600;text-align:right">' + (asg.count||0) + '</span>';
+      h += '<span style="color:#94a3b8">Сумма:</span><span style="font-weight:600;text-align:right">' + fmtAmt(asg.amount) + '</span></div></div>';
+    }
+    h += '</div></div>';
+  }
+
+  // ---- SECTION: By source ----
+  var bySource = d.by_source || {};
+  var sourceKeys = Object.keys(bySource);
+  if (sourceKeys.length > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-globe" style="color:#F59E0B;margin-right:8px"></i>Источники</h3>';
+    var srcLabels = { form: 'Форма на сайте', popup: 'Попап', calculator_pdf: 'Калькулятор / PDF', manual: 'Вручную' };
+    h += '<div class="card" style="padding:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+    for (var ski = 0; ski < sourceKeys.length; ski++) {
+      var sk = sourceKeys[ski]; var sv = bySource[sk];
+      h += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e293b"><span style="color:#94a3b8">' + escHtml(srcLabels[sk] || sk || 'Прямой') + '</span><span style="font-weight:600">' + sv + '</span></div>';
+    }
+    h += '</div></div></div>';
+  }
+
+  // ---- SECTION: Popular services ----
+  var services = d.services || [];
+  if (services.length > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-fire" style="color:#EF4444;margin-right:8px"></i>Популярные услуги</h3>';
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">#</th><th style="padding:10px;text-align:left;color:#94a3b8">Услуга</th><th style="padding:10px;text-align:center;color:#94a3b8">Заказов</th><th style="padding:10px;text-align:center;color:#94a3b8">Кол-во</th><th style="padding:10px;text-align:right;color:#94a3b8">Выручка</th><th style="padding:10px;text-align:right;color:#94a3b8">%</th></tr></thead><tbody>';
+    var totalSvcRev = services.reduce(function(a, s) { return a + (s.revenue||0); }, 0);
+    for (var svi = 0; svi < Math.min(services.length, 15); svi++) {
+      var svc = services[svi]; var svcPctV = totalSvcRev > 0 ? ((svc.revenue / totalSvcRev) * 100).toFixed(1) : '0';
+      var barW = totalSvcRev > 0 ? Math.round((svc.revenue / totalSvcRev) * 100) : 0;
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;color:#64748b">' + (svi+1) + '</td>';
+      h += '<td style="padding:8px;font-weight:600">' + escHtml(svc.name) + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + svc.count + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + (svc.qty||svc.count) + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(svc.revenue) + '</td>';
+      h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600">' + svcPctV + '%</span></div></td></tr>';
+    }
+    h += '</tbody></table></div></div>';
+  }
+
+  return h;
+}
+
+// ============ TAB 4: ПЕРИОДЫ ============
+function renderBizPeriodsV2(d) {
+  var h = '';
+  var now = new Date();
+  var currentYear = now.getFullYear();
+  var currentMonth = now.getMonth() + 1;
+  var currentQ = Math.ceil(currentMonth / 3);
+  var snapshots = data.periodSnapshots || [];
+
+  // ---- SECTION: Year overview ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-alt" style="color:#8B5CF6;margin-right:8px"></i>Год: ' + currentYear + '</h3>';
+
+  // Month grid
+  var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">';
+  for (var mi = 1; mi <= 12; mi++) {
+    var mKey = currentYear + '-' + String(mi).padStart(2,'0');
+    var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
+    var isCurrent = mi === currentMonth;
+    var isPast = mi < currentMonth;
+    var isLocked = mSnap && mSnap.is_locked;
+    var borderColor = isCurrent ? '#8B5CF6' : isLocked ? '#22C55E' : isPast ? '#F59E0B' : '#334155';
+    var bgColor = isCurrent ? 'rgba(139,92,246,0.1)' : isLocked ? 'rgba(34,197,94,0.05)' : 'transparent';
+    h += '<div class="card" style="padding:12px;text-align:center;border:2px solid ' + borderColor + ';background:' + bgColor + ';position:relative">';
+    if (isCurrent) h += '<div style="position:absolute;top:-8px;right:8px;background:#8B5CF6;color:white;font-size:0.6rem;padding:1px 8px;border-radius:10px;font-weight:700">СЕЙЧАС</div>';
+    if (isLocked) h += '<div style="position:absolute;top:-8px;left:8px;background:#22C55E;color:white;font-size:0.6rem;padding:1px 6px;border-radius:10px"><i class="fas fa-lock"></i></div>';
+    h += '<div style="font-weight:700;font-size:0.95rem;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi-1] + '</div>';
+    if (mSnap) {
+      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">Приб: ' + fmtAmt(mSnap.net_profit) + '</div>';
+      h += '<div style="font-size:0.65rem;color:#64748b">Лиды: ' + (mSnap.leads_count||0) + '</div>';
+    }
+    if (isPast && !isLocked) {
+      h += '<button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:0.7rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)"><i class="fas fa-lock" style="margin-right:3px"></i>Закрыть</button>';
+    } else if (isCurrent) {
+      h += '<button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:0.7rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)"><i class="fas fa-save" style="margin-right:3px"></i>Сохранить</button>';
+    } else if (isLocked) {
+      h += '<button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:0.65rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')"><i class="fas fa-unlock"></i></button>';
     }
     h += '</div>';
   }
+  h += '</div>';
+
+  // Quarters
+  h += '<h4 style="font-weight:700;margin-bottom:12px;color:#94a3b8">Кварталы ' + currentYear + '</h4>';
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">';
+  for (var qi = 1; qi <= 4; qi++) {
+    var qKey = currentYear + '-Q' + qi;
+    var qSnap = snapshots.find(function(s){return s.period_type==='quarter' && s.period_key===qKey;});
+    var qIsCurrent = qi === currentQ;
+    var qLocked = qSnap && qSnap.is_locked;
+    var qMonths = [qi*3-2, qi*3-1, qi*3]; var closedInQ = 0;
+    for (var qmi = 0; qmi < qMonths.length; qmi++) {
+      var qmk = currentYear + '-' + String(qMonths[qmi]).padStart(2,'0');
+      if (snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmk && s.is_locked;})) closedInQ++;
+    }
+    h += '<div class="card" style="padding:16px;text-align:center;border:2px solid ' + (qIsCurrent ? '#F59E0B' : qLocked ? '#22C55E' : '#334155') + '">';
+    h += '<div style="font-weight:700;font-size:1.1rem;color:' + (qIsCurrent ? '#F59E0B' : '#e2e8f0') + '">Q' + qi + '</div>';
+    h += '<div style="font-size:0.72rem;color:#64748b;margin-top:4px">Месяцы: ' + closedInQ + '/3 закрыто</div>';
+    if (qSnap) h += '<div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">Приб: ' + fmtAmt(qSnap.net_profit) + '</div>';
+    if (qi < currentQ && closedInQ === 3 && !qLocked) {
+      h += '<button class="btn btn-primary" style="margin-top:8px;padding:4px 12px;font-size:0.75rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)">Закрыть Q' + qi + '</button>';
+    } else if (qLocked) {
+      h += '<div style="margin-top:6px;font-size:0.7rem;color:#22C55E"><i class="fas fa-check-circle"></i> Закрыт</div>';
+    }
+    h += '</div>';
+  }
+  h += '</div>';
+
+  // Year
+  var yearKey = String(currentYear);
+  var yearSnap = snapshots.find(function(s){return s.period_type==='year' && s.period_key===yearKey;});
+  var closedQ = 0;
+  for (var yqi = 1; yqi <= 4; yqi++) { if(snapshots.find(function(s){return s.period_type==='quarter' && s.period_key===currentYear+'-Q'+yqi && s.is_locked;})) closedQ++; }
+  h += '<div class="card" style="padding:20px;text-align:center;border:2px solid ' + (yearSnap && yearSnap.is_locked ? '#22C55E' : '#8B5CF6') + ';margin-bottom:20px">';
+  h += '<div style="font-size:1.3rem;font-weight:800;color:#a78bfa">Год ' + currentYear + '</div>';
+  h += '<div style="font-size:0.85rem;color:#64748b;margin-top:4px">Кварталов закрыто: ' + closedQ + '/4</div>';
+  if (yearSnap) h += '<div style="font-size:0.85rem;margin-top:8px">Прибыль за год: <strong style="color:' + ((yearSnap.net_profit||0) >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearSnap.net_profit) + '</strong></div>';
+  if (closedQ === 4 && !(yearSnap && yearSnap.is_locked)) {
+    h += '<button class="btn btn-primary" style="margin-top:12px" onclick="closePeriodAction(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть год</button>';
+  }
+  h += '</div>';
+  h += '</div>';
+
+  // ---- SECTION: Period comparison ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#F59E0B;margin-right:8px"></i>Сравнение периодов</h3>';
+  var closedSnaps = snapshots.filter(function(s){return s.is_locked;}).sort(function(a,b){return a.period_key>b.period_key?-1:1;});
+  if (closedSnaps.length > 0) {
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Период</th><th style="padding:10px;text-align:right;color:#94a3b8">Оборот</th><th style="padding:10px;text-align:right;color:#94a3b8">Расходы</th><th style="padding:10px;text-align:right;color:#94a3b8">Прибыль</th><th style="padding:10px;text-align:right;color:#94a3b8">Лиды</th></tr></thead><tbody>';
+    for (var csi = 0; csi < closedSnaps.length; csi++) {
+      var cs = closedSnaps[csi]; var pLabel = cs.period_type === 'month' ? cs.period_key : cs.period_type === 'quarter' ? cs.period_key : 'Год ' + cs.period_key;
+      var pColor = cs.period_type === 'year' ? '#8B5CF6' : cs.period_type === 'quarter' ? '#F59E0B' : '#64748b';
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><span style="color:' + pColor + ';font-weight:600">' + pLabel + '</span><span style="font-size:0.65rem;color:#475569;margin-left:6px">' + cs.period_type + '</span></td>';
+      h += '<td style="padding:10px;text-align:right">' + fmtAmt(cs.total_turnover) + '</td>';
+      var csTotalExp = (cs.expense_salaries||0)+(cs.expense_commercial||0)+(cs.expense_marketing||0);
+      h += '<td style="padding:10px;text-align:right;color:#f87171">' + fmtAmt(csTotalExp) + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + ((cs.net_profit||0)>=0?'#22C55E':'#EF4444') + '">' + fmtAmt(cs.net_profit) + '</td>';
+      h += '<td style="padding:10px;text-align:right">' + (cs.leads_count||0) + '</td></tr>';
+    }
+    h += '</tbody></table></div>';
+  } else {
+    h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>Закройте первый месяц чтобы увидеть сравнение</div>';
+  }
+  h += '</div>';
+
   return h;
 }
 
@@ -2854,212 +2918,13 @@ async function saveBonus(userId) {
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
-// ===== PERIODS TAB (Close Month/Quarter/Year) =====
-function renderBizPeriods(d) {
-  var h = '';
-  var fin = d.financial || {};
-  var snapshots = data.periodSnapshots || [];
-  
-  // Current period info
-  var now = new Date();
-  var curYear = now.getFullYear();
-  var curMonth = now.getMonth() + 1;
-  var curQuarter = Math.ceil(curMonth / 3);
-  var monthKey = curYear + '-' + String(curMonth).padStart(2, '0');
-  var quarterKey = curYear + '-Q' + curQuarter;
-  var yearKey = String(curYear);
-  
-  var monthNames = ['', 'Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-  
-  // Check which periods are already closed
-  function getSnapshot(type, key) {
-    return snapshots.find(function(s) { return s.period_type === type && s.period_key === key; });
-  }
-  var monthSnap = getSnapshot('month', monthKey);
-  var quarterSnap = getSnapshot('quarter', quarterKey);
-  var yearSnap = getSnapshot('year', yearKey);
-  
-  // Header
-  h += '<div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(59,130,246,0.05))">' +
-    '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">' +
-    '<i class="fas fa-calendar-check" style="font-size:1.5rem;color:#8B5CF6"></i>' +
-    '<div><h3 style="font-weight:800;font-size:1.1rem;margin:0">Закрытие периодов</h3>' +
-    '<p style="color:#94a3b8;font-size:0.78rem;margin:4px 0 0">Фиксируйте финансовые итоги за месяц, квартал и год. Закрытый период блокируется от изменений.</p></div></div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-    '<span style="padding:4px 10px;border-radius:12px;font-size:0.72rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)"><i class="fas fa-lock" style="margin-right:4px"></i>Заблокирован = данные зафиксированы</span>' +
-    '<span style="padding:4px 10px;border-radius:12px;font-size:0.72rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)"><i class="fas fa-lock-open" style="margin-right:4px"></i>Открыт = можно перезаписать</span>' +
-    '</div></div>';
-  
-  // ===== CLOSE MONTH =====
-  h += '<div class="card" style="margin-bottom:16px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<div style="display:flex;align-items:center;gap:10px"><i class="fas fa-calendar-day" style="font-size:1.2rem;color:#3B82F6"></i>' +
-    '<div><h3 style="font-weight:700;font-size:0.95rem;margin:0">Закрыть месяц</h3>' +
-    '<p style="color:#94a3b8;font-size:0.72rem;margin:2px 0 0">' + monthNames[curMonth] + ' ' + curYear + ' (' + monthKey + ')</p></div></div>';
-  if (monthSnap && monthSnap.is_locked) {
-    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)">' +
-      '<i class="fas fa-lock"></i> Заблокирован</span>';
-  } else if (monthSnap) {
-    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)">' +
-      '<i class="fas fa-check-circle"></i> Сохранён (не заблокирован)</span>';
-  } else {
-    h += '<span style="font-size:0.78rem;color:#64748b">Ещё не закрыт</span>';
-  }
-  h += '</div>';
-  // Preview data
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px;padding:12px;background:#0f172a;border-radius:8px">';
-  var mMetrics = [
-    { label: 'Услуги', value: fmtAmt(fin.services), color: '#10B981' },
-    { label: 'Артикулы', value: fmtAmt(fin.articles), color: '#F59E0B' },
-    { label: 'Оборот', value: fmtAmt(fin.turnover), color: '#8B5CF6' },
-    { label: 'Возвраты', value: fmtAmt(fin.refunds), color: '#EF4444' },
-    { label: 'Зарплаты', value: fmtAmt(fin.salaries + fin.bonuses), color: '#f87171' },
-    { label: 'Комм. затраты', value: fmtAmt(fin.commercial_expenses), color: '#F97316' },
-    { label: 'Маркетинг', value: fmtAmt(fin.marketing_expenses), color: '#EF4444' },
-    { label: 'Чист. прибыль', value: fmtAmt(fin.net_profit), color: fin.net_profit >= 0 ? '#10B981' : '#EF4444' },
-  ];
-  for (var mi = 0; mi < mMetrics.length; mi++) {
-    var mm = mMetrics[mi];
-    h += '<div style="text-align:center"><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">' + mm.label + '</div>' +
-      '<div style="font-size:0.85rem;font-weight:700;color:' + mm.color + '">' + mm.value + '</div></div>';
-  }
-  h += '</div>';
-  // Actions
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  if (!monthSnap) {
-    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',false)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить итоги месяца</button>' +
-      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть и заблокировать</button>';
-  } else if (!monthSnap.is_locked) {
-    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',false)"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить итоги</button>' +
-      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'month\\',\\'' + monthKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Заблокировать</button>';
-  } else {
-    h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem;color:#F59E0B;border-color:rgba(245,158,11,0.4)" onclick="unlockPeriod(' + monthSnap.id + ')"><i class="fas fa-lock-open" style="margin-right:6px"></i>Разблокировать</button>';
-  }
-  h += '</div></div>';
-  
-  // ===== CLOSE QUARTER =====
-  h += '<div class="card" style="margin-bottom:16px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<div style="display:flex;align-items:center;gap:10px"><i class="fas fa-calendar-week" style="font-size:1.2rem;color:#8B5CF6"></i>' +
-    '<div><h3 style="font-weight:700;font-size:0.95rem;margin:0">Закрыть квартал</h3>' +
-    '<p style="color:#94a3b8;font-size:0.72rem;margin:2px 0 0">Q' + curQuarter + ' ' + curYear + ' (' + quarterKey + ')</p></div></div>';
-  if (quarterSnap && quarterSnap.is_locked) {
-    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)">' +
-      '<i class="fas fa-lock"></i> Заблокирован</span>';
-  } else if (quarterSnap) {
-    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)">' +
-      '<i class="fas fa-check-circle"></i> Сохранён (не заблокирован)</span>';
-  } else {
-    h += '<span style="font-size:0.78rem;color:#64748b">Ещё не закрыт</span>';
-  }
-  h += '</div>';
-  // Quarter months info
-  var qStartMonth = (curQuarter - 1) * 3 + 1;
-  var qMonths = [monthNames[qStartMonth], monthNames[qStartMonth+1], monthNames[qStartMonth+2]];
-  h += '<div style="margin-bottom:12px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-info-circle" style="margin-right:6px;color:#8B5CF6"></i>Месяцы квартала: <strong style="color:#e2e8f0">' + qMonths.join(', ') + '</strong>';
-  // Check if all quarter months are closed
-  var qMonthsClosed = 0;
-  for (var qm = qStartMonth; qm <= qStartMonth + 2; qm++) {
-    var qmKey = curYear + '-' + String(qm).padStart(2, '0');
-    var qmSnap = getSnapshot('month', qmKey);
-    if (qmSnap && qmSnap.is_locked) qMonthsClosed++;
-  }
-  h += ' <span style="margin-left:8px;color:' + (qMonthsClosed === 3 ? '#10B981' : '#F59E0B') + '">(' + qMonthsClosed + '/3 закрыто)</span></div>';
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  if (!quarterSnap) {
-    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',false)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить итоги квартала</button>' +
-      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть и заблокировать</button>';
-  } else if (!quarterSnap.is_locked) {
-    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',false)"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить итоги</button>' +
-      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'quarter\\',\\'' + quarterKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Заблокировать</button>';
-  } else {
-    h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem;color:#F59E0B;border-color:rgba(245,158,11,0.4)" onclick="unlockPeriod(' + quarterSnap.id + ')"><i class="fas fa-lock-open" style="margin-right:6px"></i>Разблокировать</button>';
-  }
-  h += '</div></div>';
-  
-  // ===== CLOSE YEAR =====
-  h += '<div class="card" style="margin-bottom:16px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-    '<div style="display:flex;align-items:center;gap:10px"><i class="fas fa-calendar-alt" style="font-size:1.2rem;color:#10B981"></i>' +
-    '<div><h3 style="font-weight:700;font-size:0.95rem;margin:0">Закрыть год</h3>' +
-    '<p style="color:#94a3b8;font-size:0.72rem;margin:2px 0 0">' + curYear + ' (' + yearKey + ')</p></div></div>';
-  if (yearSnap && yearSnap.is_locked) {
-    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(16,185,129,0.15);color:#10B981;border:1px solid rgba(16,185,129,0.3)">' +
-      '<i class="fas fa-lock"></i> Заблокирован</span>';
-  } else if (yearSnap) {
-    h += '<span style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:8px;font-size:0.78rem;font-weight:600;background:rgba(245,158,11,0.15);color:#F59E0B;border:1px solid rgba(245,158,11,0.3)">' +
-      '<i class="fas fa-check-circle"></i> Сохранён (не заблокирован)</span>';
-  } else {
-    h += '<span style="font-size:0.78rem;color:#64748b">Ещё не закрыт</span>';
-  }
-  h += '</div>';
-  // Year quarters info
-  var yearQuartersClosed = 0;
-  for (var yq = 1; yq <= 4; yq++) {
-    var yqKey = curYear + '-Q' + yq;
-    var yqSnap = getSnapshot('quarter', yqKey);
-    if (yqSnap && yqSnap.is_locked) yearQuartersClosed++;
-  }
-  h += '<div style="margin-bottom:12px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-info-circle" style="margin-right:6px;color:#10B981"></i>Кварталов закрыто: <strong style="color:' + (yearQuartersClosed === 4 ? '#10B981' : '#F59E0B') + '">' + yearQuartersClosed + '/4</strong></div>';
-  h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
-  if (!yearSnap) {
-    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',false)"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить итоги года</button>' +
-      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть и заблокировать</button>';
-  } else if (!yearSnap.is_locked) {
-    h += '<button class="btn btn-primary" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',false)"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить итоги</button>' +
-      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem" onclick="closePeriod(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Заблокировать</button>';
-  } else {
-    h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.82rem;color:#F59E0B;border-color:rgba(245,158,11,0.4)" onclick="unlockPeriod(' + yearSnap.id + ')"><i class="fas fa-lock-open" style="margin-right:6px"></i>Разблокировать</button>';
-  }
-  h += '</div></div>';
-  
-  // ===== HISTORY TABLE =====
-  if (snapshots.length > 0) {
-    h += '<div class="card"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-      '<h3 style="font-weight:700;font-size:0.95rem;margin:0"><i class="fas fa-history" style="color:#8B5CF6;margin-right:8px"></i>История закрытых периодов</h3>' +
-      '<span style="font-size:0.72rem;color:#64748b">' + snapshots.length + ' записей</span></div>';
-    h += '<table style="width:100%;border-collapse:collapse;font-size:0.8rem"><thead><tr style="border-bottom:2px solid #334155">' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Тип</th>' +
-      '<th style="padding:8px;text-align:left;color:#94a3b8">Период</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Услуги</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Оборот</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Расходы</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Чист. прибыль</th>' +
-      '<th style="padding:8px;text-align:center;color:#94a3b8">Статус</th>' +
-      '<th style="padding:8px;text-align:right;color:#94a3b8">Дата</th>' +
-      '</tr></thead><tbody>';
-    var typeLabels = { month: '📅 Месяц', quarter: '📊 Квартал', year: '📆 Год' };
-    var typeColors = { month: '#3B82F6', quarter: '#8B5CF6', year: '#10B981' };
-    for (var si = 0; si < snapshots.length; si++) {
-      var sn = snapshots[si];
-      var totalExp = Number(sn.expense_salaries || 0) + Number(sn.expense_commercial || 0) + Number(sn.expense_marketing || 0);
-      h += '<tr style="border-bottom:1px solid #1e293b">' +
-        '<td style="padding:8px;font-weight:600;color:' + (typeColors[sn.period_type] || '#e2e8f0') + '">' + (typeLabels[sn.period_type] || sn.period_type) + '</td>' +
-        '<td style="padding:8px;font-weight:700;color:#e2e8f0">' + escHtml(sn.period_key) + '</td>' +
-        '<td style="padding:8px;text-align:right;color:#a78bfa">' + fmtAmt(sn.revenue_services) + '</td>' +
-        '<td style="padding:8px;text-align:right;color:#e2e8f0;font-weight:600">' + fmtAmt(sn.total_turnover) + '</td>' +
-        '<td style="padding:8px;text-align:right;color:#f87171">' + fmtAmt(totalExp) + '</td>' +
-        '<td style="padding:8px;text-align:right;font-weight:700;color:' + (Number(sn.net_profit) >= 0 ? '#10B981' : '#EF4444') + '">' + fmtAmt(sn.net_profit) + '</td>' +
-        '<td style="padding:8px;text-align:center">' + (sn.is_locked ? '<span style="color:#10B981"><i class="fas fa-lock"></i></span>' : '<span style="color:#F59E0B"><i class="fas fa-lock-open"></i></span>') + '</td>' +
-        '<td style="padding:8px;text-align:right;font-size:0.72rem;color:#64748b">' + (sn.closed_at ? new Date(sn.closed_at).toLocaleDateString('ru-RU') : '—') + '</td></tr>';
-    }
-    h += '</tbody></table></div>';
-  }
-  
-  return h;
-}
-
-async function closePeriod(periodType, periodKey, lock) {
-  var confirmMsg = lock
-    ? 'Закрыть и ЗАБЛОКИРОВАТЬ ' + periodType + ' (' + periodKey + ')? Заблокированный период нельзя изменить без разблокировки.'
-    : 'Сохранить итоги ' + periodType + ' (' + periodKey + ')? Данные можно будет обновить позже.';
-  if (!confirm(confirmMsg)) return;
-  
-  // Get current analytics data
+// ===== PERIOD ACTIONS =====
+async function closePeriodAction(periodType, periodKey, lock) {
+  if (lock && !confirm('Закрыть период ' + periodKey + '?')) return;
   var d = analyticsData;
   if (!d || !d.financial) { toast('Нет данных для сохранения. Обновите аналитику.', 'error'); return; }
   var fin = d.financial;
-  
+
   var body = {
     period_type: periodType,
     period_key: periodKey,
@@ -3084,11 +2949,10 @@ async function closePeriod(periodType, periodKey, lock) {
       date_to: d.date_to
     }
   };
-  
+
   var res = await api('/period-snapshots', 'POST', body);
   if (res && res.success) {
     toast(lock ? 'Период заблокирован!' : 'Итоги сохранены!', 'success');
-    // Reload snapshots
     try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
     render();
   } else {
@@ -3119,6 +2983,7 @@ function setAnalyticsPeriod(period) {
   analyticsData = null;
   loadAnalyticsData();
 }
+
 
 // ===== TELEGRAM BOT =====
 function renderTelegramBot() {
@@ -3650,33 +3515,72 @@ function renderEmployees() {
   const isAdmin = currentUser && currentUser.role === 'main_admin';
   const rl = rolesConfig?.role_labels || {};
   const roles = rolesConfig?.roles || [];
-  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px"><div><h1 style="font-size:1.5rem;font-weight:800">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438</h1><p style="color:#94a3b8;font-size:0.85rem">\u0423\u043f\u0440\u0430\u0432\u043b\u0435\u043d\u0438\u0435 \u043a\u043e\u043c\u0430\u043d\u0434\u043e\u0439 \u2014 ' + data.users.length + ' \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a(\u043e\u0432)</p></div>';
+  var roleColors = { main_admin: '#8B5CF6', developer: '#3B82F6', analyst: '#10B981', operator: '#F59E0B', buyer: '#EF4444', courier: '#6366F1' };
+  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px"><div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Сотрудники</h1><p style="color:#94a3b8;margin-top:4px">Управление командой \u2014 ' + data.users.length + ' сотрудник(ов)</p></div>';
   if (isAdmin) {
-    h += '<button class="btn btn-primary" onclick="showEmployeeModal()"><i class="fas fa-user-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button>';
+    h += '<button class="btn btn-primary" onclick="showEmployeeModal()"><i class="fas fa-user-plus" style="margin-right:6px"></i>Добавить</button>';
   }
   h += '</div>';
-  h += '<div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:0.88rem"><thead><tr style="border-bottom:1px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u041b\u043e\u0433\u0438\u043d</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u0420\u043e\u043b\u044c</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u041a\u043e\u043d\u0442\u0430\u043a\u0442</th><th style="padding:12px 16px;text-align:left;color:#94a3b8;font-size:0.78rem">\u0421\u0442\u0430\u0442\u0443\u0441</th>';
-  if (isAdmin) h += '<th style="padding:12px 16px;text-align:right;color:#94a3b8;font-size:0.78rem">\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u044f</th>';
-  h += '</tr></thead><tbody>';
+  // Cards grid
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">';
   for (const u of data.users) {
-    h += '<tr style="border-bottom:1px solid #1e293b">';
-    h += '<td style="padding:12px 16px;font-weight:600">' + escHtml(u.display_name) + '</td>';
-    h += '<td style="padding:12px 16px;font-family:monospace;font-size:0.82rem;color:#94a3b8">' + escHtml(u.username) + '</td>';
-    h += '<td style="padding:12px 16px"><span class="badge ' + (u.role==='main_admin'?'badge-purple':'badge-amber') + '">' + escHtml(rl[u.role]||u.role) + '</span></td>';
-    h += '<td style="padding:12px 16px;font-size:0.82rem;color:#94a3b8">' + (escHtml(u.phone)||escHtml(u.email)||'\u2014') + '</td>';
-    h += '<td style="padding:12px 16px"><span class="badge ' + (u.is_active?'badge-green':'bg-red-900 text-red-300') + '" style="cursor:pointer" onclick="toggleUserActive(' + u.id + ',' + (u.is_active?0:1) + ')">' + (u.is_active?'\u0410\u043a\u0442\u0438\u0432\u0435\u043d':'\u041e\u0442\u043a\u043b\u044e\u0447\u0451\u043d') + '</span></td>';
-    if (isAdmin) {
-      h += '<td style="padding:12px 16px;text-align:right">';
-      h += '<button class="btn btn-outline" style="padding:6px 10px;font-size:0.78rem;margin-right:4px" onclick="editEmployee(' + u.id + ')"><i class="fas fa-edit"></i></button>';
-      h += '<button class="btn btn-outline" style="padding:6px 10px;font-size:0.78rem;margin-right:4px" onclick="resetEmployeePass(' + u.id + ',\\'' + escHtml(u.display_name) + '\\')"><i class="fas fa-key"></i></button>';
-      if (u.role !== 'main_admin') h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.78rem" onclick="deleteEmployee(' + u.id + ',\\'' + escHtml(u.display_name) + '\\')"><i class="fas fa-trash"></i></button>';
-      h += '</td>';
+    var rColor = roleColors[u.role] || '#64748b';
+    var initials = (u.display_name||'U').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,2);
+    h += '<div class="card" style="padding:0;overflow:hidden;border-top:3px solid ' + rColor + '">';
+    // Header
+    h += '<div style="padding:20px 20px 12px;display:flex;gap:14px;align-items:center">';
+    h += '<div style="width:48px;height:48px;border-radius:50%;background:' + rColor + '22;border:2px solid ' + rColor + ';display:flex;align-items:center;justify-content:center;font-weight:800;color:' + rColor + ';font-size:0.95rem;flex-shrink:0">' + initials + '</div>';
+    h += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(u.display_name) + '</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">';
+    h += '<span style="padding:2px 10px;border-radius:12px;font-size:0.72rem;font-weight:600;background:' + rColor + '22;color:' + rColor + '">' + escHtml(rl[u.role]||u.role) + '</span>';
+    h += '<span class="badge ' + (u.is_active?'badge-green':'bg-red-900 text-red-300') + '" style="font-size:0.68rem;cursor:pointer" onclick="toggleUserActive(' + u.id + ',' + (u.is_active?0:1) + ')">' + (u.is_active?'Активен':'Откл') + '</span>';
+    h += '</div></div></div>';
+    // Info fields
+    h += '<div style="padding:0 20px 12px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.82rem">';
+    h += '<div><span style="color:#64748b;font-size:0.72rem">Логин</span><div style="font-family:monospace;color:#94a3b8">' + escHtml(u.username) + '</div></div>';
+    h += '<div><span style="color:#64748b;font-size:0.72rem">Должность</span><div style="color:#e2e8f0">' + escHtml(u.position_title||'\u2014') + '</div></div>';
+    h += '<div><span style="color:#64748b;font-size:0.72rem">Телефон</span><div style="color:#e2e8f0">' + escHtml(u.phone||'\u2014') + '</div></div>';
+    h += '<div><span style="color:#64748b;font-size:0.72rem">Email</span><div style="color:#e2e8f0">' + escHtml(u.email||'\u2014') + '</div></div>';
+    if (u.salary) {
+      h += '<div><span style="color:#64748b;font-size:0.72rem">Зарплата</span><div style="color:#3B82F6;font-weight:600">' + fmtAmt(u.salary) + '</div></div>';
+      h += '<div><span style="color:#64748b;font-size:0.72rem">Тип</span><div style="color:#94a3b8">' + escHtml({monthly:'Помесячно',biweekly:'За 15 дн',hourly:'Почасовая',per_task:'За работу'}[u.salary_type||'monthly']||u.salary_type||'Помесячно') + '</div></div>';
     }
-    h += '</tr>';
+    h += '</div>';
+    // Actions
+    if (isAdmin) {
+      h += '<div style="padding:12px 20px;border-top:1px solid #334155;display:flex;gap:6px;flex-wrap:wrap">';
+      h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem;flex:1" onclick="editEmployee(' + u.id + ')"><i class="fas fa-edit" style="margin-right:4px"></i>Ред.</button>';
+      h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem;flex:1" onclick="showChangePassForm(' + u.id + ')"><i class="fas fa-key" style="margin-right:4px"></i>Пароль</button>';
+      h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="navigate(\\'permissions\\');editPermUserId=' + u.id + ';render()"><i class="fas fa-shield-alt"></i></button>';
+      if (u.role !== 'main_admin') h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.78rem" onclick="deleteEmployee(' + u.id + ',\\'' + escHtml(u.display_name) + '\\')"><i class="fas fa-trash"></i></button>';
+      h += '</div>';
+      // Password change form
+      if (_changePassUserId === u.id) {
+        h += '<div style="padding:12px 20px 16px;background:#0f172a;border-top:1px solid #8B5CF6">';
+        h += '<div style="font-size:0.82rem;font-weight:600;margin-bottom:8px;color:#a78bfa"><i class="fas fa-key" style="margin-right:4px"></i>Смена пароля для ' + escHtml(u.display_name) + '</div>';
+        h += '<div style="display:flex;gap:8px;align-items:center">';
+        h += '<div style="position:relative;flex:1"><input class="input" id="newpass-' + u.id + '" type="password" placeholder="Новый пароль" style="padding-right:36px">';
+        h += '<button type="button" onclick="var i=document.getElementById(\\'newpass-' + u.id + '\\');i.type=i.type===\\'password\\'?\\'text\\':\\'password\\';this.querySelector(\\'i\\').className=\\'fas fa-\\'+(i.type===\\'password\\'?\\'eye\\':\\'eye-slash\\')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;padding:4px"><i class="fas fa-eye"></i></button></div>';
+        h += '<button class="btn btn-success" style="padding:8px 14px" onclick="doChangePassword(' + u.id + ')"><i class="fas fa-check"></i></button>';
+        h += '<button class="btn btn-outline" style="padding:8px 14px" onclick="_changePassUserId=0;render()"><i class="fas fa-times"></i></button>';
+        h += '</div></div>';
+      }
+    }
+    h += '</div>';
   }
-  h += '</tbody></table></div>';
+  h += '</div>';
   h += '<div id="employeeModalArea"></div>';
   return h + '</div>';
+}
+
+var _changePassUserId = 0;
+function showChangePassForm(id) { _changePassUserId = id; render(); }
+async function doChangePassword(userId) {
+  var newPass = document.getElementById('newpass-' + userId)?.value;
+  if (!newPass || newPass.length < 3) { toast('Пароль слишком короткий', 'error'); return; }
+  var res = await api('/users/' + userId + '/reset-password', { method:'POST', body: JSON.stringify({ new_password: newPass }) });
+  if (res && (res.success || res.new_password)) { toast('Пароль изменён!'); _changePassUserId = 0; render(); }
+  else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
 async function toggleUserActive(id, val) {
@@ -3694,11 +3598,8 @@ async function deleteEmployee(id, name) {
 }
 
 async function resetEmployeePass(id, name) {
-  if (!confirm('\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0430\u0440\u043e\u043b\u044c \u0434\u043b\u044f "' + name + '"?')) return;
-  const res = await api('/users/' + id + '/reset-password', { method:'POST' });
-  if (res && res.new_password) {
-    alert('\u041d\u043e\u0432\u044b\u0439 \u043f\u0430\u0440\u043e\u043b\u044c \u0434\u043b\u044f ' + name + ':\\n\\n' + res.new_password + '\\n\\n\u0421\u043a\u043e\u043f\u0438\u0440\u0443\u0439\u0442\u0435 \u0438 \u043f\u0435\u0440\u0435\u0434\u0430\u0439\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0443.');
-  }
+  // Redirect to inline password form
+  showChangePassForm(id);
 }
 
 function showEmployeeModal(userId) {
@@ -3729,6 +3630,15 @@ function editEmployee(id) { showEmployeeModal(id); }
 async function saveEmployee(e, id) {
   e.preventDefault();
   const body = { display_name: document.getElementById('empName').value, role: document.getElementById('empRole').value, phone: document.getElementById('empPhone').value, email: document.getElementById('empEmail').value };
+  // Enforce single main_admin
+  if (body.role === 'main_admin' && !id) {
+    var existing = data.users.find(function(u) { return u.role === 'main_admin'; });
+    if (existing) { toast('Главный админ уже существует: ' + existing.display_name, 'error'); return; }
+  }
+  if (body.role === 'main_admin' && id) {
+    var existing2 = data.users.find(function(u) { return u.role === 'main_admin' && u.id !== id; });
+    if (existing2) { toast('Главный админ уже существует: ' + existing2.display_name + '. Только один main_admin допускается.', 'error'); return; }
+  }
   var res;
   if (!id) {
     body.username = document.getElementById('empUser').value;
@@ -3763,10 +3673,16 @@ function renderPermissions() {
   }
   h += '</div>';
   // Permissions grid
-  h += '<div class="card" id="permEditor"><div style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-shield-alt" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430</div></div>';
+  h += '<div class="card" id="permEditor"><div style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-shield-alt" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i>Выберите сотрудника</div></div>';
   h += '</div></div>';
+  // Auto-select user if navigated from employee card
+  if (typeof editPermUserId !== 'undefined' && editPermUserId > 0) {
+    setTimeout(function(){ selectPermUser(editPermUserId); editPermUserId = 0; }, 100);
+  }
   return h;
 }
+
+var editPermUserId = 0;
 
 let selectedPermUserId = null;
 let selectedPermSections = [];
