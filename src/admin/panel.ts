@@ -2280,18 +2280,29 @@ let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
 let showAddCategoryForm = false;
 let showAddFreqTypeForm = false;
+let expandedMonth = ''; // for month drill-down
+let yearChartMetric = 'amount'; // amount | count | done_amount
+let yearChartMode = 'month'; // month | week | day
 
 async function loadAnalyticsData() {
   var params = '';
-  if (analyticsDateFrom) params += '&from=' + analyticsDateFrom;
-  if (analyticsDateTo) params += '&to=' + analyticsDateTo;
+  if (expandedMonth) { params += '&month=' + expandedMonth; }
+  else {
+    if (analyticsDateFrom) params += '&from=' + analyticsDateFrom;
+    if (analyticsDateTo) params += '&to=' + analyticsDateTo;
+  }
   analyticsData = await api('/business-analytics?' + params.replace(/^&/,''));
   render();
 }
 
-function fmtAmt(n) { return n ? Number(n).toLocaleString('ru-RU') + '\u00a0\u058f' : '0 \u058f'; }
-function fmtPct(n) { return (n || 0).toFixed(1) + '%'; }
-function fmtNum(n) { return n ? Number(n).toLocaleString('ru-RU') : '0'; }
+function fmtAmt(n) {
+  if (n === null || n === undefined || isNaN(Number(n))) return '0 \u058f';
+  var num = Number(n);
+  if (Math.abs(num) >= 1e12) return '0 \u058f'; // prevent absurd numbers
+  return num.toLocaleString('ru-RU', {maximumFractionDigits: 0}) + '\u00a0\u058f';
+}
+function fmtPct(n) { return (Number(n) || 0).toFixed(1) + '%'; }
+function fmtNum(n) { if (!n && n !== 0) return '0'; return Number(n).toLocaleString('ru-RU'); }
 
 function renderLeadsAnalytics() {
   var d = analyticsData;
@@ -2305,24 +2316,52 @@ function renderLeadsAnalytics() {
     { id: 'overview', icon: 'fa-chart-pie', label: 'Обзор и Финансы' },
     { id: 'costs', icon: 'fa-wallet', label: 'Затраты и ЗП' },
     { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка и Детали' },
-    { id: 'periods', icon: 'fa-calendar-check', label: 'Периоды' },
+    { id: 'periods', icon: 'fa-calendar-check', label: 'Периоды и Графики' },
   ];
   var h = '<div style="padding:24px 32px">';
   // Header
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">';
   h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>';
   h += '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>';
-  h += '<button class="btn btn-outline" onclick="analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить</button>';
+  h += '<button class="btn btn-outline" onclick="expandedMonth=\\'\\';analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить</button>';
   h += '</div>';
-  // Date filter
-  h += '<div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
-  h += '<i class="fas fa-calendar" style="color:#8B5CF6"></i><span style="font-weight:600;color:#94a3b8">Период:</span>';
-  h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">';
-  h += '<span style="color:#475569">\u2014</span>';
-  h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">';
-  var periods = [{l:'Сегодня',v:'today'},{l:'7 дн',v:'week'},{l:'14 дн',v:'14d'},{l:'30 дн',v:'month'},{l:'Все',v:'all'}];
-  for (var pi = 0; pi < periods.length; pi++) {
-    h += '<button class="tab-btn" style="padding:6px 14px;font-size:0.8rem" onclick="setAnalyticsPeriod(\\'' + periods[pi].v + '\\')">' + periods[pi].l + '</button>';
+  // Expanded month banner
+  if (expandedMonth) {
+    var mNames2 = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+    var mNum = parseInt(expandedMonth.split('-')[1]);
+    h += '<div class="card" style="padding:12px 20px;margin-bottom:16px;background:rgba(139,92,246,0.1);border-color:#8B5CF6;display:flex;align-items:center;justify-content:space-between">';
+    h += '<div><i class="fas fa-calendar-day" style="color:#8B5CF6;margin-right:8px"></i><strong style="color:#a78bfa">' + mNames2[mNum] + ' ' + expandedMonth.split('-')[0] + '</strong> — детализация по месяцу</div>';
+    h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="expandedMonth=\\'\\';analyticsData=null;loadAnalyticsData()"><i class="fas fa-times" style="margin-right:4px"></i>Закрыть</button>';
+    h += '</div>';
+  }
+  // Date filter (hidden when month is expanded)
+  if (!expandedMonth) {
+    h += '<div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+    h += '<i class="fas fa-calendar" style="color:#8B5CF6"></i><span style="font-weight:600;color:#94a3b8">Период:</span>';
+    h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateFrom + '" onchange="analyticsDateFrom=this.value;analyticsData=null;loadAnalyticsData()">';
+    h += '<span style="color:#475569">\u2014</span>';
+    h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">';
+    var periods = [{l:'Сегодня',v:'today'},{l:'7 дн',v:'week'},{l:'14 дн',v:'14d'},{l:'30 дн',v:'month'},{l:'90 дн',v:'90d'},{l:'Все',v:'all'}];
+    for (var pi = 0; pi < periods.length; pi++) {
+      h += '<button class="tab-btn" style="padding:6px 14px;font-size:0.8rem" onclick="setAnalyticsPeriod(\\'' + periods[pi].v + '\\')">' + periods[pi].l + '</button>';
+    }
+    h += '</div>';
+  }
+  // Quick KPI strip at top
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">';
+  var quickKpis = [
+    {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)'},
+    {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'},
+    {label:'Конверсия',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)'},
+    {label:'Средний чек',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)'},
+    {label:'Всего лидов',val:fmtNum(d.total_leads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)'},
+    {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)'},
+  ];
+  for (var qi = 0; qi < quickKpis.length; qi++) {
+    var qk = quickKpis[qi];
+    h += '<div class="card" style="padding:16px;background:' + qk.bg + ';border:1px solid ' + qk.color + '33">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><i class="fas ' + qk.icon + '" style="color:' + qk.color + ';font-size:0.85rem"></i><span style="font-size:0.75rem;color:#94a3b8">' + qk.label + '</span></div>';
+    h += '<div style="font-size:1.2rem;font-weight:800;color:' + qk.color + '">' + qk.val + '</div></div>';
   }
   h += '</div>';
   // Tabs
@@ -2355,134 +2394,144 @@ function renderBizOverviewV2(d, sd, fin) {
     {key:'checking',label:'Проверка',color:'#8B5CF6',icon:'fa-search'},
     {key:'done',label:'Завершено',color:'#22C55E',icon:'fa-check-circle'}
   ];
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px">';
   for (var si = 0; si < statuses.length; si++) {
     var st = statuses[si]; var v = sd[st.key] || {};
+    var cnt = Number(v.count) || 0; var amt = Number(v.amount) || 0;
+    var svcAmt = Number(v.services) || 0; var artAmt = Number(v.articles) || 0;
     h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + st.key + '\\')">';
     h += '<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas ' + st.icon + '" style="color:' + st.color + ';margin-right:4px"></i>' + st.label + '</div>';
-    h += '<div style="font-size:1.8rem;font-weight:800;color:' + st.color + '">' + (v.count || 0) + '</div>';
-    h += '<div style="font-size:0.8rem;color:#64748b;margin-top:4px">' + fmtAmt(v.amount) + '</div>';
-    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.7rem;color:#475569"><span>Усл: ' + fmtAmt(v.services) + '</span><span>Зак: ' + fmtAmt(v.articles) + '</span></div>';
+    h += '<div style="font-size:1.8rem;font-weight:800;color:' + st.color + '">' + cnt + '</div>';
+    h += '<div style="font-size:0.82rem;color:#e2e8f0;margin-top:4px;font-weight:600">' + fmtAmt(amt) + '</div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.68rem;color:#475569"><span>\u0423\u0441\u043b: ' + fmtAmt(svcAmt) + '</span><span>\u0417\u0430\u043a: ' + fmtAmt(artAmt) + '</span></div>';
     h += '</div>';
   }
   h += '</div></div>';
 
-  // ---- SECTION: Key financials ----
+  // ---- SECTION: Key financials (3 big cards) ----
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-coins" style="color:#F59E0B;margin-right:8px"></i>Финансовые показатели</h3>';
-  var turnover = fin.turnover || 0; var serviceRev = fin.services || 0;
-  var articlesRev = fin.articles || 0; var refunds = fin.refunds || 0;
-  var netProfit = fin.net_profit || 0; var totalExpenses = fin.total_expenses || 0;
+  var turnover = Number(fin.turnover) || 0;
+  var serviceRev = Number(fin.services) || 0;
+  var articlesRev = Number(fin.articles) || 0;
+  var refunds = Number(fin.refunds) || 0;
+  var netProfit = Number(fin.net_profit) || 0;
+  var totalExpenses = Number(fin.total_expenses) || 0;
+  var salaryExp = Number(fin.salaries) || 0;
+  var bonusesExp = Number(fin.bonuses) || 0;
+  var commExp = Number(fin.commercial_expenses) || 0;
+  var mktExp = Number(fin.marketing_expenses) || 0;
   var profitColor = netProfit >= 0 ? '#22C55E' : '#EF4444';
 
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
-  // Turnover card
+  // Turnover card (in_progress + checking + done)
   h += '<div class="card" style="padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));border:1px solid rgba(139,92,246,0.3)">';
-  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-chart-bar" style="margin-right:4px"></i>Оборот</div>';
+  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-chart-bar" style="margin-right:4px"></i>\u041e\u0431\u043e\u0440\u043e\u0442 <span style="font-size:0.65rem;color:#64748b">(\u0432 \u0440\u0430\u0431\u043e\u0442\u0435 + \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0430 + \u0434\u043e\u043d\u0435)</span></div>';
   h += '<div style="font-size:2rem;font-weight:800;color:#a78bfa">' + fmtAmt(turnover) + '</div>';
   if (turnover > 0) {
     var svcPct = Math.round(serviceRev / turnover * 100) || 0;
     h += '<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:10px;background:#1e293b">';
-    h += '<div style="width:' + svcPct + '%;background:#8B5CF6" title="Услуги"></div>';
-    h += '<div style="width:' + (100 - svcPct) + '%;background:#F59E0B" title="Артикулы"></div>';
-    h += '</div>';
-    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.72rem;color:#64748b"><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B5CF6;margin-right:4px"></span>Услуги ' + fmtAmt(serviceRev) + '</span><span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:4px"></span>Артикулы ' + fmtAmt(articlesRev) + '</span></div>';
+    h += '<div style="width:' + svcPct + '%;background:#8B5CF6" title="\u0423\u0441\u043b\u0443\u0433\u0438"></div>';
+    h += '<div style="width:' + (100 - svcPct) + '%;background:#F59E0B" title="\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b"></div></div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.72rem;color:#64748b">';
+    h += '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B5CF6;margin-right:4px"></span>\u0423\u0441\u043b\u0443\u0433\u0438 ' + fmtAmt(serviceRev) + ' (' + svcPct + '%)</span>';
+    h += '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:4px"></span>\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b ' + fmtAmt(articlesRev) + ' (' + (100-svcPct) + '%)</span></div>';
   }
   h += '</div>';
   // Net profit
   h += '<div class="card" style="padding:20px;background:linear-gradient(135deg,rgba(' + (netProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.12),transparent);border:1px solid rgba(' + (netProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.3)">';
-  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-' + (netProfit >= 0 ? 'arrow-up' : 'arrow-down') + '" style="margin-right:4px"></i>Чистая прибыль</div>';
+  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-' + (netProfit >= 0 ? 'arrow-up' : 'arrow-down') + '" style="margin-right:4px"></i>\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div>';
   h += '<div style="font-size:2rem;font-weight:800;color:' + profitColor + '">' + fmtAmt(netProfit) + '</div>';
-  h += '<div style="font-size:0.75rem;color:#64748b;margin-top:6px">Доход \u2212 Все расходы</div>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px">\u0423\u0441\u043b\u0443\u0433\u0438 (' + fmtAmt(serviceRev) + ') \u2212 \u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b (' + fmtAmt(totalExpenses) + ')</div>';
   h += '</div>';
   // Total expenses
   h += '<div class="card" style="padding:20px;border-left:3px solid #EF4444">';
-  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-receipt" style="margin-right:4px"></i>Все расходы</div>';
+  h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-receipt" style="margin-right:4px"></i>\u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b</div>';
   h += '<div style="font-size:2rem;font-weight:800;color:#f87171">' + fmtAmt(totalExpenses) + '</div>';
-  var salaryExp = fin.salaries || 0; var bonusesExp = fin.bonuses || 0; var commExp = fin.commercial_expenses || 0; var mktExp = fin.marketing_expenses || 0;
-  h += '<div style="margin-top:8px;font-size:0.75rem;color:#64748b">';
-  h += '<div>ЗП: ' + fmtAmt(salaryExp + bonusesExp) + ' \u2022 Комм: ' + fmtAmt(commExp) + ' \u2022 Маркет: ' + fmtAmt(mktExp) + '</div></div>';
+  h += '<div style="margin-top:8px;font-size:0.72rem;color:#64748b">';
+  h += '\u0417\u041f: ' + fmtAmt(salaryExp + bonusesExp) + ' \u2022 \u041a\u043e\u043c\u043c: ' + fmtAmt(commExp) + ' \u2022 \u041c\u0430\u0440\u043a: ' + fmtAmt(mktExp);
+  h += '</div>';
   if (totalExpenses > 0) {
     var sp = Math.round((salaryExp + bonusesExp) / totalExpenses * 100); var cp = Math.round(commExp / totalExpenses * 100);
     h += '<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:8px;background:#1e293b">';
-    h += '<div style="width:' + sp + '%;background:#3B82F6" title="ЗП"></div>';
-    h += '<div style="width:' + cp + '%;background:#F59E0B" title="Комм"></div>';
-    h += '<div style="flex:1;background:#EF4444" title="Маркет"></div>';
-    h += '</div>';
+    h += '<div style="width:' + sp + '%;background:#3B82F6" title="\u0417\u041f"></div>';
+    h += '<div style="width:' + cp + '%;background:#F59E0B" title="\u041a\u043e\u043c\u043c"></div>';
+    h += '<div style="flex:1;background:#EF4444" title="\u041c\u0430\u0440\u043a\u0435\u0442"></div></div>';
   }
   h += '</div></div>';
 
-  // Revenue detail
+  // Revenue detail row (services vs articles)
   h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px">';
-  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">Доход (услуги)</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div><div style="font-size:0.72rem;color:#475569;margin-top:4px">Моя прибыль</div></div>';
-  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">Выкупы (артикулы)</div><div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesRev) + '</div><div style="font-size:0.72rem;color:#475569;margin-top:4px">Деньги клиентов</div></div>';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0414\u043e\u0445\u043e\u0434 (\u0443\u0441\u043b\u0443\u0433\u0438) \u2014 \u043c\u043e\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div></div>';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b) \u2014 \u0434\u0435\u043d\u044c\u0433\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div><div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesRev) + '</div></div>';
   h += '</div>';
-  // Refunds
   if (refunds > 0) {
     h += '<div class="card" style="margin-bottom:16px;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3);padding:16px"><div style="display:flex;align-items:center;gap:12px">';
     h += '<i class="fas fa-exclamation-triangle" style="color:#EF4444;font-size:1.2rem"></i>';
-    h += '<div><div style="font-weight:700;color:#f87171">Возвраты средств</div><div style="font-size:0.82rem;color:#94a3b8">Общая сумма: <strong style="color:#EF4444">' + fmtAmt(refunds) + '</strong></div></div></div></div>';
+    h += '<div><div style="font-weight:700;color:#f87171">\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b \u0441\u0440\u0435\u0434\u0441\u0442\u0432</div><div style="font-size:0.82rem;color:#94a3b8">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430: <strong style="color:#EF4444">' + fmtAmt(refunds) + '</strong></div></div></div></div>';
   }
   h += '</div>';
 
   // ---- SECTION: KPI Metrics ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-tachometer-alt" style="color:#10B981;margin-right:8px"></i>KPI метрики</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-tachometer-alt" style="color:#10B981;margin-right:8px"></i>KPI \u043c\u0435\u0442\u0440\u0438\u043a\u0438</h3>';
   var kpis = [
-    {label:'Конверсия',val:fmtPct(fin.conversion_rate),color:fin.conversion_rate>20?'#22C55E':fin.conversion_rate>10?'#F59E0B':'#EF4444',icon:'fa-percentage'},
-    {label:'Средний чек',val:fmtAmt(fin.avg_check),color:'#8B5CF6',icon:'fa-shopping-cart'},
-    {label:'Маржинальность',val:fmtPct(fin.marginality),color:fin.marginality>0?'#22C55E':'#EF4444',icon:'fa-percentage'},
-    {label:'ROI',val:fmtPct(fin.roi),color:fin.roi>0?'#22C55E':'#EF4444',icon:'fa-chart-line'},
-    {label:'ROMI',val:fmtPct(fin.romi),color:fin.romi>0?'#22C55E':'#EF4444',icon:'fa-bullhorn'},
-    {label:'Выполнение',val:(fin.avg_fulfillment_days||0)+' дн',color:'#3B82F6',icon:'fa-clock'},
+    {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',val:fmtPct(fin.conversion_rate),color:Number(fin.conversion_rate)>20?'#22C55E':Number(fin.conversion_rate)>10?'#F59E0B':'#EF4444',icon:'fa-percentage'},
+    {label:'\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0447\u0435\u043a',val:fmtAmt(fin.avg_check),color:'#8B5CF6',icon:'fa-shopping-cart'},
+    {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',val:fmtPct(fin.marginality),color:Number(fin.marginality)>0?'#22C55E':'#EF4444',icon:'fa-percentage'},
+    {label:'ROI',val:fmtPct(fin.roi),color:Number(fin.roi)>0?'#22C55E':'#EF4444',icon:'fa-chart-line'},
+    {label:'ROMI',val:fmtPct(fin.romi),color:Number(fin.romi)>0?'#22C55E':'#EF4444',icon:'fa-bullhorn'},
+    {label:'\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435',val:(Number(fin.avg_fulfillment_days)||0)+' \u0434\u043d',color:'#3B82F6',icon:'fa-clock'},
     {label:'Break-even',val:fmtAmt(fin.break_even),color:'#F59E0B',icon:'fa-balance-scale'},
-    {label:'Отказы',val:(d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban'}
+    {label:'\u041e\u0442\u043a\u0430\u0437\u044b',val:(d.total_leads > 0 ? (((Number((sd.rejected||{}).count)||0) / d.total_leads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban'}
   ];
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">';
   for (var ki = 0; ki < kpis.length; ki++) {
     var kp = kpis[ki];
-    h += '<div class="card" style="padding:14px;text-align:center">';
-    h += '<i class="fas ' + kp.icon + '" style="color:' + kp.color + ';font-size:0.9rem;margin-bottom:6px;display:block"></i>';
+    h += '<div class="card" style="padding:14px;text-align:center"><i class="fas ' + kp.icon + '" style="color:' + kp.color + ';font-size:0.9rem;margin-bottom:6px;display:block"></i>';
     h += '<div style="font-size:1.3rem;font-weight:800;color:' + kp.color + '">' + kp.val + '</div>';
-    h += '<div style="font-size:0.7rem;color:#64748b;margin-top:2px">' + kp.label + '</div>';
-    h += '</div>';
+    h += '<div style="font-size:0.7rem;color:#64748b;margin-top:2px">' + kp.label + '</div></div>';
   }
   h += '</div></div>';
 
-  // ---- SECTION: Financial table P&L ----
+  // ---- SECTION: Status P&L table ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-table" style="color:#3B82F6;margin-right:8px"></i>Отчёт по статусам (P&L)</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-table" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0442\u0447\u0451\u0442 \u043f\u043e \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u043c</h3>';
   h += '<div class="card" style="overflow-x:auto;padding:0"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
-  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">Статус</th><th style="padding:12px;text-align:right;color:#94a3b8">Кол-во</th><th style="padding:12px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:12px;text-align:right;color:#94a3b8">Услуги</th><th style="padding:12px;text-align:right;color:#94a3b8">Артикулы</th></tr></thead><tbody>';
-  var totalLeads = 0; var totalAmt = 0;
+  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">\u0421\u0442\u0430\u0442\u0443\u0441</th><th style="padding:12px;text-align:right;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0438</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b</th></tr></thead><tbody>';
+  var totalLeads2 = 0; var totalAmt2 = 0; var totalSvc = 0; var totalArt = 0;
   for (var si2 = 0; si2 < statuses.length; si2++) {
     var s2 = statuses[si2]; var v2 = sd[s2.key] || {};
-    totalLeads += (v2.count || 0); totalAmt += (v2.amount || 0);
+    var cnt2 = Number(v2.count) || 0; var amt2 = Number(v2.amount) || 0;
+    var svc2 = Number(v2.services) || 0; var art2 = Number(v2.articles) || 0;
+    totalLeads2 += cnt2; totalAmt2 += amt2; totalSvc += svc2; totalArt += art2;
     h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + s2.color + ';margin-right:8px"></span>' + s2.label + '</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:600">' + (v2.count || 0) + '</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(v2.amount) + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(v2.services) + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(v2.articles) + '</td></tr>';
+    h += '<td style="padding:10px;text-align:right;font-weight:600">' + cnt2 + '</td>';
+    h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(amt2) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(svc2) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(art2) + '</td></tr>';
   }
-  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td style="padding:10px;text-align:right">' + totalLeads + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAmt) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(serviceRev) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(articlesRev) + '</td></tr>';
+  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">\u0418\u0422\u041e\u0413\u041e</td><td style="padding:10px;text-align:right">' + totalLeads2 + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAmt2) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(totalSvc) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(totalArt) + '</td></tr>';
   h += '</tbody></table></div>';
+
   // P&L table
   h += '<div class="card" style="overflow-x:auto;padding:0;margin-top:16px"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8" colspan="2">Прибыли и убытки (P&L)</th></tr></thead><tbody>';
+  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8" colspan="2">\u041f\u0440\u0438\u0431\u044b\u043b\u0438 \u0438 \u0443\u0431\u044b\u0442\u043a\u0438 (P&L)</th></tr></thead><tbody>';
   var plRows = [
-    { label: 'Доход (услуги)', value: serviceRev, color: '#10B981', bold: true },
-    { label: '\u00a0\u00a0Зарплаты сотрудников', value: -(salaryExp + bonusesExp), color: '#EF4444' },
-    { label: '\u00a0\u00a0Коммерческие затраты', value: -commExp, color: '#EF4444' },
-    { label: '\u00a0\u00a0Маркетинг / Реклама', value: -mktExp, color: '#EF4444' },
-    { label: 'ИТОГО расходов', value: -totalExpenses, color: '#F97316', bold: true },
-    { label: 'ЧИСТАЯ ПРИБЫЛЬ', value: netProfit, color: profitColor, bold: true, big: true },
+    { label: '\u0414\u043e\u0445\u043e\u0434 (\u0443\u0441\u043b\u0443\u0433\u0438)', value: serviceRev, color: '#10B981', bold: true },
+    { label: '\u00a0\u00a0\u0417\u0430\u0440\u043f\u043b\u0430\u0442\u044b + \u0431\u043e\u043d\u0443\u0441\u044b', value: -(salaryExp + bonusesExp), color: '#EF4444' },
+    { label: '\u00a0\u00a0\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435 \u0437\u0430\u0442\u0440\u0430\u0442\u044b', value: -commExp, color: '#EF4444' },
+    { label: '\u00a0\u00a0\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433 / \u0420\u0435\u043a\u043b\u0430\u043c\u0430', value: -mktExp, color: '#EF4444' },
+    { label: '\u0418\u0422\u041e\u0413\u041e \u0440\u0430\u0441\u0445\u043e\u0434\u043e\u0432', value: -totalExpenses, color: '#F97316', bold: true },
+    { label: '\u0427\u0418\u0421\u0422\u0410\u042f \u041f\u0420\u0418\u0411\u042b\u041b\u042c', value: netProfit, color: profitColor, bold: true, big: true },
   ];
   for (var pli = 0; pli < plRows.length; pli++) {
-    var pr = plRows[pli];
+    var pr = plRows[pli]; var prVal = Number(pr.value) || 0;
+    var prSign = prVal < 0 ? '\u2212 ' : '';
     h += '<tr style="border-bottom:1px solid #1e293b' + (pr.big ? ';border-top:2px solid #8B5CF6' : '') + '">';
     h += '<td style="padding:10px 16px;' + (pr.bold ? 'font-weight:800;' : 'color:#94a3b8;') + (pr.big ? 'font-size:1.1rem;' : '') + '">' + pr.label + '</td>';
-    h += '<td style="padding:10px 16px;text-align:right;font-weight:' + (pr.bold ? '800' : '600') + ';color:' + pr.color + ';' + (pr.big ? 'font-size:1.2rem;' : '') + '">' + fmtAmt(Math.abs(pr.value || 0)) + '</td></tr>';
+    h += '<td style="padding:10px 16px;text-align:right;font-weight:' + (pr.bold ? '800' : '600') + ';color:' + pr.color + ';' + (pr.big ? 'font-size:1.2rem;' : '') + '">' + prSign + fmtAmt(Math.abs(prVal)) + '</td></tr>';
   }
   h += '</tbody></table></div></div>';
 
@@ -2490,15 +2539,14 @@ function renderBizOverviewV2(d, sd, fin) {
   var daily = d.daily || [];
   if (daily.length > 0) {
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:8px"></i>Заявки по дням (30 дней)</h3>';
-    h += '<div class="card" style="padding:20px">';
-    h += '<div style="display:flex;gap:4px;align-items:flex-end;height:140px">';
-    var maxD = Math.max.apply(null, daily.map(function(x){return x.count||1;}));
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:8px"></i>\u0417\u0430\u044f\u0432\u043a\u0438 \u043f\u043e \u0434\u043d\u044f\u043c' + (expandedMonth ? '' : ' (30 \u0434\u043d\u0435\u0439)') + '</h3>';
+    h += '<div class="card" style="padding:20px"><div style="display:flex;gap:3px;align-items:flex-end;height:140px">';
+    var maxD = Math.max.apply(null, daily.map(function(x){return Number(x.count)||1;}));
     for (var di = 0; di < daily.length; di++) {
-      var dd = daily[di]; var barH = Math.max(8, Math.round((dd.count / maxD) * 120));
-      var barColor = dd.count > 0 ? (di === daily.length - 1 ? '#8B5CF6' : '#4F46E5') : '#1e293b';
-      h += '<div style="flex:1;text-align:center;min-width:0"><div style="background:' + barColor + ';height:' + barH + 'px;border-radius:4px 4px 0 0;margin-bottom:4px;transition:all 0.2s" title="' + (dd.day || '') + ': ' + dd.count + ' заявок"></div>';
-      if (daily.length <= 14) h += '<div style="font-size:0.6rem;color:#475569;white-space:nowrap;overflow:hidden">' + (dd.day||'').slice(5) + '</div>';
+      var dd = daily[di]; var dCnt = Number(dd.count) || 0; var barH = Math.max(6, Math.round((dCnt / maxD) * 120));
+      var barColor = dCnt > 0 ? (di === daily.length - 1 ? '#8B5CF6' : '#4F46E5') : '#1e293b';
+      h += '<div style="flex:1;text-align:center;min-width:0"><div style="background:' + barColor + ';height:' + barH + 'px;border-radius:3px 3px 0 0;margin-bottom:4px;transition:all 0.2s" title="' + (dd.day || '') + ': ' + dCnt + ' \u0437\u0430\u044f\u0432\u043e\u043a, ' + fmtAmt(Number(dd.amount)||0) + '"></div>';
+      if (daily.length <= 14) h += '<div style="font-size:0.55rem;color:#475569;white-space:nowrap;overflow:hidden">' + (dd.day||'').slice(5) + '</div>';
       h += '</div>';
     }
     h += '</div>';
@@ -2658,46 +2706,83 @@ function renderBizFunnelV2(d, sd) {
   var h = '';
   var fin = d.financial || {};
   var totalLeads = d.total_leads || 1;
+  var stageTimings = d.stage_timings || {};
   // ---- SECTION: Visual funnel ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>Воронка продаж</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-funnel-dollar" style="color:#8B5CF6;margin-right:8px"></i>\u0412\u043e\u0440\u043e\u043d\u043a\u0430 \u043f\u0440\u043e\u0434\u0430\u0436</h3>';
   var funnelStages = [
-    {key:'new',label:'Новые лиды',color:'#10B981'},
-    {key:'contacted',label:'Контакт',color:'#3B82F6'},
-    {key:'in_progress',label:'В работе',color:'#F59E0B'},
-    {key:'checking',label:'Проверка',color:'#8B5CF6'},
-    {key:'done',label:'Завершено',color:'#22C55E'}
+    {key:'new',label:'\u041d\u043e\u0432\u044b\u0435 \u043b\u0438\u0434\u044b',color:'#10B981'},
+    {key:'contacted',label:'\u041a\u043e\u043d\u0442\u0430\u043a\u0442',color:'#3B82F6'},
+    {key:'in_progress',label:'\u0412 \u0440\u0430\u0431\u043e\u0442\u0435',color:'#F59E0B'},
+    {key:'checking',label:'\u041f\u0440\u043e\u0432\u0435\u0440\u043a\u0430',color:'#8B5CF6'},
+    {key:'done',label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e',color:'#22C55E'}
   ];
-  var totalF = 0; for (var fi3 = 0; fi3 < funnelStages.length; fi3++) totalF += ((sd[funnelStages[fi3].key]||{}).count||0);
-  h += '<div class="card" style="padding:20px">';
+  var totalF = 0; for (var fi3 = 0; fi3 < funnelStages.length; fi3++) totalF += (Number((sd[funnelStages[fi3].key]||{}).count)||0);
+  h += '<div class="card" style="padding:24px">';
+  var prevCnt = totalF;
   for (var fi4 = 0; fi4 < funnelStages.length; fi4++) {
     var fs = funnelStages[fi4]; var fv = sd[fs.key] || {};
-    var cnt = fv.count || 0; var widthPct = totalF > 0 ? Math.max(15, Math.round(cnt / totalF * 100)) : 15;
-    h += '<div style="margin-bottom:8px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span style="font-size:0.85rem;font-weight:600;color:' + fs.color + '">' + fs.label + '</span><span style="font-size:0.85rem;font-weight:700">' + cnt + ' <span style="color:#64748b;font-weight:400">(' + fmtAmt(fv.amount) + ')</span></span></div>';
-    h += '<div style="height:28px;background:#0f172a;border-radius:6px;overflow:hidden"><div style="height:100%;width:' + widthPct + '%;background:linear-gradient(90deg,' + fs.color + ',' + fs.color + '88);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white;transition:width 0.5s">' + (cnt > 0 ? cnt : '') + '</div></div></div>';
+    var cnt = Number(fv.count) || 0; var widthPct = totalF > 0 ? Math.max(15, Math.round(cnt / totalF * 100)) : 15;
+    var funnelW = 100 - (fi4 * 12); // tapering effect
+    var convFromPrev = prevCnt > 0 && fi4 > 0 ? ((cnt / prevCnt) * 100).toFixed(1) : '';
+    var stageDays = stageTimings[fs.key] || 0;
+    h += '<div style="margin-bottom:10px">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">';
+    h += '<span style="font-size:0.85rem;font-weight:600;color:' + fs.color + '">' + fs.label;
+    if (stageDays > 0) h += ' <span style="font-size:0.65rem;color:#64748b;font-weight:400">(~' + stageDays + ' \u0434\u043d)</span>';
+    h += '</span>';
+    h += '<span style="font-size:0.85rem;font-weight:700">' + cnt + ' <span style="color:#64748b;font-weight:400">(' + fmtAmt(Number(fv.amount)||0) + ')</span>';
+    if (convFromPrev) h += ' <span style="font-size:0.68rem;padding:2px 6px;border-radius:8px;background:rgba(139,92,246,0.15);color:#a78bfa;margin-left:6px">\u2192 ' + convFromPrev + '%</span>';
+    h += '</span></div>';
+    h += '<div style="width:' + funnelW + '%;margin:0 auto;height:32px;background:#0f172a;border-radius:6px;overflow:hidden">';
+    h += '<div style="height:100%;width:' + widthPct + '%;background:linear-gradient(90deg,' + fs.color + ',' + fs.color + '88);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white;transition:width 0.5s">' + (cnt > 0 ? cnt : '') + '</div></div>';
+    h += '</div>';
+    prevCnt = cnt;
   }
   // Rejected
   var rejected = sd.rejected || {};
-  h += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155"><div style="display:flex;justify-content:space-between"><span style="color:#EF4444;font-weight:600"><i class="fas fa-times-circle" style="margin-right:4px"></i>Отклонено</span><span style="font-weight:700">' + (rejected.count||0) + ' (' + fmtAmt(rejected.amount) + ')</span></div></div>';
-  h += '</div>';
-  // Conversion metrics
-  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px">';
-  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>Конверсия</div><div style="font-size:2.2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div></div>';
-  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>Отказы</div><div style="font-size:2.2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? (((sd.rejected?.count||0) / d.total_leads) * 100).toFixed(1) : '0') + '%</div></div>';
-  h += '<div class="card" style="text-align:center;padding:20px"><div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>Выполнение</div><div style="font-size:2.2rem;font-weight:900;color:#3B82F6">' + (fin.avg_fulfillment_days||0) + ' <span style="font-size:0.9rem">дн</span></div></div>';
+  var rejCnt = Number(rejected.count) || 0;
+  h += '<div style="margin-top:12px;padding-top:12px;border-top:1px solid #334155">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#EF4444;font-weight:600"><i class="fas fa-times-circle" style="margin-right:4px"></i>\u041e\u0442\u043a\u043b\u043e\u043d\u0435\u043d\u043e</span>';
+  h += '<span style="font-weight:700">' + rejCnt + ' (' + fmtAmt(Number(rejected.amount)||0) + ') <span style="font-size:0.72rem;color:#64748b">' + (totalLeads > 0 ? ((rejCnt / totalLeads * 100).toFixed(1) + '% \u043e\u0442\u043a\u0430\u0437\u043e\u0432') : '') + '</span></span></div>';
   h += '</div></div>';
+
+  // Conversion metrics
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:16px">';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-percentage" style="margin-right:4px"></i>\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f</div><div style="font-size:2rem;font-weight:900;color:#8B5CF6">' + fmtPct(fin.conversion_rate) + '</div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-ban" style="margin-right:4px"></i>\u041e\u0442\u043a\u0430\u0437\u044b</div><div style="font-size:2rem;font-weight:900;color:#EF4444">' + (d.total_leads > 0 ? ((rejCnt / d.total_leads) * 100).toFixed(1) : '0') + '%</div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-clock" style="margin-right:4px"></i>\u0421\u0440. \u0432\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435</div><div style="font-size:2rem;font-weight:900;color:#3B82F6">' + (Number(fin.avg_fulfillment_days)||0) + ' <span style="font-size:0.9rem">\u0434\u043d</span></div></div>';
+  h += '<div class="card" style="text-align:center;padding:18px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px"><i class="fas fa-shopping-cart" style="margin-right:4px"></i>\u0421\u0440. \u0447\u0435\u043a</div><div style="font-size:2rem;font-weight:900;color:#F59E0B">' + fmtAmt(fin.avg_check) + '</div></div>';
+  h += '</div></div>';
+
+  // ---- SECTION: Rejection reasons ----
+  var rejLeads = d.rejected_leads || [];
+  if (rejLeads.length > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exclamation-circle" style="color:#EF4444;margin-right:8px"></i>\u041f\u0440\u0438\u0447\u0438\u043d\u044b \u043e\u0442\u043a\u0430\u0437\u043e\u0432</h3>';
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">\u041b\u0438\u0434</th><th style="padding:10px;text-align:left;color:#94a3b8">\u041a\u043e\u043d\u0442\u0430\u043a\u0442</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:10px;text-align:left;color:#94a3b8">\u041f\u0440\u0438\u0447\u0438\u043d\u0430 / \u0417\u0430\u043c\u0435\u0442\u043a\u0438</th></tr></thead><tbody>';
+    for (var ri = 0; ri < Math.min(rejLeads.length, 20); ri++) {
+      var rl2 = rejLeads[ri];
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;font-weight:600">#' + (rl2.id||'') + ' ' + escHtml(rl2.name||'\u2014') + '</td>';
+      h += '<td style="padding:8px;color:#94a3b8">' + escHtml(rl2.contact||'\u2014') + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(Number(rl2.total_amount)||0) + '</td>';
+      h += '<td style="padding:8px;color:#e2e8f0;max-width:300px;overflow:hidden;text-overflow:ellipsis">' + escHtml(rl2.notes||'\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u0430') + '</td></tr>';
+    }
+    h += '</tbody></table></div></div>';
+  }
 
   // ---- SECTION: By assignee ----
   var byAssignee = d.by_assignee || [];
   if (byAssignee.length > 0) {
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-user-tie" style="color:#3B82F6;margin-right:8px"></i>По ответственным</h3>';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-user-tie" style="color:#3B82F6;margin-right:8px"></i>\u041f\u043e \u043e\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043d\u043d\u044b\u043c</h3>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px">';
     for (var ai = 0; ai < byAssignee.length; ai++) {
       var asg = byAssignee[ai];
-      h += '<div class="card" style="padding:14px"><div style="font-weight:700;margin-bottom:6px">' + escHtml(asg.display_name || 'Не назначен') + '</div>';
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.8rem"><span style="color:#94a3b8">Лидов:</span><span style="font-weight:600;text-align:right">' + (asg.count||0) + '</span>';
-      h += '<span style="color:#94a3b8">Сумма:</span><span style="font-weight:600;text-align:right">' + fmtAmt(asg.amount) + '</span></div></div>';
+      h += '<div class="card" style="padding:14px"><div style="font-weight:700;margin-bottom:6px">' + escHtml(asg.display_name || '\u041d\u0435 \u043d\u0430\u0437\u043d\u0430\u0447\u0435\u043d') + '</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:0.8rem"><span style="color:#94a3b8">\u041b\u0438\u0434\u043e\u0432:</span><span style="font-weight:600;text-align:right">' + (Number(asg.count)||0) + '</span>';
+      h += '<span style="color:#94a3b8">\u0421\u0443\u043c\u043c\u0430:</span><span style="font-weight:600;text-align:right">' + fmtAmt(Number(asg.amount)||0) + '</span></div></div>';
     }
     h += '</div></div>';
   }
@@ -2707,12 +2792,12 @@ function renderBizFunnelV2(d, sd) {
   var sourceKeys = Object.keys(bySource);
   if (sourceKeys.length > 0) {
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-globe" style="color:#F59E0B;margin-right:8px"></i>Источники</h3>';
-    var srcLabels = { form: 'Форма на сайте', popup: 'Попап', calculator_pdf: 'Калькулятор / PDF', manual: 'Вручную' };
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-globe" style="color:#F59E0B;margin-right:8px"></i>\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u0438</h3>';
+    var srcLabels = { form: '\u0424\u043e\u0440\u043c\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0435', popup: '\u041f\u043e\u043f\u0430\u043f', calculator_pdf: '\u041a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 / PDF', manual: '\u0412\u0440\u0443\u0447\u043d\u0443\u044e', direct: '\u041f\u0440\u044f\u043c\u043e\u0439' };
     h += '<div class="card" style="padding:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     for (var ski = 0; ski < sourceKeys.length; ski++) {
       var sk = sourceKeys[ski]; var sv = bySource[sk];
-      h += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #1e293b"><span style="color:#94a3b8">' + escHtml(srcLabels[sk] || sk || 'Прямой') + '</span><span style="font-weight:600">' + sv + '</span></div>';
+      h += '<div style="display:flex;justify-content:space-between;padding:8px;border-bottom:1px solid #1e293b"><span style="color:#94a3b8">' + escHtml(srcLabels[sk] || sk || '\u041f\u0440\u044f\u043c\u043e\u0439') + '</span><span style="font-weight:600">' + (Number(sv?.count)||sv||0) + ' / ' + fmtAmt(Number(sv?.amount)||0) + '</span></div>';
     }
     h += '</div></div></div>';
   }
@@ -2721,18 +2806,18 @@ function renderBizFunnelV2(d, sd) {
   var services = d.services || [];
   if (services.length > 0) {
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-fire" style="color:#EF4444;margin-right:8px"></i>Популярные услуги</h3>';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-fire" style="color:#EF4444;margin-right:8px"></i>\u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438</h3>';
     h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">#</th><th style="padding:10px;text-align:left;color:#94a3b8">Услуга</th><th style="padding:10px;text-align:center;color:#94a3b8">Заказов</th><th style="padding:10px;text-align:center;color:#94a3b8">Кол-во</th><th style="padding:10px;text-align:right;color:#94a3b8">Выручка</th><th style="padding:10px;text-align:right;color:#94a3b8">%</th></tr></thead><tbody>';
-    var totalSvcRev = services.reduce(function(a, s) { return a + (s.revenue||0); }, 0);
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">#</th><th style="padding:10px;text-align:left;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0430</th><th style="padding:10px;text-align:center;color:#94a3b8">\u0417\u0430\u043a\u0430\u0437\u043e\u0432</th><th style="padding:10px;text-align:center;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</th><th style="padding:10px;text-align:right;color:#94a3b8">%</th></tr></thead><tbody>';
+    var totalSvcRev = services.reduce(function(a, s) { return a + (Number(s.revenue)||0); }, 0);
     for (var svi = 0; svi < Math.min(services.length, 15); svi++) {
-      var svc = services[svi]; var svcPctV = totalSvcRev > 0 ? ((svc.revenue / totalSvcRev) * 100).toFixed(1) : '0';
-      var barW = totalSvcRev > 0 ? Math.round((svc.revenue / totalSvcRev) * 100) : 0;
+      var svc = services[svi]; var svcPctV = totalSvcRev > 0 ? ((Number(svc.revenue) / totalSvcRev) * 100).toFixed(1) : '0';
+      var barW = totalSvcRev > 0 ? Math.round((Number(svc.revenue) / totalSvcRev) * 100) : 0;
       h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;color:#64748b">' + (svi+1) + '</td>';
       h += '<td style="padding:8px;font-weight:600">' + escHtml(svc.name) + '</td>';
-      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + svc.count + '</td>';
-      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + (svc.qty||svc.count) + '</td>';
-      h += '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(svc.revenue) + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + (svc.count||0) + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + (svc.qty||svc.count||0) + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(Number(svc.revenue)||0) + '</td>';
       h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600">' + svcPctV + '%</span></div></td></tr>';
     }
     h += '</tbody></table></div></div>';
@@ -2741,7 +2826,7 @@ function renderBizFunnelV2(d, sd) {
   return h;
 }
 
-// ============ TAB 4: ПЕРИОДЫ ============
+// ============ TAB 4: ПЕРИОДЫ И ГРАФИКИ ============
 function renderBizPeriodsV2(d) {
   var h = '';
   var now = new Date();
@@ -2749,62 +2834,166 @@ function renderBizPeriodsV2(d) {
   var currentMonth = now.getMonth() + 1;
   var currentQ = Math.ceil(currentMonth / 3);
   var snapshots = data.periodSnapshots || [];
+  var monthlyData = d.monthly_data || [];
+  var weeklyData = d.weekly_data || [];
+  var monthDailyData = d.month_daily_data || [];
 
-  // ---- SECTION: Year overview ----
+  // ---- SECTION: Yearly Efficiency Graph ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-alt" style="color:#8B5CF6;margin-right:8px"></i>Год: ' + currentYear + '</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-area" style="color:#8B5CF6;margin-right:8px"></i>\u042d\u0444\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u044c ' + currentYear + '</h3>';
+  // Metric selector
+  h += '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">';
+  var metrics = [{id:'amount',label:'\u041e\u0431\u043e\u0440\u043e\u0442'},{id:'count',label:'\u041a\u043e\u043b-\u0432\u043e \u043b\u0438\u0434\u043e\u0432'},{id:'done_amount',label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043d\u044b\u0435'}];
+  for (var mi2 = 0; mi2 < metrics.length; mi2++) {
+    var m = metrics[mi2];
+    h += '<button class="tab-btn' + (yearChartMetric === m.id ? ' active' : '') + '" style="padding:6px 12px;font-size:0.78rem" onclick="yearChartMetric=\\'' + m.id + '\\';render()">' + m.label + '</button>';
+  }
+  h += '<span style="color:#334155;margin:0 4px">|</span>';
+  var modes = [{id:'month',label:'\u041c\u0435\u0441\u044f\u0446'},{id:'week',label:'\u041d\u0435\u0434\u0435\u043b\u044f'}];
+  for (var md2 = 0; md2 < modes.length; md2++) {
+    h += '<button class="tab-btn' + (yearChartMode === modes[md2].id ? ' active' : '') + '" style="padding:6px 12px;font-size:0.78rem" onclick="yearChartMode=\\'' + modes[md2].id + '\\';render()">' + modes[md2].label + '</button>';
+  }
+  h += '</div>';
+  // Chart
+  var chartData = yearChartMode === 'week' ? weeklyData : monthlyData;
+  if (chartData.length > 0) {
+    h += '<div class="card" style="padding:20px">';
+    var maxVal = 1;
+    for (var ci2 = 0; ci2 < chartData.length; ci2++) {
+      var cv = Number(chartData[ci2][yearChartMetric] || chartData[ci2].amount || chartData[ci2].count) || 0;
+      if (cv > maxVal) maxVal = cv;
+    }
+    h += '<div style="display:flex;gap:6px;align-items:flex-end;height:160px">';
+    for (var ci3 = 0; ci3 < chartData.length; ci3++) {
+      var cd = chartData[ci3];
+      var val = Number(cd[yearChartMetric] || cd.amount || cd.count) || 0;
+      var barHt = Math.max(6, Math.round((val / maxVal) * 140));
+      var isCurrentM = cd.month === (currentYear + '-' + String(currentMonth).padStart(2,'0'));
+      var bColor = isCurrentM ? '#8B5CF6' : '#4F46E5';
+      var label = cd.month ? cd.month.slice(5) : (cd.week ? cd.week.slice(5) : '');
+      h += '<div style="flex:1;text-align:center;min-width:0;cursor:pointer" onclick="expandMonthFromChart(\\'' + (cd.month||'') + '\\')">';
+      h += '<div style="font-size:0.58rem;color:#94a3b8;margin-bottom:4px">' + (yearChartMetric === 'count' ? val : fmtAmt(val).replace('\u00a0\u058f','')) + '</div>';
+      h += '<div style="background:' + bColor + ';height:' + barHt + 'px;border-radius:4px 4px 0 0;transition:all 0.3s;margin-bottom:4px" title="' + (cd.month||cd.week||'') + ': ' + val + '"></div>';
+      h += '<div style="font-size:0.62rem;color:#64748b">' + label + '</div></div>';
+    }
+    h += '</div></div>';
+  } else {
+    h += '<div class="card" style="padding:24px;text-align:center;color:#475569">\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445 \u0434\u043b\u044f \u0433\u0440\u0430\u0444\u0438\u043a\u0430</div>';
+  }
+  h += '</div>';
 
-  // Month grid
-  var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  // ---- SECTION: Month detail (if expanded) ----
+  if (monthDailyData.length > 0 && expandedMonth) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-day" style="color:#F59E0B;margin-right:8px"></i>\u0414\u0435\u0442\u0430\u043b\u0438\u0437\u0430\u0446\u0438\u044f \u043f\u043e \u0434\u043d\u044f\u043c: ' + expandedMonth + '</h3>';
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
+    h += '<th style="padding:10px 16px;text-align:left;color:#94a3b8">\u0414\u0435\u043d\u044c</th>';
+    h += '<th style="padding:10px;text-align:center;color:#94a3b8">\u0412\u0441\u0435\u0433\u043e</th>';
+    h += '<th style="padding:10px;text-align:center;color:#22C55E">\u0417\u0430\u0432\u0435\u0440\u0448.</th>';
+    h += '<th style="padding:10px;text-align:center;color:#EF4444">\u041e\u0442\u043a\u043b.</th>';
+    h += '<th style="padding:10px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th>';
+    h += '<th style="padding:10px;text-align:right;color:#22C55E">\u0414\u043e\u043d\u0435 \u0441\u0443\u043c\u043c\u0430</th>';
+    h += '</tr></thead><tbody>';
+    var weekTotals = {count:0,done:0,rej:0,amount:0,doneAmt:0};
+    var monthTotals = {count:0,done:0,rej:0,amount:0,doneAmt:0};
+    for (var mdi = 0; mdi < monthDailyData.length; mdi++) {
+      var md = monthDailyData[mdi];
+      var mCnt = Number(md.count)||0; var mDone = Number(md.done_count)||0;
+      var mRej = Number(md.rejected_count)||0; var mAmt = Number(md.amount)||0;
+      var mDoneAmt = Number(md.done_amount)||0;
+      weekTotals.count += mCnt; weekTotals.done += mDone; weekTotals.rej += mRej;
+      weekTotals.amount += mAmt; weekTotals.doneAmt += mDoneAmt;
+      monthTotals.count += mCnt; monthTotals.done += mDone; monthTotals.rej += mRej;
+      monthTotals.amount += mAmt; monthTotals.doneAmt += mDoneAmt;
+      var dayName = '';
+      try { dayName = new Date(md.day + 'T12:00:00').toLocaleDateString('ru-RU',{weekday:'short'}); } catch {}
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;font-weight:600">' + (md.day||'').slice(8) + ' <span style="color:#64748b;font-weight:400">' + dayName + '</span></td>';
+      h += '<td style="padding:8px;text-align:center">' + mCnt + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#22C55E">' + mDone + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#EF4444">' + mRej + '</td>';
+      h += '<td style="padding:8px;text-align:right">' + fmtAmt(mAmt) + '</td>';
+      h += '<td style="padding:8px;text-align:right;color:#22C55E">' + fmtAmt(mDoneAmt) + '</td></tr>';
+      // Weekly subtotal every 7 days
+      var dayNum = parseInt((md.day||'').slice(8)) || 0;
+      if (dayNum % 7 === 0 && mdi < monthDailyData.length - 1) {
+        h += '<tr style="background:rgba(139,92,246,0.08);border-bottom:2px solid #334155"><td style="padding:6px 16px;font-weight:700;color:#a78bfa;font-size:0.78rem">\u041d\u0435\u0434\u0435\u043b\u044f</td>';
+        h += '<td style="padding:6px;text-align:center;font-weight:700;color:#a78bfa">' + weekTotals.count + '</td>';
+        h += '<td style="padding:6px;text-align:center;font-weight:700;color:#22C55E">' + weekTotals.done + '</td>';
+        h += '<td style="padding:6px;text-align:center;font-weight:700;color:#EF4444">' + weekTotals.rej + '</td>';
+        h += '<td style="padding:6px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(weekTotals.amount) + '</td>';
+        h += '<td style="padding:6px;text-align:right;font-weight:700;color:#22C55E">' + fmtAmt(weekTotals.doneAmt) + '</td></tr>';
+        weekTotals = {count:0,done:0,rej:0,amount:0,doneAmt:0};
+      }
+    }
+    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px 16px">\u0418\u0422\u041e\u0413\u041e</td>';
+    h += '<td style="padding:10px;text-align:center">' + monthTotals.count + '</td>';
+    h += '<td style="padding:10px;text-align:center;color:#22C55E">' + monthTotals.done + '</td>';
+    h += '<td style="padding:10px;text-align:center;color:#EF4444">' + monthTotals.rej + '</td>';
+    h += '<td style="padding:10px;text-align:right">' + fmtAmt(monthTotals.amount) + '</td>';
+    h += '<td style="padding:10px;text-align:right;color:#22C55E">' + fmtAmt(monthTotals.doneAmt) + '</td></tr>';
+    h += '</tbody></table></div></div>';
+  }
+
+  // ---- SECTION: Year month overview ----
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-alt" style="color:#8B5CF6;margin-right:8px"></i>\u0413\u043e\u0434: ' + currentYear + '</h3>';
+  var monthNames = ['\u042f\u043d\u0432','\u0424\u0435\u0432','\u041c\u0430\u0440','\u0410\u043f\u0440','\u041c\u0430\u0439','\u0418\u044e\u043d','\u0418\u044e\u043b','\u0410\u0432\u0433','\u0421\u0435\u043d','\u041e\u043a\u0442','\u041d\u043e\u044f','\u0414\u0435\u043a'];
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px">';
-  for (var mi = 1; mi <= 12; mi++) {
-    var mKey = currentYear + '-' + String(mi).padStart(2,'0');
+  for (var mi3 = 1; mi3 <= 12; mi3++) {
+    var mKey = currentYear + '-' + String(mi3).padStart(2,'0');
     var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
-    var isCurrent = mi === currentMonth;
-    var isPast = mi < currentMonth;
+    var isCurrent = mi3 === currentMonth;
+    var isPast = mi3 < currentMonth;
     var isLocked = mSnap && mSnap.is_locked;
     var borderColor = isCurrent ? '#8B5CF6' : isLocked ? '#22C55E' : isPast ? '#F59E0B' : '#334155';
     var bgColor = isCurrent ? 'rgba(139,92,246,0.1)' : isLocked ? 'rgba(34,197,94,0.05)' : 'transparent';
     h += '<div class="card" style="padding:12px;text-align:center;border:2px solid ' + borderColor + ';background:' + bgColor + ';position:relative">';
-    if (isCurrent) h += '<div style="position:absolute;top:-8px;right:8px;background:#8B5CF6;color:white;font-size:0.6rem;padding:1px 8px;border-radius:10px;font-weight:700">СЕЙЧАС</div>';
+    if (isCurrent) h += '<div style="position:absolute;top:-8px;right:8px;background:#8B5CF6;color:white;font-size:0.6rem;padding:1px 8px;border-radius:10px;font-weight:700">\u0421\u0415\u0419\u0427\u0410\u0421</div>';
     if (isLocked) h += '<div style="position:absolute;top:-8px;left:8px;background:#22C55E;color:white;font-size:0.6rem;padding:1px 6px;border-radius:10px"><i class="fas fa-lock"></i></div>';
-    h += '<div style="font-weight:700;font-size:0.95rem;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi-1] + '</div>';
+    h += '<div style="font-weight:700;font-size:0.95rem;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi3-1] + '</div>';
     if (mSnap) {
-      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">Приб: ' + fmtAmt(mSnap.net_profit) + '</div>';
-      h += '<div style="font-size:0.65rem;color:#64748b">Лиды: ' + (mSnap.leads_count||0) + '</div>';
+      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">\u041f\u0440\u0438\u0431: ' + fmtAmt(mSnap.net_profit) + '</div>';
+      h += '<div style="font-size:0.65rem;color:#64748b">\u041b\u0438\u0434\u044b: ' + (mSnap.leads_count||0) + '</div>';
+    }
+    // Action buttons
+    h += '<div style="display:flex;gap:4px;justify-content:center;margin-top:8px;flex-wrap:wrap">';
+    // Expand month button
+    if (isPast || isCurrent) {
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="expandedMonth=\\'' + mKey + '\\';analyticsData=null;loadAnalyticsData()" title="\u0420\u0430\u0437\u0432\u0435\u0440\u043d\u0443\u0442\u044c"><i class="fas fa-expand"></i></button>';
     }
     if (isPast && !isLocked) {
-      h += '<button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:0.7rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)"><i class="fas fa-lock" style="margin-right:3px"></i>Закрыть</button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)"><i class="fas fa-lock" style="margin-right:2px"></i>\u0417\u0430\u043a\u0440</button>';
     } else if (isCurrent) {
-      h += '<button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:0.7rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)"><i class="fas fa-save" style="margin-right:3px"></i>Сохранить</button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)"><i class="fas fa-save" style="margin-right:2px"></i>\u0421\u043e\u0445\u0440</button>';
     } else if (isLocked) {
-      h += '<button class="btn btn-outline" style="margin-top:8px;padding:4px 10px;font-size:0.65rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')"><i class="fas fa-unlock"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.6rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')"><i class="fas fa-unlock"></i></button>';
     }
-    h += '</div>';
+    h += '</div></div>';
   }
   h += '</div>';
 
   // Quarters
-  h += '<h4 style="font-weight:700;margin-bottom:12px;color:#94a3b8">Кварталы ' + currentYear + '</h4>';
+  h += '<h4 style="font-weight:700;margin-bottom:12px;color:#94a3b8">\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u044b ' + currentYear + '</h4>';
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">';
-  for (var qi = 1; qi <= 4; qi++) {
-    var qKey = currentYear + '-Q' + qi;
+  for (var qi2 = 1; qi2 <= 4; qi2++) {
+    var qKey = currentYear + '-Q' + qi2;
     var qSnap = snapshots.find(function(s){return s.period_type==='quarter' && s.period_key===qKey;});
-    var qIsCurrent = qi === currentQ;
+    var qIsCurrent = qi2 === currentQ;
     var qLocked = qSnap && qSnap.is_locked;
-    var qMonths = [qi*3-2, qi*3-1, qi*3]; var closedInQ = 0;
+    var qMonths = [qi2*3-2, qi2*3-1, qi2*3]; var closedInQ = 0;
     for (var qmi = 0; qmi < qMonths.length; qmi++) {
       var qmk = currentYear + '-' + String(qMonths[qmi]).padStart(2,'0');
       if (snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmk && s.is_locked;})) closedInQ++;
     }
     h += '<div class="card" style="padding:16px;text-align:center;border:2px solid ' + (qIsCurrent ? '#F59E0B' : qLocked ? '#22C55E' : '#334155') + '">';
-    h += '<div style="font-weight:700;font-size:1.1rem;color:' + (qIsCurrent ? '#F59E0B' : '#e2e8f0') + '">Q' + qi + '</div>';
-    h += '<div style="font-size:0.72rem;color:#64748b;margin-top:4px">Месяцы: ' + closedInQ + '/3 закрыто</div>';
-    if (qSnap) h += '<div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">Приб: ' + fmtAmt(qSnap.net_profit) + '</div>';
-    if (qi < currentQ && closedInQ === 3 && !qLocked) {
-      h += '<button class="btn btn-primary" style="margin-top:8px;padding:4px 12px;font-size:0.75rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)">Закрыть Q' + qi + '</button>';
+    h += '<div style="font-weight:700;font-size:1.1rem;color:' + (qIsCurrent ? '#F59E0B' : '#e2e8f0') + '">Q' + qi2 + '</div>';
+    h += '<div style="font-size:0.72rem;color:#64748b;margin-top:4px">\u041c\u0435\u0441\u044f\u0446\u044b: ' + closedInQ + '/3 \u0437\u0430\u043a\u0440\u044b\u0442\u043e</div>';
+    if (qSnap) h += '<div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">\u041f\u0440\u0438\u0431: ' + fmtAmt(qSnap.net_profit) + '</div>';
+    if (qi2 < currentQ && closedInQ === 3 && !qLocked) {
+      h += '<button class="btn btn-primary" style="margin-top:8px;padding:4px 12px;font-size:0.75rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)">\u0417\u0430\u043a\u0440\u044b\u0442\u044c Q' + qi2 + '</button>';
     } else if (qLocked) {
-      h += '<div style="margin-top:6px;font-size:0.7rem;color:#22C55E"><i class="fas fa-check-circle"></i> Закрыт</div>';
+      h += '<div style="margin-top:6px;font-size:0.7rem;color:#22C55E"><i class="fas fa-check-circle"></i> \u0417\u0430\u043a\u0440\u044b\u0442</div>';
     }
     h += '</div>';
   }
@@ -2816,39 +3005,45 @@ function renderBizPeriodsV2(d) {
   var closedQ = 0;
   for (var yqi = 1; yqi <= 4; yqi++) { if(snapshots.find(function(s){return s.period_type==='quarter' && s.period_key===currentYear+'-Q'+yqi && s.is_locked;})) closedQ++; }
   h += '<div class="card" style="padding:20px;text-align:center;border:2px solid ' + (yearSnap && yearSnap.is_locked ? '#22C55E' : '#8B5CF6') + ';margin-bottom:20px">';
-  h += '<div style="font-size:1.3rem;font-weight:800;color:#a78bfa">Год ' + currentYear + '</div>';
-  h += '<div style="font-size:0.85rem;color:#64748b;margin-top:4px">Кварталов закрыто: ' + closedQ + '/4</div>';
-  if (yearSnap) h += '<div style="font-size:0.85rem;margin-top:8px">Прибыль за год: <strong style="color:' + ((yearSnap.net_profit||0) >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearSnap.net_profit) + '</strong></div>';
+  h += '<div style="font-size:1.3rem;font-weight:800;color:#a78bfa">\u0413\u043e\u0434 ' + currentYear + '</div>';
+  h += '<div style="font-size:0.85rem;color:#64748b;margin-top:4px">\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u043e\u0432 \u0437\u0430\u043a\u0440\u044b\u0442\u043e: ' + closedQ + '/4</div>';
+  if (yearSnap) h += '<div style="font-size:0.85rem;margin-top:8px">\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u0437\u0430 \u0433\u043e\u0434: <strong style="color:' + ((yearSnap.net_profit||0) >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearSnap.net_profit) + '</strong></div>';
   if (closedQ === 4 && !(yearSnap && yearSnap.is_locked)) {
-    h += '<button class="btn btn-primary" style="margin-top:12px" onclick="closePeriodAction(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть год</button>';
+    h += '<button class="btn btn-primary" style="margin-top:12px" onclick="closePeriodAction(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u0433\u043e\u0434</button>';
   }
-  h += '</div>';
-  h += '</div>';
+  h += '</div></div>';
 
   // ---- SECTION: Period comparison ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#F59E0B;margin-right:8px"></i>Сравнение периодов</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#F59E0B;margin-right:8px"></i>\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432</h3>';
   var closedSnaps = snapshots.filter(function(s){return s.is_locked;}).sort(function(a,b){return a.period_key>b.period_key?-1:1;});
   if (closedSnaps.length > 0) {
     h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Период</th><th style="padding:10px;text-align:right;color:#94a3b8">Оборот</th><th style="padding:10px;text-align:right;color:#94a3b8">Расходы</th><th style="padding:10px;text-align:right;color:#94a3b8">Прибыль</th><th style="padding:10px;text-align:right;color:#94a3b8">Лиды</th></tr></thead><tbody>';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">\u041f\u0435\u0440\u0438\u043e\u0434</th><th style="padding:10px;text-align:right;color:#94a3b8">\u041e\u0431\u043e\u0440\u043e\u0442</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0420\u0430\u0441\u0445\u043e\u0434\u044b</th><th style="padding:10px;text-align:right;color:#94a3b8">\u041f\u0440\u0438\u0431\u044b\u043b\u044c</th><th style="padding:10px;text-align:right;color:#94a3b8">\u041b\u0438\u0434\u044b</th></tr></thead><tbody>';
     for (var csi = 0; csi < closedSnaps.length; csi++) {
-      var cs = closedSnaps[csi]; var pLabel = cs.period_type === 'month' ? cs.period_key : cs.period_type === 'quarter' ? cs.period_key : 'Год ' + cs.period_key;
+      var cs = closedSnaps[csi]; var pLabel = cs.period_type === 'month' ? cs.period_key : cs.period_type === 'quarter' ? cs.period_key : '\u0413\u043e\u0434 ' + cs.period_key;
       var pColor = cs.period_type === 'year' ? '#8B5CF6' : cs.period_type === 'quarter' ? '#F59E0B' : '#64748b';
       h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px"><span style="color:' + pColor + ';font-weight:600">' + pLabel + '</span><span style="font-size:0.65rem;color:#475569;margin-left:6px">' + cs.period_type + '</span></td>';
       h += '<td style="padding:10px;text-align:right">' + fmtAmt(cs.total_turnover) + '</td>';
-      var csTotalExp = (cs.expense_salaries||0)+(cs.expense_commercial||0)+(cs.expense_marketing||0);
+      var csTotalExp = (Number(cs.expense_salaries)||0)+(Number(cs.expense_commercial)||0)+(Number(cs.expense_marketing)||0);
       h += '<td style="padding:10px;text-align:right;color:#f87171">' + fmtAmt(csTotalExp) + '</td>';
-      h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + ((cs.net_profit||0)>=0?'#22C55E':'#EF4444') + '">' + fmtAmt(cs.net_profit) + '</td>';
+      h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + ((Number(cs.net_profit)||0)>=0?'#22C55E':'#EF4444') + '">' + fmtAmt(cs.net_profit) + '</td>';
       h += '<td style="padding:10px;text-align:right">' + (cs.leads_count||0) + '</td></tr>';
     }
     h += '</tbody></table></div>';
   } else {
-    h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>Закройте первый месяц чтобы увидеть сравнение</div>';
+    h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>\u0417\u0430\u043a\u0440\u043e\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u043c\u0435\u0441\u044f\u0446 \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435</div>';
   }
   h += '</div>';
 
   return h;
+}
+
+function expandMonthFromChart(month) {
+  if (!month) return;
+  expandedMonth = month;
+  analyticsData = null;
+  loadAnalyticsData();
 }
 
 // ===== ANALYTICS HELPER FUNCTIONS =====
@@ -2973,12 +3168,14 @@ async function unlockPeriod(snapshotId) {
 }
 
 function setAnalyticsPeriod(period) {
+  expandedMonth = ''; // reset month drill-down
   var now = new Date();
   var fmt = function(d) { return d.toISOString().slice(0,10); };
   if (period === 'today') { analyticsDateFrom = fmt(now); analyticsDateTo = fmt(now); }
   else if (period === 'week') { var d7 = new Date(now); d7.setDate(d7.getDate()-7); analyticsDateFrom = fmt(d7); analyticsDateTo = fmt(now); }
   else if (period === '14d') { var d14 = new Date(now); d14.setDate(d14.getDate()-14); analyticsDateFrom = fmt(d14); analyticsDateTo = fmt(now); }
   else if (period === 'month') { var d30 = new Date(now); d30.setDate(d30.getDate()-30); analyticsDateFrom = fmt(d30); analyticsDateTo = fmt(now); }
+  else if (period === '90d') { var d90 = new Date(now); d90.setDate(d90.getDate()-90); analyticsDateFrom = fmt(d90); analyticsDateTo = fmt(now); }
   else { analyticsDateFrom = ''; analyticsDateTo = ''; }
   analyticsData = null;
   loadAnalyticsData();
@@ -3606,8 +3803,9 @@ function showEmployeeModal(userId) {
   const roles = rolesConfig?.roles || [];
   const rl = rolesConfig?.role_labels || {};
   const u = userId ? data.users.find(x => x.id === userId) : null;
+  const compRoles = data.companyRoles || [];
   let h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center" onclick="this.remove()">' +
-    '<div class="card" style="width:480px;max-width:90vw" onclick="event.stopPropagation()">' +
+    '<div class="card" style="width:520px;max-width:90vw;max-height:90vh;overflow-y:auto" onclick="event.stopPropagation()">' +
     '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px">' + (u ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c' : '\u041d\u043e\u0432\u044b\u0439 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a') + '</h3>' +
     '<form onsubmit="saveEmployee(event,' + (u ? u.id : 'null') + ')">' +
     '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0418\u043c\u044f / \u0424\u0418\u041e *</label><input class="input" id="empName" value="' + escHtml(u?.display_name||'') + '" required></div>';
@@ -3615,11 +3813,26 @@ function showEmployeeModal(userId) {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041b\u043e\u0433\u0438\u043d *</label><input class="input" id="empUser" required></div>' +
       '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u041f\u0430\u0440\u043e\u043b\u044c *</label><input class="input" type="password" id="empPass" required></div></div>';
   }
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0420\u043e\u043b\u044c *</label><select class="input" id="empRole">';
   for (const r of roles) { h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
   h += '</select></div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="empPosition">';
+  h += '<option value="">\u2014 \u0412\u044b\u0431\u0440\u0430\u0442\u044c \u2014</option>';
+  for (var cri = 0; cri < compRoles.length; cri++) {
+    var cr = compRoles[cri];
+    h += '<option value="' + escHtml(cr.role_name) + '"' + (u?.position_title === cr.role_name ? ' selected' : '') + '>' + escHtml(cr.role_name) + '</option>';
+  }
+  h += '</select></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</label><input class="input" id="empPhone" value="' + escHtml(u?.phone||'') + '"></div>' +
     '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Email</label><input class="input" id="empEmail" value="' + escHtml(u?.email||'') + '"></div></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0417\u0430\u0440\u043f\u043b\u0430\u0442\u0430</label><input class="input" type="number" id="empSalary" value="' + (u?.salary||0) + '"></div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0438\u043f \u043e\u043f\u043b\u0430\u0442\u044b</label><select class="input" id="empSalaryType">';
+  var stypesModal = [{v:'monthly',l:'\u041f\u043e\u043c\u0435\u0441\u044f\u0447\u043d\u043e'},{v:'biweekly',l:'\u0417\u0430 15 \u0434\u043d\u0435\u0439'},{v:'hourly',l:'\u041f\u043e\u0447\u0430\u0441\u043e\u0432\u0430\u044f'},{v:'per_task',l:'\u0417\u0430 \u0440\u0430\u0431\u043e\u0442\u0443'},{v:'percent',l:'\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043e\u0442 \u043e\u0431\u043e\u0440\u043e\u0442\u0430'}];
+  for (var sti3 = 0; sti3 < stypesModal.length; sti3++) {
+    h += '<option value="' + stypesModal[sti3].v + '"' + ((u?.salary_type||'monthly') === stypesModal[sti3].v ? ' selected' : '') + '>' + stypesModal[sti3].l + '</option>';
+  }
+  h += '</select></div></div>';
   h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (u?'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c':'\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div></form></div></div>';
   const area = document.getElementById('employeeModalArea');
   if (area) area.innerHTML = h;
@@ -3629,7 +3842,15 @@ function editEmployee(id) { showEmployeeModal(id); }
 
 async function saveEmployee(e, id) {
   e.preventDefault();
-  const body = { display_name: document.getElementById('empName').value, role: document.getElementById('empRole').value, phone: document.getElementById('empPhone').value, email: document.getElementById('empEmail').value };
+  const body = { 
+    display_name: document.getElementById('empName').value, 
+    role: document.getElementById('empRole').value, 
+    phone: document.getElementById('empPhone').value, 
+    email: document.getElementById('empEmail').value,
+    position_title: document.getElementById('empPosition')?.value || '',
+    salary: Number(document.getElementById('empSalary')?.value) || 0,
+    salary_type: document.getElementById('empSalaryType')?.value || 'monthly'
+  };
   // Enforce single main_admin
   if (body.role === 'main_admin' && !id) {
     var existing = data.users.find(function(u) { return u.role === 'main_admin'; });

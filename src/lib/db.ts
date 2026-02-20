@@ -412,6 +412,9 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE users ADD COLUMN salary REAL DEFAULT 0").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN salary_type TEXT DEFAULT 'monthly'").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN position_title TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN password_plain TEXT DEFAULT ''").run(); } catch {}
+  // v8 Migrations: ensure company_roles has role_name column  
+  try { await db.prepare("ALTER TABLE company_roles ADD COLUMN role_name TEXT NOT NULL DEFAULT ''").run(); } catch {}
   // Run seeds
   await runSeeds(db);
   dbInitialized = true;

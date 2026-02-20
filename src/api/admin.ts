@@ -884,7 +884,13 @@ api.delete('/photo-blocks/:id', authMiddleware, async (c) => {
 // ===== USERS / EMPLOYEES =====
 api.get('/users', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const res = await db.prepare('SELECT id, username, role, display_name, phone, email, is_active, salary, salary_type, position_title, created_at FROM users ORDER BY id').all();
+  const caller = c.get('user');
+  const isMainAdmin = caller.role === 'main_admin';
+  // main_admin sees password_plain for credential management; others don't
+  const cols = isMainAdmin
+    ? 'id, username, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, created_at'
+    : 'id, username, role, display_name, phone, email, is_active, salary, salary_type, position_title, created_at';
+  const res = await db.prepare('SELECT ' + cols + ' FROM users ORDER BY id').all();
   return c.json(res.results);
 });
 
@@ -935,6 +941,12 @@ api.put('/users/:id', authMiddleware, async (c) => {
   if (d.salary !== undefined) { fields.push('salary=?'); vals.push(d.salary); }
   if (d.salary_type !== undefined) { fields.push('salary_type=?'); vals.push(d.salary_type); }
   if (d.position_title !== undefined) { fields.push('position_title=?'); vals.push(d.position_title); }
+  // Update password if provided in user edit
+  if (d.new_password) {
+    const newHash = await hashPassword(d.new_password);
+    fields.push('password_hash=?'); vals.push(newHash);
+    fields.push('password_plain=?'); vals.push(d.new_password);
+  }
   if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
@@ -1525,116 +1537,156 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const url = new URL(c.req.url);
     const dateFrom = url.searchParams.get('from') || '';
     const dateTo = url.searchParams.get('to') || '';
+    // Also accept month param for period-specific analytics
+    const monthParam = url.searchParams.get('month') || ''; // e.g. "2026-02"
+    
     let dateFilter = '';
     const dateParams: string[] = [];
-    if (dateFrom) { dateFilter += " AND date(l.created_at) >= ?"; dateParams.push(dateFrom); }
-    if (dateTo) { dateFilter += " AND date(l.created_at) <= ?"; dateParams.push(dateTo); }
+    if (monthParam) {
+      dateFilter += " AND strftime('%Y-%m', l.created_at) = ?";
+      dateParams.push(monthParam);
+    } else {
+      if (dateFrom) { dateFilter += " AND date(l.created_at) >= ?"; dateParams.push(dateFrom); }
+      if (dateTo) { dateFilter += " AND date(l.created_at) <= ?"; dateParams.push(dateTo); }
+    }
 
     // 1. Lead stats by status with services/articles breakdown
-    const activeStatuses = ['in_progress', 'checking', 'done'];
+    // TURNOVER = in_progress + checking + done (money already received by company)
+    const turnoverStatuses = ['in_progress', 'checking', 'done'];
     const allStatuses = ['new', 'contacted', 'in_progress', 'rejected', 'checking', 'done'];
     const statusData: Record<string, any> = {};
     for (const st of allStatuses) {
-      const res = await db.prepare("SELECT COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first().catch(() => ({ count: 0, amount: 0 }));
-      statusData[st] = { count: res?.count || 0, amount: res?.amount || 0, services: 0, articles: 0 };
+      const res = await db.prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first().catch(() => null);
+      statusData[st] = { count: Number(res?.cnt || 0), amount: Number(res?.amt || 0), services: 0, articles: 0 };
     }
 
     // Parse calc_data for services vs articles breakdown per status
-    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
+    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
     let totalRefunds = 0;
+    const leadsById: Record<number, any> = {};
     for (const lead of (allLeads.results || [])) {
       const st = lead.status as string || 'new';
+      const lid = Number(lead.id);
+      leadsById[lid] = lead;
       totalRefunds += Number(lead.refund_amount) || 0;
       try {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
         if (cd.items && Array.isArray(cd.items)) {
           for (const item of cd.items) {
+            const subtotal = Number(item.subtotal) || 0;
             if (item.wb_article) {
-              if (statusData[st]) statusData[st].articles += Number(item.subtotal || 0);
+              if (statusData[st]) statusData[st].articles += subtotal;
             } else {
-              if (statusData[st]) statusData[st].services += Number(item.subtotal || 0);
+              if (statusData[st]) statusData[st].services += subtotal;
             }
           }
         }
       } catch {}
     }
 
-    // Also get articles totals from lead_articles table
+    // Also get articles totals from lead_articles table (external articles table)
     try {
-      const artTotals = await db.prepare("SELECT l.status, SUM(la.total_price) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE 1=1" + dateFilter + " GROUP BY l.status").bind(...dateParams).all();
+      const artDateFilter = dateFilter.replace(/l\./g, 'l2.');
+      const artTotals = await db.prepare("SELECT l2.status, COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l2 ON la.lead_id = l2.id WHERE 1=1" + artDateFilter + " GROUP BY l2.status").bind(...dateParams).all();
       for (const r of (artTotals.results || [])) {
         const st = r.status as string;
         if (statusData[st]) statusData[st].articles += Number(r.art_total || 0);
       }
     } catch {}
 
-    // 2. Financial summary (only active statuses: in_progress + checking + done)
+    // 2. Financial summary
+    // TURNOVER = total_amount of in_progress + checking + done leads (all money in company)
     let turnover = 0, servicesTotal = 0, articlesTotal = 0;
-    for (const st of activeStatuses) {
-      turnover += Number(statusData[st]?.amount || 0);
-      servicesTotal += Number(statusData[st]?.services || 0);
-      articlesTotal += Number(statusData[st]?.articles || 0);
+    for (const st of turnoverStatuses) {
+      turnover += statusData[st]?.amount || 0;
+      servicesTotal += statusData[st]?.services || 0;
+      articlesTotal += statusData[st]?.articles || 0;
     }
+    // Ensure turnover is never negative, sanitize big-number issues
+    turnover = Math.max(0, Math.round(turnover * 100) / 100);
+    servicesTotal = Math.max(0, Math.round(servicesTotal * 100) / 100);
+    articlesTotal = Math.max(0, Math.round(articlesTotal * 100) / 100);
+
+    // Completed (done) sums — separate for correct "Completed" card display
+    const doneAmount = statusData.done?.amount || 0;
+    const doneServices = statusData.done?.services || 0;
+    const doneArticles = statusData.done?.articles || 0;
+    const doneCount = statusData.done?.count || 0;
 
     // 3. Expenses
-    const expenseRes = await db.prepare(`SELECT e.*, ec.is_marketing, eft.name as freq_name
+    const expenseRes = await db.prepare(`SELECT e.*, ec.is_marketing, ec.name as cat_name, eft.name as freq_name, eft.multiplier_monthly
       FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id
       LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
       WHERE e.is_active = 1`).all().catch(() => ({ results: [] }));
     let totalExpenses = 0, marketingExpenses = 0, commercialExpenses = 0;
     for (const exp of (expenseRes.results || [])) {
-      const amt = Number(exp.amount) || 0;
+      const amt = Math.round((Number(exp.amount) || 0) * 100) / 100;
       totalExpenses += amt;
       if (exp.is_marketing) marketingExpenses += amt;
       else commercialExpenses += amt;
     }
 
     // 4. Salaries
-    const salaryRes = await db.prepare("SELECT COALESCE(SUM(salary), 0) as total_salary FROM users WHERE is_active = 1 AND salary > 0").first().catch(() => ({ total_salary: 0 }));
-    const totalSalaries = Number(salaryRes?.total_salary || 0);
+    const salaryRes = await db.prepare("SELECT COALESCE(SUM(salary), 0) as total_salary FROM users WHERE is_active = 1 AND salary > 0").first().catch(() => null);
+    const totalSalaries = Math.round((Number(salaryRes?.total_salary || 0)) * 100) / 100;
 
     // Bonuses for period
     let bonusFilter = '';
     const bonusParams: string[] = [];
-    if (dateFrom) { bonusFilter += " AND bonus_date >= ?"; bonusParams.push(dateFrom); }
-    if (dateTo) { bonusFilter += " AND bonus_date <= ?"; bonusParams.push(dateTo); }
-    const bonusRes = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total_bonuses FROM employee_bonuses WHERE 1=1" + bonusFilter).bind(...bonusParams).first().catch(() => ({ total_bonuses: 0 }));
-    const totalBonuses = Number(bonusRes?.total_bonuses || 0);
+    if (monthParam) {
+      bonusFilter += " AND strftime('%Y-%m', bonus_date) = ?";
+      bonusParams.push(monthParam);
+    } else {
+      if (dateFrom) { bonusFilter += " AND bonus_date >= ?"; bonusParams.push(dateFrom); }
+      if (dateTo) { bonusFilter += " AND bonus_date <= ?"; bonusParams.push(dateTo); }
+    }
+    const bonusRes = await db.prepare("SELECT COALESCE(SUM(amount), 0) as total_bonuses FROM employee_bonuses WHERE 1=1" + bonusFilter).bind(...bonusParams).first().catch(() => null);
+    const totalBonuses = Math.round((Number(bonusRes?.total_bonuses || 0)) * 100) / 100;
 
-    // 5. Financial metrics
-    const allExpenses = totalSalaries + totalBonuses + totalExpenses;
-    const netProfit = servicesTotal - allExpenses;
-    const marginality = servicesTotal > 0 ? ((netProfit / servicesTotal) * 100) : 0;
-    const roi = allExpenses > 0 ? (((servicesTotal - allExpenses) / allExpenses) * 100) : 0;
-    const romi = marketingExpenses > 0 ? (((servicesTotal - marketingExpenses) / marketingExpenses) * 100) : 0;
-    const doneCount = Number(statusData.done?.count || 0);
+    // 5. Financial metrics (profit from services, not articles — articles are client money)
+    const allExpensesSum = totalSalaries + totalBonuses + totalExpenses;
+    const netProfit = Math.round((servicesTotal - allExpensesSum) * 100) / 100;
+    const marginality = servicesTotal > 0 ? Math.round((netProfit / servicesTotal) * 1000) / 10 : 0;
+    const roi = allExpensesSum > 0 ? Math.round((netProfit / allExpensesSum) * 1000) / 10 : 0;
+    const romi = marketingExpenses > 0 ? Math.round(((servicesTotal - marketingExpenses) / marketingExpenses) * 1000) / 10 : 0;
     const avgCheck = doneCount > 0 ? Math.round(turnover / doneCount) : 0;
-    const totalLeadsCount = Object.values(statusData).reduce((a: number, s: any) => a + (s.count || 0), 0);
-    const conversionRate = totalLeadsCount > 0 ? ((doneCount / totalLeadsCount) * 100) : 0;
-    const breakEven = allExpenses; // point where services revenue = expenses
+    const totalLeadsCount = Object.values(statusData).reduce((a: number, s: any) => a + (Number(s.count) || 0), 0);
+    const conversionRate = totalLeadsCount > 0 ? Math.round((doneCount / totalLeadsCount) * 1000) / 10 : 0;
+    const breakEven = allExpensesSum;
 
-    // 6. Order fulfillment time (from creation to done status)
+    // 6. Order fulfillment time
     let avgFulfillmentDays = 0;
     try {
-      const ftRes = await db.prepare("SELECT AVG(julianday('now') - julianday(created_at)) as avg_days FROM leads WHERE status = 'done'" + dateFilter.replace(/l\./g, '')).bind(...dateParams).first();
+      const dfNoAlias = dateFilter.replace(/l\./g, '');
+      const ftRes = await db.prepare("SELECT AVG(julianday('now') - julianday(created_at)) as avg_days FROM leads WHERE status = 'done'" + dfNoAlias).bind(...dateParams).first();
       avgFulfillmentDays = Math.round(Number(ftRes?.avg_days || 0) * 10) / 10;
     } catch {}
 
-    // 7. Daily breakdown
+    // 7. Daily breakdown (for bar chart)
     let dailyResults: any[] = [];
     try {
-      const dailyRes = await db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day").all();
-      dailyResults = dailyRes.results || [];
+      let dailyQ = "SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads";
+      if (monthParam) {
+        dailyQ += " WHERE strftime('%Y-%m', created_at) = ? GROUP BY date(created_at) ORDER BY day";
+        const dailyRes = await db.prepare(dailyQ).bind(monthParam).all();
+        dailyResults = dailyRes.results || [];
+      } else {
+        dailyQ += " WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day";
+        const dailyRes = await db.prepare(dailyQ).all();
+        dailyResults = dailyRes.results || [];
+      }
     } catch {}
 
     // 8. By assignee
     const byAssignee: any[] = [];
     try {
-      const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as count, COALESCE(SUM(l.total_amount),0) as amount FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amount DESC").bind(...dateParams).all();
-      for (const r of (byAssRes.results || [])) { byAssignee.push({ user_id: r.assigned_to, name: r.display_name || 'Не назначен', count: r.count, amount: r.amount }); }
+      const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amt DESC").bind(...dateParams).all();
+      for (const r of (byAssRes.results || [])) {
+        byAssignee.push({ user_id: r.assigned_to, display_name: r.display_name || 'Не назначен', count: Number(r.cnt), amount: Number(r.amt) });
+      }
     } catch {}
 
-    // 9. Service popularity
+    // 9. Service popularity (from calc_data items)
     const serviceStats: Record<string, { count: number; qty: number; revenue: number }> = {};
     for (const lead of (allLeads.results || [])) {
       try {
@@ -1657,38 +1709,85 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // 10. Referral stats
     let refResults: any[] = [];
     try {
-      const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dateFilter.replace(/l\./g, '') + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
+      const dfNoAlias = dateFilter.replace(/l\./g, '');
+      const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dfNoAlias + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
       refResults = refRes.results || [];
     } catch {}
 
     // 11. By source
-    let bySource: Record<string, any> = {};
+    const bySource: Record<string, any> = {};
     try {
-      const bsRes = await db.prepare("SELECT source, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads l WHERE 1=1" + dateFilter + " GROUP BY source").bind(...dateParams).all();
-      for (const r of (bsRes.results || [])) { bySource[r.source as string] = { count: r.count, amount: r.amount }; }
+      const bsRes = await db.prepare("SELECT source, COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as amt FROM leads l WHERE 1=1" + dateFilter + " GROUP BY source").bind(...dateParams).all();
+      for (const r of (bsRes.results || [])) { bySource[r.source as string || 'direct'] = { count: Number(r.cnt), amount: Number(r.amt) }; }
     } catch {}
 
-    // 12. Employees with salaries for analytics
+    // 12. Employees with salaries
     const employees: any[] = [];
     try {
       const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
       for (const e of (empRes.results || [])) {
-        // Get bonuses sum
-        const bSum = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => ({ total: 0 }));
-        employees.push({ ...e, bonuses_total: Number(bSum?.total || 0) });
+        const bSum = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => null);
+        employees.push({ ...e, bonuses_total: Math.round((Number(bSum?.total || 0)) * 100) / 100 });
       }
     } catch {}
+
+    // 13. Rejected leads with reasons
+    let rejectedLeads: any[] = [];
+    try {
+      const rejRes = await db.prepare("SELECT id, name, contact, notes, total_amount, created_at FROM leads l WHERE l.status = 'rejected'" + dateFilter + " ORDER BY l.created_at DESC LIMIT 50").bind(...dateParams).all();
+      rejectedLeads = rejRes.results || [];
+    } catch {}
+
+    // 14. Stage timings (avg days per stage)
+    const stageTimings: Record<string, number> = {};
+    try {
+      for (const st of allStatuses) {
+        if (st === 'new') continue;
+        const tRes = await db.prepare("SELECT AVG(julianday('now') - julianday(l.created_at)) as avg_days FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first();
+        stageTimings[st] = Math.round((Number(tRes?.avg_days || 0)) * 10) / 10;
+      }
+    } catch {}
+
+    // 15. Monthly data for yearly chart
+    let monthlyData: any[] = [];
+    try {
+      const yr = monthParam ? monthParam.substring(0, 4) : String(new Date().getFullYear());
+      const mRes = await db.prepare("SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount, SUM(CASE WHEN status='done' THEN total_amount ELSE 0 END) as done_amount FROM leads WHERE strftime('%Y', created_at) = ? GROUP BY strftime('%Y-%m', created_at) ORDER BY month").bind(yr).all();
+      monthlyData = mRes.results || [];
+    } catch {}
+
+    // 16. Weekly data
+    let weeklyData: any[] = [];
+    try {
+      const wRes = await db.prepare("SELECT strftime('%Y-W%W', created_at) as week, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now', '-90 days') GROUP BY strftime('%Y-W%W', created_at) ORDER BY week").all();
+      weeklyData = wRes.results || [];
+    } catch {}
+
+    // 17. Daily breakdown for expanded month view
+    let monthDailyData: any[] = [];
+    if (monthParam) {
+      try {
+        const mdRes = await db.prepare(`SELECT date(created_at) as day, COUNT(*) as count, 
+          COALESCE(SUM(total_amount),0) as amount,
+          SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as done_count,
+          SUM(CASE WHEN status='done' THEN total_amount ELSE 0 END) as done_amount,
+          SUM(CASE WHEN status='rejected' THEN 1 ELSE 0 END) as rejected_count
+          FROM leads WHERE strftime('%Y-%m', created_at) = ? 
+          GROUP BY date(created_at) ORDER BY day`).bind(monthParam).all();
+        monthDailyData = mdRes.results || [];
+      } catch {}
+    }
 
     return c.json({
       status_data: statusData,
       financial: {
         turnover, services: servicesTotal, articles: articlesTotal, refunds: totalRefunds,
         salaries: totalSalaries, bonuses: totalBonuses, commercial_expenses: commercialExpenses,
-        marketing_expenses: marketingExpenses, total_expenses: allExpenses,
-        net_profit: netProfit, marginality: Math.round(marginality * 10) / 10,
-        roi: Math.round(roi * 10) / 10, romi: Math.round(romi * 10) / 10,
-        avg_check: avgCheck, conversion_rate: Math.round(conversionRate * 10) / 10,
+        marketing_expenses: marketingExpenses, total_expenses: allExpensesSum,
+        net_profit: netProfit, marginality, roi, romi,
+        avg_check: avgCheck, conversion_rate: conversionRate,
         break_even: breakEven, avg_fulfillment_days: avgFulfillmentDays,
+        done_amount: doneAmount, done_services: doneServices, done_articles: doneArticles,
       },
       daily: dailyResults,
       by_assignee: byAssignee,
@@ -1696,16 +1795,22 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       services: serviceList,
       referrals: refResults,
       employees,
+      rejected_leads: rejectedLeads,
+      stage_timings: stageTimings,
+      monthly_data: monthlyData,
+      weekly_data: weeklyData,
+      month_daily_data: monthDailyData,
       total_leads: totalLeadsCount,
       date_from: dateFrom,
       date_to: dateTo,
+      month: monthParam,
     });
   } catch (err: any) {
     console.error('Business analytics error:', err?.message || err);
     return c.json({
       status_data: {}, financial: {}, daily: [], by_assignee: [], by_source: {},
       services: [], referrals: [], employees: [], total_leads: 0,
-      date_from: '', date_to: '', error: 'Analytics error: ' + (err?.message || 'unknown')
+      date_from: '', date_to: '', month: '', error: 'Analytics error: ' + (err?.message || 'unknown')
     });
   }
 });
