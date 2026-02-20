@@ -375,6 +375,8 @@ export async function initDatabase(db: D1Database): Promise<void> {
     const check = await db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name='period_snapshots'").first();
     if (check) {
       dbInitialized = true;
+      // ALWAYS run latest migrations even on existing DBs
+      await runLatestMigrations(db);
       // Still run seeds in case they're missing
       await runSeeds(db);
       return;
@@ -418,11 +420,19 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE company_roles ADD COLUMN role_name TEXT NOT NULL DEFAULT ''").run(); } catch {}
   // v9 Migrations: bonus_type for fines support
   try { await db.prepare("ALTER TABLE employee_bonuses ADD COLUMN bonus_type TEXT DEFAULT 'bonus'").run(); } catch {}
-  // v9 Cleanup: remove duplicate admin accounts with display_name containing 'готррр' or 'готррр'
-  try { await db.prepare("DELETE FROM users WHERE display_name LIKE '%готр%' AND role = 'main_admin' AND id != 1").run(); } catch {}
+  // v9 Cleanup: remove accounts with display_name containing 'готр' (any role, except primary admin id=1)
+  try { await db.prepare("DELETE FROM users WHERE display_name LIKE '%готр%' AND id != 1").run(); } catch {}
   // Run seeds
   await runSeeds(db);
   dbInitialized = true;
+}
+
+// Latest migrations that MUST run on every DB (including already-initialized production)
+async function runLatestMigrations(db: D1Database): Promise<void> {
+  // v9 Migrations: bonus_type for fines support
+  try { await db.prepare("ALTER TABLE employee_bonuses ADD COLUMN bonus_type TEXT DEFAULT 'bonus'").run(); } catch {}
+  // v9 Cleanup: remove accounts with display_name containing 'готр' (any role, except primary admin id=1)
+  try { await db.prepare("DELETE FROM users WHERE display_name LIKE '%готр%' AND id != 1").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

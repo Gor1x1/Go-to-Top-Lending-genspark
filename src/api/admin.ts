@@ -959,9 +959,8 @@ api.delete('/users/:id', authMiddleware, async (c) => {
   const caller = c.get('user');
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can delete users' }, 403);
   const id = c.req.param('id');
-  // Don't allow deleting main_admin
-  const target = await db.prepare('SELECT role FROM users WHERE id = ?').bind(id).first();
-  if (target?.role === 'main_admin') return c.json({ error: 'Cannot delete main admin' }, 400);
+  // Protect only the very first admin (id=1) from deletion; other main_admins can be removed
+  if (Number(id) === 1) return c.json({ error: 'Cannot delete the primary admin account' }, 400);
   await db.prepare('DELETE FROM user_permissions WHERE user_id = ?').bind(id).run();
   await db.prepare('DELETE FROM users WHERE id = ?').bind(id).run();
   return c.json({ success: true });
@@ -1448,6 +1447,8 @@ api.post('/users/:id/bonuses', authMiddleware, async (c) => {
   const db = c.env.DB;
   const userId = c.req.param('id');
   const d = await c.req.json();
+  // Ensure bonus_type column exists (migration may not have run on production)
+  try { await db.prepare("ALTER TABLE employee_bonuses ADD COLUMN bonus_type TEXT DEFAULT 'bonus'").run(); } catch {}
   await db.prepare('INSERT INTO employee_bonuses (user_id, amount, bonus_type, description, bonus_date) VALUES (?,?,?,?,?)')
     .bind(userId, d.amount || 0, d.bonus_type || 'bonus', d.description || '', d.bonus_date || new Date().toISOString().slice(0, 10)).run();
   return c.json({ success: true });
