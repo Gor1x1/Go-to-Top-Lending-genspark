@@ -2281,7 +2281,7 @@ let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
 let addBonusType = 'bonus';
 let showBonusListUserId = 0;
-let bonusListData: any[] = [];
+let bonusListData = [];
 let editingMonthKey = '';
 let editingBonusId = 0;
 let showAddCategoryForm = false;
@@ -2735,7 +2735,7 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(exp.amount) + '</td>';
       h += '<td style="padding:8px"><span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:' + (exp.category_color||'#475569') + '22;color:' + (exp.category_color||'#94a3b8') + '">' + escHtml(exp.category_name||'\u2014') + '</span></td>';
       h += '<td style="padding:8px;font-size:0.8rem;color:#64748b">' + escHtml(exp.frequency_name||'\u2014') + '</td>';
-      h += '<td style="padding:8px;white-space:nowrap"><button class="btn btn-outline" style="padding:2px 6px;font-size:0.55rem;color:#F59E0B;border-color:#F59E0B33;margin-right:3px" onclick="editExpenseInline(' + exp.id + ',' + (exp.amount||0) + ',\'' + escHtml(exp.name||'').replace(/'/g, "\\'") + '\')" title="Изменить"><i class="fas fa-pencil-alt"></i></button><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
+      h += '<td style="padding:8px;white-space:nowrap"><button class="btn btn-outline" style="padding:2px 6px;font-size:0.55rem;color:#F59E0B;border-color:#F59E0B33;margin-right:3px" onclick="editExpenseInline(' + exp.id + ',' + (exp.amount||0) + ')" title="Изменить"><i class="fas fa-pencil-alt"></i></button><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
     }
     h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 12px">ИТОГО</td><td style="padding:10px;text-align:right;color:#EF4444">' + fmtAmt(totalExp) + '</td><td colspan="3"></td></tr>';
     h += '</tbody></table>';
@@ -3400,14 +3400,12 @@ async function deleteExpense(id) {
   var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData();
 }
 
-async function editExpenseInline(id, currentAmount, currentName) {
-  var newName = currentName !== undefined ? prompt('\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u0442\u0440\u0430\u0442\u044b:', currentName) : null;
+async function editExpenseInline(id, currentAmount) {
   var newAmount = prompt('\u0421\u0443\u043c\u043c\u0430 (\u058f):', String(currentAmount));
   if (newAmount === null) return;
   var val = Number(newAmount);
   if (isNaN(val) || val < 0) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u0443\u044e \u0441\u0443\u043c\u043c\u0443', 'error'); return; }
-  var body: any = { amount: val };
-  if (newName !== null && newName !== undefined) body.name = newName;
+  var body = { amount: val };
   var res = await api('/expenses/' + id, 'PUT', body);
   if (res && res.success) { toast('\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e'); var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData(); }
   else { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430', 'error'); }
