@@ -2301,6 +2301,9 @@ async function loadAnalyticsData() {
     if (analyticsDateTo) params += '&to=' + analyticsDateTo;
   }
   analyticsData = await api('/business-analytics?' + params.replace(/^&/,''));
+  // Stop spinner if running
+  var icon = document.getElementById('refresh-icon');
+  if (icon) icon.className = 'fas fa-sync-alt';
   render();
 }
 
@@ -2398,7 +2401,7 @@ function renderLeadsAnalytics() {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">';
   h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>';
   h += '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>';
-  h += '<button class="btn btn-outline" onclick="this.querySelector(\\'i\\').classList.add(\\'fa-spin\\');expandedMonth=\\'\\';analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:6px"></i>\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>';
+  h += '<button class="btn btn-outline" id="refresh-analytics-btn" onclick="refreshAnalytics()" style="display:flex;align-items:center;gap:6px"><i class="fas fa-sync-alt" id="refresh-icon"></i>Обновить</button>';
   h += '</div>';
   // Expanded month banner
   if (expandedMonth) {
@@ -2423,21 +2426,21 @@ function renderLeadsAnalytics() {
     h += '</div>';
   }
   // Quick KPI strip at top
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px">';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px">';
   var quickKpis = [
-    {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)'},
-    {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'},
-    {label:'Конверсия (завершено/все)',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)'},
-    {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Только стоимость услуг / кол-во завершённых'},
-    {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)',desc:'Нов: '+fmtNum((sd.new||{}).count||0)+' | Связь: '+fmtNum((sd.contacted||{}).count||0)+' | Работа: '+fmtNum((sd.in_progress||{}).count||0)+' | Пров: '+fmtNum((sd.checking||{}).count||0)+' | Откл: '+fmtNum((sd.rejected||{}).count||0)+' | Готово: '+fmtNum((sd.done||{}).count||0)},
-    {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)'},
+    {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)',desc:'Услуги: '+fmtAmt(fin.services)+' | Выкупы: '+fmtAmt(fin.articles)},
+    {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',desc:'Усл: '+fmtAmt(fin.services)+' \\u2212 Расх: '+fmtAmt(fin.total_expenses)},
+    {label:'Конверсия',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)',desc:fmtNum((sd.done||{}).count||0)+' из '+fmtNum(fin.totalLeads)+' лидов'},
+    {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Услуги / кол-во завершённых'},
+    {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)',desc:'Нов: '+fmtNum((sd.new||{}).count||0)+' | Связь: '+fmtNum((sd.contacted||{}).count||0)+' | Раб: '+fmtNum((sd.in_progress||{}).count||0)+' | Пров: '+fmtNum((sd.checking||{}).count||0)+' | Откл: '+fmtNum((sd.rejected||{}).count||0)+' | Гот: '+fmtNum((sd.done||{}).count||0)},
+    {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)',desc:'Усл: '+fmtAmt(Number((sd.done||{}).services)||0)+' | Вык: '+fmtAmt(Number((sd.done||{}).articles)||0)},
   ];
   for (var qi = 0; qi < quickKpis.length; qi++) {
     var qk = quickKpis[qi];
-    h += '<div class="card" style="padding:16px;background:' + qk.bg + ';border:1px solid ' + qk.color + '33">';
-    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><i class="fas ' + qk.icon + '" style="color:' + qk.color + ';font-size:0.85rem"></i><span style="font-size:0.75rem;color:#94a3b8">' + qk.label + '</span></div>';
-    h += '<div style="font-size:1.2rem;font-weight:800;color:' + qk.color + '">' + qk.val + '</div>';
-    if (qk.desc) h += '<div style="font-size:0.6rem;color:#475569;margin-top:3px">' + qk.desc + '</div>';
+    h += '<div class="card" style="padding:20px;background:' + qk.bg + ';border:1px solid ' + qk.color + '33">';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><i class="fas ' + qk.icon + '" style="color:' + qk.color + ';font-size:1.2rem"></i><span style="font-size:0.9rem;color:#94a3b8;font-weight:600">' + qk.label + '</span></div>';
+    h += '<div style="font-size:1.8rem;font-weight:800;color:' + qk.color + ';line-height:1.2">' + qk.val + '</div>';
+    if (qk.desc) h += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px;line-height:1.4">' + qk.desc + '</div>';
     h += '</div>';
   }
   h += '</div>';
@@ -3009,6 +3012,10 @@ function renderBizPeriodsV2(d, sd, fin) {
     // Lead counts by status
     var mDone, mInProg, mRejected, mChecking;
     var mSvc, mArt, mRefunds, mExp, mProfit, mTurnover;
+    // Check for snapshot adjustments (works for any month that has a snapshot)
+    var mAdjs = [];
+    var mAdjTotal = 0;
+    if (mSnap) { try { var cd5 = JSON.parse(mSnap.custom_data || '{}'); mAdjs = cd5.adjustments || []; if (!mAdjs.length && cd5.adjustment) { mAdjs = [{amount: Math.abs(cd5.adjustment), type: cd5.adjustment_type || 'inflow', comment: cd5.adjustment_comment || ''}]; } for (var aj = 0; aj < mAdjs.length; aj++) { var a5 = mAdjs[aj]; mAdjTotal += a5.type === 'outflow' ? -Math.abs(a5.amount) : Math.abs(a5.amount); } } catch {} }
     if (isLocked) {
       // From snapshot
       mDone = Number(mSnap.leads_done)||0;
@@ -3020,8 +3027,8 @@ function renderBizPeriodsV2(d, sd, fin) {
       mArt = Number(mSnap.revenue_articles)||0;
       mRefunds = Number(mSnap.refunds)||0;
       mExp = (Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0);
-      mTurnover = mSvc + mArt;
-      mProfit = mSvc - mExp;
+      mTurnover = mSvc + mArt + mAdjTotal;
+      mProfit = mSvc - mExp + mAdjTotal;
     } else if (isCurrent) {
       // Live data from fin (global analytics for current period)
       mDone = Number(sd.done && sd.done.count)||0;
@@ -3032,8 +3039,8 @@ function renderBizPeriodsV2(d, sd, fin) {
       mArt = Number(fin.articles)||0;
       mRefunds = Number(fin.refunds)||0;
       mExp = Number(fin.total_expenses)||0;
-      mTurnover = mSvc + mArt;
-      mProfit = mSvc - mExp;
+      mTurnover = mSvc + mArt + mAdjTotal;
+      mProfit = mSvc - mExp + mAdjTotal;
     } else if (isPast && mData) {
       // Historical from monthly_data query (only for past non-locked months)
       mDone = Number(mData.done_count)||0;
@@ -3044,8 +3051,8 @@ function renderBizPeriodsV2(d, sd, fin) {
       mArt = Number(mData.articles)||0;
       mRefunds = Number(mData.refunds)||0;
       mExp = 0; // No per-month expense history for non-snapshot months
-      mTurnover = mSvc + mArt;
-      mProfit = mSvc - mExp;
+      mTurnover = mSvc + mArt + mAdjTotal;
+      mProfit = mSvc - mExp + mAdjTotal;
     } else {
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
       mSvc = 0; mArt = 0; mRefunds = 0; mExp = 0; mTurnover = 0; mProfit = 0;
@@ -3064,7 +3071,9 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mInProg || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mRejected || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (mChecking || '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014');
+    if (mAdjTotal !== 0) h += '<div style="font-size:0.6rem;color:' + (mAdjTotal > 0 ? '#22C55E' : '#EF4444') + '">' + (mAdjTotal > 0 ? '+' : '') + fmtAmt(mAdjTotal) + '</div>';
+    h += '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? fmtAmt(mRefunds) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
@@ -3077,37 +3086,52 @@ function renderBizPeriodsV2(d, sd, fin) {
     else h += '<span style="color:#334155;font-size:0.68rem">\u2014</span>';
     h += '</td>';
     h += '<td style="padding:8px 6px;text-align:center;white-space:nowrap">';
-    if (isLocked) {
-      // Pencil to edit (unlocks edit mode), lock button to unlock
-      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render()" title="Редактировать"><i class="fas fa-pencil-alt"></i></button> ';
-      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.55rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')" title="Разблокировать"><i class="fas fa-unlock"></i></button>';
-    } else if (isPast) {
-      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)" title="Закрыть месяц"><i class="fas fa-lock"></i></button>';
-    } else if (isCurrent) {
-      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)" title="Сохранить снимок"><i class="fas fa-save"></i></button>';
+    // Edit button for ANY non-future month
+    if (!isFuture) {
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render()" title="Редактировать"><i class="fas fa-pencil-alt"></i></button>';
     }
     h += '</td></tr>';
-    // Editable inline form for locked months
-    if (isEditing && isLocked) {
+    // Editable inline form for ANY month (when editing)
+    if (isEditing && !isFuture) {
+      var snapId4Edit = mSnap ? mSnap.id : 0;
+      // Parse existing adjustments from snapshot custom_data
+      var existingAdjs = [];
+      if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch {} }
       h += '<tr style="background:#0f172a"><td colspan="13" style="padding:12px 16px">';
-      h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
+      h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
       // Standard financial fields
       h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0423\u0441\u043b\u0443\u0433\u0438</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0412\u044b\u043a\u0443\u043f\u044b</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0412\u043e\u0437\u0432\u0440\u0430\u0442</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0420\u0430\u0441\u0445\u043e\u0434\u044b</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
-      // Additional adjustment section
+      // Existing adjustments list
+      if (existingAdjs.length > 0) {
+        h += '<div style="border-top:1px solid #334155;padding-top:10px;margin-bottom:10px">';
+        h += '<div style="font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:0.82rem"><i class="fas fa-list" style="margin-right:4px"></i>Существующие корректировки</div>';
+        for (var ai = 0; ai < existingAdjs.length; ai++) {
+          var adj = existingAdjs[ai];
+          var adjIsInflow = adj.type === 'inflow';
+          h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid ' + (adjIsInflow ? '#22C55E33' : '#EF444433') + '">';
+          h += '<span style="color:' + (adjIsInflow ? '#22C55E' : '#EF4444') + ';font-weight:700;font-size:0.85rem">' + (adjIsInflow ? '+' : '-') + fmtAmt(Math.abs(adj.amount)) + '</span>';
+          h += '<span style="color:' + (adjIsInflow ? '#34d399' : '#f87171') + ';font-size:0.72rem;padding:2px 8px;background:' + (adjIsInflow ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)') + ';border-radius:4px">' + (adjIsInflow ? 'Приток' : 'Отток') + '</span>';
+          if (adj.comment) h += '<span style="color:#94a3b8;font-size:0.75rem;flex:1">' + adj.comment + '</span>';
+          h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#EF4444;border-color:#EF444433" onclick="deleteAdjustment(\\'' + mKey + '\\',' + snapId4Edit + ',' + ai + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
+          h += '</div>';
+        }
+        h += '</div>';
+      }
+      // Add new adjustment section
       h += '<div style="border-top:1px solid #334155;padding-top:12px;margin-bottom:12px">';
-      h += '<div style="font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:0.82rem"><i class="fas fa-sliders-h" style="margin-right:4px"></i>\u041a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u0438</div>';
+      h += '<div style="font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:0.82rem"><i class="fas fa-plus-circle" style="margin-right:4px"></i>Добавить корректировку</div>';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0438</label><input class="input" id="edit-adj-amount-' + mKey + '" type="number" value="0" style="width:100%;padding:6px 10px" placeholder="0"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0422\u0438\u043f</label><select class="input" id="edit-adj-type-' + mKey + '" style="width:100%;padding:6px 10px"><option value="inflow">\u041f\u0440\u0438\u0442\u043e\u043a (\u043f\u043b\u044e\u0441 \u043a \u043f\u0440\u0438\u0431\u044b\u043b\u0438)</option><option value="outflow">\u041e\u0442\u0442\u043e\u043a (\u043c\u0438\u043d\u0443\u0441 \u0438\u0437 \u043f\u0440\u0438\u0431\u044b\u043b\u0438)</option></select></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</label><input class="input" id="edit-adj-comment-' + mKey + '" placeholder="\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0438" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Сумма</label><input class="input" id="edit-adj-amount-' + mKey + '" type="number" value="" style="width:100%;padding:6px 10px" placeholder="0"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Тип</label><select class="input" id="edit-adj-type-' + mKey + '" style="width:100%;padding:6px 10px"><option value="inflow">Приток (плюс к выручке)</option><option value="outflow">Отток (минус из выручки)</option></select></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Комментарий</label><input class="input" id="edit-adj-comment-' + mKey + '" placeholder="Описание" style="width:100%;padding:6px 10px"></div>';
       h += '</div></div>';
-      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + mSnap.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>';
-      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=\\'\\';render()">\u041e\u0442\u043c\u0435\u043d\u0430</button></div>';
+      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + snapId4Edit + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
+      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=\\'\\';render()">Отмена</button></div>';
       h += '</td></tr>';
     }
   }
@@ -3473,31 +3497,91 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var adjAmount = Number(document.getElementById('edit-adj-amount-' + monthKey)?.value) || 0;
   var adjType = document.getElementById('edit-adj-type-' + monthKey)?.value || 'inflow';
   var adjComment = document.getElementById('edit-adj-comment-' + monthKey)?.value || '';
-  var adjustment = adjType === 'outflow' ? -Math.abs(adjAmount) : Math.abs(adjAmount);
-  var profit = svc - exp + adjustment; // \u041f\u0440\u0438\u0431\u044b\u043b\u044c = \u0423\u0441\u043b\u0443\u0433\u0438 - \u0420\u0430\u0441\u0445\u043e\u0434\u044b + \u041a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0430
+  // Load existing adjustments from snapshot
+  var existingAdjs = [];
+  var snapshots = data.periodSnapshots || [];
+  var mSnap2 = snapshots.find(function(s){return s.period_type==='month' && s.period_key===monthKey;});
+  if (mSnap2) { try { var cd6 = JSON.parse(mSnap2.custom_data || '{}'); existingAdjs = cd6.adjustments || []; if (!existingAdjs.length && cd6.adjustment) { existingAdjs = [{amount: Math.abs(cd6.adjustment), type: cd6.adjustment_type || 'inflow', comment: cd6.adjustment_comment || ''}]; } } catch {} }
+  // Add new adjustment if amount > 0
+  if (adjAmount > 0) {
+    existingAdjs.push({amount: Math.abs(adjAmount), type: adjType, comment: adjComment});
+  }
+  // Calculate total adjustment
+  var totalAdj = 0;
+  for (var i = 0; i < existingAdjs.length; i++) {
+    totalAdj += existingAdjs[i].type === 'outflow' ? -Math.abs(existingAdjs[i].amount) : Math.abs(existingAdjs[i].amount);
+  }
+  var profit = svc - exp + totalAdj;
+  var turnover = svc + art + totalAdj;
+  var customData = { adjustments: existingAdjs };
+  if (snapshotId > 0) {
+    // Update existing snapshot
+    var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
+      revenue_services: svc, revenue_articles: art, refunds: ref,
+      expense_salaries: 0, expense_commercial: exp, expense_marketing: 0,
+      net_profit: profit, total_turnover: turnover,
+      custom_data: customData
+    });
+    if (res && res.success) {
+      toast('Данные за ' + monthKey + ' обновлены');
+      editingMonthKey = '';
+      try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
+      render();
+    } else { toast(res?.error || 'Ошибка сохранения', 'error'); }
+  } else {
+    // Create new snapshot for this month (not locked)
+    var res2 = await api('/period-snapshots', 'POST', {
+      period_type: 'month', period_key: monthKey,
+      revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref,
+      expense_salaries: 0, expense_commercial: exp, expense_marketing: 0,
+      net_profit: profit, leads_count: 0, leads_done: 0, avg_check: 0,
+      is_locked: false,
+      custom_data: customData
+    });
+    if (res2 && res2.success) {
+      toast('Данные за ' + monthKey + ' сохранены');
+      editingMonthKey = '';
+      try { var snRes2 = await api('/period-snapshots'); data.periodSnapshots = (snRes2 && snRes2.snapshots) || []; } catch(e) {}
+      render();
+    } else { toast(res2?.error || 'Ошибка сохранения', 'error'); }
+  }
+}
+
+async function deleteAdjustment(monthKey, snapshotId, adjIndex) {
+  if (!confirm('Удалить эту корректировку?')) return;
+  var snapshots = data.periodSnapshots || [];
+  var mSnap3 = snapshots.find(function(s){return s.period_type==='month' && s.period_key===monthKey;});
+  if (!mSnap3) return;
+  var adjs = [];
+  try { var cd7 = JSON.parse(mSnap3.custom_data || '{}'); adjs = cd7.adjustments || []; if (!adjs.length && cd7.adjustment) { adjs = [{amount: Math.abs(cd7.adjustment), type: cd7.adjustment_type || 'inflow', comment: cd7.adjustment_comment || ''}]; } } catch {}
+  adjs.splice(adjIndex, 1);
+  // Recalculate totals
+  var totalAdj2 = 0;
+  for (var i = 0; i < adjs.length; i++) {
+    totalAdj2 += adjs[i].type === 'outflow' ? -Math.abs(adjs[i].amount) : Math.abs(adjs[i].amount);
+  }
+  var svc2 = Number(mSnap3.revenue_services)||0;
+  var exp2 = (Number(mSnap3.expense_salaries)||0)+(Number(mSnap3.expense_commercial)||0)+(Number(mSnap3.expense_marketing)||0);
+  var art2 = Number(mSnap3.revenue_articles)||0;
+  var profit2 = svc2 - exp2 + totalAdj2;
   var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
-    revenue_services: svc,
-    revenue_articles: art,
-    refunds: ref,
-    expense_salaries: 0,
-    expense_commercial: exp,
-    expense_marketing: 0,
-    net_profit: profit,
-    total_turnover: svc + art,
-    custom_data: {
-      adjustment: adjustment,
-      adjustment_type: adjType,
-      adjustment_comment: adjComment
-    }
+    net_profit: profit2, total_turnover: svc2 + art2 + totalAdj2,
+    custom_data: { adjustments: adjs }
   });
   if (res && res.success) {
-    toast('Данные за ' + monthKey + ' обновлены');
-    editingMonthKey = '';
-    try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
+    toast('Корректировка удалена');
+    try { var snRes3 = await api('/period-snapshots'); data.periodSnapshots = (snRes3 && snRes3.snapshots) || []; } catch {}
     render();
-  } else {
-    toast(res?.error || 'Ошибка сохранения', 'error');
-  }
+  } else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function refreshAnalytics() {
+  var btn = document.getElementById('refresh-analytics-btn');
+  if (btn) { var icon = btn.querySelector('i'); if (icon) icon.className = 'fas fa-sync-alt fa-spin'; }
+  expandedMonth = '';
+  analyticsData = null;
+  await loadAnalyticsData();
+  if (btn) { var icon2 = btn.querySelector('i'); if (icon2) icon2.className = 'fas fa-sync-alt'; }
 }
 
 async function closePeriodAction(periodType, periodKey, lock) {
