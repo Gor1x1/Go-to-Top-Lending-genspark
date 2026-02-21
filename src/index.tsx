@@ -371,10 +371,11 @@ app.get('/pdf/:id', async (c) => {
     const companyEmail = String(tpl.company_email || '');
     const companyAddress = String(tpl.company_address || '');
     const dateStr = new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU');
-    // subtotalFormatted = sum of all items BEFORE refund (always shows as ИТОГО)
+    // subtotalFormatted = sum of all items BEFORE refund (always shows as ԸՆԱԴdelays)
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    // totalFormatted = final amount after refund deduction
-    const totalFormatted = Number(total).toLocaleString('ru-RU');
+    // finalTotal = subtotal minus refund for the final amount shown
+    const finalTotal = refundAmount > 0 ? (Number(subtotal) - refundAmount) : Number(total);
+    const totalFormatted = finalTotal.toLocaleString('ru-RU');
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
       + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'

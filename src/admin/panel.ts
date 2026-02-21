@@ -2287,6 +2287,7 @@ let editingBonusId = 0;
 let showAddCategoryForm = false;
 let showAddFreqTypeForm = false;
 let expandedMonth = ''; // for month drill-down
+var analyticsRefreshing = false; // spinner flag for refresh button
 let yearChartMetric = 'amount'; // amount | count | done_amount
 let yearChartMode = 'month'; // month | week | day
 let excludedStatuses = {}; // statuses excluded from calculations
@@ -2301,9 +2302,6 @@ async function loadAnalyticsData() {
     if (analyticsDateTo) params += '&to=' + analyticsDateTo;
   }
   analyticsData = await api('/business-analytics?' + params.replace(/^&/,''));
-  // Stop spinner if running
-  var icon = document.getElementById('refresh-icon');
-  if (icon) icon.className = 'fas fa-sync-alt';
   render();
 }
 
@@ -2401,7 +2399,7 @@ function renderLeadsAnalytics() {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">';
   h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>';
   h += '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>';
-  h += '<button class="btn btn-outline" id="refresh-analytics-btn" onclick="refreshAnalytics()" style="display:flex;align-items:center;gap:6px"><i class="fas fa-sync-alt" id="refresh-icon"></i>Обновить</button>';
+  h += '<button class="btn btn-outline" id="refresh-analytics-btn" onclick="refreshAnalytics()" style="display:flex;align-items:center;gap:6px"><i class="fas fa-sync-alt' + (analyticsRefreshing ? ' fa-spin' : '') + '" id="refresh-icon"></i>Обновить</button>';
   h += '</div>';
   // Expanded month banner
   if (expandedMonth) {
@@ -3027,7 +3025,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       mArt = Number(mSnap.revenue_articles)||0;
       mRefunds = Number(mSnap.refunds)||0;
       mExp = (Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0);
-      mTurnover = mSvc + mArt + mAdjTotal;
+      mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
     } else if (isCurrent) {
       // Live data from fin (global analytics for current period)
@@ -3039,7 +3037,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       mArt = Number(fin.articles)||0;
       mRefunds = Number(fin.refunds)||0;
       mExp = Number(fin.total_expenses)||0;
-      mTurnover = mSvc + mArt + mAdjTotal;
+      mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
     } else if (isPast && mData) {
       // Historical from monthly_data query (only for past non-locked months)
@@ -3051,7 +3049,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       mArt = Number(mData.articles)||0;
       mRefunds = Number(mData.refunds)||0;
       mExp = 0; // No per-month expense history for non-snapshot months
-      mTurnover = mSvc + mArt + mAdjTotal;
+      mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
     } else {
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
@@ -3071,18 +3069,24 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mInProg || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mRejected || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (mChecking || '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014');
-    if (mAdjTotal !== 0) h += '<div style="font-size:0.6rem;color:' + (mAdjTotal > 0 ? '#22C55E' : '#EF4444') + '">' + (mAdjTotal > 0 ? '+' : '') + fmtAmt(mAdjTotal) + '</div>';
-    h += '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? fmtAmt(mRefunds) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mExp ? fmtAmt(mExp) : '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + ((mProfit || isCurrent) ? fmtAmt(mProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + ((mProfit || isCurrent) ? fmtAmt(mProfit) : '\u2014');
+    if (mAdjTotal !== 0) h += '<div style="font-size:0.6rem;color:' + (mAdjTotal > 0 ? '#22C55E' : '#EF4444') + '">' + (mAdjTotal > 0 ? '+' : '') + fmtAmt(mAdjTotal) + '</div>';
+    h += '</td>';
     h += '<td style="padding:8px 6px;text-align:center">';
-    if (isLocked) h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
-    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.68rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.5rem;margin-right:3px"></i>Текущий</span>';
-    else if (isPast) h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
+    // Check custom status from snapshot
+    var customStatus = '';
+    if (mSnap) { try { var cd8 = JSON.parse(mSnap.custom_data || '{}'); customStatus = cd8.status || ''; } catch {} }
+    if (customStatus === 'locked' || (isLocked && !customStatus)) h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
+    else if (customStatus === 'checking') h += '<span style="color:#3B82F6;font-size:0.68rem"><i class="fas fa-search"></i> Проверка</span>';
+    else if (customStatus === 'custom') { var customLabel2 = ''; try { customLabel2 = JSON.parse(mSnap.custom_data || '{}').status_label || ''; } catch {} h += '<span style="color:#a78bfa;font-size:0.68rem">' + (customLabel2 || 'Другое') + '</span>'; }
+    else if (isCurrent && !customStatus) h += '<span style="color:#F59E0B;font-size:0.68rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.5rem;margin-right:3px"></i>Текущий</span>';
+    else if (isPast && !customStatus) h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
+    else if (customStatus === 'open') h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
     else h += '<span style="color:#334155;font-size:0.68rem">\u2014</span>';
     h += '</td>';
     h += '<td style="padding:8px 6px;text-align:center;white-space:nowrap">';
@@ -3094,17 +3098,37 @@ function renderBizPeriodsV2(d, sd, fin) {
     // Editable inline form for ANY month (when editing)
     if (isEditing && !isFuture) {
       var snapId4Edit = mSnap ? mSnap.id : 0;
-      // Parse existing adjustments from snapshot custom_data
+      // Parse existing adjustments and status from snapshot custom_data
       var existingAdjs = [];
-      if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch {} }
+      var snapStatus = '';
+      if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; snapStatus = cd4.status || ''; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch {} }
+      if (!snapStatus) { snapStatus = isLocked ? 'locked' : isCurrent ? 'current' : isPast ? 'open' : ''; }
       h += '<tr style="background:#0f172a"><td colspan="13" style="padding:12px 16px">';
       h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
-      // Standard financial fields
-      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
+      // Row 1: Lead counts
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
+      h += '<div><label style="font-size:0.7rem;color:#22C55E">Закрытые</label><input class="input" id="edit-done-' + mKey + '" type="number" value="' + mDone + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#F59E0B">В работе</label><input class="input" id="edit-inprog-' + mKey + '" type="number" value="' + mInProg + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#EF4444">Отказы</label><input class="input" id="edit-rejected-' + mKey + '" type="number" value="' + mRejected + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#3B82F6">Проверка</label><input class="input" id="edit-checking-' + mKey + '" type="number" value="' + mChecking + '" style="width:100%;padding:6px 10px"></div>';
+      h += '</div>';
+      // Row 2: Financial fields
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
+      h += '<div><label style="font-size:0.7rem;color:#8B5CF6">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#F59E0B">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#f87171">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#EF4444">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
+      h += '</div>';
+      // Row 3: Status selector
+      h += '<div style="display:grid;grid-template-columns:1fr 3fr;gap:10px;margin-bottom:12px">';
+      h += '<div><label style="font-size:0.7rem;color:#94a3b8">Статус</label><select class="input" id="edit-status-' + mKey + '" style="width:100%;padding:6px 10px">';
+      h += '<option value="locked"' + (snapStatus === 'locked' ? ' selected' : '') + '>Закрыт</option>';
+      h += '<option value="checking"' + (snapStatus === 'checking' ? ' selected' : '') + '>Проверка</option>';
+      h += '<option value="open"' + (snapStatus === 'open' ? ' selected' : '') + '>Открыт</option>';
+      h += '<option value="current"' + (snapStatus === 'current' ? ' selected' : '') + '>Текущий</option>';
+      h += '<option value="custom"' + (snapStatus === 'custom' ? ' selected' : '') + '>Другое...</option>';
+      h += '</select></div>';
+      h += '<div><label style="font-size:0.7rem;color:#94a3b8">Своё название (если "Другое")</label><input class="input" id="edit-status-custom-' + mKey + '" style="width:100%;padding:6px 10px" placeholder="Введите статус"></div>';
       h += '</div>';
       // Existing adjustments list
       if (existingAdjs.length > 0) {
@@ -3114,10 +3138,10 @@ function renderBizPeriodsV2(d, sd, fin) {
           var adj = existingAdjs[ai];
           var adjIsInflow = adj.type === 'inflow';
           h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid ' + (adjIsInflow ? '#22C55E33' : '#EF444433') + '">';
-          h += '<span style="color:' + (adjIsInflow ? '#22C55E' : '#EF4444') + ';font-weight:700;font-size:0.85rem">' + (adjIsInflow ? '+' : '-') + fmtAmt(Math.abs(adj.amount)) + '</span>';
-          h += '<span style="color:' + (adjIsInflow ? '#34d399' : '#f87171') + ';font-size:0.72rem;padding:2px 8px;background:' + (adjIsInflow ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)') + ';border-radius:4px">' + (adjIsInflow ? 'Приток' : 'Отток') + '</span>';
-          if (adj.comment) h += '<span style="color:#94a3b8;font-size:0.75rem;flex:1">' + adj.comment + '</span>';
-          h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#EF4444;border-color:#EF444433" onclick="deleteAdjustment(\\'' + mKey + '\\',' + snapId4Edit + ',' + ai + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
+          h += '<span style="color:' + (adjIsInflow ? '#22C55E' : '#EF4444') + ';font-weight:700;font-size:0.85rem;min-width:80px">' + (adjIsInflow ? '+' : '-') + fmtAmt(Math.abs(adj.amount)) + '</span>';
+          h += '<span style="color:' + (adjIsInflow ? '#34d399' : '#f87171') + ';font-size:0.72rem;padding:2px 8px;background:' + (adjIsInflow ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)') + ';border-radius:4px;min-width:50px;text-align:center">' + (adjIsInflow ? 'Приток' : 'Отток') + '</span>';
+          h += '<span style="color:#94a3b8;font-size:0.75rem">' + (adj.comment || '') + '</span>';
+          h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#EF4444;border-color:#EF444433;margin-left:auto;flex-shrink:0" onclick="deleteAdjustment(\\'' + mKey + '\\',' + snapId4Edit + ',' + ai + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
           h += '</div>';
         }
         h += '</div>';
@@ -3127,7 +3151,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '<div style="font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:0.82rem"><i class="fas fa-plus-circle" style="margin-right:4px"></i>Добавить корректировку</div>';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
       h += '<div><label style="font-size:0.7rem;color:#64748b">Сумма</label><input class="input" id="edit-adj-amount-' + mKey + '" type="number" value="" style="width:100%;padding:6px 10px" placeholder="0"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Тип</label><select class="input" id="edit-adj-type-' + mKey + '" style="width:100%;padding:6px 10px"><option value="inflow">Приток (плюс к выручке)</option><option value="outflow">Отток (минус из выручки)</option></select></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Тип</label><select class="input" id="edit-adj-type-' + mKey + '" style="width:100%;padding:6px 10px"><option value="inflow">Приток (плюс к прибыли)</option><option value="outflow">Отток (минус из прибыли)</option></select></div>';
       h += '<div><label style="font-size:0.7rem;color:#64748b">Комментарий</label><input class="input" id="edit-adj-comment-' + mKey + '" placeholder="Описание" style="width:100%;padding:6px 10px"></div>';
       h += '</div></div>';
       h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + snapId4Edit + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
@@ -3178,18 +3202,23 @@ function renderBizPeriodsV2(d, sd, fin) {
     for (var qmi = 0; qmi < 3; qmi++) {
       var qmNum = qMonthsMap[qi2][qmi];
       var qmKey = currentYear + '-' + String(qmNum).padStart(2,'0');
-      var qmSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmKey && s.is_locked;});
-      if (qmSnap) {
+      var qmSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmKey;});
+      if (qmSnap && qmSnap.is_locked) {
         closedInQ++;
+      }
+      if (qmSnap) {
         var qmSvc = Number(qmSnap.revenue_services)||0;
         var qmArt = Number(qmSnap.revenue_articles)||0;
         var qmExp = (Number(qmSnap.expense_salaries)||0)+(Number(qmSnap.expense_commercial)||0)+(Number(qmSnap.expense_marketing)||0);
+        // Include adjustments from month snapshot
+        var qmAdj = 0;
+        try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch {}
         qSvc += qmSvc;
         qArt += qmArt;
         qRef += Number(qmSnap.refunds)||0;
         qExp += qmExp;
         qTurnover += qmSvc + qmArt;
-        qProfit += qmSvc - qmExp;
+        qProfit += qmSvc - qmExp + qmAdj;
         qDone += Number(qmSnap.leads_done)||0;
       } else if (qmNum === currentMonth) {
         // Include live current month data
@@ -3494,6 +3523,12 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var art = Number(document.getElementById('edit-art-' + monthKey)?.value) || 0;
   var ref = Number(document.getElementById('edit-ref-' + monthKey)?.value) || 0;
   var exp = Number(document.getElementById('edit-exp-' + monthKey)?.value) || 0;
+  var done = Number(document.getElementById('edit-done-' + monthKey)?.value) || 0;
+  var inprog = Number(document.getElementById('edit-inprog-' + monthKey)?.value) || 0;
+  var rejected = Number(document.getElementById('edit-rejected-' + monthKey)?.value) || 0;
+  var checking = Number(document.getElementById('edit-checking-' + monthKey)?.value) || 0;
+  var status = document.getElementById('edit-status-' + monthKey)?.value || '';
+  var statusLabel = document.getElementById('edit-status-custom-' + monthKey)?.value || '';
   var adjAmount = Number(document.getElementById('edit-adj-amount-' + monthKey)?.value) || 0;
   var adjType = document.getElementById('edit-adj-type-' + monthKey)?.value || 'inflow';
   var adjComment = document.getElementById('edit-adj-comment-' + monthKey)?.value || '';
@@ -3512,37 +3547,43 @@ async function saveEditedMonth(monthKey, snapshotId) {
     totalAdj += existingAdjs[i].type === 'outflow' ? -Math.abs(existingAdjs[i].amount) : Math.abs(existingAdjs[i].amount);
   }
   var profit = svc - exp + totalAdj;
-  var turnover = svc + art + totalAdj;
-  var customData = { adjustments: existingAdjs };
+  var turnover = svc + art;
+  var isLocked2 = status === 'locked';
+  var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking };
   if (snapshotId > 0) {
     // Update existing snapshot
     var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
       revenue_services: svc, revenue_articles: art, refunds: ref,
       expense_salaries: 0, expense_commercial: exp, expense_marketing: 0,
       net_profit: profit, total_turnover: turnover,
+      leads_done: done, leads_count: done + inprog + rejected + checking,
       custom_data: customData
     });
     if (res && res.success) {
       toast('Данные за ' + monthKey + ' обновлены');
       editingMonthKey = '';
+      // If status changed to locked, also lock the snapshot
+      if (isLocked2 && mSnap2 && !mSnap2.is_locked) {
+        await api('/period-snapshots', 'POST', { period_type: 'month', period_key: monthKey, revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref, expense_salaries: 0, expense_commercial: exp, expense_marketing: 0, net_profit: profit, leads_count: done+inprog+rejected+checking, leads_done: done, avg_check: done > 0 ? Math.round(svc/done) : 0, is_locked: true, custom_data: customData });
+      }
       try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
-      render();
+      analyticsData = null; loadAnalyticsData();
     } else { toast(res?.error || 'Ошибка сохранения', 'error'); }
   } else {
-    // Create new snapshot for this month (not locked)
+    // Create new snapshot for this month
     var res2 = await api('/period-snapshots', 'POST', {
       period_type: 'month', period_key: monthKey,
       revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref,
       expense_salaries: 0, expense_commercial: exp, expense_marketing: 0,
-      net_profit: profit, leads_count: 0, leads_done: 0, avg_check: 0,
-      is_locked: false,
+      net_profit: profit, leads_count: done+inprog+rejected+checking, leads_done: done, avg_check: done > 0 ? Math.round(svc/done) : 0,
+      is_locked: isLocked2,
       custom_data: customData
     });
     if (res2 && res2.success) {
       toast('Данные за ' + monthKey + ' сохранены');
       editingMonthKey = '';
       try { var snRes2 = await api('/period-snapshots'); data.periodSnapshots = (snRes2 && snRes2.snapshots) || []; } catch(e) {}
-      render();
+      analyticsData = null; loadAnalyticsData();
     } else { toast(res2?.error || 'Ошибка сохранения', 'error'); }
   }
 }
@@ -3565,7 +3606,7 @@ async function deleteAdjustment(monthKey, snapshotId, adjIndex) {
   var art2 = Number(mSnap3.revenue_articles)||0;
   var profit2 = svc2 - exp2 + totalAdj2;
   var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
-    net_profit: profit2, total_turnover: svc2 + art2 + totalAdj2,
+    net_profit: profit2, total_turnover: svc2 + art2,
     custom_data: { adjustments: adjs }
   });
   if (res && res.success) {
@@ -3576,12 +3617,13 @@ async function deleteAdjustment(monthKey, snapshotId, adjIndex) {
 }
 
 async function refreshAnalytics() {
-  var btn = document.getElementById('refresh-analytics-btn');
-  if (btn) { var icon = btn.querySelector('i'); if (icon) icon.className = 'fas fa-sync-alt fa-spin'; }
+  analyticsRefreshing = true;
+  render(); // immediately show spinning icon
   expandedMonth = '';
   analyticsData = null;
   await loadAnalyticsData();
-  if (btn) { var icon2 = btn.querySelector('i'); if (icon2) icon2.className = 'fas fa-sync-alt'; }
+  analyticsRefreshing = false;
+  render(); // stop spinning
 }
 
 async function closePeriodAction(periodType, periodKey, lock) {
