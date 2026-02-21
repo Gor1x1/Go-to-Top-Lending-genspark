@@ -2934,20 +2934,24 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-list-ol" style="color:#8B5CF6;margin-right:8px"></i>Показатели ' + currentYear + ' по месяцам</h3>';
   // Numeric table of months
-  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.78rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
-  h += '<th style="padding:10px 16px;text-align:left;color:#94a3b8">Месяц</th>';
-  h += '<th style="padding:10px;text-align:right;color:#94a3b8">Лиды</th>';
-  h += '<th style="padding:10px;text-align:right;color:#8B5CF6">Приход (итого)</th>';
-  h += '<th style="padding:10px;text-align:right;color:#8B5CF6">Услуги</th>';
-  h += '<th style="padding:10px;text-align:right;color:#F59E0B">Выкупы</th>';
-  h += '<th style="padding:10px;text-align:right;color:#EF4444">Расходы</th>';
-  h += '<th style="padding:10px;text-align:right;color:#22C55E">Прибыль</th>';
-  h += '<th style="padding:10px;text-align:center;color:#94a3b8">Статус</th>';
-  h += '<th style="padding:10px;width:80px"></th>';
+  h += '<th style="padding:8px 12px;text-align:left;color:#94a3b8;white-space:nowrap">Месяц</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E;white-space:nowrap" title="Завершённые лиды">Закрытые</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap" title="В работе / на связи">В работе</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap" title="Отказы">Отказы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#3B82F6;white-space:nowrap" title="На проверке">Проверка</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#a78bfa;white-space:nowrap" title="Услуги + Выкупы (оплата клиента)">Приход (итого)</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap">Выкупы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#f87171;white-space:nowrap" title="Возвраты клиентам от выкупов">Возврат</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6;white-space:nowrap">Услуги</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap">Расходы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E;white-space:nowrap" title="Услуги - Расходы">Прибыль</th>';
+  h += '<th style="padding:8px 6px;text-align:center;color:#94a3b8;white-space:nowrap">Статус</th>';
+  h += '<th style="padding:8px 6px;width:60px"></th>';
   h += '</tr></thead><tbody>';
   var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var yearTotals = {leads:0, turnover:0, services:0, articles:0, expenses:0, profit:0};
+  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, refunds:0, expenses:0, profit:0};
   for (var mi3 = 1; mi3 <= 12; mi3++) {
     var mKey = currentYear + '-' + String(mi3).padStart(2,'0');
     var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
@@ -2957,65 +2961,95 @@ function renderBizPeriodsV2(d, sd, fin) {
     var isFuture = mi3 > currentMonth;
     var isLocked = mSnap && mSnap.is_locked;
     var isEditing = editingMonthKey === mKey;
-    // Use snapshot data if locked, live fin data for current month, otherwise live leads data
-    var mLeads = isLocked ? (mSnap.leads_count||0) : (mData ? Number(mData.count)||0 : 0);
-    var mTurnover = isLocked ? (Number(mSnap.total_turnover)||0) : (mData ? Number(mData.amount)||0 : 0);
-    var mSvc, mArt, mExp, mProfit;
+    // Lead counts by status
+    var mDone, mInProg, mRejected, mChecking;
+    var mSvc, mArt, mRefunds, mExp, mProfit, mTurnover;
     if (isLocked) {
+      // From snapshot
+      mDone = Number(mSnap.leads_done)||0;
+      var snapCD = {}; try { snapCD = JSON.parse(mSnap.custom_data || '{}'); } catch {}
+      mInProg = Number(snapCD.in_progress_count)||0;
+      mRejected = Number(snapCD.rejected_count)||0;
+      mChecking = Number(snapCD.checking_count)||0;
       mSvc = Number(mSnap.revenue_services)||0;
       mArt = Number(mSnap.revenue_articles)||0;
+      mRefunds = Number(mSnap.refunds)||0;
       mExp = (Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0);
-      mProfit = Number(mSnap.net_profit)||0;
+      mTurnover = mSvc + mArt;
+      mProfit = mSvc - mExp;
     } else if (isCurrent) {
-      // Real-time data for current month from live analytics
+      // Live data from fin (global analytics for current period)
+      mDone = Number(sd.done && sd.done.count)||0;
+      mInProg = (Number(sd.in_progress && sd.in_progress.count)||0) + (Number(sd.contacted && sd.contacted.count)||0);
+      mRejected = Number(sd.rejected && sd.rejected.count)||0;
+      mChecking = Number(sd.checking && sd.checking.count)||0;
       mSvc = Number(fin.services)||0;
       mArt = Number(fin.articles)||0;
+      mRefunds = Number(fin.refunds)||0;
       mExp = Number(fin.total_expenses)||0;
-      mProfit = Number(fin.net_profit)||0;
+      mTurnover = mSvc + mArt;
+      mProfit = mSvc - mExp;
+    } else if (mData) {
+      // Historical from monthly_data query
+      mDone = Number(mData.done_count)||0;
+      mInProg = Number(mData.in_progress_count)||0;
+      mRejected = Number(mData.rejected_count)||0;
+      mChecking = Number(mData.checking_count)||0;
+      mSvc = Number(mData.services)||0;
+      mArt = Number(mData.articles)||0;
+      mRefunds = Number(mData.refunds)||0;
+      mExp = 0; // No per-month expense history for non-snapshot months
+      mTurnover = mSvc + mArt;
+      mProfit = mSvc - mExp;
     } else {
-      mSvc = 0; mArt = 0; mExp = 0; mProfit = 0;
+      mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
+      mSvc = 0; mArt = 0; mRefunds = 0; mExp = 0; mTurnover = 0; mProfit = 0;
     }
-    yearTotals.leads += mLeads; yearTotals.turnover += mTurnover;
-    yearTotals.services += mSvc; yearTotals.articles += mArt;
+    yearTotals.done += mDone; yearTotals.inProgress += mInProg;
+    yearTotals.rejected += mRejected; yearTotals.checking += mChecking;
+    yearTotals.turnover += mTurnover; yearTotals.services += mSvc;
+    yearTotals.articles += mArt; yearTotals.refunds += mRefunds;
     yearTotals.expenses += mExp; yearTotals.profit += mProfit;
     var rowBg = isCurrent ? 'background:rgba(139,92,246,0.06);' : isFuture ? 'opacity:0.4;' : '';
     h += '<tr style="border-bottom:1px solid #1e293b;' + rowBg + '">';
-    h += '<td style="padding:10px 16px;font-weight:700;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi3-1];
-    if (isCurrent) h += ' <span style="font-size:0.6rem;padding:1px 6px;background:#8B5CF6;color:white;border-radius:8px;vertical-align:middle">СЕЙЧАС</span>';
+    h += '<td style="padding:8px 12px;font-weight:700;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi3-1];
+    if (isCurrent) h += ' <span style="font-size:0.55rem;padding:1px 5px;background:#8B5CF6;color:white;border-radius:8px;vertical-align:middle">СЕЙЧАС</span>';
     h += '</td>';
-    h += '<td style="padding:10px;text-align:right">' + mLeads + '</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:600;color:#a78bfa">' + fmtAmt(mTurnover) + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (mExp ? fmtAmt(mExp) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (mProfit || isCurrent ? fmtAmt(mProfit) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:center">';
-    if (isLocked) h += '<span style="color:#22C55E;font-size:0.72rem"><i class="fas fa-lock"></i> Закрыт</span>';
-    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.72rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.55rem;margin-right:3px"></i>Текущий</span>';
-    else if (isPast) h += '<span style="color:#F59E0B;font-size:0.72rem">Открыт</span>';
-    else h += '<span style="color:#334155;font-size:0.72rem">\u2014</span>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#22C55E">' + (mDone || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mInProg || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mRejected || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (mChecking || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? fmtAmt(mRefunds) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mExp ? fmtAmt(mExp) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + ((mProfit || isCurrent) ? fmtAmt(mProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:center">';
+    if (isLocked) h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
+    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.68rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.5rem;margin-right:3px"></i>Текущий</span>';
+    else if (isPast) h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
+    else h += '<span style="color:#334155;font-size:0.68rem">\u2014</span>';
     h += '</td>';
-    h += '<td style="padding:10px;text-align:center">';
-    if (isPast || isCurrent) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="expandedMonth=\\'' + mKey + '\\';analyticsData=null;loadAnalyticsData()" title="Развернуть"><i class="fas fa-expand"></i></button> ';
-    }
+    h += '<td style="padding:8px 6px;text-align:center;white-space:nowrap">';
     if (isLocked) {
-      // Editable: click pencil to edit, unlock to reopen
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render()" title="Редактировать"><i class="fas fa-pencil-alt"></i></button> ';
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.6rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')" title="Разблокировать"><i class="fas fa-unlock"></i></button>';
+      // Pencil to edit (unlocks edit mode), lock button to unlock
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render()" title="Редактировать"><i class="fas fa-pencil-alt"></i></button> ';
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.55rem;color:#64748b" onclick="unlockPeriod(' + mSnap.id + ')" title="Разблокировать"><i class="fas fa-unlock"></i></button>';
     } else if (isPast) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)" title="Закрыть"><i class="fas fa-lock"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',true)" title="Закрыть месяц"><i class="fas fa-lock"></i></button>';
     } else if (isCurrent) {
-      h += '<button class="btn btn-outline" style="padding:3px 8px;font-size:0.65rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)" title="Сохранить снимок"><i class="fas fa-save"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem" onclick="closePeriodAction(\\'month\\',\\'' + mKey + '\\',false)" title="Сохранить снимок"><i class="fas fa-save"></i></button>';
     }
     h += '</td></tr>';
     // Editable inline form for locked months
     if (isEditing && isLocked) {
-      h += '<tr style="background:#0f172a"><td colspan="9" style="padding:12px 16px">';
+      h += '<tr style="background:#0f172a"><td colspan="13" style="padding:12px 16px">';
       h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
-      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">';
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">';
       h += '<div><label style="font-size:0.7rem;color:#64748b">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
       h += '<div><label style="font-size:0.7rem;color:#64748b">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
       h += '<div><label style="font-size:0.7rem;color:#64748b">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
       h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + mSnap.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
@@ -3023,21 +3057,36 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '</td></tr>';
     }
   }
-  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:10px 16px">ИТОГО ' + currentYear + '</td>';
-  h += '<td style="padding:10px;text-align:right">' + yearTotals.leads + '</td>';
-  h += '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(yearTotals.turnover) + '</td>';
-  h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
-  h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (yearTotals.articles ? fmtAmt(yearTotals.articles) : '\u2014') + '</td>';
-  h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? fmtAmt(yearTotals.expenses) : '\u2014') + '</td>';
-  h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (yearTotals.profit >= 0 ? '#22C55E' : '#EF4444') + '">' + (yearTotals.profit ? fmtAmt(yearTotals.profit) : '\u2014') + '</td>';
+  h += '<tr style="border-top:2px solid #8B5CF6;font-weight:800"><td style="padding:8px 12px">ИТОГО ' + currentYear + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#22C55E">' + yearTotals.done + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + yearTotals.inProgress + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + yearTotals.rejected + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + yearTotals.checking + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#a78bfa">' + fmtAmt(yearTotals.turnover) + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (yearTotals.articles ? fmtAmt(yearTotals.articles) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (yearTotals.refunds ? fmtAmt(yearTotals.refunds) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? fmtAmt(yearTotals.expenses) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (yearTotals.profit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearTotals.profit) + '</td>';
   h += '<td colspan="2"></td></tr>';
   h += '</tbody></table></div></div>';
 
   // ---- SECTION: Quarters (Q1=Jan-Mar, Q2=Apr-Jun, Q3=Jul-Sep, Q4=Oct-Dec) ----
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-calendar-alt" style="color:#F59E0B;margin-right:8px"></i>\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u044b ' + currentYear + '</h3>';
-  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
-  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Квартал</th><th style="padding:10px;text-align:left;color:#94a3b8">Месяцы</th><th style="padding:10px;text-align:center;color:#94a3b8">Закрыто</th><th style="padding:10px;text-align:right;color:#94a3b8">Приход</th><th style="padding:10px;text-align:right;color:#8B5CF6">Услуги</th><th style="padding:10px;text-align:right;color:#F59E0B">Выкупы</th><th style="padding:10px;text-align:right;color:#EF4444">Расходы</th><th style="padding:10px;text-align:right;color:#22C55E">Прибыль</th><th style="padding:10px;width:60px"></th></tr></thead><tbody>';
+  h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.78rem">';
+  h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
+  h += '<th style="padding:8px 12px;text-align:left;color:#94a3b8">Квартал</th>';
+  h += '<th style="padding:8px 6px;text-align:left;color:#94a3b8;font-size:0.72rem">Месяцы</th>';
+  h += '<th style="padding:8px 6px;text-align:center;color:#94a3b8">Закрыто</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E" title="Закрытые лиды">Закрытые</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#a78bfa">Приход</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B">Выкупы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#f87171">Возврат</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6">Услуги</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#EF4444">Расходы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E" title="Услуги - Расходы">Прибыль</th>';
+  h += '<th style="padding:8px;width:50px"></th></tr></thead><tbody>';
   var qMonthsMap = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]];
   var qNames = ['Q1 (Янв\u2013Мар)','Q2 (Апр\u2013Июн)','Q3 (Июл\u2013Сен)','Q4 (Окт\u2013Дек)'];
   for (var qi2 = 0; qi2 < 4; qi2++) {
@@ -3047,38 +3096,61 @@ function renderBizPeriodsV2(d, sd, fin) {
     var qIsCurrent = qNum === currentQ;
     var qLocked = qSnap && qSnap.is_locked;
     var closedInQ = 0;
-    var qTurnover = 0, qSvc = 0, qArt = 0, qExp = 0, qProfit = 0;
+    var qTurnover = 0, qSvc = 0, qArt = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0;
     for (var qmi = 0; qmi < 3; qmi++) {
       var qmNum = qMonthsMap[qi2][qmi];
       var qmKey = currentYear + '-' + String(qmNum).padStart(2,'0');
       var qmSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===qmKey && s.is_locked;});
       if (qmSnap) {
         closedInQ++;
-        qTurnover += Number(qmSnap.total_turnover)||0;
-        qSvc += Number(qmSnap.revenue_services)||0;
-        qArt += Number(qmSnap.revenue_articles)||0;
-        qExp += (Number(qmSnap.expense_salaries)||0)+(Number(qmSnap.expense_commercial)||0)+(Number(qmSnap.expense_marketing)||0);
-        qProfit += Number(qmSnap.net_profit)||0;
+        var qmSvc = Number(qmSnap.revenue_services)||0;
+        var qmArt = Number(qmSnap.revenue_articles)||0;
+        var qmExp = (Number(qmSnap.expense_salaries)||0)+(Number(qmSnap.expense_commercial)||0)+(Number(qmSnap.expense_marketing)||0);
+        qSvc += qmSvc;
+        qArt += qmArt;
+        qRef += Number(qmSnap.refunds)||0;
+        qExp += qmExp;
+        qTurnover += qmSvc + qmArt;
+        qProfit += qmSvc - qmExp;
+        qDone += Number(qmSnap.leads_done)||0;
+      } else if (qmNum === currentMonth) {
+        // Include live current month data
+        var cSvc = Number(fin.services)||0;
+        var cArt = Number(fin.articles)||0;
+        var cExp = Number(fin.total_expenses)||0;
+        qSvc += cSvc;
+        qArt += cArt;
+        qRef += Number(fin.refunds)||0;
+        qExp += cExp;
+        qTurnover += cSvc + cArt;
+        qProfit += cSvc - cExp;
+        qDone += (sd.done ? Number(sd.done.count)||0 : 0);
       }
     }
     // Use quarter snapshot if locked
     if (qLocked) {
-      qTurnover = Number(qSnap.total_turnover)||0;
-      qSvc = Number(qSnap.revenue_services)||0;
+      var qlSvc = Number(qSnap.revenue_services)||0;
+      var qlExp = (Number(qSnap.expense_salaries)||0)+(Number(qSnap.expense_commercial)||0)+(Number(qSnap.expense_marketing)||0);
+      qTurnover = qlSvc + (Number(qSnap.revenue_articles)||0);
+      qSvc = qlSvc;
       qArt = Number(qSnap.revenue_articles)||0;
-      qExp = (Number(qSnap.expense_salaries)||0)+(Number(qSnap.expense_commercial)||0)+(Number(qSnap.expense_marketing)||0);
-      qProfit = Number(qSnap.net_profit)||0;
+      qRef = Number(qSnap.refunds)||0;
+      qExp = qlExp;
+      qProfit = qSvc - qExp; // Прибыль = Услуги - Расходы
+      qDone = Number(qSnap.leads_done)||0;
     }
     var qColor = qIsCurrent ? '#F59E0B' : qLocked ? '#22C55E' : '#e2e8f0';
-    h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px;font-weight:700;color:' + qColor + '">' + qNames[qi2] + '</td>';
-    h += '<td style="padding:10px;color:#64748b;font-size:0.78rem">' + qMonthsMap[qi2].map(function(m){return monthNames[m-1];}).join(', ') + '</td>';
-    h += '<td style="padding:10px;text-align:center">' + closedInQ + '/3</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:600">' + (qTurnover ? fmtAmt(qTurnover) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#8B5CF6">' + (qSvc ? fmtAmt(qSvc) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#F59E0B">' + (qArt ? fmtAmt(qArt) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (qExp ? fmtAmt(qExp) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (qProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (qProfit ? fmtAmt(qProfit) : '\u2014') + '</td>';
-    h += '<td style="padding:10px;text-align:center">';
+    h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 12px;font-weight:700;color:' + qColor + '">' + qNames[qi2] + '</td>';
+    h += '<td style="padding:8px 6px;color:#64748b;font-size:0.72rem">' + qMonthsMap[qi2].map(function(m){return monthNames[m-1];}).join(', ') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:center">' + closedInQ + '/3</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#22C55E">' + (qDone || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (qTurnover ? fmtAmt(qTurnover) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (qArt ? fmtAmt(qArt) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (qRef ? fmtAmt(qRef) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (qSvc ? fmtAmt(qSvc) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (qExp ? fmtAmt(qExp) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (qProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (qProfit ? fmtAmt(qProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:8px;text-align:center">';
     if (qNum < currentQ && closedInQ === 3 && !qLocked) {
       h += '<button class="btn btn-primary" style="padding:3px 10px;font-size:0.72rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)"><i class="fas fa-lock"></i></button>';
     } else if (qLocked) {
@@ -3298,11 +3370,13 @@ async function saveBonus(userId, bonusType) {
 async function saveEditedMonth(monthKey, snapshotId) {
   var svc = Number(document.getElementById('edit-svc-' + monthKey)?.value) || 0;
   var art = Number(document.getElementById('edit-art-' + monthKey)?.value) || 0;
+  var ref = Number(document.getElementById('edit-ref-' + monthKey)?.value) || 0;
   var exp = Number(document.getElementById('edit-exp-' + monthKey)?.value) || 0;
-  var profit = svc - exp;
+  var profit = svc - exp; // Прибыль = Услуги - Расходы
   var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
     revenue_services: svc,
     revenue_articles: art,
+    refunds: ref,
     expense_salaries: 0,
     expense_commercial: exp,
     expense_marketing: 0,
@@ -3335,7 +3409,7 @@ async function closePeriodAction(periodType, periodKey, lock) {
     expense_salaries: (fin.salaries || 0) + (fin.bonuses || 0) + (fin.fines || 0),
     expense_commercial: fin.commercial_expenses || 0,
     expense_marketing: fin.marketing_expenses || 0,
-    net_profit: fin.net_profit || 0,
+    net_profit: (fin.services || 0) - (fin.total_expenses || 0), // Прибыль = Услуги - Расходы
     leads_count: d.total_leads || 0,
     leads_done: (d.status_data && d.status_data.done) ? d.status_data.done.count || 0 : 0,
     avg_check: fin.avg_check || 0,
@@ -3346,7 +3420,10 @@ async function closePeriodAction(periodType, periodKey, lock) {
       roi: fin.roi,
       romi: fin.romi,
       date_from: d.date_from,
-      date_to: d.date_to
+      date_to: d.date_to,
+      in_progress_count: ((d.status_data && d.status_data.in_progress) ? d.status_data.in_progress.count || 0 : 0) + ((d.status_data && d.status_data.contacted) ? d.status_data.contacted.count || 0 : 0),
+      rejected_count: (d.status_data && d.status_data.rejected) ? d.status_data.rejected.count || 0 : 0,
+      checking_count: (d.status_data && d.status_data.checking) ? d.status_data.checking.count || 0 : 0
     }
   };
 

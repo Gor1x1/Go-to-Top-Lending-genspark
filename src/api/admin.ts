@@ -1540,11 +1540,15 @@ api.put('/period-snapshots/:id', authMiddleware, async (c) => {
   const vals: any[] = [];
   if (d.revenue_services !== undefined) { fields.push('revenue_services=?'); vals.push(d.revenue_services); }
   if (d.revenue_articles !== undefined) { fields.push('revenue_articles=?'); vals.push(d.revenue_articles); }
+  if (d.refunds !== undefined) { fields.push('refunds=?'); vals.push(d.refunds); }
   if (d.expense_salaries !== undefined) { fields.push('expense_salaries=?'); vals.push(d.expense_salaries); }
   if (d.expense_commercial !== undefined) { fields.push('expense_commercial=?'); vals.push(d.expense_commercial); }
   if (d.expense_marketing !== undefined) { fields.push('expense_marketing=?'); vals.push(d.expense_marketing); }
   if (d.net_profit !== undefined) { fields.push('net_profit=?'); vals.push(d.net_profit); }
   if (d.total_turnover !== undefined) { fields.push('total_turnover=?'); vals.push(d.total_turnover); }
+  if (d.leads_done !== undefined) { fields.push('leads_done=?'); vals.push(d.leads_done); }
+  if (d.leads_count !== undefined) { fields.push('leads_count=?'); vals.push(d.leads_count); }
+  if (d.custom_data !== undefined) { fields.push('custom_data=?'); vals.push(typeof d.custom_data === 'string' ? d.custom_data : JSON.stringify(d.custom_data)); }
   if (fields.length === 0) return c.json({ error: 'Nothing to update' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
@@ -1818,12 +1822,49 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       }
     } catch {}
 
-    // 15. Monthly data for yearly chart
+    // 15. Monthly data for yearly chart — detailed breakdown by status + financials
     let monthlyData: any[] = [];
     try {
       const yr = monthParam ? monthParam.substring(0, 4) : String(new Date().getFullYear());
-      const mRes = await db.prepare("SELECT strftime('%Y-%m', created_at) as month, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount, SUM(CASE WHEN status='done' THEN total_amount ELSE 0 END) as done_amount FROM leads WHERE strftime('%Y', created_at) = ? GROUP BY strftime('%Y-%m', created_at) ORDER BY month").bind(yr).all();
-      monthlyData = mRes.results || [];
+      const mRes = await db.prepare(`SELECT strftime('%Y-%m', created_at) as month, 
+        COUNT(*) as count, 
+        COALESCE(SUM(total_amount),0) as amount, 
+        SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as done_count,
+        SUM(CASE WHEN status='done' THEN total_amount ELSE 0 END) as done_amount,
+        SUM(CASE WHEN status='in_progress' OR status='contacted' THEN 1 ELSE 0 END) as in_progress_count,
+        SUM(CASE WHEN status='rejected' THEN 1 ELSE 0 END) as rejected_count,
+        SUM(CASE WHEN status='checking' THEN 1 ELSE 0 END) as checking_count,
+        COALESCE(SUM(refund_amount),0) as refunds
+        FROM leads WHERE strftime('%Y', created_at) = ? 
+        GROUP BY strftime('%Y-%m', created_at) ORDER BY month`).bind(yr).all();
+      // Now enrich with services/articles per month from calc_data + lead_articles
+      const mDataArr = mRes.results || [];
+      for (const md of mDataArr) {
+        const mk = md.month as string;
+        // Services from calc_data for this month's done leads
+        const svcRes = await db.prepare(`SELECT COALESCE(SUM(total_amount),0) as svc_total FROM leads 
+          WHERE strftime('%Y-%m', created_at) = ? AND status = 'done'`).bind(mk).first().catch(() => ({svc_total:0}));
+        // Articles total from lead_articles for this month
+        const artRes = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art_total 
+          FROM lead_articles la JOIN leads l ON la.lead_id = l.id 
+          WHERE strftime('%Y-%m', l.created_at) = ?`).bind(mk).first().catch(() => ({art_total:0}));
+        // Services = look at calc_data items without wb_article for done leads
+        const svcItemsRes = await db.prepare(`SELECT l.calc_data FROM leads l 
+          WHERE strftime('%Y-%m', l.created_at) = ? AND l.status = 'done'`).bind(mk).all().catch(() => ({results:[]}));
+        let svcTotal = 0;
+        for (const row of (svcItemsRes.results || [])) {
+          try {
+            const cd = JSON.parse(row.calc_data as string || '{}');
+            const items = cd.items || cd.services || [];
+            for (const it of items) {
+              if (!it.wb_article) svcTotal += (Number(it.price) || 0) * (Number(it.qty) || Number(it.quantity) || 1);
+            }
+          } catch {}
+        }
+        (md as any).services = svcTotal;
+        (md as any).articles = Number((artRes as any)?.art_total) || 0;
+      }
+      monthlyData = mDataArr;
     } catch {}
 
     // 16. Weekly data
