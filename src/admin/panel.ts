@@ -1568,7 +1568,7 @@ function renderLeads() {
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-undo-alt" style="margin-right:4px;color:#EF4444"></i>Возврат средств (֏):</div>' +
         '<input class="input" type="number" min="0" step="1" id="lead-refund-' + l.id + '" value="' + refundVal + '" style="font-size:0.88rem;padding:8px;border-color:rgba(239,68,68,0.3)" placeholder="0"></div>' +
         '<div style="display:flex;align-items:flex-end">' +
-        (refundVal > 0 ? '<div style="font-size:0.78rem;color:#f87171;font-weight:600;padding:8px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Возврат: ' + Number(refundVal).toLocaleString('ru-RU') + ' ֏ будет вычтен из итога</div>' : '<div style="font-size:0.78rem;color:#64748b;padding:8px">Сумма вычитается из стоимости выкупов</div>') +
+        (refundVal > 0 ? '<div style="font-size:0.78rem;color:#f87171;font-weight:600;padding:8px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Возврат: ' + Number(refundVal).toLocaleString('ru-RU') + ' ֏ (из суммы выкупов)</div>' : '<div style="font-size:0.78rem;color:#64748b;padding:8px">Сумма вычитается из стоимости выкупов</div>') +
         '</div></div>';
 
       // --- 3. NOTES (at top, above services) ---
@@ -2280,7 +2280,10 @@ let bizAnalyticsTab = 'overview';
 let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
 let addBonusType = 'bonus';
+let showBonusListUserId = 0;
+let bonusListData: any[] = [];
 let editingMonthKey = '';
+let editingBonusId = 0;
 let showAddCategoryForm = false;
 let showAddFreqTypeForm = false;
 let expandedMonth = ''; // for month drill-down
@@ -2388,14 +2391,14 @@ function renderLeadsAnalytics() {
     { id: 'overview', icon: 'fa-chart-pie', label: 'Обзор и Финансы' },
     { id: 'costs', icon: 'fa-wallet', label: 'Затраты и ЗП' },
     { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка и Детали' },
-    { id: 'periods', icon: 'fa-list-ol', label: 'Детальные показатели' },
+    { id: 'periods', icon: 'fa-list-ol', label: 'Результативность' },
   ];
   var h = '<div style="padding:24px 32px">';
   // Header
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">';
   h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>';
   h += '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>';
-  h += '<button class="btn btn-outline" onclick="expandedMonth=\\'\\';analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить</button>';
+  h += '<button class="btn btn-outline" onclick="this.querySelector(\\'i\\').classList.add(\\'fa-spin\\');expandedMonth=\\'\\';analyticsData=null;loadAnalyticsData()"><i class="fas fa-sync-alt" style="margin-right:6px"></i>\u041e\u0431\u043d\u043e\u0432\u0438\u0442\u044c</button>';
   h += '</div>';
   // Expanded month banner
   if (expandedMonth) {
@@ -2426,7 +2429,7 @@ function renderLeadsAnalytics() {
     {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)'},
     {label:'Конверсия (завершено/все)',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)'},
     {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Только стоимость услуг / кол-во завершённых'},
-    {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)'},
+    {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)',desc:'Нов: '+fmtNum((sd.new||{}).count||0)+' | Связь: '+fmtNum((sd.contacted||{}).count||0)+' | Работа: '+fmtNum((sd.in_progress||{}).count||0)+' | Пров: '+fmtNum((sd.checking||{}).count||0)+' | Откл: '+fmtNum((sd.rejected||{}).count||0)+' | Готово: '+fmtNum((sd.done||{}).count||0)},
     {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)'},
   ];
   for (var qi = 0; qi < quickKpis.length; qi++) {
@@ -2732,7 +2735,7 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(exp.amount) + '</td>';
       h += '<td style="padding:8px"><span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:' + (exp.category_color||'#475569') + '22;color:' + (exp.category_color||'#94a3b8') + '">' + escHtml(exp.category_name||'\u2014') + '</span></td>';
       h += '<td style="padding:8px;font-size:0.8rem;color:#64748b">' + escHtml(exp.frequency_name||'\u2014') + '</td>';
-      h += '<td style="padding:8px"><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
+      h += '<td style="padding:8px;white-space:nowrap"><button class="btn btn-outline" style="padding:2px 6px;font-size:0.55rem;color:#F59E0B;border-color:#F59E0B33;margin-right:3px" onclick="editExpenseInline(' + exp.id + ',' + (exp.amount||0) + ',\'' + escHtml(exp.name||'').replace(/'/g, "\\'") + '\')" title="Изменить"><i class="fas fa-pencil-alt"></i></button><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
     }
     h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 12px">ИТОГО</td><td style="padding:10px;text-align:right;color:#EF4444">' + fmtAmt(totalExp) + '</td><td colspan="3"></td></tr>';
     h += '</tbody></table>';
@@ -2782,6 +2785,7 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:10px"><div style="display:flex;gap:4px">';
       h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#22C55E;border-color:#22C55E44" onclick="showAddBonusUserId=' + u.id + ';addBonusType=\\'bonus\\';render()" title="Добавить бонус"><i class="fas fa-plus"></i></button>';
       h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#EF4444;border-color:#EF444444" onclick="showAddBonusUserId=' + u.id + ';addBonusType=\\'fine\\';render()" title="Добавить штраф"><i class="fas fa-minus"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#64748b" onclick="toggleBonusList(' + u.id + ')" title="Показать историю"><i class="fas fa-list"></i></button>';
       h += '</div></td></tr>';
       // Bonus/fine form
       if (showAddBonusUserId === u.id) {
@@ -2794,6 +2798,42 @@ function renderBizCostsV2(d, sd, fin) {
         h += '<button class="btn ' + (isFine ? 'btn-outline' : 'btn-success') + '" style="padding:6px 12px;' + (isFine ? 'color:#EF4444;border-color:#EF4444' : '') + '" onclick="saveBonus(' + u.id + ',\\'' + (isFine ? 'fine' : 'bonus') + '\\')"><i class="fas fa-check"></i></button>';
         h += '<button class="btn btn-outline" style="padding:6px 12px" onclick="showAddBonusUserId=0;render()"><i class="fas fa-times"></i></button>';
         h += '</div></td></tr>';
+      }
+      // Bonus/fine list (expandable)
+      if (showBonusListUserId === u.id && bonusListData.length > 0) {
+        h += '<tr><td colspan="8" style="padding:0;background:#0f172a"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
+        h += '<tr style="border-bottom:1px solid #1e293b"><th style="padding:6px 16px;text-align:left;color:#475569">Тип</th><th style="padding:6px;text-align:left;color:#475569">Описание</th><th style="padding:6px;text-align:right;color:#475569">Сумма</th><th style="padding:6px;text-align:center;color:#475569">Дата</th><th style="padding:6px;width:70px"></th></tr>';
+        for (var bi = 0; bi < bonusListData.length; bi++) {
+          var b = bonusListData[bi];
+          var bType = b.bonus_type === 'fine' ? 'fine' : 'bonus';
+          var bColor = bType === 'fine' ? '#EF4444' : '#22C55E';
+          var bAmt = Number(b.amount) || 0;
+          if (editingBonusId === b.id) {
+            // Inline edit mode
+            h += '<tr style="border-bottom:1px solid #1e293b22;background:#0f172a">';
+            h += '<td style="padding:5px 16px;color:' + bColor + ';font-weight:600">' + (bType === 'fine' ? '\u0428\u0442\u0440\u0430\u0444' : '\u0411\u043e\u043d\u0443\u0441') + '</td>';
+            h += '<td style="padding:5px"><input class="input" id="edit-bonus-desc-' + b.id + '" value="' + escHtml(b.description || '') + '" style="padding:4px 8px;font-size:0.75rem;width:100%"></td>';
+            h += '<td style="padding:5px"><input class="input" id="edit-bonus-amt-' + b.id + '" type="number" value="' + Math.abs(bAmt) + '" style="padding:4px 8px;font-size:0.75rem;width:80px;text-align:right" min="0"></td>';
+            h += '<td style="padding:5px"><input class="input" id="edit-bonus-date-' + b.id + '" type="date" value="' + (b.bonus_date || '') + '" style="padding:4px 6px;font-size:0.72rem"></td>';
+            h += '<td style="padding:5px;text-align:center;white-space:nowrap">';
+            h += '<button class="btn btn-success" style="padding:2px 6px;font-size:0.6rem;margin-right:2px" onclick="saveBonusEdit(' + b.id + ',' + u.id + ',\\'' + bType + '\\')" title="\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c"><i class="fas fa-check"></i></button>';
+            h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem" onclick="editingBonusId=0;render()" title="\u041e\u0442\u043c\u0435\u043d\u0430"><i class="fas fa-times"></i></button>';
+            h += '</td></tr>';
+          } else {
+            h += '<tr style="border-bottom:1px solid #1e293b22">';
+            h += '<td style="padding:5px 16px;color:' + bColor + ';font-weight:600">' + (bType === 'fine' ? '\u0428\u0442\u0440\u0430\u0444' : '\u0411\u043e\u043d\u0443\u0441') + '</td>';
+            h += '<td style="padding:5px;color:#94a3b8">' + escHtml(b.description || '\u2014') + '</td>';
+            h += '<td style="padding:5px;text-align:right;font-weight:600;color:' + bColor + '">' + (bAmt < 0 ? '\u2212' : '+') + fmtAmt(Math.abs(bAmt)) + '</td>';
+            h += '<td style="padding:5px;text-align:center;color:#64748b">' + (b.bonus_date || '\u2014') + '</td>';
+            h += '<td style="padding:5px;text-align:center;white-space:nowrap">';
+            h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B33;margin-right:2px" onclick="editingBonusId=' + b.id + ';render()" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c"><i class="fas fa-pencil-alt"></i></button>';
+            h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#EF4444;border-color:#EF444433" onclick="deleteBonus(' + b.id + ',' + u.id + ')" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-trash"></i></button>';
+            h += '</td></tr>';
+          }
+        }
+        h += '</table></td></tr>';
+      } else if (showBonusListUserId === u.id) {
+        h += '<tr><td colspan="8" style="padding:10px 16px;background:#0f172a;color:#64748b;font-size:0.78rem;text-align:center">Нет записей бонусов / штрафов</td></tr>';
       }
     }
     h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td colspan="2"></td>';
@@ -2840,9 +2880,14 @@ function renderBizFunnelV2(d, sd, fin) {
     h += '<span style="font-size:0.85rem;font-weight:600;color:' + fs.color + '">' + fs.label;
     if (stageDays > 0) h += ' <span style="font-size:0.65rem;color:#64748b;font-weight:400">(~' + stageDays + ' \u0434\u043d)</span>';
     h += '</span>';
-    h += '<span style="font-size:0.85rem;font-weight:700">' + cnt + ' <span style="color:#64748b;font-weight:400">(' + fmtAmt(Number(fv.amount)||0) + ')</span>';
+    var fvSvc = Number(fv.services)||0; var fvArt = Number(fv.articles)||0; var fvAmt = Number(fv.amount)||0;
+    h += '<span style="font-size:0.85rem;font-weight:700">' + cnt + ' <span style="color:#64748b;font-weight:400">(' + fmtAmt(fvAmt) + ')</span>';
     if (convFromPrev) h += ' <span style="font-size:0.68rem;padding:2px 6px;border-radius:8px;background:rgba(139,92,246,0.15);color:#a78bfa;margin-left:6px">\u2192 ' + convFromPrev + '%</span>';
     h += '</span></div>';
+    h += '<div style="display:flex;gap:12px;margin-bottom:4px;padding-left:4px">';
+    h += '<span style="font-size:0.68rem;color:#8B5CF6"><i class="fas fa-concierge-bell" style="margin-right:2px"></i>\u0423\u0441\u043b: ' + fmtAmt(fvSvc) + '</span>';
+    h += '<span style="font-size:0.68rem;color:#F59E0B"><i class="fas fa-box" style="margin-right:2px"></i>\u0412\u044b\u043a: ' + fmtAmt(fvArt) + '</span>';
+    h += '</div>';
     h += '<div style="width:' + funnelW + '%;margin:0 auto;height:32px;background:#0f172a;border-radius:6px;overflow:hidden">';
     h += '<div style="height:100%;width:' + widthPct + '%;background:linear-gradient(90deg,' + fs.color + ',' + fs.color + '88);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:white;transition:width 0.5s">' + (cnt > 0 ? cnt : '') + '</div></div>';
     h += '</div>';
@@ -2887,7 +2932,7 @@ function renderBizFunnelV2(d, sd, fin) {
   if (sourceKeys.length > 0) {
     h += '<div style="margin-bottom:32px">';
     h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-globe" style="color:#F59E0B;margin-right:8px"></i>\u0418\u0441\u0442\u043e\u0447\u043d\u0438\u043a\u0438</h3>';
-    var srcLabels = { form: '\u0424\u043e\u0440\u043c\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0435', popup: '\u041f\u043e\u043f\u0430\u043f', calculator_pdf: '\u041a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 / PDF', manual: '\u0412\u0440\u0443\u0447\u043d\u0443\u044e', direct: '\u041f\u0440\u044f\u043c\u043e\u0439', admin_panel: '\u0410\u0434\u043c\u0438\u043d-\u043f\u0430\u043d\u0435\u043b\u044c (\u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a)' };
+    var srcLabels = { form: '\u0424\u043e\u0440\u043c\u0430 \u043d\u0430 \u0441\u0430\u0439\u0442\u0435', popup: '\u041f\u043e\u043f\u0430\u043f', calculator_pdf: '\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b \u0432\u0440\u0443\u0447\u043d\u0443\u044e', manual: '\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b \u0432\u0440\u0443\u0447\u043d\u0443\u044e', direct: '\u041f\u0440\u044f\u043c\u043e\u0439', admin_panel: '\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b \u0432\u0440\u0443\u0447\u043d\u0443\u044e (\u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a)' };
     h += '<div class="card" style="padding:16px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
     for (var ski = 0; ski < sourceKeys.length; ski++) {
       var sk = sourceKeys[ski]; var sv = bySource[sk];
@@ -2989,8 +3034,8 @@ function renderBizPeriodsV2(d, sd, fin) {
       mExp = Number(fin.total_expenses)||0;
       mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp;
-    } else if (mData) {
-      // Historical from monthly_data query
+    } else if (isPast && mData) {
+      // Historical from monthly_data query (only for past non-locked months)
       mDone = Number(mData.done_count)||0;
       mInProg = Number(mData.in_progress_count)||0;
       mRejected = Number(mData.rejected_count)||0;
@@ -3045,15 +3090,24 @@ function renderBizPeriodsV2(d, sd, fin) {
     // Editable inline form for locked months
     if (isEditing && isLocked) {
       h += '<tr style="background:#0f172a"><td colspan="13" style="padding:12px 16px">';
-      h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
+      h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
+      // Standard financial fields
       h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px">';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#64748b">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0423\u0441\u043b\u0443\u0433\u0438</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0412\u044b\u043a\u0443\u043f\u044b</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0412\u043e\u0437\u0432\u0440\u0430\u0442</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0420\u0430\u0441\u0445\u043e\u0434\u044b</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
-      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + mSnap.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
-      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=\\'\\';render()">Отмена</button></div>';
+      // Additional adjustment section
+      h += '<div style="border-top:1px solid #334155;padding-top:12px;margin-bottom:12px">';
+      h += '<div style="font-weight:600;color:#a78bfa;margin-bottom:8px;font-size:0.82rem"><i class="fas fa-sliders-h" style="margin-right:4px"></i>\u041a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u0438</div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0438</label><input class="input" id="edit-adj-amount-' + mKey + '" type="number" value="0" style="width:100%;padding:6px 10px" placeholder="0"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u0422\u0438\u043f</label><select class="input" id="edit-adj-type-' + mKey + '" style="width:100%;padding:6px 10px"><option value="inflow">\u041f\u0440\u0438\u0442\u043e\u043a (\u043f\u043b\u044e\u0441 \u043a \u043f\u0440\u0438\u0431\u044b\u043b\u0438)</option><option value="outflow">\u041e\u0442\u0442\u043e\u043a (\u043c\u0438\u043d\u0443\u0441 \u0438\u0437 \u043f\u0440\u0438\u0431\u044b\u043b\u0438)</option></select></div>';
+      h += '<div><label style="font-size:0.7rem;color:#64748b">\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439</label><input class="input" id="edit-adj-comment-' + mKey + '" placeholder="\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0438" style="width:100%;padding:6px 10px"></div>';
+      h += '</div></div>';
+      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + mSnap.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>';
+      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=\\'\\';render()">\u041e\u0442\u043c\u0435\u043d\u0430</button></div>';
       h += '</td></tr>';
     }
   }
@@ -3346,6 +3400,19 @@ async function deleteExpense(id) {
   var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData();
 }
 
+async function editExpenseInline(id, currentAmount, currentName) {
+  var newName = currentName !== undefined ? prompt('\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u0437\u0430\u0442\u0440\u0430\u0442\u044b:', currentName) : null;
+  var newAmount = prompt('\u0421\u0443\u043c\u043c\u0430 (\u058f):', String(currentAmount));
+  if (newAmount === null) return;
+  var val = Number(newAmount);
+  if (isNaN(val) || val < 0) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u0443\u044e \u0441\u0443\u043c\u043c\u0443', 'error'); return; }
+  var body: any = { amount: val };
+  if (newName !== null && newName !== undefined) body.name = newName;
+  var res = await api('/expenses/' + id, 'PUT', body);
+  if (res && res.success) { toast('\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e'); var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData(); }
+  else { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430', 'error'); }
+}
+
 async function updateUserSalary(userId, field, value) {
   var body = {};
   body[field] = value;
@@ -3366,13 +3433,50 @@ async function saveBonus(userId, bonusType) {
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
+async function toggleBonusList(userId) {
+  if (showBonusListUserId === userId) { showBonusListUserId = 0; bonusListData = []; render(); return; }
+  showBonusListUserId = userId;
+  var res = await api('/users/' + userId + '/bonuses');
+  bonusListData = (res && res.bonuses) || [];
+  render();
+}
+
+async function deleteBonus(bonusId, userId) {
+  if (!confirm('Удалить эту запись?')) return;
+  await api('/bonuses/' + bonusId, 'DELETE');
+  // Refresh list
+  var res = await api('/users/' + userId + '/bonuses');
+  bonusListData = (res && res.bonuses) || [];
+  analyticsData = null; loadAnalyticsData();
+}
+
+async function saveBonusEdit(bonusId, userId, bonusType) {
+  var desc = document.getElementById('edit-bonus-desc-' + bonusId)?.value || '';
+  var amt = Number(document.getElementById('edit-bonus-amt-' + bonusId)?.value) || 0;
+  var bdate = document.getElementById('edit-bonus-date-' + bonusId)?.value || '';
+  if (!amt) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0443\u043c\u043c\u0443', 'error'); return; }
+  var actualAmt = bonusType === 'fine' ? -Math.abs(amt) : Math.abs(amt);
+  var res = await api('/bonuses/' + bonusId, 'PUT', { amount: actualAmt, description: desc, bonus_date: bdate });
+  if (res && res.success) {
+    toast('\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e');
+    editingBonusId = 0;
+    var r = await api('/users/' + userId + '/bonuses');
+    bonusListData = (r && r.bonuses) || [];
+    analyticsData = null; loadAnalyticsData();
+  } else { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430', 'error'); }
+}
+
 // ===== PERIOD ACTIONS =====
 async function saveEditedMonth(monthKey, snapshotId) {
   var svc = Number(document.getElementById('edit-svc-' + monthKey)?.value) || 0;
   var art = Number(document.getElementById('edit-art-' + monthKey)?.value) || 0;
   var ref = Number(document.getElementById('edit-ref-' + monthKey)?.value) || 0;
   var exp = Number(document.getElementById('edit-exp-' + monthKey)?.value) || 0;
-  var profit = svc - exp; // Прибыль = Услуги - Расходы
+  var adjAmount = Number(document.getElementById('edit-adj-amount-' + monthKey)?.value) || 0;
+  var adjType = document.getElementById('edit-adj-type-' + monthKey)?.value || 'inflow';
+  var adjComment = document.getElementById('edit-adj-comment-' + monthKey)?.value || '';
+  var adjustment = adjType === 'outflow' ? -Math.abs(adjAmount) : Math.abs(adjAmount);
+  var profit = svc - exp + adjustment; // \u041f\u0440\u0438\u0431\u044b\u043b\u044c = \u0423\u0441\u043b\u0443\u0433\u0438 - \u0420\u0430\u0441\u0445\u043e\u0434\u044b + \u041a\u043e\u0440\u0440\u0435\u043a\u0442\u0438\u0440\u043e\u0432\u043a\u0430
   var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
     revenue_services: svc,
     revenue_articles: art,
@@ -3381,7 +3485,12 @@ async function saveEditedMonth(monthKey, snapshotId) {
     expense_commercial: exp,
     expense_marketing: 0,
     net_profit: profit,
-    total_turnover: svc + art
+    total_turnover: svc + art,
+    custom_data: {
+      adjustment: adjustment,
+      adjustment_type: adjType,
+      adjustment_comment: adjComment
+    }
   });
   if (res && res.success) {
     toast('Данные за ' + monthKey + ' обновлены');

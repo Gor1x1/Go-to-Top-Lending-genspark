@@ -1129,14 +1129,14 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     });
   }
   
-  // Total = services + articles; subtotal is WITHOUT refund, total_amount is WITH refund deducted
+  // Total = services + articles; refund stored separately, does NOT reduce total_amount
   const refundAmount = Number(leadRow.refund_amount) || 0;
   const subtotalAmount = servicesTotalAmount + articlesTotalAmount;
-  const totalAmount = subtotalAmount - refundAmount;
+  const totalAmount = subtotalAmount; // total_amount stays unchanged by refunds
   const allItems = [...serviceItems, ...articleItems];
   
   // Update lead total_amount and calc_data (for PDF)
-  // subtotal = raw sum of all items (before refund), total = final amount after refund
+  // subtotal = raw sum of all items, total = same (refund tracked separately in refund_amount field)
   const calcData = JSON.stringify({ items: allItems, subtotal: subtotalAmount, total: totalAmount, refund: refundAmount, referralCode: existingCalcData?.referralCode || '' });
   await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
     .bind(totalAmount, calcData, leadId).run();
@@ -1458,6 +1458,22 @@ api.delete('/bonuses/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
   await db.prepare('DELETE FROM employee_bonuses WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+api.put('/bonuses/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.amount !== undefined) { fields.push('amount=?'); vals.push(d.amount); }
+  if (d.description !== undefined) { fields.push('description=?'); vals.push(d.description); }
+  if (d.bonus_date !== undefined) { fields.push('bonus_date=?'); vals.push(d.bonus_date); }
+  if (d.bonus_type !== undefined) { fields.push('bonus_type=?'); vals.push(d.bonus_type); }
+  if (fields.length === 0) return c.json({ error: 'Nothing to update' }, 400);
+  vals.push(id);
+  await db.prepare('UPDATE employee_bonuses SET ' + fields.join(', ') + ' WHERE id = ?').bind(...vals).run();
   return c.json({ success: true });
 });
 
