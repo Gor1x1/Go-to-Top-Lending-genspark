@@ -2286,6 +2286,7 @@ let editingMonthKey = '';
 let editingBonusId = 0;
 let showAddCategoryForm = false;
 let showAddFreqTypeForm = false;
+let editingExpenseId = 0; // for inline expense editing
 let expandedMonth = ''; // for month drill-down
 var analyticsRefreshing = false; // spinner flag for refresh button
 let yearChartMetric = 'amount'; // amount | count | done_amount
@@ -2346,12 +2347,14 @@ function recalcFinancials(sd, fin) {
   var doneSvc = done.excluded ? 0 : (Number(done.services) || 0);
   // avg_check = services of completed leads only (no articles)
   var avgCheck = doneCount > 0 ? Math.round(doneSvc / doneCount) : 0;
+  // If no leads at all, reset avg_check and conversion to 0
   var totalLeads = 0;
   var allSt = ['new','contacted','in_progress','rejected','checking','done'];
   for (var j = 0; j < allSt.length; j++) {
     var v2 = sd[allSt[j]] || {};
     if (!v2.excluded) totalLeads += Number(v2.count) || 0;
   }
+  if (totalLeads === 0) avgCheck = 0;
   var convRate = totalLeads > 0 ? Math.round((doneCount / totalLeads) * 1000) / 10 : 0;
   return {
     turnover: Math.max(0, Math.round(turnover * 100) / 100),
@@ -2399,7 +2402,7 @@ function renderLeadsAnalytics() {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:12px">';
   h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-chart-line" style="color:#8B5CF6;margin-right:10px"></i>Бизнес-аналитика</h1>';
   h += '<p style="color:#94a3b8;margin-top:4px">Финансы, лиды, расходы, эффективность</p></div>';
-  h += '<button class="btn btn-outline" id="refresh-analytics-btn" onclick="refreshAnalytics()" style="display:flex;align-items:center;gap:6px"><i class="fas fa-sync-alt' + (analyticsRefreshing ? ' fa-spin' : '') + '" id="refresh-icon"></i>Обновить</button>';
+  h += '<button class="btn btn-outline" id="refresh-analytics-btn" onclick="refreshAnalytics()" style="display:flex;align-items:center;gap:6px"' + (analyticsRefreshing ? ' disabled' : '') + '><i class="fas fa-sync-alt' + (analyticsRefreshing ? ' fa-spin' : '') + '" id="refresh-icon"></i>' + (analyticsRefreshing ? 'Загрузка...' : 'Обновить') + '</button>';
   h += '</div>';
   // Expanded month banner
   if (expandedMonth) {
@@ -2542,18 +2545,16 @@ function renderBizOverviewV2(d, sd, fin) {
   }
   h += '</div></div>';
 
-  // Revenue detail row (services vs articles with refunds)
-  h += '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-bottom:16px">';
-  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0414\u043e\u0445\u043e\u0434 (\u0443\u0441\u043b\u0443\u0433\u0438) \u2014 \u043c\u043e\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div></div>';
-  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px">\u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b) \u2014 \u0434\u0435\u043d\u044c\u0433\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div>';
-  h += '<div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesNet) + '</div>';
-  if (refunds > 0) h += '<div style="font-size:0.68rem;color:#64748b;margin-top:4px">Брутто: ' + fmtAmt(articlesRev) + ' \u2212 Возвраты: <span style="color:#EF4444">' + fmtAmt(refunds) + '</span> = Нетто: <span style="color:#F59E0B">' + fmtAmt(articlesNet) + '</span></div>';
-  h += '</div></div>';
-  if (refunds > 0) {
-    h += '<div class="card" style="margin-bottom:16px;background:rgba(239,68,68,0.08);border-color:rgba(239,68,68,0.3);padding:16px"><div style="display:flex;align-items:center;gap:12px">';
-    h += '<i class="fas fa-exclamation-triangle" style="color:#EF4444;font-size:1.2rem"></i>';
-    h += '<div><div style="font-weight:700;color:#f87171">\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b \u0441\u0440\u0435\u0434\u0441\u0442\u0432</div><div style="font-size:0.82rem;color:#94a3b8">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430: <strong style="color:#EF4444">' + fmtAmt(refunds) + '</strong> (вычтена из выкупов)</div></div></div></div>';
-  }
+  // Revenue detail row (services vs articles + refunds)
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-concierge-bell" style="margin-right:4px"></i>\u0414\u043e\u0445\u043e\u0434 (\u0443\u0441\u043b\u0443\u0433\u0438)</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div><div style="font-size:0.65rem;color:#475569;margin-top:4px">\u041c\u043e\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div></div>';
+  h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-shopping-bag" style="margin-right:4px"></i>\u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b)</div>';
+  h += '<div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesRev) + '</div>';
+  h += '<div style="font-size:0.65rem;color:#475569;margin-top:4px">\u0414\u0435\u043d\u044c\u0433\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div></div>';
+  h += '<div class="card" style="padding:16px;border-left:3px solid #EF4444"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-undo" style="margin-right:4px"></i>\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b</div>';
+  h += '<div style="font-size:1.5rem;font-weight:700;color:#EF4444">' + (refunds > 0 ? '-' + fmtAmt(refunds) : '0 \u058f') + '</div>';
+  h += '<div style="font-size:0.65rem;color:#475569;margin-top:4px">\u0412\u044b\u0447\u0442\u0435\u043d\u043e \u0438\u0437 \u0432\u044b\u043a\u0443\u043f\u043e\u0432</div></div>';
+  h += '</div>';
   h += '</div>';
 
   // ---- SECTION: KPI Metrics ----
@@ -2587,7 +2588,7 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<div class="card" style="overflow-x:auto;padding:0"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
   h += '<th style="padding:12px 8px;text-align:center;color:#94a3b8;width:40px"><i class="fas fa-check-square" style="font-size:0.7rem"></i></th>';
-  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">\u0421\u0442\u0430\u0442\u0443\u0441</th><th style="padding:12px;text-align:right;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0438</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0412\u044b\u043a\u0443\u043f\u044b (нетто)</th></tr></thead><tbody>';
+  h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">\u0421\u0442\u0430\u0442\u0443\u0441</th><th style="padding:12px;text-align:right;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0438</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0412\u044b\u043a\u0443\u043f\u044b</th></tr></thead><tbody>';
   var totalLeads2 = 0; var totalAmt2 = 0; var totalSvc = 0; var totalArt = 0;
   for (var si2 = 0; si2 < statuses.length; si2++) {
     var s2 = statuses[si2]; var rawV2 = (d.status_data || {})[s2.key] || {};
@@ -2628,21 +2629,51 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '</tbody></table></div></div>';
 
   // ---- SECTION: Daily chart ----
-  var daily = d.daily || [];
+  var rawDaily = d.daily || [];
+  // Fill in missing days so every day in the range shows (including today / day 21 etc.)
+  var daily = [];
+  { // Always fill days - even if no data, show empty bars
+    var dayMap = {};
+    for (var rdi = 0; rdi < rawDaily.length; rdi++) { dayMap[rawDaily[rdi].day] = rawDaily[rdi]; }
+    var dEnd = new Date(); // today
+    var dStart = new Date();
+    if (expandedMonth) {
+      var eParts = expandedMonth.split('-');
+      var eY = Number(eParts[0]), eM = Number(eParts[1]);
+      dStart = new Date(eY, eM-1, 1);
+      var eLastDay = new Date(eY, eM, 0).getDate();
+      // For current month, show up to today; for past months, show entire month
+      var isCurrentMonth = (eY === dEnd.getFullYear() && eM-1 === dEnd.getMonth());
+      dEnd = isCurrentMonth ? new Date(dEnd.getFullYear(), dEnd.getMonth(), dEnd.getDate()) : new Date(eY, eM-1, eLastDay);
+    } else {
+      dStart.setDate(dStart.getDate() - 29);
+    }
+    for (var dc = new Date(dStart); dc <= dEnd; dc.setDate(dc.getDate()+1)) {
+      var dKey = dc.getFullYear() + '-' + String(dc.getMonth()+1).padStart(2,'0') + '-' + String(dc.getDate()).padStart(2,'0');
+      daily.push(dayMap[dKey] || {day: dKey, count: 0, amount: 0});
+    }
+  }
   if (daily.length > 0) {
     h += '<div style="margin-bottom:32px">';
     h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:8px"></i>\u0417\u0430\u044f\u0432\u043a\u0438 \u043f\u043e \u0434\u043d\u044f\u043c' + (expandedMonth ? '' : ' (30 \u0434\u043d\u0435\u0439)') + '</h3>';
-    h += '<div class="card" style="padding:20px"><div style="display:flex;gap:3px;align-items:flex-end;height:140px">';
+    // Compute daily average
+    var dailyTotalCnt = 0; for (var dti = 0; dti < daily.length; dti++) dailyTotalCnt += Number(daily[dti].count)||0;
+    var dailyAvg = daily.length > 0 ? (dailyTotalCnt / daily.length).toFixed(1) : '0';
+    h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:8px">Всего: <strong style="color:#a78bfa">' + dailyTotalCnt + '</strong> заявок \u2022 Среднее/день: <strong style="color:#F59E0B">' + dailyAvg + '</strong></div>';
+    h += '<div class="card" style="padding:20px"><div style="display:flex;gap:3px;align-items:flex-end;height:180px">';
     var maxD = Math.max.apply(null, daily.map(function(x){return Number(x.count)||1;}));
     for (var di = 0; di < daily.length; di++) {
-      var dd = daily[di]; var dCnt = Number(dd.count) || 0; var barH = Math.max(6, Math.round((dCnt / maxD) * 120));
-      var barColor = dCnt > 0 ? (di === daily.length - 1 ? '#8B5CF6' : '#4F46E5') : '#1e293b';
-      h += '<div style="flex:1;text-align:center;min-width:0"><div style="background:' + barColor + ';height:' + barH + 'px;border-radius:3px 3px 0 0;margin-bottom:4px;transition:all 0.2s" title="' + (dd.day || '') + ': ' + dCnt + ' \u0437\u0430\u044f\u0432\u043e\u043a, ' + fmtAmt(Number(dd.amount)||0) + '"></div>';
-      if (daily.length <= 14) h += '<div style="font-size:0.55rem;color:#475569;white-space:nowrap;overflow:hidden">' + (dd.day||'').slice(5) + '</div>';
+      var dd = daily[di]; var dCnt = Number(dd.count) || 0; var barH = Math.max(6, Math.round((dCnt / maxD) * 140));
+      var barColor = dCnt > 0 ? (di === daily.length - 1 ? '#8B5CF6' : '#4F46E5') : '#334155';
+      var dayNum = (dd.day||'').slice(8);
+      h += '<div style="flex:1;text-align:center;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">';
+      h += '<div style="font-size:0.58rem;font-weight:700;color:' + (dCnt > 0 ? '#a78bfa' : '#475569') + ';margin-bottom:2px">' + dCnt + '</div>';
+      h += '<div style="background:' + barColor + ';width:100%;height:' + barH + 'px;border-radius:3px 3px 0 0;transition:all 0.2s;position:relative" title="' + (dd.day || '') + ': ' + dCnt + ' \u0437\u0430\u044f\u0432\u043e\u043a, ' + fmtAmt(Number(dd.amount)||0) + '"></div>';
+      if (daily.length <= 31) h += '<div style="font-size:0.52rem;color:#94a3b8;margin-top:3px;font-weight:600">' + dayNum + '</div>';
       h += '</div>';
     }
     h += '</div>';
-    if (daily.length > 14) {
+    if (daily.length > 31) {
       h += '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.65rem;color:#475569"><span>' + (daily[0]?.day||'').slice(5) + '</span><span>' + (daily[daily.length-1]?.day||'').slice(5) + '</span></div>';
     }
     h += '</div></div>';
@@ -2721,7 +2752,10 @@ function renderBizCostsV2(d, sd, fin) {
     h += '</select></div>';
     h += '<div><label style="font-size:0.72rem;color:#64748b">Периодичность</label><select class="input" id="new-exp-freq"><option value="">— Тип —</option>';
     for (var fi2 = 0; fi2 < freqs.length; fi2++) h += '<option value="' + freqs[fi2].id + '">' + escHtml(freqs[fi2].name) + '</option>';
-    h += '</select></div></div>';
+    h += '</select></div>';
+    h += '<div><label style="font-size:0.72rem;color:#64748b">Дата начала</label><input class="input" id="new-exp-start" type="date" style="width:100%;padding:6px 10px"></div>';
+    h += '<div><label style="font-size:0.72rem;color:#64748b">Дата окончания <span style="font-size:0.6rem;color:#475569">(пусто = бессрочно)</span></label><input class="input" id="new-exp-end" type="date" style="width:100%;padding:6px 10px"></div>';
+    h += '</div>';
     h += '<div style="margin-bottom:10px"><label style="font-size:0.72rem;color:#64748b">Заметка</label><input class="input" id="new-exp-notes" placeholder="Комментарий (опционально)"></div>';
     h += '<div style="display:flex;gap:8px"><button class="btn btn-success" onclick="saveNewExpense()"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
     h += '<button class="btn btn-outline" onclick="showAddExpenseForm=false;render()">Отмена</button></div></div>';
@@ -2729,16 +2763,42 @@ function renderBizCostsV2(d, sd, fin) {
   // Table
   if (exps.length > 0) {
     var totalExp = 0;
-    h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr style="border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">Затрата</th><th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:8px;color:#94a3b8">Категория</th><th style="padding:8px;color:#94a3b8">Период</th><th style="padding:8px;width:40px"></th></tr></thead><tbody>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr style="border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">Затрата</th><th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:8px;color:#94a3b8">Категория</th><th style="padding:8px;color:#94a3b8">Период</th><th style="padding:8px;color:#94a3b8">Действует</th><th style="padding:8px;width:50px"></th></tr></thead><tbody>';
     for (var ei = 0; ei < exps.length; ei++) {
       var exp = exps[ei]; totalExp += (exp.amount || 0);
+      var expDateStr = '';
+      if (exp.start_date || exp.end_date) {
+        expDateStr = (exp.start_date || '...') + ' — ' + (exp.end_date || 'бессрочно');
+      }
       h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 12px;font-weight:600">' + escHtml(exp.name) + (exp.notes ? '<div style="font-size:0.7rem;color:#64748b">' + escHtml(exp.notes) + '</div>' : '') + '</td>';
       h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(exp.amount) + '</td>';
       h += '<td style="padding:8px"><span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:' + (exp.category_color||'#475569') + '22;color:' + (exp.category_color||'#94a3b8') + '">' + escHtml(exp.category_name||'\u2014') + '</span></td>';
       h += '<td style="padding:8px;font-size:0.8rem;color:#64748b">' + escHtml(exp.frequency_name||'\u2014') + '</td>';
-      h += '<td style="padding:8px;white-space:nowrap"><button class="btn btn-outline" style="padding:2px 6px;font-size:0.55rem;color:#F59E0B;border-color:#F59E0B33;margin-right:3px" onclick="editExpenseInline(' + exp.id + ',' + (exp.amount||0) + ')" title="Изменить"><i class="fas fa-pencil-alt"></i></button><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
+      h += '<td style="padding:8px;font-size:0.72rem;color:#475569">' + (expDateStr || '\u2014') + '</td>';
+      h += '<td style="padding:8px;white-space:nowrap"><button class="btn btn-outline" style="padding:2px 6px;font-size:0.55rem;color:#F59E0B;border-color:#F59E0B33;margin-right:3px" onclick="editingExpenseId=' + exp.id + ';render()" title="Изменить"><i class="fas fa-pencil-alt"></i></button><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
+      // Inline edit form for this expense
+      if (editingExpenseId === exp.id) {
+        h += '<tr><td colspan="6" style="padding:12px 16px;background:#0f172a;border:1px solid #8B5CF6;border-radius:0">';
+        h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px;font-size:0.85rem"><i class="fas fa-pencil-alt" style="margin-right:4px"></i>Редактирование: ' + escHtml(exp.name) + '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-bottom:10px">';
+        h += '<div><label style="font-size:0.7rem;color:#64748b">Название</label><input class="input" id="edit-exp-name-' + exp.id + '" value="' + escHtml(exp.name||'') + '" style="width:100%;padding:6px 10px"></div>';
+        h += '<div><label style="font-size:0.7rem;color:#64748b">Сумма (\u058f)</label><input class="input" id="edit-exp-amount-' + exp.id + '" type="number" value="' + (exp.amount||0) + '" style="width:100%;padding:6px 10px"></div>';
+        h += '<div><label style="font-size:0.7rem;color:#64748b">Категория</label><select class="input" id="edit-exp-cat-' + exp.id + '" style="width:100%;padding:6px 10px"><option value="">— Без категории —</option>';
+        for (var eci = 0; eci < cats.length; eci++) h += '<option value="' + cats[eci].id + '"' + (exp.category_id == cats[eci].id ? ' selected' : '') + '>' + escHtml(cats[eci].name) + '</option>';
+        h += '</select></div>';
+        h += '<div><label style="font-size:0.7rem;color:#64748b">Периодичность</label><select class="input" id="edit-exp-freq-' + exp.id + '" style="width:100%;padding:6px 10px"><option value="">— Тип —</option>';
+        for (var efi = 0; efi < freqs.length; efi++) h += '<option value="' + freqs[efi].id + '"' + (exp.frequency_type_id == freqs[efi].id ? ' selected' : '') + '>' + escHtml(freqs[efi].name) + '</option>';
+        h += '</select></div>';
+        h += '<div><label style="font-size:0.7rem;color:#64748b">Дата начала</label><input class="input" id="edit-exp-start-' + exp.id + '" type="date" value="' + (exp.start_date||'') + '" style="width:100%;padding:6px 10px"></div>';
+        h += '<div><label style="font-size:0.7rem;color:#64748b">Дата окончания</label><input class="input" id="edit-exp-end-' + exp.id + '" type="date" value="' + (exp.end_date||'') + '" style="width:100%;padding:6px 10px"></div>';
+        h += '</div>';
+        h += '<div style="margin-bottom:10px"><label style="font-size:0.7rem;color:#64748b">Заметка</label><input class="input" id="edit-exp-notes-' + exp.id + '" value="' + escHtml(exp.notes||'') + '" style="width:100%;padding:6px 10px" placeholder="Комментарий"></div>';
+        h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedExpense(' + exp.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
+        h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingExpenseId=0;render()">Отмена</button></div>';
+        h += '</td></tr>';
+      }
     }
-    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 12px">ИТОГО</td><td style="padding:10px;text-align:right;color:#EF4444">' + fmtAmt(totalExp) + '</td><td colspan="3"></td></tr>';
+    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 12px">ИТОГО</td><td style="padding:10px;text-align:right;color:#EF4444">' + fmtAmt(totalExp) + '</td><td colspan="4"></td></tr>';
     h += '</tbody></table>';
   } else {
     h += '<div style="text-align:center;padding:24px;color:#475569"><i class="fas fa-inbox" style="font-size:1.5rem;margin-bottom:8px;display:block"></i>Затраты не добавлены</div>';
@@ -2750,7 +2810,7 @@ function renderBizCostsV2(d, sd, fin) {
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-users-cog" style="color:#3B82F6;margin-right:8px"></i>Зарплаты и бонусы</h3>';
   // Use employees from analytics API (auto-pulled from Employees section)
   var employees = d.employees || [];
-  var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', hourly: 'Почасовая', per_task: 'За работу' };
+  var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', per_task: 'За работу' };
   var totalSalary = 0; var totalBonus = 0; var totalFines = 0; var totalNetPay = 0;
   for (var si3 = 0; si3 < employees.length; si3++) {
     var empSal = Number(employees[si3].salary) || 0;
@@ -2769,7 +2829,7 @@ function renderBizCostsV2(d, sd, fin) {
   // Employee salary table — data auto-pulled from Employees
   if (employees.length > 0) {
     h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип оплаты</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:right;color:#22C55E">Бонусы</th><th style="padding:10px;text-align:right;color:#EF4444">Штрафы</th><th style="padding:10px;text-align:right;color:#a78bfa">Итого</th><th style="padding:10px;width:90px"></th></tr></thead><tbody>';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип оплаты</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:center;color:#94a3b8">С даты</th><th style="padding:10px;text-align:right;color:#22C55E">Бонусы</th><th style="padding:10px;text-align:right;color:#EF4444">Штрафы</th><th style="padding:10px;text-align:right;color:#a78bfa">Итого</th><th style="padding:10px;width:90px"></th></tr></thead><tbody>';
     for (var ui = 0; ui < employees.length; ui++) {
       var u = employees[ui];
       var uSal = Number(u.salary) || 0;
@@ -2780,6 +2840,7 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:10px;color:#94a3b8;font-size:0.8rem">' + escHtml(u.position_title||'\u2014') + '</td>';
       h += '<td style="padding:10px;font-size:0.78rem;color:#64748b">' + (salaryTypeLabels[u.salary_type||'monthly']||(u.salary_type||'monthly')) + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#3B82F6">' + fmtAmt(uSal) + '</td>';
+      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#64748b">' + (u.hire_date ? '<input class="input" type="date" value="' + u.hire_date + '" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'hire_date\\',this.value)">' : '<input class="input" type="date" value="" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'hire_date\\',this.value)" placeholder="Дата">') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#22C55E">' + (uBonus > 0 ? '+' + fmtAmt(uBonus) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#EF4444">' + (uFines < 0 ? '\u2212' + fmtAmt(Math.abs(uFines)) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (uNet >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(uNet) + '</td>';
@@ -2791,18 +2852,18 @@ function renderBizCostsV2(d, sd, fin) {
       // Bonus/fine form
       if (showAddBonusUserId === u.id) {
         var isFine = (typeof addBonusType !== 'undefined' && addBonusType === 'fine');
-        h += '<tr><td colspan="8" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+        h += '<tr><td colspan="9" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
         h += '<span style="font-size:0.78rem;font-weight:600;color:' + (isFine ? '#EF4444' : '#22C55E') + '">' + (isFine ? '\u0428\u0442\u0440\u0430\u0444' : '\u0411\u043e\u043d\u0443\u0441') + ':</span>';
         h += '<input class="input" id="bonus-amount-' + u.id + '" type="number" placeholder="Сумма" style="width:120px;padding:6px 10px" min="0">';
         h += '<input class="input" id="bonus-desc-' + u.id + '" placeholder="' + (isFine ? 'Причина штрафа' : 'Описание бонуса') + '" style="flex:1;padding:6px 10px;min-width:120px">';
-        h += '<input class="input" id="bonus-date-' + u.id + '" type="date" style="width:140px;padding:6px 10px">';
+        h += '<input class="input" id="bonus-date-' + u.id + '" type="date" style="width:140px;padding:6px 10px" required value="' + (new Date().toISOString().slice(0,10)) + '">';
         h += '<button class="btn ' + (isFine ? 'btn-outline' : 'btn-success') + '" style="padding:6px 12px;' + (isFine ? 'color:#EF4444;border-color:#EF4444' : '') + '" onclick="saveBonus(' + u.id + ',\\'' + (isFine ? 'fine' : 'bonus') + '\\')"><i class="fas fa-check"></i></button>';
         h += '<button class="btn btn-outline" style="padding:6px 12px" onclick="showAddBonusUserId=0;render()"><i class="fas fa-times"></i></button>';
         h += '</div></td></tr>';
       }
       // Bonus/fine list (expandable)
       if (showBonusListUserId === u.id && bonusListData.length > 0) {
-        h += '<tr><td colspan="8" style="padding:0;background:#0f172a"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
+        h += '<tr><td colspan="9" style="padding:0;background:#0f172a"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
         h += '<tr style="border-bottom:1px solid #1e293b"><th style="padding:6px 16px;text-align:left;color:#475569">Тип</th><th style="padding:6px;text-align:left;color:#475569">Описание</th><th style="padding:6px;text-align:right;color:#475569">Сумма</th><th style="padding:6px;text-align:center;color:#475569">Дата</th><th style="padding:6px;width:70px"></th></tr>';
         for (var bi = 0; bi < bonusListData.length; bi++) {
           var b = bonusListData[bi];
@@ -2834,7 +2895,7 @@ function renderBizCostsV2(d, sd, fin) {
         }
         h += '</table></td></tr>';
       } else if (showBonusListUserId === u.id) {
-        h += '<tr><td colspan="8" style="padding:10px 16px;background:#0f172a;color:#64748b;font-size:0.78rem;text-align:center">Нет записей бонусов / штрафов</td></tr>';
+        h += '<tr><td colspan="9" style="padding:10px 16px;background:#0f172a;color:#64748b;font-size:0.78rem;text-align:center">Нет записей бонусов / штрафов</td></tr>';
       }
     }
     h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td colspan="2"></td>';
@@ -3071,9 +3132,9 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (mChecking || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? fmtAmt(mRefunds) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? '-' + fmtAmt(Math.abs(mRefunds)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mExp ? fmtAmt(mExp) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mExp ? '-' + fmtAmt(Math.abs(mExp)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + ((mProfit || isCurrent) ? fmtAmt(mProfit) : '\u2014');
     if (mAdjTotal !== 0) h += '<div style="font-size:0.6rem;color:' + (mAdjTotal > 0 ? '#22C55E' : '#EF4444') + '">' + (mAdjTotal > 0 ? '+' : '') + fmtAmt(mAdjTotal) + '</div>';
     h += '</td>';
@@ -3166,9 +3227,9 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + yearTotals.checking + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#a78bfa">' + fmtAmt(yearTotals.turnover) + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (yearTotals.articles ? fmtAmt(yearTotals.articles) : '\u2014') + '</td>';
-  h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (yearTotals.refunds ? fmtAmt(yearTotals.refunds) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (yearTotals.refunds ? '-' + fmtAmt(Math.abs(yearTotals.refunds)) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
-  h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? fmtAmt(yearTotals.expenses) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? '-' + fmtAmt(Math.abs(yearTotals.expenses)) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (yearTotals.profit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearTotals.profit) + '</td>';
   h += '<td colspan="2"></td></tr>';
   h += '</tbody></table></div></div>';
@@ -3253,9 +3314,9 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#22C55E">' + (qDone || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (qTurnover ? fmtAmt(qTurnover) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (qArt ? fmtAmt(qArt) : '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (qRef ? fmtAmt(qRef) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (qRef ? '-' + fmtAmt(Math.abs(qRef)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (qSvc ? fmtAmt(qSvc) : '\u2014') + '</td>';
-    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (qExp ? fmtAmt(qExp) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (qExp ? '-' + fmtAmt(Math.abs(qExp)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (qProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (qProfit ? fmtAmt(qProfit) : '\u2014') + '</td>';
     h += '<td style="padding:8px;text-align:center">';
     if (qNum < currentQ && closedInQ === 3 && !qLocked) {
@@ -3285,6 +3346,30 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#F59E0B;margin-right:8px"></i>\u0421\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432</h3>';
   var allSnaps = snapshots.slice().sort(function(a,b){return a.period_key>b.period_key?-1:1;});
+  // Quick comparison buttons
+  var monthSnaps = allSnaps.filter(function(s){return s.period_type==='month';}).sort(function(a,b){return a.period_key>b.period_key?-1:1;});
+  var quarterSnaps = allSnaps.filter(function(s){return s.period_type==='quarter';}).sort(function(a,b){return a.period_key>b.period_key?-1:1;});
+  if (monthSnaps.length >= 1 || quarterSnaps.length >= 1) {
+    h += '<div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
+    h += '<span style="font-size:0.78rem;color:#94a3b8;font-weight:600"><i class="fas fa-bolt" style="margin-right:4px;color:#F59E0B"></i>\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435:</span>';
+    // 1-month vs prev month
+    if (monthSnaps.length >= 2) {
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[1].id + '\\';render()"><i class="fas fa-calendar-day" style="margin-right:3px"></i>1 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[1].period_key.slice(5) + '</button>';
+    }
+    // 2-month comparison (latest vs 2 months ago)
+    if (monthSnaps.length >= 3) {
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[2].id + '\\';render()"><i class="fas fa-calendar-alt" style="margin-right:3px"></i>2 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[2].period_key.slice(5) + '</button>';
+    }
+    // 3-month comparison (latest vs 3 months ago)
+    if (monthSnaps.length >= 4) {
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[3].id + '\\';render()"><i class="fas fa-calendar-week" style="margin-right:3px"></i>3 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[3].period_key.slice(5) + '</button>';
+    }
+    // Quarter comparison
+    if (quarterSnaps.length >= 2) {
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + quarterSnaps[0].id + '\\';comparePeriod2=\\'' + quarterSnaps[1].id + '\\';render()"><i class="fas fa-layer-group" style="margin-right:3px"></i>\u041a\u0432\u0430\u0440\u0442: ' + quarterSnaps[0].period_key + ' vs ' + quarterSnaps[1].period_key + '</button>';
+    }
+    h += '</div>';
+  }
   if (allSnaps.length > 1) {
     // Manual selection dropdowns
     h += '<div class="card" style="padding:16px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
@@ -3317,23 +3402,24 @@ function renderBizPeriodsV2(d, sd, fin) {
       var exp1 = (Number(snap1.expense_salaries)||0)+(Number(snap1.expense_commercial)||0)+(Number(snap1.expense_marketing)||0);
       var exp2 = (Number(snap2.expense_salaries)||0)+(Number(snap2.expense_commercial)||0)+(Number(snap2.expense_marketing)||0);
       var cmpMetrics = [
-        {label:'Оборот',v1:Number(snap1.total_turnover)||0,v2:Number(snap2.total_turnover)||0,color:'#a78bfa',icon:'fa-coins'},
-        {label:'Услуги',v1:Number(snap1.revenue_services)||0,v2:Number(snap2.revenue_services)||0,color:'#8B5CF6',icon:'fa-concierge-bell'},
-        {label:'Выкупы',v1:Number(snap1.revenue_articles)||0,v2:Number(snap2.revenue_articles)||0,color:'#F59E0B',icon:'fa-shopping-bag'},
-        {label:'Возвраты',v1:Number(snap1.refunds)||0,v2:Number(snap2.refunds)||0,color:'#f87171',icon:'fa-undo',invert:true},
-        {label:'ЗП + Бонусы',v1:Number(snap1.expense_salaries)||0,v2:Number(snap2.expense_salaries)||0,color:'#3B82F6',icon:'fa-users',invert:true},
-        {label:'Коммерческие',v1:Number(snap1.expense_commercial)||0,v2:Number(snap2.expense_commercial)||0,color:'#F97316',icon:'fa-store',invert:true},
-        {label:'Маркетинг',v1:Number(snap1.expense_marketing)||0,v2:Number(snap2.expense_marketing)||0,color:'#EC4899',icon:'fa-bullhorn',invert:true},
-        {label:'Расходы (итого)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',invert:true,bold:true},
-        {label:'Чистая прибыль',v1:Number(snap1.net_profit)||0,v2:Number(snap2.net_profit)||0,color:'#22C55E',icon:'fa-chart-line',bold:true},
-        {label:'Лиды (всего)',v1:Number(snap1.leads_count)||0,v2:Number(snap2.leads_count)||0,color:'#10B981',icon:'fa-users',isCnt:true},
-        {label:'Завершено',v1:Number(snap1.leads_done)||0,v2:Number(snap2.leads_done)||0,color:'#22C55E',icon:'fa-check-circle',isCnt:true},
-        {label:'Ср. чек (услуги)',v1:Number(snap1.avg_check)||0,v2:Number(snap2.avg_check)||0,color:'#8B5CF6',icon:'fa-shopping-cart'},
-        {label:'Конверсия',v1:Number(cd1.conversion_rate)||0,v2:Number(cd2.conversion_rate)||0,color:'#F59E0B',icon:'fa-percentage',isPct:true},
-        {label:'Маржинальность',v1:Number(cd1.marginality)||0,v2:Number(cd2.marginality)||0,color:'#10B981',icon:'fa-percentage',isPct:true},
+        {label:'\u041e\u0431\u043e\u0440\u043e\u0442',v1:Number(snap1.total_turnover)||0,v2:Number(snap2.total_turnover)||0,color:'#a78bfa',icon:'fa-coins'},
+        {label:'\u0423\u0441\u043b\u0443\u0433\u0438',v1:Number(snap1.revenue_services)||0,v2:Number(snap2.revenue_services)||0,color:'#8B5CF6',icon:'fa-concierge-bell'},
+        {label:'\u0412\u044b\u043a\u0443\u043f\u044b',v1:Number(snap1.revenue_articles)||0,v2:Number(snap2.revenue_articles)||0,color:'#F59E0B',icon:'fa-shopping-bag'},
+        {label:'\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b',v1:Number(snap1.refunds)||0,v2:Number(snap2.refunds)||0,color:'#f87171',icon:'fa-undo',invert:true},
+        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:Number(snap1.expense_salaries)||0,v2:Number(snap2.expense_salaries)||0,color:'#3B82F6',icon:'fa-users',invert:true,
+          detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||Number(snap1.expense_salaries)||0) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd1.bonuses_net) : '') + (cd1.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd1.date_from + ' \u2014 ' + (cd1.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : ''),
+          detail2: '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||Number(snap2.expense_salaries)||0) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd2.bonuses_net) : '') + (cd2.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd2.date_from + ' \u2014 ' + (cd2.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : '')},
+        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:Number(snap1.expense_commercial)||0,v2:Number(snap2.expense_commercial)||0,color:'#F97316',icon:'fa-store',invert:true},
+        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:Number(snap1.expense_marketing)||0,v2:Number(snap2.expense_marketing)||0,color:'#EC4899',icon:'fa-bullhorn',invert:true},
+        {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',invert:true,bold:true},
+        {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:Number(snap1.net_profit)||0,v2:Number(snap2.net_profit)||0,color:'#22C55E',icon:'fa-chart-line',bold:true},
+        {label:'\u041b\u0438\u0434\u044b (\u0432\u0441\u0435\u0433\u043e)',v1:Number(snap1.leads_count)||0,v2:Number(snap2.leads_count)||0,color:'#10B981',icon:'fa-users',isCnt:true},
+        {label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e',v1:Number(snap1.leads_done)||0,v2:Number(snap2.leads_done)||0,color:'#22C55E',icon:'fa-check-circle',isCnt:true},
+        {label:'\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)',v1:Number(snap1.avg_check)||0,v2:Number(snap2.avg_check)||0,color:'#8B5CF6',icon:'fa-shopping-cart'},
+        {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',v1:Number(cd1.conversion_rate)||0,v2:Number(cd2.conversion_rate)||0,color:'#F59E0B',icon:'fa-percentage',isPct:true},
+        {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',v1:Number(cd1.marginality)||0,v2:Number(cd2.marginality)||0,color:'#10B981',icon:'fa-percentage',isPct:true},
         {label:'ROI',v1:Number(cd1.roi)||0,v2:Number(cd2.roi)||0,color:'#3B82F6',icon:'fa-chart-bar',isPct:true},
         {label:'ROMI',v1:Number(cd1.romi)||0,v2:Number(cd2.romi)||0,color:'#EC4899',icon:'fa-bullhorn',isPct:true},
-        {label:'Чистые выкупы',v1:(Number(snap1.revenue_articles)||0)-(Number(snap1.refunds)||0),v2:(Number(snap2.revenue_articles)||0)-(Number(snap2.refunds)||0),color:'#06B6D4',icon:'fa-box-open'},
       ];
       // Period status labels
       var snap1Lbl = snap1.period_key + (snap1.is_locked ? ' \ud83d\udd12' : ' (текущий)');
@@ -3382,6 +3468,13 @@ function renderBizPeriodsV2(d, sd, fin) {
           h += '</div>';
         } else { h += '<span style="color:#64748b">\u2014</span>'; }
         h += '</td></tr>';
+        // Show detail rows (salary/bonus breakdown etc.)
+        if (cm.detail1 || cm.detail2) {
+          h += '<tr style="border-bottom:1px solid #0f172a;background:#0f172a22"><td style="padding:3px 16px;padding-left:36px;font-size:0.68rem;color:#475569"></td>';
+          h += '<td style="padding:3px;text-align:right;font-size:0.68rem;color:#64748b">' + (cm.detail1 || '') + '</td>';
+          h += '<td style="padding:3px;text-align:right;font-size:0.68rem;color:#64748b">' + (cm.detail2 || '') + '</td>';
+          h += '<td colspan="2"></td></tr>';
+        }
       }
       h += '</tbody></table></div>';
     } else {
@@ -3441,8 +3534,10 @@ async function saveNewExpense() {
   var categoryId = document.getElementById('new-exp-category')?.value || null;
   var freqId = document.getElementById('new-exp-freq')?.value || null;
   var notes = document.getElementById('new-exp-notes')?.value || '';
+  var startDate = document.getElementById('new-exp-start')?.value || '';
+  var endDate = document.getElementById('new-exp-end')?.value || '';
   if (!name) { toast('Введите название', 'error'); return; }
-  var res = await api('/expenses', 'POST', { name: name, amount: amount, category_id: categoryId ? Number(categoryId) : null, frequency_type_id: freqId ? Number(freqId) : null, notes: notes });
+  var res = await api('/expenses', 'POST', { name: name, amount: amount, category_id: categoryId ? Number(categoryId) : null, frequency_type_id: freqId ? Number(freqId) : null, notes: notes, start_date: startDate, end_date: endDate });
   if (res && res.success) { toast('Затрата добавлена'); showAddExpenseForm = false; var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData(); }
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
@@ -3454,13 +3549,22 @@ async function deleteExpense(id) {
 }
 
 async function editExpenseInline(id, currentAmount) {
-  var newAmount = prompt('\u0421\u0443\u043c\u043c\u0430 (\u058f):', String(currentAmount));
-  if (newAmount === null) return;
-  var val = Number(newAmount);
-  if (isNaN(val) || val < 0) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u0443\u044e \u0441\u0443\u043c\u043c\u0443', 'error'); return; }
-  var body = { amount: val };
+  // Legacy — redirect to inline form
+  editingExpenseId = id; render();
+}
+
+async function saveEditedExpense(id) {
+  var name = document.getElementById('edit-exp-name-' + id)?.value;
+  var amount = Number(document.getElementById('edit-exp-amount-' + id)?.value) || 0;
+  var categoryId = document.getElementById('edit-exp-cat-' + id)?.value || null;
+  var freqId = document.getElementById('edit-exp-freq-' + id)?.value || null;
+  var notes = document.getElementById('edit-exp-notes-' + id)?.value || '';
+  var startDate = document.getElementById('edit-exp-start-' + id)?.value || '';
+  var endDate = document.getElementById('edit-exp-end-' + id)?.value || '';
+  if (!name) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435', 'error'); return; }
+  var body = { name: name, amount: amount, category_id: categoryId ? Number(categoryId) : null, frequency_type_id: freqId ? Number(freqId) : null, notes: notes, start_date: startDate, end_date: endDate };
   var res = await api('/expenses/' + id, 'PUT', body);
-  if (res && res.success) { toast('\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e'); var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData(); }
+  if (res && res.success) { toast('\u0421\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u043e'); editingExpenseId = 0; var r = await api('/expenses'); data.expenses = (r&&r.expenses)||[]; analyticsData = null; loadAnalyticsData(); }
   else { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430', 'error'); }
 }
 
@@ -3477,6 +3581,7 @@ async function saveBonus(userId, bonusType) {
   var desc = document.getElementById('bonus-desc-' + userId)?.value || '';
   var bdate = document.getElementById('bonus-date-' + userId)?.value || '';
   if (!amount) { toast('Введите сумму', 'error'); return; }
+  if (!bdate) { toast('Укажите дату', 'error'); return; }
   // For fines, send negative amount
   var actualAmount = bonusType === 'fine' ? -Math.abs(amount) : Math.abs(amount);
   var res = await api('/users/' + userId + '/bonuses', 'POST', { amount: actualAmount, bonus_type: bonusType || 'bonus', description: desc, bonus_date: bdate });
@@ -3616,13 +3721,19 @@ async function deleteAdjustment(monthKey, snapshotId, adjIndex) {
   } else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
+var _refreshLock = false;
 async function refreshAnalytics() {
+  if (_refreshLock) return; // prevent double-trigger absolutely
+  _refreshLock = true;
   analyticsRefreshing = true;
-  render(); // immediately show spinning icon
+  render(); // immediately show spinning icon + disabled button
   expandedMonth = '';
   analyticsData = null;
-  await loadAnalyticsData();
+  try {
+    await loadAnalyticsData();
+  } catch(e) { console.error('Refresh error:', e); }
   analyticsRefreshing = false;
+  _refreshLock = false;
   render(); // stop spinning
 }
 
@@ -3654,6 +3765,8 @@ async function closePeriodAction(periodType, periodKey, lock) {
       romi: fin.romi,
       date_from: d.date_from,
       date_to: d.date_to,
+      salary_base: fin.salaries || 0,
+      bonuses_net: (fin.bonuses || 0) + (fin.fines || 0),
       in_progress_count: ((d.status_data && d.status_data.in_progress) ? d.status_data.in_progress.count || 0 : 0) + ((d.status_data && d.status_data.contacted) ? d.status_data.contacted.count || 0 : 0),
       rejected_count: (d.status_data && d.status_data.rejected) ? d.status_data.rejected.count || 0 : 0,
       checking_count: (d.status_data && d.status_data.checking) ? d.status_data.checking.count || 0 : 0
@@ -4255,7 +4368,10 @@ function renderEmployees() {
     h += '<div><span style="color:#64748b;font-size:0.72rem">Email</span><div style="color:#e2e8f0">' + escHtml(u.email||'\u2014') + '</div></div>';
     if (u.salary) {
       h += '<div><span style="color:#64748b;font-size:0.72rem">Зарплата</span><div style="color:#3B82F6;font-weight:600">' + fmtAmt(u.salary) + '</div></div>';
-      h += '<div><span style="color:#64748b;font-size:0.72rem">Тип</span><div style="color:#94a3b8">' + escHtml({monthly:'Помесячно',biweekly:'За 15 дн',hourly:'Почасовая',per_task:'За работу'}[u.salary_type||'monthly']||u.salary_type||'Помесячно') + '</div></div>';
+      h += '<div><span style="color:#64748b;font-size:0.72rem">Тип</span><div style="color:#94a3b8">' + escHtml({monthly:'Помесячно',biweekly:'За 15 дн',per_task:'За работу',percent:'Процент'}[u.salary_type||'monthly']||u.salary_type||'Помесячно') + '</div></div>';
+    }
+    if (u.hire_date) {
+      h += '<div><span style="color:#64748b;font-size:0.72rem">С даты</span><div style="color:#a78bfa">' + escHtml(u.hire_date) + '</div></div>';
     }
     h += '</div>';
     // Actions
@@ -4343,11 +4459,12 @@ function showEmployeeModal(userId) {
     '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Email</label><input class="input" id="empEmail" value="' + escHtml(u?.email||'') + '"></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0417\u0430\u0440\u043f\u043b\u0430\u0442\u0430</label><input class="input" type="number" id="empSalary" value="' + (u?.salary||0) + '"></div>';
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0438\u043f \u043e\u043f\u043b\u0430\u0442\u044b</label><select class="input" id="empSalaryType">';
-  var stypesModal = [{v:'monthly',l:'\u041f\u043e\u043c\u0435\u0441\u044f\u0447\u043d\u043e'},{v:'biweekly',l:'\u0417\u0430 15 \u0434\u043d\u0435\u0439'},{v:'hourly',l:'\u041f\u043e\u0447\u0430\u0441\u043e\u0432\u0430\u044f'},{v:'per_task',l:'\u0417\u0430 \u0440\u0430\u0431\u043e\u0442\u0443'},{v:'percent',l:'\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043e\u0442 \u043e\u0431\u043e\u0440\u043e\u0442\u0430'}];
+  var stypesModal = [{v:'monthly',l:'\u041f\u043e\u043c\u0435\u0441\u044f\u0447\u043d\u043e'},{v:'biweekly',l:'\u0417\u0430 15 \u0434\u043d\u0435\u0439'},{v:'per_task',l:'\u0417\u0430 \u0440\u0430\u0431\u043e\u0442\u0443'},{v:'percent',l:'\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043e\u0442 \u043e\u0431\u043e\u0440\u043e\u0442\u0430'}];
   for (var sti3 = 0; sti3 < stypesModal.length; sti3++) {
     h += '<option value="' + stypesModal[sti3].v + '"' + ((u?.salary_type||'monthly') === stypesModal[sti3].v ? ' selected' : '') + '>' + stypesModal[sti3].l + '</option>';
   }
   h += '</select></div></div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u0430\u0442\u0430 \u043d\u0430\u0447\u0430\u043b\u0430 \u0440\u0430\u0431\u043e\u0442\u044b</label><input class="input" type="date" id="empHireDate" value="' + escHtml(u?.hire_date||'') + '"></div>';
   h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (u?'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c':'\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div></form></div></div>';
   const area = document.getElementById('employeeModalArea');
   if (area) area.innerHTML = h;
@@ -4364,7 +4481,8 @@ async function saveEmployee(e, id) {
     email: document.getElementById('empEmail').value,
     position_title: document.getElementById('empPosition')?.value || '',
     salary: Number(document.getElementById('empSalary')?.value) || 0,
-    salary_type: document.getElementById('empSalaryType')?.value || 'monthly'
+    salary_type: document.getElementById('empSalaryType')?.value || 'monthly',
+    hire_date: document.getElementById('empHireDate')?.value || ''
   };
   // Enforce single main_admin
   if (body.role === 'main_admin' && !id) {
