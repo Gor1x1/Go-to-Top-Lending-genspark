@@ -3076,6 +3076,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     // Check for snapshot adjustments (works for any month that has a snapshot)
     var mAdjs = [];
     var mAdjTotal = 0;
+    var mExpSal = 0, mExpComm = 0, mExpMkt = 0; // Split expenses for edit form
     if (mSnap) { try { var cd5 = JSON.parse(mSnap.custom_data || '{}'); mAdjs = cd5.adjustments || []; if (!mAdjs.length && cd5.adjustment) { mAdjs = [{amount: Math.abs(cd5.adjustment), type: cd5.adjustment_type || 'inflow', comment: cd5.adjustment_comment || ''}]; } for (var aj = 0; aj < mAdjs.length; aj++) { var a5 = mAdjs[aj]; mAdjTotal += a5.type === 'outflow' ? -Math.abs(a5.amount) : Math.abs(a5.amount); } } catch {} }
     if (isLocked) {
       // From snapshot
@@ -3087,7 +3088,10 @@ function renderBizPeriodsV2(d, sd, fin) {
       mSvc = Number(mSnap.revenue_services)||0;
       mArt = Number(mSnap.revenue_articles)||0;
       mRefunds = Number(mSnap.refunds)||0;
-      mExp = (Number(mSnap.expense_salaries)||0)+(Number(mSnap.expense_commercial)||0)+(Number(mSnap.expense_marketing)||0);
+      mExpSal = Math.abs(Number(mSnap.expense_salaries)||0);
+      mExpComm = Math.abs(Number(mSnap.expense_commercial)||0);
+      mExpMkt = Math.abs(Number(mSnap.expense_marketing)||0);
+      mExp = mExpSal + mExpComm + mExpMkt;
       mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
     } else if (isCurrent) {
@@ -3099,6 +3103,9 @@ function renderBizPeriodsV2(d, sd, fin) {
       mSvc = Number(fin.services)||0;
       mArt = Number(fin.articles)||0;
       mRefunds = Number(fin.refunds)||0;
+      mExpSal = (Number(fin.salaries)||0) + (Number(fin.bonuses)||0) + (Number(fin.fines)||0);
+      mExpComm = Number(fin.commercial_expenses)||0;
+      mExpMkt = Number(fin.marketing_expenses)||0;
       mExp = Number(fin.total_expenses)||0;
       mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
@@ -3176,11 +3183,15 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '<div><label style="font-size:0.7rem;color:#3B82F6">Проверка</label><input class="input" id="edit-checking-' + mKey + '" type="number" value="' + mChecking + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
       // Row 2: Financial fields
-      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">';
       h += '<div><label style="font-size:0.7rem;color:#8B5CF6">Услуги</label><input class="input" id="edit-svc-' + mKey + '" type="number" value="' + mSvc + '" style="width:100%;padding:6px 10px"></div>';
       h += '<div><label style="font-size:0.7rem;color:#F59E0B">Выкупы</label><input class="input" id="edit-art-' + mKey + '" type="number" value="' + mArt + '" style="width:100%;padding:6px 10px"></div>';
       h += '<div><label style="font-size:0.7rem;color:#f87171">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
-      h += '<div><label style="font-size:0.7rem;color:#EF4444">Расходы</label><input class="input" id="edit-exp-' + mKey + '" type="number" value="' + mExp + '" style="width:100%;padding:6px 10px"></div>';
+      h += '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">';
+      h += '<div><label style="font-size:0.7rem;color:#3B82F6">ЗП + Бонусы</label><input class="input" id="edit-expsal-' + mKey + '" type="number" value="' + mExpSal + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#EF4444">Коммерческие</label><input class="input" id="edit-expcomm-' + mKey + '" type="number" value="' + mExpComm + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#EC4899">Маркетинг</label><input class="input" id="edit-expmkt-' + mKey + '" type="number" value="' + mExpMkt + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
       // Row 3: Status selector
       h += '<div style="display:grid;grid-template-columns:1fr 3fr;gap:10px;margin-bottom:12px">';
@@ -3285,7 +3296,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         // Use snapshot data for past months
         var qmSvc = Number(qmSnap.revenue_services)||0;
         var qmArt = Number(qmSnap.revenue_articles)||0;
-        var qmExp = (Number(qmSnap.expense_salaries)||0)+(Number(qmSnap.expense_commercial)||0)+(Number(qmSnap.expense_marketing)||0);
+        var qmExp = Math.abs(Number(qmSnap.expense_salaries)||0)+Math.abs(Number(qmSnap.expense_commercial)||0)+Math.abs(Number(qmSnap.expense_marketing)||0);
         var qmAdj = 0;
         try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch {}
         qSvc += qmSvc;
@@ -3300,7 +3311,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     // Use quarter snapshot if locked
     if (qLocked) {
       var qlSvc = Number(qSnap.revenue_services)||0;
-      var qlExp = (Number(qSnap.expense_salaries)||0)+(Number(qSnap.expense_commercial)||0)+(Number(qSnap.expense_marketing)||0);
+      var qlExp = Math.abs(Number(qSnap.expense_salaries)||0)+Math.abs(Number(qSnap.expense_commercial)||0)+Math.abs(Number(qSnap.expense_marketing)||0);
       qTurnover = qlSvc + (Number(qSnap.revenue_articles)||0);
       qSvc = qlSvc;
       qArt = Number(qSnap.revenue_articles)||0;
@@ -3405,14 +3416,31 @@ function renderBizPeriodsV2(d, sd, fin) {
       var cd1 = {}; var cd2 = {};
       try { cd1 = JSON.parse(snap1.custom_data || '{}'); } catch {}
       if (snap2) { try { cd2 = JSON.parse(snap2.custom_data || '{}'); } catch {} }
-      var exp1 = (Number(snap1.expense_salaries)||0)+(Number(snap1.expense_commercial)||0)+(Number(snap1.expense_marketing)||0);
-      var exp2 = snap2 ? (Number(snap2.expense_salaries)||0)+(Number(snap2.expense_commercial)||0)+(Number(snap2.expense_marketing)||0) : 0;
+      // All expense values must be POSITIVE (absolute) — guard against corrupted snapshots
+      var snap1ExpSal = Math.abs(Number(snap1.expense_salaries)||0);
+      var snap1ExpComm = Math.abs(Number(snap1.expense_commercial)||0);
+      var snap1ExpMkt = Math.abs(Number(snap1.expense_marketing)||0);
+      var snap2ExpSal = snap2 ? Math.abs(Number(snap2.expense_salaries)||0) : 0;
+      var snap2ExpComm = snap2 ? Math.abs(Number(snap2.expense_commercial)||0) : 0;
+      var snap2ExpMkt = snap2 ? Math.abs(Number(snap2.expense_marketing)||0) : 0;
+      var exp1 = snap1ExpSal + snap1ExpComm + snap1ExpMkt;
+      var exp2 = snap2ExpSal + snap2ExpComm + snap2ExpMkt;
+      // Recompute net_profit from expenses if snapshot had corrupted negative expenses
+      var snap1NP = Number(snap1.net_profit)||0;
+      var snap2NP = snap2 ? Number(snap2.net_profit)||0 : 0;
+      // Check if any expense was negative (corrupted) — then recalculate profit
+      if (Number(snap1.expense_commercial) < 0 || Number(snap1.expense_salaries) < 0 || Number(snap1.expense_marketing) < 0) {
+        snap1NP = (Number(snap1.revenue_services)||0) - exp1;
+      }
+      if (snap2 && (Number(snap2.expense_commercial) < 0 || Number(snap2.expense_salaries) < 0 || Number(snap2.expense_marketing) < 0)) {
+        snap2NP = (Number(snap2.revenue_services)||0) - exp2;
+      }
       // Helper: get valid avg_check (0 if no leads_done)
       var snap1AvgCheck = (Number(snap1.leads_done)||0) > 0 ? Number(snap1.avg_check)||0 : 0;
       var snap2AvgCheck = snap2 ? ((Number(snap2.leads_done)||0) > 0 ? Number(snap2.avg_check)||0 : 0) : 0;
       // Profit margin: (net_profit / services) * 100
-      var snap1ProfitMargin = (Number(snap1.revenue_services)||0) > 0 ? (Number(snap1.net_profit)||0) / (Number(snap1.revenue_services)||1) * 100 : 0;
-      var snap2ProfitMargin = snap2 ? ((Number(snap2.revenue_services)||0) > 0 ? (Number(snap2.net_profit)||0) / (Number(snap2.revenue_services)||1) * 100 : 0) : 0;
+      var snap1ProfitMargin = (Number(snap1.revenue_services)||0) > 0 ? snap1NP / (Number(snap1.revenue_services)||1) * 100 : 0;
+      var snap2ProfitMargin = snap2 ? ((Number(snap2.revenue_services)||0) > 0 ? snap2NP / (Number(snap2.revenue_services)||1) * 100 : 0) : 0;
       // Cost per lead
       var snap1CPL = (Number(snap1.leads_count)||0) > 0 ? exp1 / (Number(snap1.leads_count)||1) : 0;
       var snap2CPL = snap2 ? ((Number(snap2.leads_count)||0) > 0 ? exp2 / (Number(snap2.leads_count)||1) : 0) : 0;
@@ -3437,16 +3465,16 @@ function renderBizPeriodsV2(d, sd, fin) {
       }
       var snap1Margin = Number(cd1.marginality) || 0;
       if (!snap1Margin && (Number(snap1.revenue_services)||0) > 0) {
-        snap1Margin = Math.round(((Number(snap1.net_profit)||0) / (Number(snap1.revenue_services)||1)) * 1000) / 10;
+        snap1Margin = Math.round((snap1NP / (Number(snap1.revenue_services)||1)) * 1000) / 10;
       }
       var snap2Margin = snap2 ? (Number(cd2.marginality) || 0) : 0;
       if (snap2 && !snap2Margin && (Number(snap2.revenue_services)||0) > 0) {
-        snap2Margin = Math.round(((Number(snap2.net_profit)||0) / (Number(snap2.revenue_services)||1)) * 1000) / 10;
+        snap2Margin = Math.round((snap2NP / (Number(snap2.revenue_services)||1)) * 1000) / 10;
       }
       var snap1ROI = Number(cd1.roi) || 0;
-      if (!snap1ROI && exp1 > 0) { snap1ROI = Math.round(((Number(snap1.net_profit)||0) / exp1) * 1000) / 10; }
+      if (!snap1ROI && exp1 > 0) { snap1ROI = Math.round((snap1NP / exp1) * 1000) / 10; }
       var snap2ROI = snap2 ? (Number(cd2.roi) || 0) : 0;
-      if (snap2 && !snap2ROI && exp2 > 0) { snap2ROI = Math.round(((Number(snap2.net_profit)||0) / exp2) * 1000) / 10; }
+      if (snap2 && !snap2ROI && exp2 > 0) { snap2ROI = Math.round((snap2NP / exp2) * 1000) / 10; }
       var snap1ROMI = Number(cd1.romi) || 0;
       var mkt1 = Number(snap1.expense_marketing)||0;
       if (!snap1ROMI && mkt1 > 0) { snap1ROMI = Math.round((((Number(snap1.revenue_services)||0) - mkt1) / mkt1) * 1000) / 10; }
@@ -3469,15 +3497,15 @@ function renderBizPeriodsV2(d, sd, fin) {
         {label:'\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b',v1:Number(snap1.refunds)||0,v2:snap2 ? Number(snap2.refunds)||0 : 0,color:'#f87171',icon:'fa-undo',isExpense:true},
         // ===== EXPENSES =====
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b',section:true},
-        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:Number(snap1.expense_salaries)||0,v2:snap2 ? Number(snap2.expense_salaries)||0 : 0,color:'#3B82F6',icon:'fa-users',isExpense:true,
-          detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||Number(snap1.expense_salaries)||0) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (Number(cd1.bonuses_net) >= 0 ? '+' : '') + fmtAmt(Number(cd1.bonuses_net)||0) : ''),
-          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||Number(snap2.expense_salaries)||0) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (Number(cd2.bonuses_net) >= 0 ? '+' : '') + fmtAmt(Number(cd2.bonuses_net)||0) : '') : ''},
-        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:Number(snap1.expense_commercial)||0,v2:snap2 ? Number(snap2.expense_commercial)||0 : 0,color:'#EF4444',icon:'fa-store',isExpense:true},
-        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:Number(snap1.expense_marketing)||0,v2:snap2 ? Number(snap2.expense_marketing)||0 : 0,color:'#EC4899',icon:'fa-bullhorn',isExpense:true},
+        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:snap1ExpSal,v2:snap2ExpSal,color:'#3B82F6',icon:'fa-users',isExpense:true,
+          detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||snap1ExpSal) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (Number(cd1.bonuses_net) >= 0 ? '+' : '') + fmtAmt(Number(cd1.bonuses_net)||0) : ''),
+          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||snap2ExpSal) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (Number(cd2.bonuses_net) >= 0 ? '+' : '') + fmtAmt(Number(cd2.bonuses_net)||0) : '') : ''},
+        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:snap1ExpComm,v2:snap2ExpComm,color:'#EF4444',icon:'fa-store',isExpense:true},
+        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:snap1ExpMkt,v2:snap2ExpMkt,color:'#EC4899',icon:'fa-bullhorn',isExpense:true},
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',isExpense:true,bold:true},
         // ===== PROFIT =====
         {label:'\u041f\u0440\u0438\u0431\u044b\u043b\u044c',section:true},
-        {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:Number(snap1.net_profit)||0,v2:snap2 ? Number(snap2.net_profit)||0 : 0,color:'#22C55E',icon:'fa-chart-line',bold:true},
+        {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:snap1NP,v2:snap2NP,color:'#22C55E',icon:'fa-chart-line',bold:true},
         {label:'\u041c\u0430\u0440\u0436\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 %',v1:snap1ProfitMargin,v2:snap2ProfitMargin,color:'#10B981',icon:'fa-percentage',isPct:true},
         // ===== LEADS =====
         {label:'\u041b\u0438\u0434\u044b',section:true},
@@ -3628,7 +3656,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         h += '<div style="position:relative;width:56px;height:56px;flex-shrink:0"><svg viewBox="0 0 36 36" style="width:56px;height:56px"><path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="#1e293b" stroke-width="3"/><path d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" fill="none" stroke="' + healthColor + '" stroke-width="3" stroke-dasharray="' + healthScore + ', 100" stroke-linecap="round"/></svg><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.7rem;color:' + healthColor + '">' + healthScore + '</div></div>';
         h += '</div>';
         // Key delta cards
-        var profitDiff = (Number(snap1.net_profit)||0) - (Number(snap2.net_profit)||0);
+        var profitDiff = snap1NP - snap2NP;
         var revDiff = (Number(snap1.revenue_services)||0) - (Number(snap2.revenue_services)||0);
         var expDiffCalc = exp1 - exp2;
         h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">';
@@ -3816,7 +3844,10 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var svc = Number(document.getElementById('edit-svc-' + monthKey)?.value) || 0;
   var art = Number(document.getElementById('edit-art-' + monthKey)?.value) || 0;
   var ref = Number(document.getElementById('edit-ref-' + monthKey)?.value) || 0;
-  var exp = Number(document.getElementById('edit-exp-' + monthKey)?.value) || 0;
+  var expSal = Math.abs(Number(document.getElementById('edit-expsal-' + monthKey)?.value) || 0);
+  var expComm = Math.abs(Number(document.getElementById('edit-expcomm-' + monthKey)?.value) || 0);
+  var expMkt = Math.abs(Number(document.getElementById('edit-expmkt-' + monthKey)?.value) || 0);
+  var exp = expSal + expComm + expMkt;
   var done = Number(document.getElementById('edit-done-' + monthKey)?.value) || 0;
   var inprog = Number(document.getElementById('edit-inprog-' + monthKey)?.value) || 0;
   var rejected = Number(document.getElementById('edit-rejected-' + monthKey)?.value) || 0;
@@ -3843,14 +3874,20 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var profit = svc - exp + totalAdj;
   var turnover = svc + art;
   var isLocked2 = status === 'locked';
-  var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking };
+  var totalLeadsEdit = done + inprog + rejected + checking;
+  var convEdit = totalLeadsEdit > 0 ? Math.round((done / totalLeadsEdit) * 1000) / 10 : 0;
+  var marginEdit = svc > 0 ? Math.round((profit / svc) * 1000) / 10 : 0;
+  var roiEdit = exp > 0 ? Math.round((profit / exp) * 1000) / 10 : 0;
+  var romiEdit = expMkt > 0 ? Math.round(((svc - expMkt) / expMkt) * 1000) / 10 : 0;
+  var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking, conversion_rate: convEdit, marginality: marginEdit, roi: roiEdit, romi: romiEdit, salary_base: expSal, bonuses_net: 0 };
   if (snapshotId > 0) {
     // Update existing snapshot
     var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
       revenue_services: svc, revenue_articles: art, refunds: ref,
-      expense_salaries: 0, expense_commercial: exp, expense_marketing: 0,
+      expense_salaries: expSal, expense_commercial: expComm, expense_marketing: expMkt,
       net_profit: profit, total_turnover: turnover,
       leads_done: done, leads_count: done + inprog + rejected + checking,
+      avg_check: done > 0 ? Math.round(svc/done) : 0,
       custom_data: customData
     });
     if (res && res.success) {
@@ -3858,7 +3895,7 @@ async function saveEditedMonth(monthKey, snapshotId) {
       editingMonthKey = '';
       // If status changed to locked, also lock the snapshot
       if (isLocked2 && mSnap2 && !mSnap2.is_locked) {
-        await api('/period-snapshots', 'POST', { period_type: 'month', period_key: monthKey, revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref, expense_salaries: 0, expense_commercial: exp, expense_marketing: 0, net_profit: profit, leads_count: done+inprog+rejected+checking, leads_done: done, avg_check: done > 0 ? Math.round(svc/done) : 0, is_locked: true, custom_data: customData });
+        await api('/period-snapshots', 'POST', { period_type: 'month', period_key: monthKey, revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref, expense_salaries: expSal, expense_commercial: expComm, expense_marketing: expMkt, net_profit: profit, leads_count: done+inprog+rejected+checking, leads_done: done, avg_check: done > 0 ? Math.round(svc/done) : 0, is_locked: true, custom_data: customData });
       }
       try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
       analyticsData = null; loadAnalyticsData();
@@ -3868,7 +3905,7 @@ async function saveEditedMonth(monthKey, snapshotId) {
     var res2 = await api('/period-snapshots', 'POST', {
       period_type: 'month', period_key: monthKey,
       revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref,
-      expense_salaries: 0, expense_commercial: exp, expense_marketing: 0,
+      expense_salaries: expSal, expense_commercial: expComm, expense_marketing: expMkt,
       net_profit: profit, leads_count: done+inprog+rejected+checking, leads_done: done, avg_check: done > 0 ? Math.round(svc/done) : 0,
       is_locked: isLocked2,
       custom_data: customData
@@ -3939,9 +3976,9 @@ async function closePeriodAction(periodType, periodKey, lock) {
     revenue_articles: fin.articles || 0,
     total_turnover: fin.turnover || 0,
     refunds: fin.refunds || 0,
-    expense_salaries: (fin.salaries || 0) + (fin.bonuses || 0) + (fin.fines || 0),
-    expense_commercial: fin.commercial_expenses || 0,
-    expense_marketing: fin.marketing_expenses || 0,
+    expense_salaries: Math.abs((fin.salaries || 0) + (fin.bonuses || 0) + (fin.fines || 0)),
+    expense_commercial: Math.abs(fin.commercial_expenses || 0),
+    expense_marketing: Math.abs(fin.marketing_expenses || 0),
     net_profit: (fin.services || 0) - (fin.total_expenses || 0), // Прибыль = Услуги - Расходы
     leads_count: d.total_leads || 0,
     leads_done: (d.status_data && d.status_data.done) ? d.status_data.done.count || 0 : 0,
