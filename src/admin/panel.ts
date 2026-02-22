@@ -3171,7 +3171,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:center;white-space:nowrap">';
     // Edit button for ANY non-future month
     if (!isFuture) {
-      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render()" title="Редактировать"><i class="fas fa-pencil-alt"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render();setTimeout(function(){loadSalarySummary(\\'' + mKey + '\\')},100)" title="Редактировать"><i class="fas fa-pencil-alt"></i></button>';
     }
     h += '</td></tr>';
     // Editable inline form for ANY month (when editing)
@@ -3203,8 +3203,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '<div><label style="font-size:0.7rem;color:#EF4444">Коммерческие</label><input class="input" id="edit-expcomm-' + mKey + '" type="number" value="' + mExpComm + '" style="width:100%;padding:6px 10px"></div>';
       h += '<div><label style="font-size:0.7rem;color:#EC4899">Маркетинг</label><input class="input" id="edit-expmkt-' + mKey + '" type="number" value="' + mExpMkt + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
-      // Auto-fetch salary breakdown from DB for editing month
-      h += '<script>setTimeout(function(){loadSalarySummary("' + mKey + '")},100)</script>';
+      // Auto-fetch salary breakdown from DB for editing month (triggered by edit button onclick)
       // Row 3: Status selector
       h += '<div style="display:grid;grid-template-columns:1fr 3fr;gap:10px;margin-bottom:12px">';
       h += '<div><label style="font-size:0.7rem;color:#94a3b8">Статус</label><select class="input" id="edit-status-' + mKey + '" style="width:100%;padding:6px 10px">';
