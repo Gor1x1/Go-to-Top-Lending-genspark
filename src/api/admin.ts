@@ -908,8 +908,8 @@ api.post('/users', authMiddleware, async (c) => {
   const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
   if (existing) return c.json({ error: 'Username already exists' }, 400);
   const hash = await hashPassword(d.password);
-  await db.prepare('INSERT INTO users (username, password_hash, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date) VALUES (?,?,?,?,?,?,?,1,?,?,?,?)')
-    .bind(d.username, hash, d.password, d.role || 'operator', d.display_name, d.phone || '', d.email || '', d.salary || 0, d.salary_type || 'monthly', d.position_title || '', d.hire_date || '').run();
+  await db.prepare('INSERT INTO users (username, password_hash, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date, end_date) VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?)')
+    .bind(d.username, hash, d.password, d.role || 'operator', d.display_name, d.phone || '', d.email || '', d.salary || 0, d.salary_type || 'monthly', d.position_title || '', d.hire_date || '', d.end_date || '').run();
   // Set default permissions
   const newUser = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
   if (newUser) {
@@ -942,6 +942,7 @@ api.put('/users/:id', authMiddleware, async (c) => {
   if (d.salary_type !== undefined) { fields.push('salary_type=?'); vals.push(d.salary_type); }
   if (d.position_title !== undefined) { fields.push('position_title=?'); vals.push(d.position_title); }
   if (d.hire_date !== undefined) { fields.push('hire_date=?'); vals.push(d.hire_date); }
+  if (d.end_date !== undefined) { fields.push('end_date=?'); vals.push(d.end_date); }
   // Update password if provided in user edit
   if (d.new_password) {
     const newHash = await hashPassword(d.new_password);
@@ -1490,6 +1491,7 @@ api.put('/users/:id/salary', authMiddleware, async (c) => {
   if (d.salary_type !== undefined) { fields.push('salary_type=?'); vals.push(d.salary_type); }
   if (d.position_title !== undefined) { fields.push('position_title=?'); vals.push(d.position_title); }
   if (d.hire_date !== undefined) { fields.push('hire_date=?'); vals.push(d.hire_date); }
+  if (d.end_date !== undefined) { fields.push('end_date=?'); vals.push(d.end_date); }
   if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
@@ -1811,9 +1813,10 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // 12. Employees with salaries
     const employees: any[] = [];
     try {
-      // Ensure hire_date column exists
+      // Ensure hire_date and end_date columns exist
       try { await db.prepare("ALTER TABLE users ADD COLUMN hire_date TEXT DEFAULT ''").run(); } catch {}
-      const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active, hire_date FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
+      try { await db.prepare("ALTER TABLE users ADD COLUMN end_date TEXT DEFAULT ''").run(); } catch {}
+      const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active, hire_date, end_date FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
       for (const e of (empRes.results || [])) {
         const bSum = await db.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END),0) as total_bonuses, COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END),0) as total_fines, COALESCE(SUM(amount),0) as net_total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => null);
         employees.push({ 

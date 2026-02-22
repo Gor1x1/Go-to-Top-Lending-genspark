@@ -2763,7 +2763,7 @@ function renderBizCostsV2(d, sd, fin) {
   // Table
   if (exps.length > 0) {
     var totalExp = 0;
-    h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr style="border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">Затрата</th><th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:8px;color:#94a3b8">Категория</th><th style="padding:8px;color:#94a3b8">Период</th><th style="padding:8px;color:#94a3b8">Действует</th><th style="padding:8px;width:50px"></th></tr></thead><tbody>';
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem"><thead><tr style="border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">Затрата</th><th style="padding:8px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:8px;text-align:center;color:#94a3b8">Категория</th><th style="padding:8px;text-align:center;color:#94a3b8">Период</th><th style="padding:8px;text-align:center;color:#94a3b8">Действует</th><th style="padding:8px;width:50px"></th></tr></thead><tbody>';
     for (var ei = 0; ei < exps.length; ei++) {
       var exp = exps[ei]; totalExp += (exp.amount || 0);
       var expDateStr = '';
@@ -2772,9 +2772,9 @@ function renderBizCostsV2(d, sd, fin) {
       }
       h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 12px;font-weight:600">' + escHtml(exp.name) + (exp.notes ? '<div style="font-size:0.7rem;color:#64748b">' + escHtml(exp.notes) + '</div>' : '') + '</td>';
       h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(exp.amount) + '</td>';
-      h += '<td style="padding:8px"><span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:' + (exp.category_color||'#475569') + '22;color:' + (exp.category_color||'#94a3b8') + '">' + escHtml(exp.category_name||'\u2014') + '</span></td>';
-      h += '<td style="padding:8px;font-size:0.8rem;color:#64748b">' + escHtml(exp.frequency_name||'\u2014') + '</td>';
-      h += '<td style="padding:8px;font-size:0.72rem;color:#475569">' + (expDateStr || '\u2014') + '</td>';
+      h += '<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:' + (exp.category_color||'#475569') + '22;color:' + (exp.category_color||'#94a3b8') + '">' + escHtml(exp.category_name||'\u2014') + '</span></td>';
+      h += '<td style="padding:8px;text-align:center;font-size:0.8rem;color:#64748b">' + escHtml(exp.frequency_name||'\u2014') + '</td>';
+      h += '<td style="padding:8px;text-align:center;font-size:0.72rem;color:#475569">' + (expDateStr || '\u2014') + '</td>';
       h += '<td style="padding:8px;white-space:nowrap"><button class="btn btn-outline" style="padding:2px 6px;font-size:0.55rem;color:#F59E0B;border-color:#F59E0B33;margin-right:3px" onclick="editingExpenseId=' + exp.id + ';render()" title="Изменить"><i class="fas fa-pencil-alt"></i></button><button class="tier-del-btn" onclick="deleteExpense(' + exp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button></td></tr>';
       // Inline edit form for this expense
       if (editingExpenseId === exp.id) {
@@ -2829,7 +2829,7 @@ function renderBizCostsV2(d, sd, fin) {
   // Employee salary table — data auto-pulled from Employees
   if (employees.length > 0) {
     h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
-    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип оплаты</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:center;color:#94a3b8">С даты</th><th style="padding:10px;text-align:right;color:#22C55E">Бонусы</th><th style="padding:10px;text-align:right;color:#EF4444">Штрафы</th><th style="padding:10px;text-align:right;color:#a78bfa">Итого</th><th style="padding:10px;width:90px"></th></tr></thead><tbody>';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Сотрудник</th><th style="padding:10px;text-align:left;color:#94a3b8">Должность</th><th style="padding:10px;text-align:left;color:#94a3b8">Тип оплаты</th><th style="padding:10px;text-align:right;color:#94a3b8">ЗП</th><th style="padding:10px;text-align:center;color:#94a3b8">С даты</th><th style="padding:10px;text-align:center;color:#94a3b8">По дату</th><th style="padding:10px;text-align:right;color:#22C55E">Бонусы</th><th style="padding:10px;text-align:right;color:#EF4444">Штрафы</th><th style="padding:10px;text-align:right;color:#a78bfa">Итого</th><th style="padding:10px;width:90px"></th></tr></thead><tbody>';
     for (var ui = 0; ui < employees.length; ui++) {
       var u = employees[ui];
       var uSal = Number(u.salary) || 0;
@@ -2840,7 +2840,8 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:10px;color:#94a3b8;font-size:0.8rem">' + escHtml(u.position_title||'\u2014') + '</td>';
       h += '<td style="padding:10px;font-size:0.78rem;color:#64748b">' + (salaryTypeLabels[u.salary_type||'monthly']||(u.salary_type||'monthly')) + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#3B82F6">' + fmtAmt(uSal) + '</td>';
-      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#64748b">' + (u.hire_date ? '<input class="input" type="date" value="' + u.hire_date + '" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'hire_date\\',this.value)">' : '<input class="input" type="date" value="" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'hire_date\\',this.value)" placeholder="Дата">') + '</td>';
+      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#64748b"><input class="input" type="date" value="' + (u.hire_date||'') + '" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'hire_date\\',this.value)"></td>';
+      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#64748b"><input class="input" type="date" value="' + (u.end_date||'') + '" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'end_date\\',this.value)" title="Пусто = работает"></td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#22C55E">' + (uBonus > 0 ? '+' + fmtAmt(uBonus) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#EF4444">' + (uFines < 0 ? '\u2212' + fmtAmt(Math.abs(uFines)) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (uNet >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(uNet) + '</td>';
@@ -2852,7 +2853,7 @@ function renderBizCostsV2(d, sd, fin) {
       // Bonus/fine form
       if (showAddBonusUserId === u.id) {
         var isFine = (typeof addBonusType !== 'undefined' && addBonusType === 'fine');
-        h += '<tr><td colspan="9" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+        h += '<tr><td colspan="10" style="padding:10px 16px;background:#0f172a"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
         h += '<span style="font-size:0.78rem;font-weight:600;color:' + (isFine ? '#EF4444' : '#22C55E') + '">' + (isFine ? '\u0428\u0442\u0440\u0430\u0444' : '\u0411\u043e\u043d\u0443\u0441') + ':</span>';
         h += '<input class="input" id="bonus-amount-' + u.id + '" type="number" placeholder="Сумма" style="width:120px;padding:6px 10px" min="0">';
         h += '<input class="input" id="bonus-desc-' + u.id + '" placeholder="' + (isFine ? 'Причина штрафа' : 'Описание бонуса') + '" style="flex:1;padding:6px 10px;min-width:120px">';
@@ -2863,7 +2864,7 @@ function renderBizCostsV2(d, sd, fin) {
       }
       // Bonus/fine list (expandable)
       if (showBonusListUserId === u.id && bonusListData.length > 0) {
-        h += '<tr><td colspan="9" style="padding:0;background:#0f172a"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
+        h += '<tr><td colspan="10" style="padding:0;background:#0f172a"><table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
         h += '<tr style="border-bottom:1px solid #1e293b"><th style="padding:6px 16px;text-align:left;color:#475569">Тип</th><th style="padding:6px;text-align:left;color:#475569">Описание</th><th style="padding:6px;text-align:right;color:#475569">Сумма</th><th style="padding:6px;text-align:center;color:#475569">Дата</th><th style="padding:6px;width:70px"></th></tr>';
         for (var bi = 0; bi < bonusListData.length; bi++) {
           var b = bonusListData[bi];
@@ -2895,11 +2896,12 @@ function renderBizCostsV2(d, sd, fin) {
         }
         h += '</table></td></tr>';
       } else if (showBonusListUserId === u.id) {
-        h += '<tr><td colspan="9" style="padding:10px 16px;background:#0f172a;color:#64748b;font-size:0.78rem;text-align:center">Нет записей бонусов / штрафов</td></tr>';
+        h += '<tr><td colspan="10" style="padding:10px 16px;background:#0f172a;color:#64748b;font-size:0.78rem;text-align:center">Нет записей бонусов / штрафов</td></tr>';
       }
     }
-    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td colspan="2"></td>';
+    h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td style="padding:10px 16px">ИТОГО</td><td colspan="3"></td>';
     h += '<td style="padding:10px;text-align:right;color:#3B82F6">' + fmtAmt(totalSalary) + '</td>';
+    h += '<td></td>';
     h += '<td style="padding:10px;text-align:right;color:#22C55E">' + fmtAmt(totalBonus) + '</td>';
     h += '<td style="padding:10px;text-align:right;color:#EF4444">' + (totalFines < 0 ? '\u2212' + fmtAmt(Math.abs(totalFines)) : '\u2014') + '</td>';
     h += '<td style="padding:10px;text-align:right;color:#a78bfa">' + fmtAmt(totalNetPay) + '</td>';
@@ -3351,7 +3353,11 @@ function renderBizPeriodsV2(d, sd, fin) {
   var quarterSnaps = allSnaps.filter(function(s){return s.period_type==='quarter';}).sort(function(a,b){return a.period_key>b.period_key?-1:1;});
   if (monthSnaps.length >= 1 || quarterSnaps.length >= 1) {
     h += '<div class="card" style="padding:12px 16px;margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">';
-    h += '<span style="font-size:0.78rem;color:#94a3b8;font-weight:600"><i class="fas fa-bolt" style="margin-right:4px;color:#F59E0B"></i>\u0411\u044b\u0441\u0442\u0440\u043e\u0435 \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435:</span>';
+    h += '<span style="font-size:0.78rem;color:#94a3b8;font-weight:600"><i class="fas fa-bolt" style="margin-right:4px;color:#F59E0B"></i>\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440:</span>';
+    // Single period quick view
+    if (monthSnaps.length >= 1) {
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'\\';render()"><i class="fas fa-eye" style="margin-right:3px"></i>' + monthSnaps[0].period_key.slice(5) + '</button>';
+    }
     // 1-month vs prev month
     if (monthSnaps.length >= 2) {
       h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[1].id + '\\';render()"><i class="fas fa-calendar-day" style="margin-right:3px"></i>1 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[1].period_key.slice(5) + '</button>';
@@ -3370,7 +3376,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     }
     h += '</div>';
   }
-  if (allSnaps.length > 1) {
+  if (allSnaps.length >= 1) {
     // Manual selection dropdowns
     h += '<div class="card" style="padding:16px;margin-bottom:16px;display:flex;gap:16px;align-items:center;flex-wrap:wrap">';
     h += '<div style="font-size:0.82rem;color:#94a3b8;font-weight:600">\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u044b \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f:</div>';
@@ -3384,104 +3390,119 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '</select>';
     h += '<span style="color:#64748b">vs</span>';
     h += '<select class="input" style="width:220px;padding:6px 10px;font-size:0.82rem" onchange="comparePeriod2=this.value;render()" id="cmpPeriod2">';
-    h += '<option value="">\u2014 \u041f\u0435\u0440\u0438\u043e\u0434 2 \u2014</option>';
+    h += '<option value="">\u2014 \u041f\u0435\u0440\u0438\u043e\u0434 2 (\u043e\u043f\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e) \u2014</option>';
     for (var cs2 = 0; cs2 < allSnaps.length; cs2++) {
       var sn2 = allSnaps[cs2]; var lbl2 = sn2.period_type === 'month' ? sn2.period_key : sn2.period_type === 'quarter' ? sn2.period_key : '\u0413\u043e\u0434 ' + sn2.period_key;
       var lockIcon2 = sn2.is_locked ? ' \ud83d\udd12' : ' \ud83d\udcca';
       h += '<option value="' + sn2.id + '"' + (comparePeriod2 == sn2.id ? ' selected' : '') + '>' + lbl2 + ' (' + sn2.period_type + ')' + lockIcon2 + '</option>';
     }
     h += '</select></div>';
-    // Show comparison if both selected
+    // Show comparison if period 1 selected (period 2 is optional for single-period view)
     var snap1 = comparePeriod1 ? allSnaps.find(function(s){return s.id == comparePeriod1;}) : null;
     var snap2 = comparePeriod2 ? allSnaps.find(function(s){return s.id == comparePeriod2;}) : null;
-    if (snap1 && snap2) {
+    if (snap1) {
       // Parse custom_data for extra metrics
       var cd1 = {}; var cd2 = {};
       try { cd1 = JSON.parse(snap1.custom_data || '{}'); } catch {}
-      try { cd2 = JSON.parse(snap2.custom_data || '{}'); } catch {}
+      if (snap2) { try { cd2 = JSON.parse(snap2.custom_data || '{}'); } catch {} }
       var exp1 = (Number(snap1.expense_salaries)||0)+(Number(snap1.expense_commercial)||0)+(Number(snap1.expense_marketing)||0);
-      var exp2 = (Number(snap2.expense_salaries)||0)+(Number(snap2.expense_commercial)||0)+(Number(snap2.expense_marketing)||0);
+      var exp2 = snap2 ? (Number(snap2.expense_salaries)||0)+(Number(snap2.expense_commercial)||0)+(Number(snap2.expense_marketing)||0) : 0;
+      // Helper: get valid avg_check (0 if no leads_done)
+      var snap1AvgCheck = (Number(snap1.leads_done)||0) > 0 ? Number(snap1.avg_check)||0 : 0;
+      var snap2AvgCheck = snap2 ? ((Number(snap2.leads_done)||0) > 0 ? Number(snap2.avg_check)||0 : 0) : 0;
       var cmpMetrics = [
-        {label:'\u041e\u0431\u043e\u0440\u043e\u0442',v1:Number(snap1.total_turnover)||0,v2:Number(snap2.total_turnover)||0,color:'#a78bfa',icon:'fa-coins'},
-        {label:'\u0423\u0441\u043b\u0443\u0433\u0438',v1:Number(snap1.revenue_services)||0,v2:Number(snap2.revenue_services)||0,color:'#8B5CF6',icon:'fa-concierge-bell'},
-        {label:'\u0412\u044b\u043a\u0443\u043f\u044b',v1:Number(snap1.revenue_articles)||0,v2:Number(snap2.revenue_articles)||0,color:'#F59E0B',icon:'fa-shopping-bag'},
-        {label:'\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b',v1:Number(snap1.refunds)||0,v2:Number(snap2.refunds)||0,color:'#f87171',icon:'fa-undo',invert:true},
-        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:Number(snap1.expense_salaries)||0,v2:Number(snap2.expense_salaries)||0,color:'#3B82F6',icon:'fa-users',invert:true,
+        {label:'\u041e\u0431\u043e\u0440\u043e\u0442',v1:Number(snap1.total_turnover)||0,v2:snap2 ? Number(snap2.total_turnover)||0 : 0,color:'#a78bfa',icon:'fa-coins'},
+        {label:'\u0423\u0441\u043b\u0443\u0433\u0438',v1:Number(snap1.revenue_services)||0,v2:snap2 ? Number(snap2.revenue_services)||0 : 0,color:'#8B5CF6',icon:'fa-concierge-bell'},
+        {label:'\u0412\u044b\u043a\u0443\u043f\u044b',v1:Number(snap1.revenue_articles)||0,v2:snap2 ? Number(snap2.revenue_articles)||0 : 0,color:'#F59E0B',icon:'fa-shopping-bag'},
+        {label:'\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b',v1:Number(snap1.refunds)||0,v2:snap2 ? Number(snap2.refunds)||0 : 0,color:'#f87171',icon:'fa-undo',invert:true},
+        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:Number(snap1.expense_salaries)||0,v2:snap2 ? Number(snap2.expense_salaries)||0 : 0,color:'#3B82F6',icon:'fa-users',invert:true,
           detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||Number(snap1.expense_salaries)||0) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd1.bonuses_net) : '') + (cd1.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd1.date_from + ' \u2014 ' + (cd1.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : ''),
-          detail2: '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||Number(snap2.expense_salaries)||0) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd2.bonuses_net) : '') + (cd2.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd2.date_from + ' \u2014 ' + (cd2.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : '')},
-        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:Number(snap1.expense_commercial)||0,v2:Number(snap2.expense_commercial)||0,color:'#F97316',icon:'fa-store',invert:true},
-        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:Number(snap1.expense_marketing)||0,v2:Number(snap2.expense_marketing)||0,color:'#EC4899',icon:'fa-bullhorn',invert:true},
+          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||Number(snap2.expense_salaries)||0) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd2.bonuses_net) : '') + (cd2.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd2.date_from + ' \u2014 ' + (cd2.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : '') : ''},
+        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:Number(snap1.expense_commercial)||0,v2:snap2 ? Number(snap2.expense_commercial)||0 : 0,color:'#F97316',icon:'fa-store',invert:true},
+        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:Number(snap1.expense_marketing)||0,v2:snap2 ? Number(snap2.expense_marketing)||0 : 0,color:'#EC4899',icon:'fa-bullhorn',invert:true},
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',invert:true,bold:true},
-        {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:Number(snap1.net_profit)||0,v2:Number(snap2.net_profit)||0,color:'#22C55E',icon:'fa-chart-line',bold:true},
-        {label:'\u041b\u0438\u0434\u044b (\u0432\u0441\u0435\u0433\u043e)',v1:Number(snap1.leads_count)||0,v2:Number(snap2.leads_count)||0,color:'#10B981',icon:'fa-users',isCnt:true},
-        {label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e',v1:Number(snap1.leads_done)||0,v2:Number(snap2.leads_done)||0,color:'#22C55E',icon:'fa-check-circle',isCnt:true},
-        {label:'\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)',v1:Number(snap1.avg_check)||0,v2:Number(snap2.avg_check)||0,color:'#8B5CF6',icon:'fa-shopping-cart'},
-        {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',v1:Number(cd1.conversion_rate)||0,v2:Number(cd2.conversion_rate)||0,color:'#F59E0B',icon:'fa-percentage',isPct:true},
-        {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',v1:Number(cd1.marginality)||0,v2:Number(cd2.marginality)||0,color:'#10B981',icon:'fa-percentage',isPct:true},
-        {label:'ROI',v1:Number(cd1.roi)||0,v2:Number(cd2.roi)||0,color:'#3B82F6',icon:'fa-chart-bar',isPct:true},
-        {label:'ROMI',v1:Number(cd1.romi)||0,v2:Number(cd2.romi)||0,color:'#EC4899',icon:'fa-bullhorn',isPct:true},
+        {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:Number(snap1.net_profit)||0,v2:snap2 ? Number(snap2.net_profit)||0 : 0,color:'#22C55E',icon:'fa-chart-line',bold:true},
+        {label:'\u041b\u0438\u0434\u044b (\u0432\u0441\u0435\u0433\u043e)',v1:Number(snap1.leads_count)||0,v2:snap2 ? Number(snap2.leads_count)||0 : 0,color:'#10B981',icon:'fa-users',isCnt:true},
+        {label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e',v1:Number(snap1.leads_done)||0,v2:snap2 ? Number(snap2.leads_done)||0 : 0,color:'#22C55E',icon:'fa-check-circle',isCnt:true},
+        {label:'\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)',v1:snap1AvgCheck,v2:snap2AvgCheck,color:'#8B5CF6',icon:'fa-shopping-cart'},
+        {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',v1:Number(cd1.conversion_rate)||0,v2:snap2 ? Number(cd2.conversion_rate)||0 : 0,color:'#F59E0B',icon:'fa-percentage',isPct:true},
+        {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',v1:Number(cd1.marginality)||0,v2:snap2 ? Number(cd2.marginality)||0 : 0,color:'#10B981',icon:'fa-percentage',isPct:true},
+        {label:'ROI',v1:Number(cd1.roi)||0,v2:snap2 ? Number(cd2.roi)||0 : 0,color:'#3B82F6',icon:'fa-chart-bar',isPct:true},
+        {label:'ROMI',v1:Number(cd1.romi)||0,v2:snap2 ? Number(cd2.romi)||0 : 0,color:'#EC4899',icon:'fa-bullhorn',isPct:true},
       ];
       // Period status labels
-      var snap1Lbl = snap1.period_key + (snap1.is_locked ? ' \ud83d\udd12' : ' (текущий)');
-      var snap2Lbl = snap2.period_key + (snap2.is_locked ? ' \ud83d\udd12' : ' (текущий)');
+      var snap1Lbl = snap1.period_key + (snap1.is_locked ? ' \ud83d\udd12' : ' (\u0442\u0435\u043a\u0443\u0449\u0438\u0439)');
+      var snap2Lbl = snap2 ? snap2.period_key + (snap2.is_locked ? ' \ud83d\udd12' : ' (\u0442\u0435\u043a\u0443\u0449\u0438\u0439)') : '';
+      var isSingleView = !snap2;
       h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
       h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
-      h += '<th style="padding:10px 16px;text-align:left;color:#94a3b8">Метрика</th>';
+      h += '<th style="padding:10px 16px;text-align:left;color:#94a3b8">\u041c\u0435\u0442\u0440\u0438\u043a\u0430</th>';
       h += '<th style="padding:10px;text-align:right;color:#a78bfa">' + snap1Lbl + '</th>';
-      h += '<th style="padding:10px;text-align:right;color:#F59E0B">' + snap2Lbl + '</th>';
-      h += '<th style="padding:10px;text-align:right;color:#94a3b8">\u0394 Разница</th>';
-      h += '<th style="padding:10px;text-align:right;color:#94a3b8;min-width:120px">% Изменение</th>';
+      if (!isSingleView) {
+        h += '<th style="padding:10px;text-align:right;color:#F59E0B">' + snap2Lbl + '</th>';
+        h += '<th style="padding:10px;text-align:right;color:#94a3b8">\u0394 \u0420\u0430\u0437\u043d\u0438\u0446\u0430</th>';
+        h += '<th style="padding:10px;text-align:right;color:#94a3b8;min-width:120px">% \u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435</th>';
+      }
       h += '</tr></thead><tbody>';
       for (var cmi = 0; cmi < cmpMetrics.length; cmi++) {
         var cm = cmpMetrics[cmi];
+        // Skip rows where both values are 0 (no real data)
+        if (cm.v1 === 0 && cm.v2 === 0) continue;
         var diff = cm.v1 - cm.v2;
-        var diffPctVal = cm.v2 !== 0 ? ((diff / Math.abs(cm.v2)) * 100) : (cm.v1 !== 0 ? 100 : 0);
-        var diffPctStr = cm.v2 !== 0 ? diffPctVal.toFixed(1) : (cm.v1 > 0 ? '+100' : '0');
+        var diffPctVal = cm.v2 !== 0 ? ((diff / Math.abs(cm.v2)) * 100) : (cm.v1 !== 0 ? (isSingleView ? 0 : 100) : 0);
+        var diffPctStr = cm.v2 !== 0 ? diffPctVal.toFixed(1) : (cm.v1 > 0 && !isSingleView ? '+100' : '0');
         // For expenses/refunds, decrease is good (green), increase is bad (red)
         var diffColor;
-        if (cm.invert) { diffColor = diff < 0 ? '#22C55E' : diff > 0 ? '#EF4444' : '#64748b'; }
+        if (isSingleView) { diffColor = '#64748b'; }
+        else if (cm.invert) { diffColor = diff < 0 ? '#22C55E' : diff > 0 ? '#EF4444' : '#64748b'; }
         else { diffColor = diff > 0 ? '#22C55E' : diff < 0 ? '#EF4444' : '#64748b'; }
         var fmtV = function(v, m) {
           if (m.isCnt) return String(v);
           if (m.isPct) return v.toFixed(1) + '%';
+          // For expense/refund metrics display with minus
+          if (m.invert && v > 0) return '-' + fmtAmt(v);
           return fmtAmt(v);
         };
         var fmtDiff = function(d2, m) {
           if (m.isCnt) return (d2 > 0 ? '+' : '') + d2;
-          if (m.isPct) return (d2 > 0 ? '+' : '') + d2.toFixed(1) + ' п.п.';
+          if (m.isPct) return (d2 > 0 ? '+' : '') + d2.toFixed(1) + ' \u043f.\u043f.';
           return (d2 > 0 ? '+' : '') + fmtAmt(d2);
         };
         var rowStyle = cm.bold ? 'font-weight:700;background:rgba(139,92,246,0.04);' : '';
         h += '<tr style="border-bottom:1px solid #1e293b;' + rowStyle + '">';
         h += '<td style="padding:9px 16px;font-weight:600"><i class="fas ' + cm.icon + '" style="color:' + cm.color + ';margin-right:6px;font-size:0.7rem;width:14px;text-align:center"></i>' + cm.label + '</td>';
         h += '<td style="padding:9px;text-align:right;font-weight:600">' + fmtV(cm.v1, cm) + '</td>';
-        h += '<td style="padding:9px;text-align:right;font-weight:600">' + fmtV(cm.v2, cm) + '</td>';
-        h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">' + fmtDiff(diff, cm) + '</td>';
-        h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">';
-        if (diff !== 0) {
-          var arrow = diff > 0 ? (cm.invert ? '\u2191' : '\u2191') : '\u2193';
-          var absPct = Math.min(Math.abs(diffPctVal), 100);
-          var barW = Math.max(absPct * 0.6, 4);
-          h += '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end">';
-          h += '<div style="width:60px;height:6px;background:#1e293b;border-radius:3px;overflow:hidden;display:inline-block"><div style="width:' + barW + '%;height:100%;background:' + diffColor + ';border-radius:3px"></div></div>';
-          h += '<span>' + arrow + ' ' + (diffPctVal > 0 ? '+' : '') + Number(diffPctStr).toFixed(1) + '%</span>';
-          h += '</div>';
-        } else { h += '<span style="color:#64748b">\u2014</span>'; }
-        h += '</td></tr>';
+        if (!isSingleView) {
+          h += '<td style="padding:9px;text-align:right;font-weight:600">' + fmtV(cm.v2, cm) + '</td>';
+          h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">' + fmtDiff(diff, cm) + '</td>';
+          h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">';
+          if (diff !== 0) {
+            var arrow = diff > 0 ? (cm.invert ? '\u2191' : '\u2191') : '\u2193';
+            var absPct = Math.min(Math.abs(diffPctVal), 100);
+            var barW = Math.max(absPct * 0.6, 4);
+            h += '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end">';
+            h += '<div style="width:60px;height:6px;background:#1e293b;border-radius:3px;overflow:hidden;display:inline-block"><div style="width:' + barW + '%;height:100%;background:' + diffColor + ';border-radius:3px"></div></div>';
+            h += '<span>' + arrow + ' ' + (diffPctVal > 0 ? '+' : '') + Number(diffPctStr).toFixed(1) + '%</span>';
+            h += '</div>';
+          } else { h += '<span style="color:#64748b">\u2014</span>'; }
+          h += '</td>';
+        }
+        h += '</tr>';
         // Show detail rows (salary/bonus breakdown etc.)
         if (cm.detail1 || cm.detail2) {
           h += '<tr style="border-bottom:1px solid #0f172a;background:#0f172a22"><td style="padding:3px 16px;padding-left:36px;font-size:0.68rem;color:#475569"></td>';
           h += '<td style="padding:3px;text-align:right;font-size:0.68rem;color:#64748b">' + (cm.detail1 || '') + '</td>';
-          h += '<td style="padding:3px;text-align:right;font-size:0.68rem;color:#64748b">' + (cm.detail2 || '') + '</td>';
-          h += '<td colspan="2"></td></tr>';
+          if (!isSingleView) {
+            h += '<td style="padding:3px;text-align:right;font-size:0.68rem;color:#64748b">' + (cm.detail2 || '') + '</td>';
+            h += '<td colspan="2"></td>';
+          }
+          h += '</tr>';
         }
       }
       h += '</tbody></table></div>';
     } else {
-      h += '<div class="card" style="padding:20px;text-align:center;color:#475569"><i class="fas fa-arrows-alt-h" style="margin-right:8px"></i>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0434\u0432\u0430 \u043f\u0435\u0440\u0438\u043e\u0434\u0430 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f</div>';
+      h += '<div class="card" style="padding:20px;text-align:center;color:#475569"><i class="fas fa-arrows-alt-h" style="margin-right:8px"></i>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0435\u0440\u0438\u043e\u0434 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430 (\u0438\u043b\u0438 \u0434\u0432\u0430 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f)</div>';
     }
-  } else if (allSnaps.length === 1) {
-    h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>\u041d\u0443\u0436\u043d\u043e \u043c\u0438\u043d\u0438\u043c\u0443\u043c 2 \u043f\u0435\u0440\u0438\u043e\u0434\u0430 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f</div>';
   } else {
     h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>\u0417\u0430\u043a\u0440\u043e\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u043c\u0435\u0441\u044f\u0446 \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435</div>';
   }
@@ -3572,7 +3593,7 @@ async function updateUserSalary(userId, field, value) {
   var body = {};
   body[field] = value;
   var res = await api('/users/' + userId + '/salary', 'PUT', body);
-  if (res && res.success) { toast('Обновлено'); var r = await api('/users'); data.users = r || []; }
+  if (res && res.success) { toast('Обновлено'); var r = await api('/users'); data.users = r || []; analyticsData = null; loadAnalyticsData(); }
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
@@ -3756,7 +3777,7 @@ async function closePeriodAction(periodType, periodKey, lock) {
     net_profit: (fin.services || 0) - (fin.total_expenses || 0), // Прибыль = Услуги - Расходы
     leads_count: d.total_leads || 0,
     leads_done: (d.status_data && d.status_data.done) ? d.status_data.done.count || 0 : 0,
-    avg_check: fin.avg_check || 0,
+    avg_check: ((d.status_data && d.status_data.done && d.status_data.done.count > 0) ? fin.avg_check || 0 : 0),
     is_locked: lock,
     custom_data: {
       conversion_rate: fin.conversion_rate,
@@ -3769,7 +3790,8 @@ async function closePeriodAction(periodType, periodKey, lock) {
       bonuses_net: (fin.bonuses || 0) + (fin.fines || 0),
       in_progress_count: ((d.status_data && d.status_data.in_progress) ? d.status_data.in_progress.count || 0 : 0) + ((d.status_data && d.status_data.contacted) ? d.status_data.contacted.count || 0 : 0),
       rejected_count: (d.status_data && d.status_data.rejected) ? d.status_data.rejected.count || 0 : 0,
-      checking_count: (d.status_data && d.status_data.checking) ? d.status_data.checking.count || 0 : 0
+      checking_count: (d.status_data && d.status_data.checking) ? d.status_data.checking.count || 0 : 0,
+      employees_snapshot: (d.employees || []).map(function(emp) { return { id: emp.id, name: emp.display_name, salary: emp.salary, hire_date: emp.hire_date || '', end_date: emp.end_date || '' }; })
     }
   };
 
@@ -4372,6 +4394,9 @@ function renderEmployees() {
     }
     if (u.hire_date) {
       h += '<div><span style="color:#64748b;font-size:0.72rem">С даты</span><div style="color:#a78bfa">' + escHtml(u.hire_date) + '</div></div>';
+    }
+    if (u.end_date) {
+      h += '<div><span style="color:#64748b;font-size:0.72rem">По дату</span><div style="color:#f87171">' + escHtml(u.end_date) + '</div></div>';
     }
     h += '</div>';
     // Actions
