@@ -2840,8 +2840,8 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:10px;color:#94a3b8;font-size:0.8rem">' + escHtml(u.position_title||'\u2014') + '</td>';
       h += '<td style="padding:10px;font-size:0.78rem;color:#64748b">' + (salaryTypeLabels[u.salary_type||'monthly']||(u.salary_type||'monthly')) + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#3B82F6">' + fmtAmt(uSal) + '</td>';
-      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#64748b"><input class="input" type="date" value="' + (u.hire_date||'') + '" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'hire_date\\',this.value)"></td>';
-      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#64748b"><input class="input" type="date" value="' + (u.end_date||'') + '" style="width:120px;padding:3px 6px;font-size:0.72rem;text-align:center" onchange="updateUserSalary(' + u.id + ',\\'end_date\\',this.value)" title="Пусто = работает"></td>';
+      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:#a78bfa">' + (u.hire_date || '\u2014') + '</td>';
+      h += '<td style="padding:10px;text-align:center;font-size:0.72rem;color:' + (u.end_date ? '#f87171' : '#475569') + '">' + (u.end_date || '\u0431\u0435\u0441\u0441\u0440\u043e\u0447\u043d\u043e') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#22C55E">' + (uBonus > 0 ? '+' + fmtAmt(uBonus) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#EF4444">' + (uFines < 0 ? '\u2212' + fmtAmt(Math.abs(uFines)) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (uNet >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(uNet) + '</td>';
@@ -3410,25 +3410,61 @@ function renderBizPeriodsV2(d, sd, fin) {
       // Helper: get valid avg_check (0 if no leads_done)
       var snap1AvgCheck = (Number(snap1.leads_done)||0) > 0 ? Number(snap1.avg_check)||0 : 0;
       var snap2AvgCheck = snap2 ? ((Number(snap2.leads_done)||0) > 0 ? Number(snap2.avg_check)||0 : 0) : 0;
+      // Profit margin: (net_profit / services) * 100
+      var snap1ProfitMargin = (Number(snap1.revenue_services)||0) > 0 ? (Number(snap1.net_profit)||0) / (Number(snap1.revenue_services)||1) * 100 : 0;
+      var snap2ProfitMargin = snap2 ? ((Number(snap2.revenue_services)||0) > 0 ? (Number(snap2.net_profit)||0) / (Number(snap2.revenue_services)||1) * 100 : 0) : 0;
+      // Cost per lead
+      var snap1CPL = (Number(snap1.leads_count)||0) > 0 ? exp1 / (Number(snap1.leads_count)||1) : 0;
+      var snap2CPL = snap2 ? ((Number(snap2.leads_count)||0) > 0 ? exp2 / (Number(snap2.leads_count)||1) : 0) : 0;
+      // Cost per acquisition (expenses / leads_done)
+      var snap1CPA = (Number(snap1.leads_done)||0) > 0 ? exp1 / (Number(snap1.leads_done)||1) : 0;
+      var snap2CPA = snap2 ? ((Number(snap2.leads_done)||0) > 0 ? exp2 / (Number(snap2.leads_done)||1) : 0) : 0;
+      // Revenue per lead
+      var snap1RPL = (Number(snap1.leads_count)||0) > 0 ? (Number(snap1.revenue_services)||0) / (Number(snap1.leads_count)||1) : 0;
+      var snap2RPL = snap2 ? ((Number(snap2.leads_count)||0) > 0 ? (Number(snap2.revenue_services)||0) / (Number(snap2.leads_count)||1) : 0) : 0;
+      // LTV estimate (avg_check * conversion_rate / 100)
+      var snap1LTV = snap1AvgCheck * (Number(cd1.conversion_rate)||0) / 100;
+      var snap2LTV = snap2 ? (snap2AvgCheck * (Number(cd2.conversion_rate)||0) / 100) : 0;
+
+      // Section separator helper
+      var SECTION = '__section__';
+
       var cmpMetrics = [
+        // ===== REVENUE =====
+        {label:'\u0414\u043e\u0445\u043e\u0434\u044b',section:true},
         {label:'\u041e\u0431\u043e\u0440\u043e\u0442',v1:Number(snap1.total_turnover)||0,v2:snap2 ? Number(snap2.total_turnover)||0 : 0,color:'#a78bfa',icon:'fa-coins'},
         {label:'\u0423\u0441\u043b\u0443\u0433\u0438',v1:Number(snap1.revenue_services)||0,v2:snap2 ? Number(snap2.revenue_services)||0 : 0,color:'#8B5CF6',icon:'fa-concierge-bell'},
         {label:'\u0412\u044b\u043a\u0443\u043f\u044b',v1:Number(snap1.revenue_articles)||0,v2:snap2 ? Number(snap2.revenue_articles)||0 : 0,color:'#F59E0B',icon:'fa-shopping-bag'},
-        {label:'\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b',v1:Number(snap1.refunds)||0,v2:snap2 ? Number(snap2.refunds)||0 : 0,color:'#f87171',icon:'fa-undo',invert:true},
-        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:Number(snap1.expense_salaries)||0,v2:snap2 ? Number(snap2.expense_salaries)||0 : 0,color:'#3B82F6',icon:'fa-users',invert:true,
-          detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||Number(snap1.expense_salaries)||0) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd1.bonuses_net) : '') + (cd1.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd1.date_from + ' \u2014 ' + (cd1.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : ''),
-          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||Number(snap2.expense_salaries)||0) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd2.bonuses_net) : '') + (cd2.date_from ? ' | \u041f\u0435\u0440\u0438\u043e\u0434: ' + cd2.date_from + ' \u2014 ' + (cd2.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : '') : ''},
-        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:Number(snap1.expense_commercial)||0,v2:snap2 ? Number(snap2.expense_commercial)||0 : 0,color:'#F97316',icon:'fa-store',invert:true},
-        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:Number(snap1.expense_marketing)||0,v2:snap2 ? Number(snap2.expense_marketing)||0 : 0,color:'#EC4899',icon:'fa-bullhorn',invert:true},
-        {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',invert:true,bold:true},
+        {label:'\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b',v1:Number(snap1.refunds)||0,v2:snap2 ? Number(snap2.refunds)||0 : 0,color:'#f87171',icon:'fa-undo',isExpense:true},
+        // ===== EXPENSES =====
+        {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b',section:true},
+        {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:Number(snap1.expense_salaries)||0,v2:snap2 ? Number(snap2.expense_salaries)||0 : 0,color:'#3B82F6',icon:'fa-users',isExpense:true,
+          detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||Number(snap1.expense_salaries)||0) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd1.bonuses_net) : '') + (cd1.date_from ? ' | ' + cd1.date_from + ' \u2014 ' + (cd1.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : ''),
+          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||Number(snap2.expense_salaries)||0) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + fmtAmt(cd2.bonuses_net) : '') + (cd2.date_from ? ' | ' + cd2.date_from + ' \u2014 ' + (cd2.date_to || '\u0441\u0435\u0439\u0447\u0430\u0441') : '') : ''},
+        {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:Number(snap1.expense_commercial)||0,v2:snap2 ? Number(snap2.expense_commercial)||0 : 0,color:'#EF4444',icon:'fa-store',isExpense:true},
+        {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:Number(snap1.expense_marketing)||0,v2:snap2 ? Number(snap2.expense_marketing)||0 : 0,color:'#EC4899',icon:'fa-bullhorn',isExpense:true},
+        {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',isExpense:true,bold:true},
+        // ===== PROFIT =====
+        {label:'\u041f\u0440\u0438\u0431\u044b\u043b\u044c',section:true},
         {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:Number(snap1.net_profit)||0,v2:snap2 ? Number(snap2.net_profit)||0 : 0,color:'#22C55E',icon:'fa-chart-line',bold:true},
+        {label:'\u041c\u0430\u0440\u0436\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 %',v1:snap1ProfitMargin,v2:snap2ProfitMargin,color:'#10B981',icon:'fa-percentage',isPct:true},
+        // ===== LEADS =====
+        {label:'\u041b\u0438\u0434\u044b',section:true},
         {label:'\u041b\u0438\u0434\u044b (\u0432\u0441\u0435\u0433\u043e)',v1:Number(snap1.leads_count)||0,v2:snap2 ? Number(snap2.leads_count)||0 : 0,color:'#10B981',icon:'fa-users',isCnt:true},
         {label:'\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u043e',v1:Number(snap1.leads_done)||0,v2:snap2 ? Number(snap2.leads_done)||0 : 0,color:'#22C55E',icon:'fa-check-circle',isCnt:true},
         {label:'\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)',v1:snap1AvgCheck,v2:snap2AvgCheck,color:'#8B5CF6',icon:'fa-shopping-cart'},
+        // ===== KPI =====
+        {label:'\u041a\u043b\u044e\u0447\u0435\u0432\u044b\u0435 KPI',section:true},
         {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',v1:Number(cd1.conversion_rate)||0,v2:snap2 ? Number(cd2.conversion_rate)||0 : 0,color:'#F59E0B',icon:'fa-percentage',isPct:true},
         {label:'\u041c\u0430\u0440\u0436\u0438\u043d\u0430\u043b\u044c\u043d\u043e\u0441\u0442\u044c',v1:Number(cd1.marginality)||0,v2:snap2 ? Number(cd2.marginality)||0 : 0,color:'#10B981',icon:'fa-percentage',isPct:true},
         {label:'ROI',v1:Number(cd1.roi)||0,v2:snap2 ? Number(cd2.roi)||0 : 0,color:'#3B82F6',icon:'fa-chart-bar',isPct:true},
         {label:'ROMI',v1:Number(cd1.romi)||0,v2:snap2 ? Number(cd2.romi)||0 : 0,color:'#EC4899',icon:'fa-bullhorn',isPct:true},
+        // ===== PRO METRICS =====
+        {label:'\u041f\u0440\u043e\u0444-\u043c\u0435\u0442\u0440\u0438\u043a\u0438',section:true},
+        {label:'CPL (\u0441\u0442\u043e\u0438\u043c. \u043b\u0438\u0434\u0430)',v1:snap1CPL,v2:snap2CPL,color:'#F97316',icon:'fa-tag',isExpense:true},
+        {label:'CPA (\u0441\u0442\u043e\u0438\u043c. \u043a\u043b\u0438\u0435\u043d\u0442\u0430)',v1:snap1CPA,v2:snap2CPA,color:'#EF4444',icon:'fa-crosshairs',isExpense:true},
+        {label:'\u0414\u043e\u0445\u043e\u0434 \u043d\u0430 \u043b\u0438\u0434',v1:snap1RPL,v2:snap2RPL,color:'#22C55E',icon:'fa-hand-holding-usd'},
+        {label:'LTV (\u043e\u0446\u0435\u043d\u043a\u0430)',v1:snap1LTV,v2:snap2LTV,color:'#a78bfa',icon:'fa-gem'},
       ];
       // Period status labels
       var snap1Lbl = snap1.period_key + (snap1.is_locked ? ' \ud83d\udd12' : ' (\u0442\u0435\u043a\u0443\u0449\u0438\u0439)');
@@ -3446,43 +3482,76 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '</tr></thead><tbody>';
       for (var cmi = 0; cmi < cmpMetrics.length; cmi++) {
         var cm = cmpMetrics[cmi];
-        // Skip rows where both values are 0 (no real data)
-        if (cm.v1 === 0 && cm.v2 === 0) continue;
-        var diff = cm.v1 - cm.v2;
-        var diffPctVal = cm.v2 !== 0 ? ((diff / Math.abs(cm.v2)) * 100) : (cm.v1 !== 0 ? (isSingleView ? 0 : 100) : 0);
-        var diffPctStr = cm.v2 !== 0 ? diffPctVal.toFixed(1) : (cm.v1 > 0 && !isSingleView ? '+100' : '0');
-        // For expenses/refunds, decrease is good (green), increase is bad (red)
+        // Section headers
+        if (cm.section) {
+          h += '<tr style="background:rgba(139,92,246,0.06);border-bottom:1px solid #334155"><td colspan="' + (isSingleView ? 2 : 5) + '" style="padding:8px 16px;font-weight:700;font-size:0.78rem;color:#a78bfa;text-transform:uppercase;letter-spacing:0.05em"><i class="fas fa-caret-right" style="margin-right:6px"></i>' + cm.label + '</td></tr>';
+          continue;
+        }
+        // Values — expenses stored as POSITIVE in DB, display as negative
+        var rawV1 = cm.v1 || 0;
+        var rawV2 = cm.v2 || 0;
+
+        // For diff calculation: expenses increase = bad, so diff on raw values
+        // diff > 0 means period1 has MORE of this metric
+        var diff = rawV1 - rawV2;
+
+        // Percentage: compare raw absolute values correctly
+        // For expenses: spending went from rawV2 to rawV1
+        // % change = (rawV1 - rawV2) / rawV2 * 100
+        var diffPctVal = 0;
+        if (rawV2 !== 0) {
+          diffPctVal = (diff / Math.abs(rawV2)) * 100;
+        } else if (rawV1 !== 0 && !isSingleView) {
+          diffPctVal = rawV1 > 0 ? 100 : -100;
+        }
+
+        // Color logic:
+        // - For expenses (isExpense): MORE spending = RED, LESS spending = GREEN
+        // - For revenue/profit: MORE = GREEN, LESS = RED
         var diffColor;
-        if (isSingleView) { diffColor = '#64748b'; }
-        else if (cm.invert) { diffColor = diff < 0 ? '#22C55E' : diff > 0 ? '#EF4444' : '#64748b'; }
+        if (isSingleView || diff === 0) { diffColor = '#64748b'; }
+        else if (cm.isExpense) { diffColor = diff > 0 ? '#EF4444' : '#22C55E'; }
         else { diffColor = diff > 0 ? '#22C55E' : diff < 0 ? '#EF4444' : '#64748b'; }
+
+        // Format value for display
         var fmtV = function(v, m) {
-          if (m.isCnt) return String(v);
+          if (m.isCnt) return String(Math.round(v));
           if (m.isPct) return v.toFixed(1) + '%';
-          // For expense/refund metrics display with minus
-          if (m.invert && v > 0) return '-' + fmtAmt(v);
-          return fmtAmt(v);
+          if (m.isExpense && v > 0) return '-' + fmtAmt(Math.round(v));
+          if (m.isExpense && v === 0) return fmtAmt(0);
+          return fmtAmt(Math.round(v));
         };
-        var fmtDiff = function(d2, m) {
-          if (m.isCnt) return (d2 > 0 ? '+' : '') + d2;
+
+        // Format diff for display
+        var fmtDiffFn = function(d2, m) {
+          if (m.isCnt) return (d2 > 0 ? '+' : '') + Math.round(d2);
           if (m.isPct) return (d2 > 0 ? '+' : '') + d2.toFixed(1) + ' \u043f.\u043f.';
-          return (d2 > 0 ? '+' : '') + fmtAmt(d2);
+          if (m.isExpense) {
+            // For expenses: increase in spending is bad, show as positive diff
+            return (d2 > 0 ? '+' : '') + fmtAmt(Math.round(d2));
+          }
+          return (d2 > 0 ? '+' : '') + fmtAmt(Math.round(d2));
         };
+
+        // Value color: expenses always red, revenue/profit depends
+        var valColor1 = cm.isExpense ? '#EF4444' : (cm.bold ? (rawV1 >= 0 ? '#22C55E' : '#EF4444') : cm.color);
+        var valColor2 = cm.isExpense ? '#EF4444' : (cm.bold ? (rawV2 >= 0 ? '#22C55E' : '#EF4444') : cm.color);
+
         var rowStyle = cm.bold ? 'font-weight:700;background:rgba(139,92,246,0.04);' : '';
         h += '<tr style="border-bottom:1px solid #1e293b;' + rowStyle + '">';
         h += '<td style="padding:9px 16px;font-weight:600"><i class="fas ' + cm.icon + '" style="color:' + cm.color + ';margin-right:6px;font-size:0.7rem;width:14px;text-align:center"></i>' + cm.label + '</td>';
-        h += '<td style="padding:9px;text-align:right;font-weight:600">' + fmtV(cm.v1, cm) + '</td>';
+        h += '<td style="padding:9px;text-align:right;font-weight:600;color:' + valColor1 + '">' + fmtV(rawV1, cm) + '</td>';
         if (!isSingleView) {
-          h += '<td style="padding:9px;text-align:right;font-weight:600">' + fmtV(cm.v2, cm) + '</td>';
-          h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">' + fmtDiff(diff, cm) + '</td>';
+          h += '<td style="padding:9px;text-align:right;font-weight:600;color:' + valColor2 + '">' + fmtV(rawV2, cm) + '</td>';
+          h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">' + fmtDiffFn(diff, cm) + '</td>';
           h += '<td style="padding:9px;text-align:right;font-weight:700;color:' + diffColor + '">';
-          if (diff !== 0) {
-            var arrow = diff > 0 ? (cm.invert ? '\u2191' : '\u2191') : '\u2193';
-            var absPct = Math.min(Math.abs(diffPctVal), 100);
-            var barW = Math.max(absPct * 0.6, 4);
+          if (diff !== 0 && !isSingleView) {
+            var arrow = (cm.isExpense ? (diff > 0 ? '\u2191' : '\u2193') : (diff > 0 ? '\u2191' : '\u2193'));
+            var absPct = Math.min(Math.abs(diffPctVal), 999);
+            var barW = Math.max(Math.min(absPct * 0.6, 100), 4);
             h += '<div style="display:inline-flex;align-items:center;gap:6px;justify-content:flex-end">';
             h += '<div style="width:60px;height:6px;background:#1e293b;border-radius:3px;overflow:hidden;display:inline-block"><div style="width:' + barW + '%;height:100%;background:' + diffColor + ';border-radius:3px"></div></div>';
-            h += '<span>' + arrow + ' ' + (diffPctVal > 0 ? '+' : '') + Number(diffPctStr).toFixed(1) + '%</span>';
+            h += '<span>' + arrow + ' ' + (diffPctVal > 0 ? '+' : '') + diffPctVal.toFixed(1) + '%</span>';
             h += '</div>';
           } else { h += '<span style="color:#64748b">\u2014</span>'; }
           h += '</td>';
@@ -3500,6 +3569,38 @@ function renderBizPeriodsV2(d, sd, fin) {
         }
       }
       h += '</tbody></table></div>';
+
+      // ===== PRO: SUMMARY / INSIGHTS CARD =====
+      if (!isSingleView) {
+        var totalMetrics = 0; var improvCount = 0; var declineCount = 0;
+        for (var si4 = 0; si4 < cmpMetrics.length; si4++) {
+          var m2 = cmpMetrics[si4];
+          if (m2.section || m2.isCnt) continue;
+          var d4 = (m2.v1||0) - (m2.v2||0);
+          if (d4 === 0) continue;
+          totalMetrics++;
+          if (m2.isExpense) { if (d4 < 0) improvCount++; else declineCount++; }
+          else { if (d4 > 0) improvCount++; else declineCount++; }
+        }
+        var healthScore = totalMetrics > 0 ? Math.round((improvCount / totalMetrics) * 100) : 0;
+        var healthColor = healthScore >= 60 ? '#22C55E' : healthScore >= 40 ? '#F59E0B' : '#EF4444';
+        var healthIcon = healthScore >= 60 ? 'fa-arrow-trend-up' : healthScore >= 40 ? 'fa-arrows-alt-h' : 'fa-arrow-trend-down';
+        var healthLabel = healthScore >= 60 ? '\u041f\u043e\u0437\u0438\u0442\u0438\u0432\u043d\u0430\u044f \u0434\u0438\u043d\u0430\u043c\u0438\u043a\u0430' : healthScore >= 40 ? '\u0421\u0442\u0430\u0431\u0438\u043b\u044c\u043d\u043e' : '\u0422\u0440\u0435\u0431\u0443\u0435\u0442 \u0432\u043d\u0438\u043c\u0430\u043d\u0438\u044f';
+        h += '<div class="card" style="padding:20px;margin-top:16px;border:2px solid ' + healthColor + '33">';
+        h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">';
+        h += '<div style="width:50px;height:50px;border-radius:50%;background:' + healthColor + '15;display:flex;align-items:center;justify-content:center"><i class="fas ' + healthIcon + '" style="color:' + healthColor + ';font-size:1.2rem"></i></div>';
+        h += '<div><div style="font-weight:700;font-size:1rem;color:' + healthColor + '">' + healthLabel + '</div>';
+        h += '<div style="font-size:0.78rem;color:#94a3b8">\u0417\u0434\u043e\u0440\u043e\u0432\u044c\u0435 \u0431\u0438\u0437\u043d\u0435\u0441\u0430: ' + healthScore + '% | \u0423\u043b\u0443\u0447\u0448\u0435\u043d\u0438\u044f: ' + improvCount + ' | \u0421\u043d\u0438\u0436\u0435\u043d\u0438\u044f: ' + declineCount + '</div></div></div>';
+        // Key insights
+        var profitDiff = (Number(snap1.net_profit)||0) - (Number(snap2.net_profit)||0);
+        var revDiff = (Number(snap1.revenue_services)||0) - (Number(snap2.revenue_services)||0);
+        var expDiffCalc = exp1 - exp2;
+        h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">';
+        h += '<div style="padding:10px;border-radius:8px;background:#0f172a;text-align:center"><div style="font-size:0.68rem;color:#94a3b8">\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u0414</div><div style="font-weight:700;font-size:1rem;color:' + (profitDiff >= 0 ? '#22C55E' : '#EF4444') + '">' + (profitDiff >= 0 ? '+' : '') + fmtAmt(profitDiff) + '</div></div>';
+        h += '<div style="padding:10px;border-radius:8px;background:#0f172a;text-align:center"><div style="font-size:0.68rem;color:#94a3b8">\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u0414</div><div style="font-weight:700;font-size:1rem;color:' + (revDiff >= 0 ? '#22C55E' : '#EF4444') + '">' + (revDiff >= 0 ? '+' : '') + fmtAmt(revDiff) + '</div></div>';
+        h += '<div style="padding:10px;border-radius:8px;background:#0f172a;text-align:center"><div style="font-size:0.68rem;color:#94a3b8">\u0420\u0430\u0441\u0445\u043e\u0434\u044b \u0414</div><div style="font-weight:700;font-size:1rem;color:' + (expDiffCalc <= 0 ? '#22C55E' : '#EF4444') + '">' + (expDiffCalc > 0 ? '+' : '') + fmtAmt(expDiffCalc) + '</div></div>';
+        h += '</div></div>';
+      }
     } else {
       h += '<div class="card" style="padding:20px;text-align:center;color:#475569"><i class="fas fa-arrows-alt-h" style="margin-right:8px"></i>\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u043f\u0435\u0440\u0438\u043e\u0434 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430 (\u0438\u043b\u0438 \u0434\u0432\u0430 \u0434\u043b\u044f \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u044f)</div>';
     }
@@ -4489,7 +4590,8 @@ function showEmployeeModal(userId) {
     h += '<option value="' + stypesModal[sti3].v + '"' + ((u?.salary_type||'monthly') === stypesModal[sti3].v ? ' selected' : '') + '>' + stypesModal[sti3].l + '</option>';
   }
   h += '</select></div></div>';
-  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u0430\u0442\u0430 \u043d\u0430\u0447\u0430\u043b\u0430 \u0440\u0430\u0431\u043e\u0442\u044b</label><input class="input" type="date" id="empHireDate" value="' + escHtml(u?.hire_date||'') + '"></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u0430\u0442\u0430 \u043d\u0430\u0447\u0430\u043b\u0430 \u0440\u0430\u0431\u043e\u0442\u044b</label><input class="input" type="date" id="empHireDate" value="' + escHtml(u?.hire_date||'') + '"></div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u0430\u0442\u0430 \u043e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f <span style="font-size:0.65rem;color:#475569">(\u043f\u0443\u0441\u0442\u043e = \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442)</span></label><input class="input" type="date" id="empEndDate" value="' + escHtml(u?.end_date||'') + '"></div></div>';
   h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (u?'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c':'\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div></form></div></div>';
   const area = document.getElementById('employeeModalArea');
   if (area) area.innerHTML = h;
