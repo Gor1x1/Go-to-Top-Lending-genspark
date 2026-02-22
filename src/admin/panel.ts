@@ -2391,6 +2391,8 @@ function renderLeadsAnalytics() {
   }
   var sd = getActiveStatusData(d.status_data || {});
   var fin = recalcFinancials(sd, d.financial || {});
+  // Attach ltv_data from analytics response
+  fin.ltv_data = d.ltv_data || null;
   var tabs = [
     { id: 'overview', icon: 'fa-chart-pie', label: 'Обзор и Финансы' },
     { id: 'costs', icon: 'fa-wallet', label: 'Затраты и ЗП' },
@@ -2568,7 +2570,8 @@ function renderBizOverviewV2(d, sd, fin) {
     {label:'ROMI',val:fmtPct(fin.romi),color:Number(fin.romi)>0?'#22C55E':'#EF4444',icon:'fa-bullhorn',desc:'(Доход услуг \u2212 маркетинг) / маркетинг'},
     {label:'\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435',val:(Number(fin.avg_fulfillment_days)||0)+' \u0434\u043d',color:'#3B82F6',icon:'fa-clock',desc:'Среднее время выполнения заказа'},
     {label:'Break-even',val:fmtAmt(fin.break_even),color:'#F59E0B',icon:'fa-balance-scale',desc:'Точка безубыточности (= все расходы)'},
-    {label:'\u041e\u0442\u043a\u0430\u0437\u044b',val:(fin.totalLeads > 0 ? (((Number((sd.rejected||{}).count)||0) / fin.totalLeads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban',desc:'Отклонённые / Все лиды'}
+    {label:'\u041e\u0442\u043a\u0430\u0437\u044b',val:(fin.totalLeads > 0 ? (((Number((sd.rejected||{}).count)||0) / fin.totalLeads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban',desc:'Отклонённые / Все лиды'},
+    {label:'LTV',val:fmtAmt((fin.ltv_data||{}).ltv||0),color:'#a78bfa',icon:'fa-gem',desc:'Ср.чек × Частота покупок × Срок жизни клиента'}
   ];
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">';
   for (var ki = 0; ki < kpis.length; ki++) {
@@ -2580,6 +2583,33 @@ function renderBizOverviewV2(d, sd, fin) {
     h += '</div>';
   }
   h += '</div></div>';
+
+  // ---- SECTION: LTV Details ----
+  var ltvD = fin.ltv_data || {};
+  if (ltvD.unique_customers > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-gem" style="color:#a78bfa;margin-right:8px"></i>LTV \u0430\u043d\u0430\u043b\u0438\u0442\u0438\u043a\u0430 <span style="font-size:0.72rem;font-weight:400;color:#64748b">(\u043f\u043e \u043d\u043e\u043c\u0435\u0440\u0443 \u0442\u0435\u043b\u0435\u0444\u043e\u043d\u0430)</span></h3>';
+    h += '<div class="card" style="padding:0;overflow:hidden">';
+    // LTV formula visualization
+    h += '<div style="padding:20px;background:linear-gradient(135deg,rgba(139,92,246,0.1),rgba(167,139,250,0.05));border-bottom:1px solid #334155">';
+    h += '<div style="text-align:center;margin-bottom:12px">';
+    h += '<span style="font-size:2.2rem;font-weight:900;color:#a78bfa">' + fmtAmt(ltvD.ltv || 0) + '</span>';
+    h += '<div style="font-size:0.78rem;color:#94a3b8;margin-top:4px">LTV = \u0421\u0440.\u0447\u0435\u043a \u00d7 \u0427\u0430\u0441\u0442\u043e\u0442\u0430 \u043f\u043e\u043a\u0443\u043f\u043e\u043a \u00d7 \u0421\u0440\u043e\u043a \u0436\u0438\u0437\u043d\u0438</div></div>';
+    h += '<div style="display:flex;justify-content:center;align-items:center;gap:16px;flex-wrap:wrap">';
+    h += '<div style="text-align:center;padding:12px 20px;background:#0f172a;border-radius:10px;border:1px solid #334155"><div style="font-size:1.4rem;font-weight:800;color:#8B5CF6">' + fmtAmt(ltvD.avg_check_ltv || 0) + '</div><div style="font-size:0.68rem;color:#94a3b8;margin-top:2px">\u0421\u0440. \u0447\u0435\u043a</div></div>';
+    h += '<span style="font-size:1.4rem;font-weight:800;color:#475569">\u00d7</span>';
+    h += '<div style="text-align:center;padding:12px 20px;background:#0f172a;border-radius:10px;border:1px solid #334155"><div style="font-size:1.4rem;font-weight:800;color:#F59E0B">' + (ltvD.purchase_frequency || 0) + '</div><div style="font-size:0.68rem;color:#94a3b8;margin-top:2px">\u0427\u0430\u0441\u0442\u043e\u0442\u0430</div></div>';
+    h += '<span style="font-size:1.4rem;font-weight:800;color:#475569">\u00d7</span>';
+    h += '<div style="text-align:center;padding:12px 20px;background:#0f172a;border-radius:10px;border:1px solid #334155"><div style="font-size:1.4rem;font-weight:800;color:#22C55E">' + (ltvD.customer_lifespan_months || 1) + ' \u043c\u0435\u0441</div><div style="font-size:0.68rem;color:#94a3b8;margin-top:2px">\u0421\u0440\u043e\u043a \u0436\u0438\u0437\u043d\u0438</div></div>';
+    h += '</div></div>';
+    // Details
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:0">';
+    h += '<div style="padding:16px;text-align:center;border-right:1px solid #334155"><div style="font-size:1.6rem;font-weight:800;color:#3B82F6">' + (ltvD.unique_customers || 0) + '</div><div style="font-size:0.7rem;color:#94a3b8">\u0423\u043d\u0438\u043a. \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div></div>';
+    h += '<div style="padding:16px;text-align:center;border-right:1px solid #334155"><div style="font-size:1.6rem;font-weight:800;color:#22C55E">' + (ltvD.repeat_customers || 0) + '</div><div style="font-size:0.7rem;color:#94a3b8">\u041f\u043e\u0432\u0442\u043e\u0440\u043d\u044b\u0435</div></div>';
+    h += '<div style="padding:16px;text-align:center;border-right:1px solid #334155"><div style="font-size:1.6rem;font-weight:800;color:#F59E0B">' + (ltvD.total_orders || 0) + '</div><div style="font-size:0.7rem;color:#94a3b8">\u0412\u0441\u0435\u0433\u043e \u0437\u0430\u043a\u0430\u0437\u043e\u0432</div></div>';
+    h += '<div style="padding:16px;text-align:center"><div style="font-size:1.6rem;font-weight:800;color:' + (ltvD.repeat_rate > 0 ? '#a78bfa' : '#64748b') + '">' + (ltvD.repeat_rate || 0) + '%</div><div style="font-size:0.7rem;color:#94a3b8">\u0414\u043e\u043b\u044f \u043f\u043e\u0432\u0442\u043e\u0440\u043d\u044b\u0445</div></div>';
+    h += '</div></div></div>';
+  }
 
   // ---- SECTION: Status P&L table with exclude checkboxes ----
   h += '<div style="margin-bottom:32px">';
@@ -3559,9 +3589,10 @@ function renderBizPeriodsV2(d, sd, fin) {
       // Revenue per lead
       var snap1RPL = (Number(snap1.leads_count)||0) > 0 ? (Number(snap1.revenue_services)||0) / (Number(snap1.leads_count)||1) : 0;
       var snap2RPL = snap2 ? ((Number(snap2.leads_count)||0) > 0 ? (Number(snap2.revenue_services)||0) / (Number(snap2.leads_count)||1) : 0) : 0;
-      // LTV estimate (avg_check * conversion_rate / 100)
-      var snap1LTV = snap1AvgCheck * (Number(cd1.conversion_rate)||0) / 100;
-      var snap2LTV = snap2 ? (snap2AvgCheck * (Number(cd2.conversion_rate)||0) / 100) : 0;
+      // LTV: use live data for snap1 if available, snapshot custom_data ltv, otherwise fallback to estimate
+      var liveLtv = (fin.ltv_data || {}).ltv || 0;
+      var snap1LTV = liveLtv || Number(cd1.ltv) || (snap1AvgCheck * (Number(cd1.conversion_rate)||0) / 100);
+      var snap2LTV = snap2 ? (Number(cd2.ltv) || (snap2AvgCheck * (Number(cd2.conversion_rate)||0) / 100)) : 0;
 
       // === COMPUTE KPI from raw snapshot data if custom_data is empty (old snapshots) ===
       var snap1Conv = Number(cd1.conversion_rate) || 0;
@@ -3590,8 +3621,8 @@ function renderBizPeriodsV2(d, sd, fin) {
       var snap2ROMI = snap2 ? (Number(cd2.romi) || 0) : 0;
       var mkt2 = snap2 ? Number(snap2.expense_marketing)||0 : 0;
       if (snap2 && !snap2ROMI && mkt2 > 0) { snap2ROMI = Math.round((((Number(snap2.revenue_services)||0) - mkt2) / mkt2) * 1000) / 10; }
-      // Update LTV with computed conversion
-      snap1LTV = snap1AvgCheck * snap1Conv / 100;
+      // Update LTV: keep live value for snap1, update snap2 with computed conversion
+      if (!liveLtv) snap1LTV = snap1AvgCheck * snap1Conv / 100;
       snap2LTV = snap2 ? (snap2AvgCheck * snap2Conv / 100) : 0;
 
       // Section separator helper
@@ -3632,7 +3663,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         {label:'CPL (\u0441\u0442\u043e\u0438\u043c. \u043b\u0438\u0434\u0430)',v1:snap1CPL,v2:snap2CPL,color:'#F97316',icon:'fa-tag',isExpense:true},
         {label:'CPA (\u0441\u0442\u043e\u0438\u043c. \u043a\u043b\u0438\u0435\u043d\u0442\u0430)',v1:snap1CPA,v2:snap2CPA,color:'#EF4444',icon:'fa-crosshairs',isExpense:true},
         {label:'\u0414\u043e\u0445\u043e\u0434 \u043d\u0430 \u043b\u0438\u0434',v1:snap1RPL,v2:snap2RPL,color:'#22C55E',icon:'fa-hand-holding-usd'},
-        {label:'LTV (\u043e\u0446\u0435\u043d\u043a\u0430)',v1:snap1LTV,v2:snap2LTV,color:'#a78bfa',icon:'fa-gem'},
+        {label:'LTV' + (liveLtv ? '' : ' (\u043e\u0446\u0435\u043d\u043a\u0430)'),v1:snap1LTV,v2:snap2LTV,color:'#a78bfa',icon:'fa-gem'},
       ];
       // Period status labels
       var snap1Lbl = snap1.period_key + (snap1.is_locked ? ' \ud83d\udd12' : ' (\u0442\u0435\u043a\u0443\u0449\u0438\u0439)');
@@ -4192,6 +4223,11 @@ async function closePeriodAction(periodType, periodKey, lock) {
       in_progress_count: ((d.status_data && d.status_data.in_progress) ? d.status_data.in_progress.count || 0 : 0) + ((d.status_data && d.status_data.contacted) ? d.status_data.contacted.count || 0 : 0),
       rejected_count: (d.status_data && d.status_data.rejected) ? d.status_data.rejected.count || 0 : 0,
       checking_count: (d.status_data && d.status_data.checking) ? d.status_data.checking.count || 0 : 0,
+      ltv: (d.ltv_data || {}).ltv || 0,
+      ltv_purchase_frequency: (d.ltv_data || {}).purchase_frequency || 0,
+      ltv_lifespan_months: (d.ltv_data || {}).customer_lifespan_months || 0,
+      ltv_unique_customers: (d.ltv_data || {}).unique_customers || 0,
+      ltv_repeat_customers: (d.ltv_data || {}).repeat_customers || 0,
       employees_snapshot: (d.employees || []).map(function(emp) { return { id: emp.id, name: emp.display_name, salary: emp.salary, hire_date: emp.hire_date || '', end_date: emp.end_date || '' }; })
     }
   };

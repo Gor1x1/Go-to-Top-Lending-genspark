@@ -1964,6 +1964,73 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       } catch {}
     }
 
+    // 18. LTV calculation based on repeat customers (by phone number)
+    // LTV = Средний чек × Частота покупок × Срок жизни клиента (мес)
+    let ltvData: any = { ltv: 0, avg_check_ltv: 0, purchase_frequency: 0, customer_lifespan_months: 0, unique_customers: 0, repeat_customers: 0, total_orders: 0 };
+    try {
+      // Get customer data grouped by contact (phone number)
+      let ltvQ = `SELECT contact, COUNT(*) as orders, 
+        ROUND(AVG(total_amount),2) as avg_check,
+        MIN(created_at) as first_order, MAX(created_at) as last_order
+        FROM leads WHERE contact IS NOT NULL AND contact != '' 
+        AND status IN ('done','in_progress','checking')`;
+      const ltvParams: string[] = [];
+      if (monthParam) {
+        ltvQ += " AND strftime('%Y-%m', created_at) = ?";
+        ltvParams.push(monthParam);
+      } else {
+        if (dateFrom) { ltvQ += " AND date(created_at) >= ?"; ltvParams.push(dateFrom); }
+        if (dateTo) { ltvQ += " AND date(created_at) <= ?"; ltvParams.push(dateTo); }
+      }
+      ltvQ += " GROUP BY contact ORDER BY orders DESC";
+      const ltvRes = await db.prepare(ltvQ).bind(...ltvParams).all();
+      const customers = ltvRes.results || [];
+      
+      if (customers.length > 0) {
+        const uniqueCustomers = customers.length;
+        const totalOrders = customers.reduce((sum: number, c: any) => sum + Number(c.orders), 0);
+        const repeatCustomers = customers.filter((c: any) => Number(c.orders) > 1).length;
+        
+        // Средний чек по всем клиентам
+        const avgCheckLtv = customers.reduce((sum: number, c: any) => sum + Number(c.avg_check || 0), 0) / uniqueCustomers;
+        
+        // Частота покупок = общее число заказов / уникальные клиенты
+        const purchaseFrequency = totalOrders / uniqueCustomers;
+        
+        // Срок жизни клиента (в месяцах)
+        // Для повторных клиентов: среднее время между первым и последним заказом
+        // Если повторных нет — берём 1 месяц как базовый
+        let customerLifespanMonths = 1;
+        const repeatCustomersList = customers.filter((c: any) => Number(c.orders) > 1);
+        if (repeatCustomersList.length > 0) {
+          let totalLifespanDays = 0;
+          for (const rc of repeatCustomersList) {
+            const first = new Date(rc.first_order as string).getTime();
+            const last = new Date(rc.last_order as string).getTime();
+            const diffDays = Math.max(1, (last - first) / (1000 * 60 * 60 * 24));
+            totalLifespanDays += diffDays;
+          }
+          const avgLifespanDays = totalLifespanDays / repeatCustomersList.length;
+          // Конвертируем дни в месяцы, минимум 1 месяц
+          customerLifespanMonths = Math.max(1, Math.round((avgLifespanDays / 30) * 10) / 10);
+        }
+        
+        // LTV = Средний чек × Частота покупок × Срок жизни (мес)
+        const ltv = Math.round(avgCheckLtv * purchaseFrequency * customerLifespanMonths);
+        
+        ltvData = {
+          ltv,
+          avg_check_ltv: Math.round(avgCheckLtv),
+          purchase_frequency: Math.round(purchaseFrequency * 100) / 100,
+          customer_lifespan_months: customerLifespanMonths,
+          unique_customers: uniqueCustomers,
+          repeat_customers: repeatCustomers,
+          total_orders: totalOrders,
+          repeat_rate: uniqueCustomers > 0 ? Math.round((repeatCustomers / uniqueCustomers) * 1000) / 10 : 0,
+        };
+      }
+    } catch {}
+
     return c.json({
       status_data: statusData,
       financial: {
@@ -1986,6 +2053,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       monthly_data: monthlyData,
       weekly_data: weeklyData,
       month_daily_data: monthDailyData,
+      ltv_data: ltvData,
       total_leads: totalLeadsCount,
       date_from: dateFrom,
       date_to: dateTo,
