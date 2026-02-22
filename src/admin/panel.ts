@@ -2571,7 +2571,8 @@ function renderBizOverviewV2(d, sd, fin) {
     {label:'\u0412\u044b\u043f\u043e\u043b\u043d\u0435\u043d\u0438\u0435',val:(Number(fin.avg_fulfillment_days)||0)+' \u0434\u043d',color:'#3B82F6',icon:'fa-clock',desc:'Среднее время выполнения заказа'},
     {label:'Break-even',val:fmtAmt(fin.break_even),color:'#F59E0B',icon:'fa-balance-scale',desc:'Точка безубыточности (= все расходы)'},
     {label:'\u041e\u0442\u043a\u0430\u0437\u044b',val:(fin.totalLeads > 0 ? (((Number((sd.rejected||{}).count)||0) / fin.totalLeads) * 100).toFixed(1) : '0') + '%',color:'#EF4444',icon:'fa-ban',desc:'Отклонённые / Все лиды'},
-    {label:'LTV',val:fmtAmt((fin.ltv_data||{}).ltv||0),color:'#a78bfa',icon:'fa-gem',desc:'Ср.чек × Частота покупок × Срок жизни клиента'}
+    {label:'LTV',val:fmtAmt((fin.ltv_data||{}).ltv||0),color:'#a78bfa',icon:'fa-gem',desc:'Ср.чек × Частота покупок × Срок жизни клиента'},
+    {label:'CAC',val:fmtAmt(Number((sd.done||{}).count||0) > 0 ? Math.round(fin.total_expenses / Number((sd.done||{}).count||1)) : 0),color:'#F97316',icon:'fa-user-plus',desc:'Все расходы / Кол-во клиентов (done)'}
   ];
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px">';
   for (var ki = 0; ki < kpis.length; ki++) {
@@ -3589,10 +3590,13 @@ function renderBizPeriodsV2(d, sd, fin) {
       // Revenue per lead
       var snap1RPL = (Number(snap1.leads_count)||0) > 0 ? (Number(snap1.revenue_services)||0) / (Number(snap1.leads_count)||1) : 0;
       var snap2RPL = snap2 ? ((Number(snap2.leads_count)||0) > 0 ? (Number(snap2.revenue_services)||0) / (Number(snap2.leads_count)||1) : 0) : 0;
-      // LTV: use live data for snap1 if available, snapshot custom_data ltv, otherwise fallback to estimate
+      // LTV: use live data for snap1 if available, snapshot custom_data ltv only (no fallback guesses)
       var liveLtv = (fin.ltv_data || {}).ltv || 0;
-      var snap1LTV = liveLtv || Number(cd1.ltv) || (snap1AvgCheck * (Number(cd1.conversion_rate)||0) / 100);
-      var snap2LTV = snap2 ? (Number(cd2.ltv) || (snap2AvgCheck * (Number(cd2.conversion_rate)||0) / 100)) : 0;
+      var snap1LTV = liveLtv || Number(cd1.ltv) || 0;
+      var snap2LTV = snap2 ? (Number(cd2.ltv) || 0) : 0;
+      // CAC = Customer Acquisition Cost = total expenses / leads_done
+      var snap1CAC = (Number(snap1.leads_done)||0) > 0 ? exp1 / Number(snap1.leads_done) : 0;
+      var snap2CAC = snap2 ? ((Number(snap2.leads_done)||0) > 0 ? exp2 / Number(snap2.leads_done) : 0) : 0;
 
       // === COMPUTE KPI from raw snapshot data if custom_data is empty (old snapshots) ===
       var snap1Conv = Number(cd1.conversion_rate) || 0;
@@ -3621,9 +3625,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       var snap2ROMI = snap2 ? (Number(cd2.romi) || 0) : 0;
       var mkt2 = snap2 ? Number(snap2.expense_marketing)||0 : 0;
       if (snap2 && !snap2ROMI && mkt2 > 0) { snap2ROMI = Math.round((((Number(snap2.revenue_services)||0) - mkt2) / mkt2) * 1000) / 10; }
-      // Update LTV: keep live value for snap1, only fallback for snap2 if no saved ltv
-      if (!liveLtv) snap1LTV = snap1AvgCheck * snap1Conv / 100;
-      if (snap2 && !Number(cd2.ltv)) snap2LTV = snap2AvgCheck * snap2Conv / 100;
+      // LTV is already set from live data or snapshot - no fallback overwrite
 
       // Section separator helper
       var SECTION = '__section__';
@@ -3662,8 +3664,9 @@ function renderBizPeriodsV2(d, sd, fin) {
         {label:'\u041f\u0440\u043e\u0444-\u043c\u0435\u0442\u0440\u0438\u043a\u0438',section:true},
         {label:'CPL (\u0441\u0442\u043e\u0438\u043c. \u043b\u0438\u0434\u0430)',v1:snap1CPL,v2:snap2CPL,color:'#F97316',icon:'fa-tag',isExpense:true},
         {label:'CPA (\u0441\u0442\u043e\u0438\u043c. \u043a\u043b\u0438\u0435\u043d\u0442\u0430)',v1:snap1CPA,v2:snap2CPA,color:'#EF4444',icon:'fa-crosshairs',isExpense:true},
+        {label:'CAC (\u043f\u0440\u0438\u0432\u043b\u0435\u0447\u0435\u043d\u0438\u0435)',v1:snap1CAC,v2:snap2CAC,color:'#F97316',icon:'fa-user-plus',isExpense:true},
         {label:'\u0414\u043e\u0445\u043e\u0434 \u043d\u0430 \u043b\u0438\u0434',v1:snap1RPL,v2:snap2RPL,color:'#22C55E',icon:'fa-hand-holding-usd'},
-        {label:'LTV' + (liveLtv ? '' : ' (\u043e\u0446\u0435\u043d\u043a\u0430)'),v1:snap1LTV,v2:snap2LTV,color:'#a78bfa',icon:'fa-gem'},
+        {label:'LTV',v1:snap1LTV,v2:snap2LTV,color:'#a78bfa',icon:'fa-gem'},
       ];
       // Period status labels
       var snap1Lbl = snap1.period_key + (snap1.is_locked ? ' \ud83d\udd12' : ' (\u0442\u0435\u043a\u0443\u0449\u0438\u0439)');
