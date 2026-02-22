@@ -3423,16 +3423,62 @@ function renderBizPeriodsV2(d, sd, fin) {
       var snap2ExpSal = snap2 ? Math.abs(Number(snap2.expense_salaries)||0) : 0;
       var snap2ExpComm = snap2 ? Math.abs(Number(snap2.expense_commercial)||0) : 0;
       var snap2ExpMkt = snap2 ? Math.abs(Number(snap2.expense_marketing)||0) : 0;
+      // Compute salary_base and bonuses_net from snapshot data (custom_data may be stale/zero)
+      // Strategy: use live analytics data for the matching period when snapshot data is stale/zero
+      var liveFin = (analyticsData && analyticsData.financial) ? analyticsData.financial : {};
+      var liveMonth = analyticsData ? analyticsData.month : '';
+      // Override snapshot expense values from live analytics if they are 0 and live data available
+      function enrichFromLive(snap, snapExpSal, snapExpComm, snapExpMkt) {
+        var r = { sal: snapExpSal, comm: snapExpComm, mkt: snapExpMkt };
+        if (snap && snap.period_key === liveMonth && liveFin.salaries !== undefined) {
+          if (r.sal === 0) { r.sal = (Number(liveFin.salaries)||0) + (Number(liveFin.bonuses)||0) + (Number(liveFin.fines)||0); }
+          if (r.comm === 0) { r.comm = Number(liveFin.commercial_expenses)||0; }
+          if (r.mkt === 0) { r.mkt = Number(liveFin.marketing_expenses)||0; }
+        }
+        return r;
+      }
+      var enriched1 = enrichFromLive(snap1, snap1ExpSal, snap1ExpComm, snap1ExpMkt);
+      snap1ExpSal = enriched1.sal; snap1ExpComm = enriched1.comm; snap1ExpMkt = enriched1.mkt;
+      if (snap2) {
+        var enriched2 = enrichFromLive(snap2, snap2ExpSal, snap2ExpComm, snap2ExpMkt);
+        snap2ExpSal = enriched2.sal; snap2ExpComm = enriched2.comm; snap2ExpMkt = enriched2.mkt;
+      }
+      var snap1SalBase = Number(cd1.salary_base) || 0;
+      var snap1BonNet = Number(cd1.bonuses_net) || 0;
+      // Override from live analytics if snapshot period matches current analytics month and bonuses_net is stale
+      if (snap1BonNet === 0 && snap1.period_key === liveMonth && liveFin.salaries !== undefined) {
+        snap1SalBase = Number(liveFin.salaries) || snap1SalBase;
+        snap1BonNet = (Number(liveFin.bonuses) || 0) + (Number(liveFin.fines) || 0);
+      }
+      // Fallback: If bonuses_net is 0 but expense_salaries > salary_base, derive bonuses from difference
+      if (snap1BonNet === 0 && snap1SalBase > 0 && snap1ExpSal > snap1SalBase) {
+        snap1BonNet = snap1ExpSal - snap1SalBase;
+      }
+      // If salary_base is 0, the entire expense_salaries is base salary (no bonus data saved)
+      if (snap1SalBase === 0) { snap1SalBase = snap1ExpSal; }
+      var snap2SalBase = snap2 ? (Number(cd2.salary_base) || 0) : 0;
+      var snap2BonNet = snap2 ? (Number(cd2.bonuses_net) || 0) : 0;
+      // Override snap2 from live analytics too if it matches
+      if (snap2 && snap2BonNet === 0 && snap2.period_key === liveMonth && liveFin.salaries !== undefined) {
+        snap2SalBase = Number(liveFin.salaries) || snap2SalBase;
+        snap2BonNet = (Number(liveFin.bonuses) || 0) + (Number(liveFin.fines) || 0);
+      }
+      if (snap2 && snap2BonNet === 0 && snap2SalBase > 0 && snap2ExpSal > snap2SalBase) {
+        snap2BonNet = snap2ExpSal - snap2SalBase;
+      }
+      if (snap2 && snap2SalBase === 0) { snap2SalBase = snap2ExpSal; }
       var exp1 = snap1ExpSal + snap1ExpComm + snap1ExpMkt;
       var exp2 = snap2ExpSal + snap2ExpComm + snap2ExpMkt;
-      // Recompute net_profit from expenses if snapshot had corrupted negative expenses
+      // Recompute net_profit from expenses if snapshot had corrupted negative expenses or zero expenses enriched from live
       var snap1NP = Number(snap1.net_profit)||0;
       var snap2NP = snap2 ? Number(snap2.net_profit)||0 : 0;
-      // Check if any expense was negative (corrupted) — then recalculate profit
-      if (Number(snap1.expense_commercial) < 0 || Number(snap1.expense_salaries) < 0 || Number(snap1.expense_marketing) < 0) {
+      // Check if any expense was negative (corrupted) or if we enriched from live data — then recalculate profit
+      var snap1Corrupted = Number(snap1.expense_commercial) < 0 || Number(snap1.expense_salaries) < 0 || Number(snap1.expense_marketing) < 0;
+      var snap1Enriched = (snap1.period_key === liveMonth) && (Math.abs(Number(snap1.expense_marketing)||0) === 0 || Math.abs(Number(snap1.expense_salaries)||0) === 0);
+      if (snap1Corrupted || snap1Enriched) {
         snap1NP = (Number(snap1.revenue_services)||0) - exp1;
       }
-      if (snap2 && (Number(snap2.expense_commercial) < 0 || Number(snap2.expense_salaries) < 0 || Number(snap2.expense_marketing) < 0)) {
+      if (snap2 && (Number(snap2.expense_commercial) < 0 || Number(snap2.expense_salaries) < 0 || Number(snap2.expense_marketing) < 0 || ((snap2.period_key === liveMonth) && (Math.abs(Number(snap2.expense_marketing)||0) === 0 || Math.abs(Number(snap2.expense_salaries)||0) === 0)))) {
         snap2NP = (Number(snap2.revenue_services)||0) - exp2;
       }
       // Helper: get valid avg_check (0 if no leads_done)
@@ -3498,8 +3544,8 @@ function renderBizPeriodsV2(d, sd, fin) {
         // ===== EXPENSES =====
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b',section:true},
         {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:snap1ExpSal,v2:snap2ExpSal,color:'#3B82F6',icon:'fa-users',isExpense:true,
-          detail1: '\u0417\u041f: ' + fmtAmt(Number(cd1.salary_base)||snap1ExpSal) + (cd1.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (Number(cd1.bonuses_net) >= 0 ? '+' : '') + fmtAmt(Number(cd1.bonuses_net)||0) : ''),
-          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(Number(cd2.salary_base)||snap2ExpSal) + (cd2.bonuses_net !== undefined ? ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (Number(cd2.bonuses_net) >= 0 ? '+' : '') + fmtAmt(Number(cd2.bonuses_net)||0) : '') : ''},
+          detail1: '\u0417\u041f: ' + fmtAmt(snap1SalBase) + ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (snap1BonNet >= 0 ? '+' : '') + fmtAmt(snap1BonNet),
+          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(snap2SalBase) + ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (snap2BonNet >= 0 ? '+' : '') + fmtAmt(snap2BonNet) : ''},
         {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:snap1ExpComm,v2:snap2ExpComm,color:'#EF4444',icon:'fa-store',isExpense:true},
         {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:snap1ExpMkt,v2:snap2ExpMkt,color:'#EC4899',icon:'fa-bullhorn',isExpense:true},
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',isExpense:true,bold:true},
@@ -3879,7 +3925,27 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var marginEdit = svc > 0 ? Math.round((profit / svc) * 1000) / 10 : 0;
   var roiEdit = exp > 0 ? Math.round((profit / exp) * 1000) / 10 : 0;
   var romiEdit = expMkt > 0 ? Math.round(((svc - expMkt) / expMkt) * 1000) / 10 : 0;
-  var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking, conversion_rate: convEdit, marginality: marginEdit, roi: roiEdit, romi: romiEdit, salary_base: expSal, bonuses_net: 0 };
+  // Get bonus/fine data from live analytics if available for this month
+  var liveBonNet = 0;
+  var liveSalBase = expSal;
+  if (analyticsData && analyticsData.financial) {
+    var aFin = analyticsData.financial;
+    var currentMonth = analyticsData.month;
+    // If analytics is showing the same month we're editing, use live bonus data
+    if (currentMonth === monthKey) {
+      liveSalBase = Number(aFin.salaries) || expSal;
+      liveBonNet = (Number(aFin.bonuses) || 0) + (Number(aFin.fines) || 0);
+      // If expSal was manually entered, keep it; adjust bonuses_net accordingly
+      if (expSal > 0 && liveSalBase > 0 && expSal !== liveSalBase) {
+        liveBonNet = expSal - liveSalBase + liveBonNet;
+      }
+    }
+  }
+  // Fallback: if expSal > liveSalBase, difference is bonuses
+  if (liveBonNet === 0 && liveSalBase > 0 && expSal > liveSalBase) {
+    liveBonNet = expSal - liveSalBase;
+  }
+  var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking, conversion_rate: convEdit, marginality: marginEdit, roi: roiEdit, romi: romiEdit, salary_base: liveSalBase, bonuses_net: liveBonNet };
   if (snapshotId > 0) {
     // Update existing snapshot
     var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
