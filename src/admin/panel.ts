@@ -4928,7 +4928,7 @@ function showEmployeeModal(userId) {
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0420\u043e\u043b\u044c *</label><select class="input" id="empRole">';
   for (const r of roles) { h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
   h += '</select></div>';
-  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="empPosition" onchange="if(this.value===\\'__custom\\\\'){document.getElementById(\\'empPositionCustom\\').style.display=\\'block\\';this.style.display=\\'none\\'}">';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="empPosition" onchange="empPosChanged(this)">';
   h += '<option value="">\u2014 \u0412\u044b\u0431\u0440\u0430\u0442\u044c \u2014</option>';
   for (var cri = 0; cri < compRoles.length; cri++) {
     var cr = compRoles[cri];
@@ -4956,6 +4956,14 @@ function showEmployeeModal(userId) {
 }
 
 function editEmployee(id) { showEmployeeModal(id); }
+
+function empPosChanged(sel) {
+  if (sel.value === '__custom') {
+    var ci = document.getElementById('empPositionCustom');
+    if (ci) { ci.style.display = 'block'; ci.focus(); }
+    sel.style.display = 'none';
+  }
+}
 
 async function saveEmployee(e, id) {
   e.preventDefault();
@@ -5030,7 +5038,7 @@ function renderTeamAccess() {
   for (var ti = 0; ti < tabs.length; ti++) {
     var t = tabs[ti];
     var active = _teamAccessTab === t.id;
-    h += '<button class="tab-btn' + (active ? ' active' : '') + '" style="border-radius:8px 8px 0 0;border-bottom:2px solid ' + (active ? '#8B5CF6' : 'transparent') + ';margin-bottom:-2px;padding:10px 20px" onclick="_teamAccessTab=\'' + t.id + '\';render()"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
+    h += '<button class="tab-btn' + (active ? ' active' : '') + '" style="border-radius:8px 8px 0 0;border-bottom:2px solid ' + (active ? '#8B5CF6' : 'transparent') + ';margin-bottom:-2px;padding:10px 20px" onclick="_teamAccessTab=&apos;' + t.id + '&apos;;render()"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
   }
   h += '</div>';
 
@@ -5106,7 +5114,7 @@ function renderAccessMatrix(users, roles, allSections, sl, rl, isAdmin) {
     var userRole = roles.find(function(r){ return r.role_key === u.role; });
     var defaultSections = [];
     try { defaultSections = userRole ? JSON.parse(userRole.default_sections || '[]') : []; } catch {}
-    h += '<tr style="border-bottom:1px solid #1e293b;background:' + (ui % 2 === 0 ? '#131b2e' : '#0f172a') + ';cursor:pointer" onclick="_teamAccessTab=\'users\';render();setTimeout(function(){selectPermUser(' + u.id + ')},100)">';
+    h += '<tr style="border-bottom:1px solid #1e293b;background:' + (ui % 2 === 0 ? '#131b2e' : '#0f172a') + ';cursor:pointer" onclick="_teamAccessTab=&apos;users&apos;;render();setTimeout(function(){selectPermUser(' + u.id + ')},100)">';
     h += '<td style="padding:8px 16px;position:sticky;left:0;background:inherit;z-index:1"><div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + (u.is_active ? '#10B981' : '#EF4444') + ';flex-shrink:0"></span><span style="font-weight:600;color:#e2e8f0">' + escHtml(u.display_name) + '</span><span style="font-size:0.68rem;color:#64748b">' + escHtml(rl[u.role] || u.role) + '</span></div></td>';
     for (var sk = 0; sk < allSections.length; sk++) {
       var sec = allSections[sk];
@@ -5178,7 +5186,7 @@ function renderRolesTab(roles, sl, isAdmin) {
       if (isAdmin) {
         h += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:flex-start">';
         h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.82rem" onclick="showCompanyRoleModal(' + r.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>';
-        if (!r.is_system) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',\'' + escHtml(r.role_name) + '\')" title="Удалить"><i class="fas fa-trash"></i></button>';
+        if (!r.is_system) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',&apos;' + escHtml(r.role_name) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
         h += '</div>';
       }
       h += '</div></div>';
@@ -5265,7 +5273,7 @@ async function selectPermUser(uid) {
     if (!isMainAdmin2 && checked2 && fromRole) indicator = '<span style="font-size:0.6rem;color:#10B981;margin-left:auto" title="Из роли">▪ роль</span>';
     else if (!isMainAdmin2 && checked2 && !fromRole) indicator = '<span style="font-size:0.6rem;color:#F59E0B;margin-left:auto" title="Индивидуально">▪ свой</span>';
     h += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0f172a;border:1px solid ' + borderColor + ';border-radius:8px;cursor:' + (disabled2?'default':'pointer') + ';opacity:' + (disabled2?'0.6':'1') + ';transition:all 0.2s">' +
-      '<input type="checkbox" ' + (checked2?'checked':'') + ' ' + (disabled2?'disabled':'') + ' onchange="togglePermSection(\'' + sec2 + '\')" style="accent-color:#8B5CF6;flex-shrink:0">' +
+      '<input type="checkbox" ' + (checked2?'checked':'') + ' ' + (disabled2?'disabled':'') + ' onchange="togglePermSection(&apos;' + sec2 + '&apos;)" style="accent-color:#8B5CF6;flex-shrink:0">' +
       '<span style="font-size:0.82rem">' + escHtml(sl2[sec2]||sec2) + '</span>' + indicator + '</label>';
   }
   h += '</div>';
@@ -5359,7 +5367,7 @@ function showCompanyRoleModal(roleId) {
     h += (sl[sec] || sec) + '</label>';
   }
   h += '</div></div>';
-  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\'[style*=fixed]\').remove()">Отмена</button>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Отмена</button>';
   h += '<button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (r ? 'Сохранить' : 'Создать') + '</button></div>';
   h += '</form></div></div>';
   var area = document.getElementById('companyRoleModalArea');
