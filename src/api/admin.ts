@@ -888,8 +888,8 @@ api.get('/users', authMiddleware, async (c) => {
   const isMainAdmin = caller.role === 'main_admin';
   // main_admin sees password_plain for credential management; others don't
   const cols = isMainAdmin
-    ? 'id, username, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, created_at'
-    : 'id, username, role, display_name, phone, email, is_active, salary, salary_type, position_title, created_at';
+    ? 'id, username, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date, end_date, created_at'
+    : 'id, username, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date, end_date, created_at';
   const res = await db.prepare('SELECT ' + cols + ' FROM users ORDER BY id').all();
   return c.json(res.results);
 });
@@ -974,10 +974,33 @@ api.post('/users/:id/reset-password', authMiddleware, async (c) => {
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can reset passwords' }, 403);
   const id = c.req.param('id');
   const body = await c.req.json().catch(() => ({}));
-  const newPass = body.new_password || generatePassword(10);
-  const hash = await hashPassword(newPass);
-  await db.prepare('UPDATE users SET password_hash = ?, password_plain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(hash, newPass, id).run();
-  return c.json({ success: true, new_password: newPass });
+  const wantNewPass = !!body.new_password;
+  const wantNewUser = !!body.new_username;
+  if (!wantNewPass && !wantNewUser) {
+    // Generate random password if nothing specified
+    const newPass = generatePassword(10);
+    const hash = await hashPassword(newPass);
+    await db.prepare('UPDATE users SET password_hash = ?, password_plain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(hash, newPass, id).run();
+    return c.json({ success: true, new_password: newPass });
+  }
+  // Update username if provided
+  if (wantNewUser) {
+    const existing = await db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').bind(body.new_username, id).first();
+    if (existing) return c.json({ error: 'Username already taken' }, 400);
+  }
+  // Build update query
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (wantNewUser) { fields.push('username = ?'); vals.push(body.new_username); }
+  if (wantNewPass) {
+    const hash = await hashPassword(body.new_password);
+    fields.push('password_hash = ?'); vals.push(hash);
+    fields.push('password_plain = ?'); vals.push(body.new_password);
+  }
+  fields.push('updated_at = CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE users SET ${fields.join(', ')} WHERE id = ?`).bind(...vals).run();
+  return c.json({ success: true, new_password: wantNewPass ? body.new_password : undefined });
 });
 
 // ===== PERMISSIONS =====
