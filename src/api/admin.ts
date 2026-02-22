@@ -1499,6 +1499,51 @@ api.put('/users/:id/salary', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== SALARY SUMMARY FOR A MONTH (auto-calculates salary + bonuses + fines) =====
+api.get('/salary-summary/:month', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const month = c.req.param('month'); // Format: YYYY-MM
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return c.json({ error: 'Invalid month format (YYYY-MM)' }, 400);
+  try {
+    // Total active salaries (all active employees with salary > 0)
+    const salaryRes = await db.prepare("SELECT COALESCE(SUM(salary), 0) as total_salary FROM users WHERE is_active = 1 AND salary > 0").first();
+    const totalSalaries = Math.round((Number(salaryRes?.total_salary || 0)) * 100) / 100;
+
+    // Bonuses and fines for the specific month
+    const bonusRes = await db.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END),0) as total_bonuses, COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END),0) as total_fines, COALESCE(SUM(amount),0) as net_total FROM employee_bonuses WHERE strftime('%Y-%m', bonus_date) = ?").bind(month).first();
+    const totalBonuses = Math.round((Number(bonusRes?.total_bonuses || 0)) * 100) / 100;
+    const totalFines = Math.round((Number(bonusRes?.total_fines || 0)) * 100) / 100;
+    const bonusesNet = Math.round((Number(bonusRes?.net_total || 0)) * 100) / 100;
+
+    // Expenses breakdown (marketing vs commercial)
+    const expRes = await db.prepare(`SELECT e.amount, ec.is_marketing FROM expenses e 
+      LEFT JOIN expense_categories ec ON e.category_id = ec.id WHERE e.is_active = 1`).all();
+    let marketingExpenses = 0, commercialExpenses = 0;
+    for (const exp of (expRes.results || [])) {
+      const amt = Math.round((Number(exp.amount) || 0) * 100) / 100;
+      if (exp.is_marketing) marketingExpenses += amt;
+      else commercialExpenses += amt;
+    }
+
+    // Combined expense_salaries = salaries + bonuses + fines
+    const expenseSalaries = Math.round((totalSalaries + totalBonuses + totalFines) * 100) / 100;
+
+    return c.json({
+      month,
+      salaries: totalSalaries,
+      bonuses: totalBonuses,
+      fines: totalFines,
+      bonuses_net: bonusesNet,
+      expense_salaries: expenseSalaries,
+      commercial_expenses: commercialExpenses,
+      marketing_expenses: marketingExpenses,
+      total_expenses: expenseSalaries + commercialExpenses + marketingExpenses
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Salary summary error: ' + (err?.message || 'unknown') }, 500);
+  }
+});
+
 // ===== PERIOD SNAPSHOTS (Close month/quarter/year) =====
 api.get('/period-snapshots', authMiddleware, async (c) => {
   const db = c.env.DB;

@@ -3118,7 +3118,16 @@ function renderBizPeriodsV2(d, sd, fin) {
       mSvc = Number(mData.services)||0;
       mArt = Number(mData.articles)||0;
       mRefunds = Number(mData.refunds)||0;
-      mExp = 0; // No per-month expense history for non-snapshot months
+      // Try to get expenses from salSummaryCache (loaded async)
+      var cachedSal = salSummaryCache[mKey];
+      if (cachedSal) {
+        mExpSal = Number(cachedSal.expense_salaries) || 0;
+        mExpComm = Number(cachedSal.commercial_expenses) || 0;
+        mExpMkt = Number(cachedSal.marketing_expenses) || 0;
+        mExp = mExpSal + mExpComm + mExpMkt;
+      } else {
+        mExp = 0;
+      }
       mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
     } else {
@@ -3189,10 +3198,13 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '<div><label style="font-size:0.7rem;color:#f87171">Возврат</label><input class="input" id="edit-ref-' + mKey + '" type="number" value="' + mRefunds + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
       h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:10px">';
-      h += '<div><label style="font-size:0.7rem;color:#3B82F6">ЗП + Бонусы</label><input class="input" id="edit-expsal-' + mKey + '" type="number" value="' + mExpSal + '" style="width:100%;padding:6px 10px"></div>';
+      h += '<div><label style="font-size:0.7rem;color:#3B82F6"><i class="fas fa-lock" style="font-size:0.55rem;margin-right:3px;opacity:0.6"></i>ЗП + Бонусы <span style="color:#475569;font-size:0.55rem">(авто)</span></label><input class="input" id="edit-expsal-' + mKey + '" type="number" value="' + mExpSal + '" style="width:100%;padding:6px 10px;background:#1e293b;color:#94a3b8;border-color:#334155;cursor:not-allowed" readonly title="Автоматически из листа Зарплаты и бонусы">';
+      h += '<div id="sal-hint-' + mKey + '" style="margin-top:4px;font-size:0.65rem;color:#475569"><i class="fas fa-spinner fa-spin" style="margin-right:3px"></i>Загрузка из Зарплаты и бонусы...</div></div>';
       h += '<div><label style="font-size:0.7rem;color:#EF4444">Коммерческие</label><input class="input" id="edit-expcomm-' + mKey + '" type="number" value="' + mExpComm + '" style="width:100%;padding:6px 10px"></div>';
       h += '<div><label style="font-size:0.7rem;color:#EC4899">Маркетинг</label><input class="input" id="edit-expmkt-' + mKey + '" type="number" value="' + mExpMkt + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
+      // Auto-fetch salary breakdown from DB for editing month
+      h += '<script>setTimeout(function(){loadSalarySummary("' + mKey + '")},100)</script>';
       // Row 3: Status selector
       h += '<div style="display:grid;grid-template-columns:1fr 3fr;gap:10px;margin-bottom:12px">';
       h += '<div><label style="font-size:0.7rem;color:#94a3b8">Статус</label><select class="input" id="edit-status-' + mKey + '" style="width:100%;padding:6px 10px">';
@@ -3424,13 +3436,23 @@ function renderBizPeriodsV2(d, sd, fin) {
       var snap2ExpComm = snap2 ? Math.abs(Number(snap2.expense_commercial)||0) : 0;
       var snap2ExpMkt = snap2 ? Math.abs(Number(snap2.expense_marketing)||0) : 0;
       // Compute salary_base and bonuses_net from snapshot data (custom_data may be stale/zero)
-      // Strategy: use live analytics data for the matching period when snapshot data is stale/zero
+      // Strategy: use live analytics data OR salSummaryCache for the matching period when snapshot data is stale/zero
       var liveFin = (analyticsData && analyticsData.financial) ? analyticsData.financial : {};
       var liveMonth = analyticsData ? analyticsData.month : '';
-      // Override snapshot expense values from live analytics if they are 0 and live data available
+      // Override snapshot expense values from live analytics or salary cache if they are 0
       function enrichFromLive(snap, snapExpSal, snapExpComm, snapExpMkt) {
         var r = { sal: snapExpSal, comm: snapExpComm, mkt: snapExpMkt };
-        if (snap && snap.period_key === liveMonth && liveFin.salaries !== undefined) {
+        if (!snap) return r;
+        var pk = snap.period_key || '';
+        // First try salSummaryCache (works for ANY month)
+        var cached = salSummaryCache[pk];
+        if (cached) {
+          if (r.sal === 0) { r.sal = Number(cached.expense_salaries) || 0; }
+          if (r.comm === 0) { r.comm = Number(cached.commercial_expenses) || 0; }
+          if (r.mkt === 0) { r.mkt = Number(cached.marketing_expenses) || 0; }
+        }
+        // Then try live analytics (only for current month)
+        if (pk === liveMonth && liveFin.salaries !== undefined) {
           if (r.sal === 0) { r.sal = (Number(liveFin.salaries)||0) + (Number(liveFin.bonuses)||0) + (Number(liveFin.fines)||0); }
           if (r.comm === 0) { r.comm = Number(liveFin.commercial_expenses)||0; }
           if (r.mkt === 0) { r.mkt = Number(liveFin.marketing_expenses)||0; }
@@ -3443,30 +3465,48 @@ function renderBizPeriodsV2(d, sd, fin) {
         var enriched2 = enrichFromLive(snap2, snap2ExpSal, snap2ExpComm, snap2ExpMkt);
         snap2ExpSal = enriched2.sal; snap2ExpComm = enriched2.comm; snap2ExpMkt = enriched2.mkt;
       }
-      var snap1SalBase = Number(cd1.salary_base) || 0;
-      var snap1BonNet = Number(cd1.bonuses_net) || 0;
-      // Override from live analytics if snapshot period matches current analytics month and bonuses_net is stale
-      if (snap1BonNet === 0 && snap1.period_key === liveMonth && liveFin.salaries !== undefined) {
-        snap1SalBase = Number(liveFin.salaries) || snap1SalBase;
-        snap1BonNet = (Number(liveFin.bonuses) || 0) + (Number(liveFin.fines) || 0);
+      // Compute salary_base and bonuses_net — priority: salSummaryCache > live analytics > snapshot custom_data > fallback
+      function getSalBreakdown(snap, cd, snapExpSal) {
+        var sb = Number(cd.salary_base) || 0;
+        var bn = Number(cd.bonuses_net) || 0;
+        if (!snap) return { base: sb || snapExpSal, net: bn };
+        var pk = snap.period_key || '';
+        // Priority 1: salSummaryCache (most accurate, from DB)
+        var cached = salSummaryCache[pk];
+        if (cached) {
+          return { base: Number(cached.salaries) || sb || snapExpSal, net: (Number(cached.bonuses) || 0) + (Number(cached.fines) || 0) };
+        }
+        // Priority 2: live analytics (current month only)
+        if (pk === liveMonth && liveFin.salaries !== undefined) {
+          return { base: Number(liveFin.salaries) || sb || snapExpSal, net: (Number(liveFin.bonuses) || 0) + (Number(liveFin.fines) || 0) };
+        }
+        // Priority 3: derive from snapshot data
+        if (bn === 0 && sb > 0 && snapExpSal > sb) { bn = snapExpSal - sb; }
+        if (sb === 0) { sb = snapExpSal; }
+        return { base: sb, net: bn };
       }
-      // Fallback: If bonuses_net is 0 but expense_salaries > salary_base, derive bonuses from difference
-      if (snap1BonNet === 0 && snap1SalBase > 0 && snap1ExpSal > snap1SalBase) {
-        snap1BonNet = snap1ExpSal - snap1SalBase;
+      var sal1 = getSalBreakdown(snap1, cd1, snap1ExpSal);
+      var snap1SalBase = sal1.base;
+      var snap1BonNet = sal1.net;
+      var sal2 = snap2 ? getSalBreakdown(snap2, cd2, snap2ExpSal) : { base: 0, net: 0 };
+      var snap2SalBase = sal2.base;
+      var snap2BonNet = sal2.net;
+      // Trigger async loading of salary summary for comparison snapshots if not cached (with guard against infinite loop)
+      var snapPeriodsToLoad = [];
+      if (snap1 && snap1.period_type === 'month' && !salSummaryCache[snap1.period_key] && !salSummaryLoading[snap1.period_key]) snapPeriodsToLoad.push(snap1.period_key);
+      if (snap2 && snap2.period_type === 'month' && !salSummaryCache[snap2.period_key] && !salSummaryLoading[snap2.period_key]) snapPeriodsToLoad.push(snap2.period_key);
+      if (snapPeriodsToLoad.length > 0) {
+        for (var _li = 0; _li < snapPeriodsToLoad.length; _li++) salSummaryLoading[snapPeriodsToLoad[_li]] = true;
+        setTimeout(function() {
+          var loadPromises = snapPeriodsToLoad.map(function(pk) {
+            return api('/salary-summary/' + pk).then(function(res) {
+              if (res && res.salaries !== undefined) salSummaryCache[pk] = res;
+              delete salSummaryLoading[pk];
+            }).catch(function(){ delete salSummaryLoading[pk]; });
+          });
+          Promise.all(loadPromises).then(function() { render(); });
+        }, 50);
       }
-      // If salary_base is 0, the entire expense_salaries is base salary (no bonus data saved)
-      if (snap1SalBase === 0) { snap1SalBase = snap1ExpSal; }
-      var snap2SalBase = snap2 ? (Number(cd2.salary_base) || 0) : 0;
-      var snap2BonNet = snap2 ? (Number(cd2.bonuses_net) || 0) : 0;
-      // Override snap2 from live analytics too if it matches
-      if (snap2 && snap2BonNet === 0 && snap2.period_key === liveMonth && liveFin.salaries !== undefined) {
-        snap2SalBase = Number(liveFin.salaries) || snap2SalBase;
-        snap2BonNet = (Number(liveFin.bonuses) || 0) + (Number(liveFin.fines) || 0);
-      }
-      if (snap2 && snap2BonNet === 0 && snap2SalBase > 0 && snap2ExpSal > snap2SalBase) {
-        snap2BonNet = snap2ExpSal - snap2SalBase;
-      }
-      if (snap2 && snap2SalBase === 0) { snap2SalBase = snap2ExpSal; }
       var exp1 = snap1ExpSal + snap1ExpComm + snap1ExpMkt;
       var exp2 = snap2ExpSal + snap2ExpComm + snap2ExpMkt;
       // Recompute net_profit from expenses if snapshot had corrupted negative expenses or zero expenses enriched from live
@@ -3544,8 +3584,8 @@ function renderBizPeriodsV2(d, sd, fin) {
         // ===== EXPENSES =====
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b',section:true},
         {label:'\u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b',v1:snap1ExpSal,v2:snap2ExpSal,color:'#3B82F6',icon:'fa-users',isExpense:true,
-          detail1: '\u0417\u041f: ' + fmtAmt(snap1SalBase) + ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (snap1BonNet >= 0 ? '+' : '') + fmtAmt(snap1BonNet),
-          detail2: snap2 ? '\u0417\u041f: ' + fmtAmt(snap2SalBase) + ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (snap2BonNet >= 0 ? '+' : '') + fmtAmt(snap2BonNet) : ''},
+          detail1: (snap1 && salSummaryLoading[snap1.period_key]) ? '<i class="fas fa-spinner fa-spin" style="font-size:0.55rem"></i> загрузка...' : '\u0417\u041f: ' + fmtAmt(snap1SalBase) + ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (snap1BonNet >= 0 ? '+' : '') + fmtAmt(snap1BonNet),
+          detail2: snap2 ? ((salSummaryLoading[snap2.period_key]) ? '<i class="fas fa-spinner fa-spin" style="font-size:0.55rem"></i> загрузка...' : '\u0417\u041f: ' + fmtAmt(snap2SalBase) + ' | \u0411\u043e\u043d/\u0428\u0442\u0440: ' + (snap2BonNet >= 0 ? '+' : '') + fmtAmt(snap2BonNet)) : ''},
         {label:'\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435',v1:snap1ExpComm,v2:snap2ExpComm,color:'#EF4444',icon:'fa-store',isExpense:true},
         {label:'\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433',v1:snap1ExpMkt,v2:snap2ExpMkt,color:'#EC4899',icon:'fa-bullhorn',isExpense:true},
         {label:'\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)',v1:exp1,v2:exp2,color:'#EF4444',icon:'fa-receipt',isExpense:true,bold:true},
@@ -3885,8 +3925,62 @@ async function saveBonusEdit(bonusId, userId, bonusType) {
   } else { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430', 'error'); }
 }
 
+// ===== SALARY SUMMARY LOADER (auto-fetch from DB for month editing) =====
+var salSummaryCache = {};
+var salSummaryLoading = {};
+async function loadSalarySummary(monthKey) {
+  var hintEl = document.getElementById('sal-hint-' + monthKey);
+  var salInput = document.getElementById('edit-expsal-' + monthKey);
+  var commInput = document.getElementById('edit-expcomm-' + monthKey);
+  var mktInput = document.getElementById('edit-expmkt-' + monthKey);
+  if (!hintEl) return;
+  try {
+    var res = await api('/salary-summary/' + monthKey);
+    if (res && res.salaries !== undefined) {
+      salSummaryCache[monthKey] = res;
+      var sal = Number(res.salaries) || 0;
+      var bon = Number(res.bonuses) || 0;
+      var fin = Number(res.fines) || 0;
+      var total = Number(res.expense_salaries) || 0;
+      // Update input with calculated total
+      if (salInput) {
+        salInput.value = total;
+        salInput.style.color = '#a78bfa';
+        salInput.style.fontWeight = '600';
+      }
+      // Update commercial and marketing if they were 0
+      if (commInput && Number(commInput.value) === 0 && Number(res.commercial_expenses) > 0) {
+        commInput.value = Math.round(Number(res.commercial_expenses));
+      }
+      if (mktInput && Number(mktInput.value) === 0 && Number(res.marketing_expenses) > 0) {
+        mktInput.value = Math.round(Number(res.marketing_expenses));
+      }
+      // Build readable breakdown hint
+      var parts = [];
+      parts.push('<span style="color:#3B82F6">ФОТ: ' + fmtAmt(sal) + '</span>');
+      if (bon > 0) parts.push('<span style="color:#22C55E">Бонусы: +' + fmtAmt(bon) + '</span>');
+      if (fin < 0) parts.push('<span style="color:#EF4444">Штрафы: ' + fmtAmt(fin) + '</span>');
+      if (bon === 0 && fin === 0) parts.push('<span style="color:#475569">Бонусы/штрафы: нет</span>');
+      parts.push('<span style="color:#a78bfa;font-weight:700">= ' + fmtAmt(total) + '</span>');
+      hintEl.innerHTML = '<i class="fas fa-database" style="margin-right:3px;color:#3B82F6"></i>' + parts.join(' <span style="color:#334155">|</span> ');
+      hintEl.style.color = '#64748b';
+    } else {
+      hintEl.innerHTML = '<span style="color:#F59E0B"><i class="fas fa-exclamation-triangle" style="margin-right:3px"></i>Нет данных о ЗП. Добавьте сотрудников в "Сотрудники"</span>';
+    }
+  } catch(e) {
+    hintEl.innerHTML = '<span style="color:#EF4444"><i class="fas fa-times-circle" style="margin-right:3px"></i>Ошибка загрузки</span>';
+  }
+}
+
 // ===== PERIOD ACTIONS =====
 async function saveEditedMonth(monthKey, snapshotId) {
+  // Ensure salary data is loaded before saving (if not cached yet)
+  if (!salSummaryCache[monthKey]) {
+    try {
+      var salRes = await api('/salary-summary/' + monthKey);
+      if (salRes && salRes.salaries !== undefined) salSummaryCache[monthKey] = salRes;
+    } catch(e) {}
+  }
   var svc = Number(document.getElementById('edit-svc-' + monthKey)?.value) || 0;
   var art = Number(document.getElementById('edit-art-' + monthKey)?.value) || 0;
   var ref = Number(document.getElementById('edit-ref-' + monthKey)?.value) || 0;
@@ -3925,25 +4019,21 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var marginEdit = svc > 0 ? Math.round((profit / svc) * 1000) / 10 : 0;
   var roiEdit = exp > 0 ? Math.round((profit / exp) * 1000) / 10 : 0;
   var romiEdit = expMkt > 0 ? Math.round(((svc - expMkt) / expMkt) * 1000) / 10 : 0;
-  // Get bonus/fine data from live analytics if available for this month
+  // Get salary/bonus/fine breakdown from salSummaryCache (loaded via loadSalarySummary API call)
   var liveBonNet = 0;
   var liveSalBase = expSal;
-  if (analyticsData && analyticsData.financial) {
+  var cached = salSummaryCache[monthKey];
+  if (cached) {
+    liveSalBase = Number(cached.salaries) || expSal;
+    liveBonNet = (Number(cached.bonuses) || 0) + (Number(cached.fines) || 0);
+  } else if (analyticsData && analyticsData.financial) {
+    // Fallback to live analytics if cache miss (only works for current month)
     var aFin = analyticsData.financial;
     var currentMonth = analyticsData.month;
-    // If analytics is showing the same month we're editing, use live bonus data
     if (currentMonth === monthKey) {
       liveSalBase = Number(aFin.salaries) || expSal;
       liveBonNet = (Number(aFin.bonuses) || 0) + (Number(aFin.fines) || 0);
-      // If expSal was manually entered, keep it; adjust bonuses_net accordingly
-      if (expSal > 0 && liveSalBase > 0 && expSal !== liveSalBase) {
-        liveBonNet = expSal - liveSalBase + liveBonNet;
-      }
     }
-  }
-  // Fallback: if expSal > liveSalBase, difference is bonuses
-  if (liveBonNet === 0 && liveSalBase > 0 && expSal > liveSalBase) {
-    liveBonNet = expSal - liveSalBase;
   }
   var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking, conversion_rate: convEdit, marginality: marginEdit, roi: roiEdit, romi: romiEdit, salary_base: liveSalBase, bonuses_net: liveBonNet };
   if (snapshotId > 0) {
@@ -4035,6 +4125,23 @@ async function closePeriodAction(periodType, periodKey, lock) {
   if (!d || !d.financial) { toast('Нет данных для сохранения. Обновите аналитику.', 'error'); return; }
   var fin = d.financial;
 
+  // Fetch salary summary for this period to ensure accurate bonus data
+  var salBase = Number(fin.salaries) || 0;
+  var bonNet = (Number(fin.bonuses) || 0) + (Number(fin.fines) || 0);
+  if (periodType === 'month') {
+    try {
+      if (!salSummaryCache[periodKey]) {
+        var salRes = await api('/salary-summary/' + periodKey);
+        if (salRes && salRes.salaries !== undefined) salSummaryCache[periodKey] = salRes;
+      }
+      var cached = salSummaryCache[periodKey];
+      if (cached) {
+        salBase = Number(cached.salaries) || salBase;
+        bonNet = (Number(cached.bonuses) || 0) + (Number(cached.fines) || 0);
+      }
+    } catch(e) {}
+  }
+
   var body = {
     period_type: periodType,
     period_key: periodKey,
@@ -4057,8 +4164,8 @@ async function closePeriodAction(periodType, periodKey, lock) {
       romi: Number(fin.romi) || 0,
       date_from: d.date_from,
       date_to: d.date_to,
-      salary_base: fin.salaries || 0,
-      bonuses_net: (fin.bonuses || 0) + (fin.fines || 0),
+      salary_base: salBase,
+      bonuses_net: bonNet,
       in_progress_count: ((d.status_data && d.status_data.in_progress) ? d.status_data.in_progress.count || 0 : 0) + ((d.status_data && d.status_data.contacted) ? d.status_data.contacted.count || 0 : 0),
       rejected_count: (d.status_data && d.status_data.rejected) ? d.status_data.rejected.count || 0 : 0,
       checking_count: (d.status_data && d.status_data.checking) ? d.status_data.checking.count || 0 : 0,
