@@ -429,10 +429,50 @@ export async function initDatabase(db: D1Database): Promise<void> {
 
 // Latest migrations that MUST run on every DB (including already-initialized production)
 async function runLatestMigrations(db: D1Database): Promise<void> {
+  // v8: ensure company_roles has role_name column
+  try { await db.prepare("ALTER TABLE company_roles ADD COLUMN role_name TEXT NOT NULL DEFAULT ''").run(); } catch {}
   // v9 Migrations: bonus_type for fines support
   try { await db.prepare("ALTER TABLE employee_bonuses ADD COLUMN bonus_type TEXT DEFAULT 'bonus'").run(); } catch {}
+  // v10: ensure users have hire_date and end_date columns
+  try { await db.prepare("ALTER TABLE users ADD COLUMN hire_date TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN end_date TEXT DEFAULT ''").run(); } catch {}
   // v9 Cleanup: remove accounts with display_name containing 'готр' (any role, except primary admin id=1)
   try { await db.prepare("DELETE FROM users WHERE display_name LIKE '%готр%' AND id != 1").run(); } catch {}
+  // v11: Migrate old permissions/company_roles to team_access
+  try {
+    const rows = await db.prepare('SELECT user_id, sections_json FROM user_permissions').all();
+    for (const row of rows.results || []) {
+      let sections: string[] = [];
+      try { sections = JSON.parse(row.sections_json as string); } catch { continue; }
+      let changed = false;
+      const hasOldPerms = sections.includes('permissions');
+      const hasOldRoles = sections.includes('company_roles');
+      if (hasOldPerms || hasOldRoles) {
+        sections = sections.filter(s => s !== 'permissions' && s !== 'company_roles');
+        if (!sections.includes('team_access')) sections.push('team_access');
+        changed = true;
+      }
+      if (changed) {
+        await db.prepare('UPDATE user_permissions SET sections_json = ? WHERE user_id = ?')
+          .bind(JSON.stringify(sections), row.user_id).run();
+      }
+    }
+  } catch {}
+  // v11: Migrate company_roles default_sections from permissions/company_roles to team_access
+  try {
+    const roles = await db.prepare('SELECT id, default_sections FROM company_roles').all();
+    for (const role of roles.results || []) {
+      let sections: string[] = [];
+      try { sections = JSON.parse(role.default_sections as string); } catch { continue; }
+      const hasOld = sections.includes('permissions') || sections.includes('company_roles');
+      if (hasOld) {
+        sections = sections.filter(s => s !== 'permissions' && s !== 'company_roles');
+        if (!sections.includes('team_access')) sections.push('team_access');
+        await db.prepare('UPDATE company_roles SET default_sections = ? WHERE id = ?')
+          .bind(JSON.stringify(sections), role.id).run();
+      }
+    }
+  } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
@@ -491,7 +531,7 @@ async function runSeeds(db: D1Database): Promise<void> {
 // ===== ROLES & PERMISSIONS CONFIG =====
 export const ALL_ROLES = ['main_admin', 'developer', 'analyst', 'operator', 'buyer', 'courier'] as const;
 export const ALL_SECTIONS = [
-  'dashboard', 'leads', 'analytics', 'employees', 'permissions', 'company_roles',
+  'dashboard', 'leads', 'analytics', 'employees', 'team_access',
   'blocks', 'calculator', 'pdf', 'referrals', 'slots',
   'footer', 'telegram', 'tgbot', 'scripts', 'settings'
 ] as const;
@@ -501,7 +541,7 @@ export const ROLE_LABELS: Record<string, string> = {
 };
 export const SECTION_LABELS: Record<string, string> = {
   dashboard: 'Дашборд', leads: 'Лиды / CRM', analytics: 'Бизнес-аналитика', employees: 'Сотрудники',
-  permissions: 'Управление доступами', company_roles: 'Роли компании', blocks: 'Конструктор блоков',
+  team_access: 'Роли и доступы', blocks: 'Конструктор блоков',
   calculator: 'Калькулятор', pdf: 'PDF шаблон', referrals: 'Реферальные коды',
   slots: 'Счётчики слотов', footer: 'Футер сайта', telegram: 'TG сообщения',
   tgbot: 'TG Бот / Уведомления', scripts: 'Скрипты', settings: 'Настройки',
