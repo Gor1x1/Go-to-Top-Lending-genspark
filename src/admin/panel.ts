@@ -3621,9 +3621,9 @@ function renderBizPeriodsV2(d, sd, fin) {
       var snap2ROMI = snap2 ? (Number(cd2.romi) || 0) : 0;
       var mkt2 = snap2 ? Number(snap2.expense_marketing)||0 : 0;
       if (snap2 && !snap2ROMI && mkt2 > 0) { snap2ROMI = Math.round((((Number(snap2.revenue_services)||0) - mkt2) / mkt2) * 1000) / 10; }
-      // Update LTV: keep live value for snap1, update snap2 with computed conversion
+      // Update LTV: keep live value for snap1, only fallback for snap2 if no saved ltv
       if (!liveLtv) snap1LTV = snap1AvgCheck * snap1Conv / 100;
-      snap2LTV = snap2 ? (snap2AvgCheck * snap2Conv / 100) : 0;
+      if (snap2 && !Number(cd2.ltv)) snap2LTV = snap2AvgCheck * snap2Conv / 100;
 
       // Section separator helper
       var SECTION = '__section__';
