@@ -2587,7 +2587,7 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:12px">Снимите галочку, чтобы исключить статус из расчётов. Исключённые статусы будут затемнены.</div>';
   h += '<div class="card" style="overflow-x:auto;padding:0"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155">';
-  h += '<th style="padding:12px 8px;text-align:center;color:#94a3b8;width:40px"><i class="fas fa-check-square" style="font-size:0.7rem"></i></th>';
+  h += '<th style="padding:12px 8px;text-align:center;color:#94a3b8;width:40px"><input type="checkbox" ' + (Object.keys(excludedStatuses).length === 0 ? 'checked' : '') + ' onchange="toggleAllStatuses(this.checked)" style="cursor:pointer;accent-color:#8B5CF6" title="Выбрать все / Убрать все"></th>';
   h += '<th style="padding:12px 16px;text-align:left;color:#94a3b8">\u0421\u0442\u0430\u0442\u0443\u0441</th><th style="padding:12px;text-align:right;color:#94a3b8">\u041a\u043e\u043b-\u0432\u043e</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0421\u0443\u043c\u043c\u0430</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0423\u0441\u043b\u0443\u0433\u0438</th><th style="padding:12px;text-align:right;color:#94a3b8">\u0412\u044b\u043a\u0443\u043f\u044b</th></tr></thead><tbody>';
   var totalLeads2 = 0; var totalAmt2 = 0; var totalSvc = 0; var totalArt = 0;
   for (var si2 = 0; si2 < statuses.length; si2++) {
@@ -2645,6 +2645,15 @@ function renderBizOverviewV2(d, sd, fin) {
       // For current month, show up to today; for past months, show entire month
       var isCurrentMonth = (eY === dEnd.getFullYear() && eM-1 === dEnd.getMonth());
       dEnd = isCurrentMonth ? new Date(dEnd.getFullYear(), dEnd.getMonth(), dEnd.getDate()) : new Date(eY, eM-1, eLastDay);
+    } else if (analyticsDateFrom && analyticsDateTo) {
+      // Use the selected analytics date range
+      var fromParts = analyticsDateFrom.split('-');
+      var toParts = analyticsDateTo.split('-');
+      dStart = new Date(Number(fromParts[0]), Number(fromParts[1])-1, Number(fromParts[2]));
+      dEnd = new Date(Number(toParts[0]), Number(toParts[1])-1, Number(toParts[2]));
+    } else if (analyticsDateFrom) {
+      var fromParts2 = analyticsDateFrom.split('-');
+      dStart = new Date(Number(fromParts2[0]), Number(fromParts2[1])-1, Number(fromParts2[2]));
     } else {
       dStart.setDate(dStart.getDate() - 29);
     }
@@ -2655,7 +2664,12 @@ function renderBizOverviewV2(d, sd, fin) {
   }
   if (daily.length > 0) {
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:8px"></i>\u0417\u0430\u044f\u0432\u043a\u0438 \u043f\u043e \u0434\u043d\u044f\u043c' + (expandedMonth ? '' : ' (30 \u0434\u043d\u0435\u0439)') + '</h3>';
+    var chartPeriodLabel = '';
+    if (expandedMonth) { chartPeriodLabel = ''; }
+    else if (analyticsDateFrom && analyticsDateTo) { chartPeriodLabel = ' (' + analyticsDateFrom + ' \u2014 ' + analyticsDateTo + ')'; }
+    else if (analyticsDateFrom) { chartPeriodLabel = ' (\u0441 ' + analyticsDateFrom + ')'; }
+    else { chartPeriodLabel = ' (30 \u0434\u043d\u0435\u0439)'; }
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-chart-bar" style="color:#8B5CF6;margin-right:8px"></i>\u0417\u0430\u044f\u0432\u043a\u0438 \u043f\u043e \u0434\u043d\u044f\u043c' + chartPeriodLabel + '</h3>';
     // Compute daily average
     var dailyTotalCnt = 0; for (var dti = 0; dti < daily.length; dti++) dailyTotalCnt += Number(daily[dti].count)||0;
     var dailyAvg = daily.length > 0 ? (dailyTotalCnt / daily.length).toFixed(1) : '0';
@@ -2685,6 +2699,16 @@ function renderBizOverviewV2(d, sd, fin) {
 function toggleExcludeStatus(statusKey, checked) {
   if (checked) { delete excludedStatuses[statusKey]; }
   else { excludedStatuses[statusKey] = true; }
+  render();
+}
+
+function toggleAllStatuses(checked) {
+  var allKeys = ['new','contacted','in_progress','rejected','checking','done'];
+  if (checked) {
+    excludedStatuses = {};
+  } else {
+    for (var i = 0; i < allKeys.length; i++) { excludedStatuses[allKeys[i]] = true; }
+  }
   render();
 }
 
@@ -3669,7 +3693,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         // Format diff for display
         var fmtDiffFn = function(d2, m) {
           if (m.isCnt) return (d2 > 0 ? '+' : '') + Math.round(d2);
-          if (m.isPct) return (d2 > 0 ? '+' : '') + d2.toFixed(1) + ' \u043f.\u043f.';
+          if (m.isPct) return (d2 > 0 ? '+' : '') + d2.toFixed(1) + '%';
           if (m.isExpense) {
             // For expenses: increase in spending is bad, show as positive diff
             return (d2 > 0 ? '+' : '') + fmtAmt(Math.round(d2));

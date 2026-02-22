@@ -1761,13 +1761,20 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // 7. Daily breakdown (for bar chart)
     let dailyResults: any[] = [];
     try {
-      let dailyQ = "SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads";
       if (monthParam) {
-        dailyQ += " WHERE strftime('%Y-%m', created_at) = ? GROUP BY date(created_at) ORDER BY day";
+        const dailyQ = "SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE strftime('%Y-%m', created_at) = ? GROUP BY date(created_at) ORDER BY day";
         const dailyRes = await db.prepare(dailyQ).bind(monthParam).all();
         dailyResults = dailyRes.results || [];
+      } else if (dateFrom || dateTo) {
+        let dailyQ = "SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE 1=1";
+        const dailyParams: string[] = [];
+        if (dateFrom) { dailyQ += " AND date(created_at) >= ?"; dailyParams.push(dateFrom); }
+        if (dateTo) { dailyQ += " AND date(created_at) <= ?"; dailyParams.push(dateTo); }
+        dailyQ += " GROUP BY date(created_at) ORDER BY day";
+        const dailyRes = await db.prepare(dailyQ).bind(...dailyParams).all();
+        dailyResults = dailyRes.results || [];
       } else {
-        dailyQ += " WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day";
+        const dailyQ = "SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE date(created_at) >= date('now','-30 days') GROUP BY date(created_at) ORDER BY day";
         const dailyRes = await db.prepare(dailyQ).all();
         dailyResults = dailyRes.results || [];
       }
