@@ -47,6 +47,8 @@ export function getAdminHTML(): string {
   .spinner { display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top: 2px solid white; border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
   @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.4; } }
+  .emp-card { transition: transform 0.2s, box-shadow 0.2s; }
+  .emp-card:hover { transform: translateY(-2px); box-shadow: 0 8px 30px rgba(0,0,0,0.3); }
   .tier-del-btn { width:24px;height:24px;min-width:24px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:0.65rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;padding:0; }
   .tier-del-btn:hover { background:#EF4444;color:white; }
 </style>
@@ -4947,7 +4949,7 @@ function renderEmployees() {
     var workDuration = calcWorkDuration(u.hire_date, u.end_date);
 
     // Card wrapper with gradient border-top and hover effect
-    h += '<div class="card" style="padding:0;overflow:hidden;border-radius:16px;border-top:3px solid ' + (isDisabled ? '#475569' : rColor) + ';transition:transform 0.2s,box-shadow 0.2s;' + (isDisabled ? 'opacity:0.55;filter:grayscale(0.3);' : '') + '" onmouseenter="this.style.transform=\'translateY(-2px)\';this.style.boxShadow=\'0 8px 30px rgba(0,0,0,0.3)\'" onmouseleave="this.style.transform=\'\';this.style.boxShadow=\'\'">';
+    h += '<div class="card emp-card" style="padding:0;overflow:hidden;border-radius:16px;border-top:3px solid ' + (isDisabled ? '#475569' : rColor) + ';' + (isDisabled ? 'opacity:0.55;filter:grayscale(0.3);' : '') + '">';
 
     // === CARD HEADER with gradient bg ===
     h += '<div style="padding:18px 20px 14px;background:linear-gradient(135deg,' + (isDisabled ? 'rgba(71,85,105,0.1)' : rColor + '08') + ',transparent);display:flex;gap:14px;align-items:center">';
@@ -5235,7 +5237,7 @@ async function toggleUserActive(id, val) {
 }
 
 async function forceStopEmployee(id, name) {
-  if (!confirm('\u26a0\ufe0f Принудительно завершить работу сотрудника "' + name + '"?\n\nСотрудник будет отключён и не сможет войти в админ-панель.\nДата окончания работы будет установлена на сегодня.')) return;
+  if (!confirm('\u26a0\ufe0f Принудительно завершить работу сотрудника "' + name + '"?\\n\\nСотрудник будет отключён и не сможет войти в админ-панель.\\nДата окончания работы будет установлена на сегодня.')) return;
   var today = new Date().toISOString().slice(0,10);
   await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 0, end_date: today }) });
   data.users = await api('/users') || [];
@@ -5244,7 +5246,7 @@ async function forceStopEmployee(id, name) {
 }
 
 async function reactivateEmployee(id, name) {
-  if (!confirm('Активировать сотрудника "' + name + '"?\n\nСотрудник снова сможет входить в админ-панель. Дата окончания будет очищена.')) return;
+  if (!confirm('Активировать сотрудника "' + name + '"?\\n\\nСотрудник снова сможет входить в админ-панель. Дата окончания будет очищена.')) return;
   await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 1, end_date: '' }) });
   data.users = await api('/users') || [];
   toast('Сотрудник "' + name + '" активирован');
@@ -5303,7 +5305,7 @@ function showEmployeeModal(userId) {
   h += '</select></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u0430\u0442\u0430 \u043d\u0430\u0447\u0430\u043b\u0430 \u0440\u0430\u0431\u043e\u0442\u044b</label><input class="input" type="date" id="empHireDate" value="' + escHtml(u?.hire_date||'') + '"></div>';
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u0430\u0442\u0430 \u043e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u044f <span style="font-size:0.65rem;color:#475569">(\u043f\u0443\u0441\u0442\u043e = \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442)</span></label><input class="input" type="date" id="empEndDate" value="' + escHtml(u?.end_date||'') + '"></div></div>';
-  h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (u?'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c':'\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div></form></div></div>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px"><button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (u?'\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c':'\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button></div></form></div></div>';
   const area = document.getElementById('employeeModalArea');
   if (area) area.innerHTML = h;
 }
