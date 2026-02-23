@@ -2871,20 +2871,26 @@ function renderBizCostsV2(d, sd, fin) {
   // Use employees from analytics API (auto-pulled from Employees section)
   var employees = d.employees || [];
   var salaryTypeLabels = { monthly: 'Помесячно', biweekly: 'За 15 дней', per_task: 'За работу' };
-  var totalSalary = 0; var totalBonus = 0; var totalFines = 0; var totalNetPay = 0;
+  var totalSalary = 0; var totalBonus = 0; var totalFines = 0; var totalNetPay = 0; var totalVacPaid = 0; var totalVacPaidDays = 0; var totalVacUnpaidDays = 0;
   for (var si3 = 0; si3 < employees.length; si3++) {
     var empSal = Number(employees[si3].salary) || 0;
     var empBon = Number(employees[si3].bonuses_total) || 0;
     var empFin = Number(employees[si3].fines_total) || 0;
+    var empVacPaid = Number(employees[si3].vacation_paid_amount) || 0;
     totalSalary += empSal; totalBonus += empBon; totalFines += empFin;
-    totalNetPay += empSal + empBon + empFin;
+    totalVacPaid += empVacPaid;
+    totalVacPaidDays += Number(employees[si3].vacation_paid_days) || 0;
+    totalVacUnpaidDays += Number(employees[si3].vacation_unpaid_days) || 0;
+    totalNetPay += empSal + empBon + empFin + empVacPaid;
   }
-  // Summary cards (4 indicators including new one)
-  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">';
+  // Summary cards (6 indicators)
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:16px">';
   h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">ФОТ (зарплаты)</div><div style="font-size:1.3rem;font-weight:700;color:#3B82F6">' + fmtAmt(totalSalary) + '</div></div>';
   h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">Бонусы</div><div style="font-size:1.3rem;font-weight:700;color:#22C55E">' + fmtAmt(totalBonus) + '</div></div>';
   h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">Штрафы</div><div style="font-size:1.3rem;font-weight:700;color:#EF4444">' + fmtAmt(Math.abs(totalFines)) + '</div></div>';
-  h += '<div class="card" style="padding:14px;text-align:center;border:1px solid ' + (totalNetPay >= 0 ? '#8B5CF633' : '#EF444433') + '"><div style="font-size:0.75rem;color:#94a3b8">ИТОГО к выплате</div><div style="font-size:1.3rem;font-weight:700;color:' + (totalNetPay >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(totalNetPay) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:2px">ЗП + Бонусы \u2212 Штрафы</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8"><i class="fas fa-umbrella-beach" style="margin-right:3px;color:#fbbf24"></i>Отпускные</div><div style="font-size:1.3rem;font-weight:700;color:#fbbf24">' + fmtAmt(totalVacPaid) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:2px">' + totalVacPaidDays + ' оплач. / ' + totalVacUnpaidDays + ' неоплач. дн.</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center"><div style="font-size:0.75rem;color:#94a3b8">Стоимость / чел.</div><div style="font-size:1.1rem;font-weight:700;color:#a78bfa">' + fmtAmt(employees.length > 0 ? Math.round(totalNetPay / employees.length) : 0) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:2px">средняя на сотрудника</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center;border:1px solid ' + (totalNetPay >= 0 ? '#8B5CF633' : '#EF444433') + '"><div style="font-size:0.75rem;color:#94a3b8">ИТОГО к выплате</div><div style="font-size:1.3rem;font-weight:700;color:' + (totalNetPay >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(totalNetPay) + '</div><div style="font-size:0.6rem;color:#475569;margin-top:2px">ЗП + Бонусы \u2212 Штрафы + Отпускные</div></div>';
   h += '</div>';
   // Employee salary table — data auto-pulled from Employees
   if (employees.length > 0) {
@@ -4840,7 +4846,7 @@ function filterEmployees(users) {
     if (_empFilterStatus === 'vacation' && !isUserOnVacation(u.id)) return false;
     // Search across all fields
     if (q) {
-      var fields = [u.display_name, u.username, u.phone, u.email, u.position_title, u.role, String(u.salary||'')].join(' ').toLowerCase();
+      var fields = [u.display_name, u.username, u.phone, u.telegram_link, u.email, u.position_title, u.role, String(u.salary||'')].join(' ').toLowerCase();
       if (fields.indexOf(q) < 0) return false;
     }
     return true;
@@ -4927,7 +4933,7 @@ function renderEmployees() {
 
   // === SEARCH & FILTERS BAR ===
   h += '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:#0f172a;padding:12px 16px;border-radius:12px;border:1px solid #1e293b">';
-  h += '<div style="flex:1;min-width:220px;position:relative"><i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#64748b"></i><input class="input" style="padding-left:36px;border-radius:10px" placeholder="Поиск по имени, телефону, email, должности..." value="' + escHtml(_empSearch) + '" oninput="_empSearch=this.value;render()"></div>';
+  h += '<div style="flex:1;min-width:220px;position:relative"><i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#64748b"></i><input class="input" style="padding-left:36px;border-radius:10px" placeholder="Поиск по имени, телефону, Telegram, должности..." value="' + escHtml(_empSearch) + '" oninput="_empSearch=this.value;render()"></div>';
   h += '<select class="input" style="width:auto;min-width:140px;border-radius:10px" onchange="_empFilterRole=this.value;render()"><option value="">Все роли</option>';
   for (var ri = 0; ri < roles.length; ri++) {
     h += '<option value="' + roles[ri] + '"' + (_empFilterRole===roles[ri]?' selected':'') + '>' + escHtml(rl[roles[ri]]||roles[ri]) + '</option>';
@@ -4978,7 +4984,7 @@ function renderEmployees() {
     h += '<div style="padding:4px 20px 12px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">';
     h += '<div style="padding:8px 0;border-bottom:1px solid #1e293b"><span style="color:#475569;font-size:0.68rem;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Логин</span><span style="font-family:monospace;color:#94a3b8;font-size:0.8rem">' + escHtml(u.username) + '</span></div>';
     h += '<div style="padding:8px 0;border-bottom:1px solid #1e293b"><span style="color:#475569;font-size:0.68rem;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Телефон</span><span style="color:#e2e8f0;font-size:0.8rem">' + (u.phone ? '<a href="tel:' + escHtml(u.phone) + '" style="color:#60a5fa;text-decoration:none">' + escHtml(u.phone) + '</a>' : '<span style="color:#334155">\u2014</span>') + '</span></div>';
-    h += '<div style="padding:8px 0;border-bottom:1px solid #1e293b"><span style="color:#475569;font-size:0.68rem;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px">Email</span><span style="color:#e2e8f0;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">' + (u.email ? '<a href="mailto:' + escHtml(u.email) + '" style="color:#60a5fa;text-decoration:none">' + escHtml(u.email) + '</a>' : '<span style="color:#334155">\u2014</span>') + '</span></div>';
+    h += '<div style="padding:8px 0;border-bottom:1px solid #1e293b"><span style="color:#475569;font-size:0.68rem;display:block;margin-bottom:2px;text-transform:uppercase;letter-spacing:0.5px"><i class="fab fa-telegram" style="color:#26A5E4;margin-right:3px;font-size:0.6rem"></i>Telegram</span><span style="color:#e2e8f0;font-size:0.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block">' + (u.telegram_link ? '<a href="' + escHtml(u.telegram_link) + '" target="_blank" style="color:#26A5E4;text-decoration:none">' + escHtml(u.telegram_link.replace('https://t.me/', '@')) + '</a>' : '<span style="color:#334155">\u2014</span>') + '</span></div>';
     h += '</div>';
 
     // === SALARY & EMPLOYMENT ROW ===
@@ -5335,7 +5341,7 @@ function showEmployeeModal(userId) {
   }
   h += '</select></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</label><input class="input" id="empPhone" value="' + escHtml(u?.phone||'') + '"></div>' +
-    '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Email</label><input class="input" id="empEmail" value="' + escHtml(u?.email||'') + '"></div></div>';
+    '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px"><i class="fab fa-telegram" style="color:#26A5E4;margin-right:4px"></i>Telegram</label><input class="input" id="empTelegram" value="' + escHtml(u?.telegram_link||'') + '" placeholder="https://t.me/username"></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0417\u0430\u0440\u043f\u043b\u0430\u0442\u0430</label><input class="input" type="number" id="empSalary" value="' + (u?.salary||0) + '"></div>';
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0438\u043f \u043e\u043f\u043b\u0430\u0442\u044b</label><select class="input" id="empSalaryType">';
   var stypesModal = [{v:'monthly',l:'\u041f\u043e\u043c\u0435\u0441\u044f\u0447\u043d\u043e'},{v:'biweekly',l:'\u0417\u0430 15 \u0434\u043d\u0435\u0439'},{v:'per_task',l:'\u0417\u0430 \u0440\u0430\u0431\u043e\u0442\u0443'},{v:'percent',l:'\u041f\u0440\u043e\u0446\u0435\u043d\u0442 \u043e\u0442 \u043e\u0431\u043e\u0440\u043e\u0442\u0430'}];
@@ -5358,7 +5364,7 @@ async function saveEmployee(e, id) {
     display_name: document.getElementById('empName').value, 
     role: document.getElementById('empRole').value, 
     phone: document.getElementById('empPhone').value, 
-    email: document.getElementById('empEmail').value,
+    telegram_link: document.getElementById('empTelegram')?.value || '',
     position_title: document.getElementById('empPosition')?.value || '',
     salary: Number(document.getElementById('empSalary')?.value) || 0,
     salary_type: document.getElementById('empSalaryType')?.value || 'monthly',

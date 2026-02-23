@@ -529,6 +529,10 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   // v14: sync role_label = role_name where role_label is empty
   try { await db.prepare("UPDATE company_roles SET role_label = role_name WHERE role_label = '' AND role_name != ''").run(); } catch {}
   try { await db.prepare("UPDATE company_roles SET role_name = role_label WHERE role_name = '' AND role_label != ''").run(); } catch {}
+  // v15: add telegram_link to users (replaces email for contact)
+  try { await db.prepare("ALTER TABLE users ADD COLUMN telegram_link TEXT DEFAULT ''").run(); } catch {}
+  // v15: migrate email data to telegram_link if it looks like telegram
+  try { await db.prepare("UPDATE users SET telegram_link = email WHERE email LIKE '%t.me%' AND (telegram_link = '' OR telegram_link IS NULL)").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

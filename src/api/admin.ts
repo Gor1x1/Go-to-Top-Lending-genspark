@@ -888,8 +888,8 @@ api.get('/users', authMiddleware, async (c) => {
   const isMainAdmin = caller.role === 'main_admin';
   // main_admin sees password_plain for credential management; others don't
   const cols = isMainAdmin
-    ? 'id, username, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date, end_date, created_at'
-    : 'id, username, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date, end_date, created_at';
+    ? 'id, username, password_plain, role, display_name, phone, email, telegram_link, is_active, salary, salary_type, position_title, hire_date, end_date, created_at'
+    : 'id, username, role, display_name, phone, email, telegram_link, is_active, salary, salary_type, position_title, hire_date, end_date, created_at';
   const res = await db.prepare('SELECT ' + cols + ' FROM users ORDER BY id').all();
   return c.json(res.results);
 });
@@ -908,8 +908,8 @@ api.post('/users', authMiddleware, async (c) => {
   const existing = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
   if (existing) return c.json({ error: 'Username already exists' }, 400);
   const hash = await hashPassword(d.password);
-  await db.prepare('INSERT INTO users (username, password_hash, password_plain, role, display_name, phone, email, is_active, salary, salary_type, position_title, hire_date, end_date) VALUES (?,?,?,?,?,?,?,1,?,?,?,?,?)')
-    .bind(d.username, hash, d.password, d.role || 'operator', d.display_name, d.phone || '', d.email || '', d.salary || 0, d.salary_type || 'monthly', d.position_title || '', d.hire_date || '', d.end_date || '').run();
+  await db.prepare('INSERT INTO users (username, password_hash, password_plain, role, display_name, phone, email, telegram_link, is_active, salary, salary_type, position_title, hire_date, end_date) VALUES (?,?,?,?,?,?,?,?,1,?,?,?,?,?)')
+    .bind(d.username, hash, d.password, d.role || 'operator', d.display_name, d.phone || '', d.email || '', d.telegram_link || '', d.salary || 0, d.salary_type || 'monthly', d.position_title || '', d.hire_date || '', d.end_date || '').run();
   // Set default permissions
   const newUser = await db.prepare('SELECT id FROM users WHERE username = ?').bind(d.username).first();
   if (newUser) {
@@ -936,6 +936,7 @@ api.put('/users/:id', authMiddleware, async (c) => {
   if (d.role !== undefined) { fields.push('role=?'); vals.push(d.role); }
   if (d.phone !== undefined) { fields.push('phone=?'); vals.push(d.phone); }
   if (d.email !== undefined) { fields.push('email=?'); vals.push(d.email); }
+  if (d.telegram_link !== undefined) { fields.push('telegram_link=?'); vals.push(d.telegram_link); }
   if (d.is_active !== undefined) { fields.push('is_active=?'); vals.push(d.is_active ? 1 : 0); }
   if (d.username !== undefined) { fields.push('username=?'); vals.push(d.username); }
   if (d.salary !== undefined) { fields.push('salary=?'); vals.push(d.salary); }
@@ -1895,16 +1896,36 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       // Ensure hire_date and end_date columns exist
       try { await db.prepare("ALTER TABLE users ADD COLUMN hire_date TEXT DEFAULT ''").run(); } catch {}
       try { await db.prepare("ALTER TABLE users ADD COLUMN end_date TEXT DEFAULT ''").run(); } catch {}
-      const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active, hire_date, end_date FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
+      const empRes = await db.prepare("SELECT id, display_name, role, salary, salary_type, position_title, is_active, hire_date, end_date, telegram_link FROM users WHERE salary > 0 OR role != 'main_admin' ORDER BY salary DESC").all();
       for (const e of (empRes.results || [])) {
         const bSum = await db.prepare("SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END),0) as total_bonuses, COALESCE(SUM(CASE WHEN amount < 0 THEN amount ELSE 0 END),0) as total_fines, COALESCE(SUM(amount),0) as net_total FROM employee_bonuses WHERE user_id = ?" + bonusFilter).bind(e.id, ...bonusParams).first().catch(() => null);
+        // Vacation data for this employee
+        let vacPaidDays = 0, vacUnpaidDays = 0, vacPaidAmount = 0;
+        try {
+          const vacSum = await db.prepare("SELECT COALESCE(SUM(CASE WHEN is_paid=1 THEN days_count ELSE 0 END),0) as paid_days, COALESCE(SUM(CASE WHEN is_paid=0 THEN days_count ELSE 0 END),0) as unpaid_days, COALESCE(SUM(paid_amount),0) as paid_amount FROM employee_vacations WHERE user_id = ?").bind(e.id).first();
+          vacPaidDays = Number(vacSum?.paid_days || 0);
+          vacUnpaidDays = Number(vacSum?.unpaid_days || 0);
+          vacPaidAmount = Number(vacSum?.paid_amount || 0);
+        } catch {}
         employees.push({ 
           ...e, 
           bonuses_total: Math.round((Number(bSum?.total_bonuses || 0)) * 100) / 100,
           fines_total: Math.round((Number(bSum?.total_fines || 0)) * 100) / 100,
-          bonuses_net: Math.round((Number(bSum?.net_total || 0)) * 100) / 100
+          bonuses_net: Math.round((Number(bSum?.net_total || 0)) * 100) / 100,
+          vacation_paid_days: vacPaidDays,
+          vacation_unpaid_days: vacUnpaidDays,
+          vacation_paid_amount: Math.round(vacPaidAmount * 100) / 100
         });
       }
+    } catch {}
+
+    // 12b. Total vacation costs across all employees
+    let totalVacPaidAmount = 0, totalVacPaidDays = 0, totalVacUnpaidDays = 0;
+    try {
+      const vacTotals = await db.prepare("SELECT COALESCE(SUM(paid_amount),0) as paid_amt, COALESCE(SUM(CASE WHEN is_paid=1 THEN days_count ELSE 0 END),0) as paid_days, COALESCE(SUM(CASE WHEN is_paid=0 THEN days_count ELSE 0 END),0) as unpaid_days FROM employee_vacations").first();
+      totalVacPaidAmount = Math.round(Number(vacTotals?.paid_amt || 0) * 100) / 100;
+      totalVacPaidDays = Number(vacTotals?.paid_days || 0);
+      totalVacUnpaidDays = Number(vacTotals?.unpaid_days || 0);
     } catch {}
 
     // 13. Rejected leads with reasons
@@ -2068,6 +2089,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         avg_check: avgCheck, conversion_rate: conversionRate,
         break_even: breakEven, avg_fulfillment_days: avgFulfillmentDays,
         done_amount: doneAmount, done_services: doneServices, done_articles: doneArticles,
+        vacation_paid_amount: totalVacPaidAmount, vacation_paid_days: totalVacPaidDays, vacation_unpaid_days: totalVacUnpaidDays,
       },
       daily: dailyResults,
       by_assignee: byAssignee,
@@ -2294,6 +2316,7 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
     let lifetimePenalties = 0;
     let lifetimeUnpaidDays = 0;
     let lifetimeUnpaidDeduction = 0;
+    let lifetimePaidVacAmount = 0;
     let lifetimeTotal = 0;
 
     if (hireDate) {
@@ -2317,7 +2340,6 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
       const lifetimeBonusNet = Number(lifeBonus?.net || 0);
 
       // Lifetime unpaid vacation days + paid vacation amounts
-      let lifetimePaidVacAmount = 0;
       try {
         const lifeVac = await db.prepare(`
           SELECT COALESCE(SUM(CASE WHEN is_paid = 0 THEN days_count ELSE 0 END),0) as unpaid_days,
