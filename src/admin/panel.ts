@@ -5002,12 +5002,26 @@ function renderEmployees() {
 
     // === EARNINGS BLOCK ===
     h += '<div style="padding:0 20px 12px">';
+    // Find any cached earnings for this user (prefer curMonth, then any other month)
+    var earningsMonth = curMonth;
     var earnings = _empEarningsCache[u.id + '_' + curMonth];
+    if (!earnings) {
+      for (var ek in _empEarningsCache) {
+        if (ek.indexOf(u.id + '_') === 0 && _empEarningsCache[ek]) {
+          earnings = _empEarningsCache[ek];
+          earningsMonth = ek.replace(u.id + '_', '');
+          break;
+        }
+      }
+    }
     if (earnings) {
-      h += '<div style="background:linear-gradient(135deg,#0c1222,#0f172a);border-radius:12px;padding:14px 16px;border:1px solid #1e293b">';
+      var cacheKey = u.id + '_' + earningsMonth;
+      h += '<div style="background:linear-gradient(135deg,#0c1222,#0f172a);border-radius:12px;padding:14px 16px;border:1px solid #1e293b;position:relative">';
+      // Close button
+      h += '<button onclick="delete _empEarningsCache[&apos;' + cacheKey + '&apos;];render()" style="position:absolute;top:8px;right:8px;background:rgba(100,116,139,0.2);border:none;color:#94a3b8;cursor:pointer;width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:0.8rem;transition:all 0.2s" title="Скрыть заработок"><i class="fas fa-times"></i></button>';
       // Month header
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
-      h += '<span style="font-size:0.75rem;color:#64748b"><i class="fas fa-chart-bar" style="margin-right:4px;color:#8B5CF6"></i>Заработок: ' + curMonth + '</span>';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-right:28px">';
+      h += '<span style="font-size:0.75rem;color:#64748b"><i class="fas fa-chart-bar" style="margin-right:4px;color:#8B5CF6"></i>Заработок: ' + earningsMonth + '</span>';
       h += '<span style="color:#c4b5fd;font-weight:900;font-size:1rem">' + fmtAmt(earnings.total_earnings) + '</span></div>';
       // Visual breakdown bar
       var maxEarn = Math.max(earnings.salary || 0, 1);
@@ -5024,8 +5038,12 @@ function renderEmployees() {
       h += '<div style="text-align:center"><div style="color:#475569;font-size:0.62rem;text-transform:uppercase;margin-bottom:3px">ЗП</div><div style="color:#60a5fa;font-weight:700;font-size:0.82rem">' + fmtAmt(earnings.month_salary_after_vac !== undefined ? earnings.month_salary_after_vac : earnings.salary) + '</div></div>';
       h += '<div style="text-align:center"><div style="color:#475569;font-size:0.62rem;text-transform:uppercase;margin-bottom:3px">Бонусы</div><div style="color:#34d399;font-weight:700;font-size:0.82rem">+' + fmtAmt(earnings.bonuses) + '</div></div>';
       h += '<div style="text-align:center"><div style="color:#475569;font-size:0.62rem;text-transform:uppercase;margin-bottom:3px">Штрафы</div><div style="color:#f87171;font-weight:700;font-size:0.82rem">' + (earnings.penalties > 0 ? '-' : '') + fmtAmt(earnings.penalties) + '</div></div>';
-      h += '<div style="text-align:center"><div style="color:#475569;font-size:0.62rem;text-transform:uppercase;margin-bottom:3px">Отпуск</div><div style="color:#fbbf24;font-weight:700;font-size:0.82rem">' + (earnings.vacation_total_days || 0) + ' дн.</div></div>';
+      h += '<div style="text-align:center"><div style="color:#475569;font-size:0.62rem;text-transform:uppercase;margin-bottom:3px">Отпуск дн.</div><div style="color:#fbbf24;font-weight:700;font-size:0.82rem">' + (earnings.vacation_total_days || 0) + ' дн.</div></div>';
       h += '</div>';
+      // === VACATION EARNINGS ===
+      if (earnings.vacation_paid_amount > 0) {
+        h += '<div style="margin-top:8px;font-size:0.78rem;color:#10B981;background:rgba(16,185,129,0.06);padding:8px 12px;border-radius:8px;border:1px solid rgba(16,185,129,0.12);display:flex;justify-content:space-between;align-items:center"><span><i class="fas fa-umbrella-beach" style="margin-right:6px;color:#fbbf24"></i><strong>Отпуск (оплачиваемый)</strong></span><span style="font-weight:800;color:#34d399">+' + fmtAmt(earnings.vacation_paid_amount) + '</span></div>';
+      }
       // Unpaid vacation notice
       if (earnings.unpaid_deduction > 0) {
         h += '<div style="margin-top:8px;font-size:0.72rem;color:#f87171;background:rgba(239,68,68,0.06);padding:6px 10px;border-radius:8px;border:1px solid rgba(239,68,68,0.1)"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Вычет за неоплач. отпуск: -' + fmtAmt(earnings.unpaid_deduction) + '</div>';
@@ -5034,10 +5052,15 @@ function renderEmployees() {
       if (earnings.lifetime && earnings.lifetime.months_worked > 0) {
         h += '<div style="margin-top:10px;padding-top:10px;border-top:1px solid #1e293b">';
         h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:8px;display:flex;align-items:center;gap:6px"><i class="fas fa-history" style="color:#8B5CF6"></i><span>За всё время работы</span><span style="background:#1e293b;padding:1px 8px;border-radius:6px;font-weight:600;color:#a78bfa">' + earnings.lifetime.months_worked + ' мес.</span></div>';
-        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:6px">';
         h += '<div style="text-align:center"><div style="color:#475569;font-size:0.6rem;text-transform:uppercase;margin-bottom:2px">ЗП</div><div style="color:#60a5fa;font-weight:700;font-size:0.78rem">' + fmtAmt(earnings.lifetime.total_salary) + '</div></div>';
         h += '<div style="text-align:center"><div style="color:#475569;font-size:0.6rem;text-transform:uppercase;margin-bottom:2px">Бонусы</div><div style="color:#34d399;font-weight:700;font-size:0.78rem">+' + fmtAmt(earnings.lifetime.total_bonuses) + '</div></div>';
         h += '<div style="text-align:center"><div style="color:#475569;font-size:0.6rem;text-transform:uppercase;margin-bottom:2px">Штрафы</div><div style="color:#f87171;font-weight:700;font-size:0.78rem">-' + fmtAmt(earnings.lifetime.total_penalties) + '</div></div>';
+        if (earnings.lifetime.paid_vacation_amount > 0) {
+          h += '<div style="text-align:center"><div style="color:#475569;font-size:0.6rem;text-transform:uppercase;margin-bottom:2px">Отпуск</div><div style="color:#fbbf24;font-weight:700;font-size:0.78rem">+' + fmtAmt(earnings.lifetime.paid_vacation_amount) + '</div></div>';
+        } else {
+          h += '<div></div>';
+        }
         h += '<div style="text-align:center;background:rgba(139,92,246,0.06);border-radius:8px;padding:4px"><div style="color:#a78bfa;font-size:0.6rem;text-transform:uppercase;margin-bottom:2px;font-weight:600">ИТОГО</div><div style="color:#c4b5fd;font-weight:900;font-size:0.9rem">' + fmtAmt(earnings.lifetime.grand_total) + '</div></div>';
         h += '</div>';
         if (earnings.lifetime.unpaid_deduction > 0) {
@@ -5047,7 +5070,10 @@ function renderEmployees() {
       }
       h += '</div>';
     } else {
-      h += '<button class="btn btn-outline" style="width:100%;padding:10px;font-size:0.82rem;border-radius:10px;border-style:dashed" onclick="loadEmpEarnings(' + u.id + ',&apos;' + curMonth + '&apos;)"><i class="fas fa-chart-line" style="margin-right:6px;color:#8B5CF6"></i>Показать заработок за ' + curMonth + '</button>';
+      h += '<div style="display:flex;gap:6px">';
+      h += '<button class="btn btn-outline" style="flex:1;padding:10px;font-size:0.82rem;border-radius:10px;border-style:dashed" onclick="loadEmpEarnings(' + u.id + ',&apos;' + curMonth + '&apos;)"><i class="fas fa-chart-line" style="margin-right:6px;color:#8B5CF6"></i>Заработок за ' + curMonth + '</button>';
+      h += '<button class="btn btn-outline" style="padding:10px 14px;font-size:0.82rem;border-radius:10px;border-style:dashed" onclick="showPeriodEarningsModal(' + u.id + ')" title="Заработок за период"><i class="fas fa-calendar-alt" style="color:#F59E0B"></i></button>';
+      h += '</div>';
     }
     h += '</div>';
 
@@ -5150,6 +5176,20 @@ async function loadAllEarnings() {
   await Promise.all(promises);
   toast('Данные обновлены!');
   render();
+}
+
+function showPeriodEarningsModal(userId) {
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center" onclick="this.remove()">';
+  h += '<div class="card" style="width:400px;max-width:90vw" onclick="event.stopPropagation()">';
+  h += '<h3 style="font-size:1.05rem;font-weight:700;margin-bottom:16px"><i class="fas fa-calendar-alt" style="color:#F59E0B;margin-right:8px"></i>Заработок за период</h3>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Выберите месяц</label>';
+  h += '<input class="input" type="month" id="periodMonth" value="' + new Date().toISOString().slice(0,7) + '"></div>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end">';
+  h += '<button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Отмена</button>';
+  h += '<button type="button" class="btn btn-primary" onclick="var m=document.getElementById(&apos;periodMonth&apos;).value;if(m){loadEmpEarnings(' + userId + ',m);this.closest(&apos;[style*=fixed]&apos;).remove();}"><i class="fas fa-search" style="margin-right:6px"></i>Показать</button>';
+  h += '</div></div></div>';
+  var area = document.getElementById('employeeModalArea');
+  if (area) area.innerHTML = h;
 }
 
 function showVacationModal(userId) {
@@ -5370,7 +5410,10 @@ function renderTeamAccess() {
   h += '<div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-shield-alt" style="color:#8B5CF6;margin-right:10px"></i>Роли и доступы</h1>';
   h += '<p style="color:#94a3b8;margin-top:4px">Управление ролями, правами доступа и назначениями сотрудников</p></div>';
   if (isAdmin) {
+    h += '<div style="display:flex;gap:8px">';
+    h += '<button class="btn btn-outline" onclick="_matrixPermsLoaded=false;loadUserPermsForMatrix();var r2=api(&apos;/company-roles&apos;);r2.then(function(x){data.companyRoles=(x&amp;&amp;x.roles)||[];render();});toast(&apos;Обновление...&apos;,&apos;info&apos;)" title="Обновить данные"><i class="fas fa-sync-alt"></i></button>';
     h += '<button class="btn btn-primary" onclick="showCompanyRoleModal()"><i class="fas fa-plus" style="margin-right:6px"></i>Новая роль</button>';
+    h += '</div>';
   }
   h += '</div>';
   
@@ -5411,7 +5454,28 @@ function renderTeamAccess() {
 }
 
 // === TAB 1: ACCESS MATRIX ===
+// Preload user permissions for matrix display
+async function loadUserPermsForMatrix() {
+  var users = data.users || [];
+  for (var i = 0; i < users.length; i++) {
+    var uid = users[i].id;
+    try {
+      var res = await api('/permissions/' + uid);
+      var perms = (res && res.permissions) || [];
+      window['_userPermsMatrix_' + uid] = perms;
+    } catch {}
+  }
+  render();
+}
+// Auto-load on first matrix view
+var _matrixPermsLoaded = false;
+
 function renderAccessMatrix(users, roles, allSections, sl, rl, isAdmin) {
+  // Trigger load of actual user permissions if not done yet
+  if (!_matrixPermsLoaded) {
+    _matrixPermsLoaded = true;
+    loadUserPermsForMatrix();
+  }
   var h = '';
   // Stats cards
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px;margin-bottom:24px">';
@@ -5455,21 +5519,29 @@ function renderAccessMatrix(users, roles, allSections, sl, rl, isAdmin) {
   // Separator
   h += '<tr style="background:#1a1a3e;border-bottom:1px solid #334155"><td colspan="' + (allSections.length + 1) + '" style="padding:8px 16px;font-weight:700;color:#10B981;font-size:0.78rem"><i class="fas fa-users" style="margin-right:6px"></i>Сотрудники (индивидуальные доступы)</td></tr>';
   
-  // Users
+  // Users — fetch actual permissions from API cache or use role defaults
   for (var ui = 0; ui < users.length; ui++) {
     var u = users[ui];
     var userRole = roles.find(function(r){ return r.role_key === u.role; });
     var defaultSections = [];
     try { defaultSections = userRole ? JSON.parse(userRole.default_sections || '[]') : []; } catch {}
+    // Check if user has custom permissions stored
+    var userPermsKey = '_userPermsMatrix_' + u.id;
+    var userCustomPerms = window[userPermsKey] || null;
+    var effectiveSections = userCustomPerms || defaultSections;
     h += '<tr style="border-bottom:1px solid #1e293b;background:' + (ui % 2 === 0 ? '#131b2e' : '#0f172a') + ';cursor:pointer" onclick="_teamAccessTab=&apos;users&apos;;render();setTimeout(function(){selectPermUser(' + u.id + ')},100)">';
     h += '<td style="padding:8px 16px;position:sticky;left:0;background:inherit;z-index:1"><div style="display:flex;align-items:center;gap:8px"><span style="width:8px;height:8px;border-radius:50%;background:' + (u.is_active ? '#10B981' : '#EF4444') + ';flex-shrink:0"></span><span style="font-weight:600;color:#e2e8f0">' + escHtml(u.display_name) + '</span><span style="font-size:0.68rem;color:#64748b">' + escHtml(rl[u.role] || u.role) + '</span></div></td>';
     for (var sk = 0; sk < allSections.length; sk++) {
       var sec = allSections[sk];
       var isMainAdmin = u.role === 'main_admin';
       var hasFromRole = defaultSections.indexOf(sec) >= 0;
-      var hasAccess2 = isMainAdmin || hasFromRole;
-      var cellColor = isMainAdmin ? 'rgba(139,92,246,0.4)' : (hasAccess2 ? 'rgba(16,185,129,0.25)' : 'rgba(100,116,139,0.1)');
-      var textColor = isMainAdmin ? '#c4b5fd' : (hasAccess2 ? '#34d399' : '#475569');
+      var hasCustom = userCustomPerms ? userCustomPerms.indexOf(sec) >= 0 : false;
+      var hasAccess2 = isMainAdmin || hasFromRole || hasCustom;
+      var cellColor, textColor;
+      if (isMainAdmin) { cellColor = 'rgba(139,92,246,0.4)'; textColor = '#c4b5fd'; }
+      else if (hasCustom && !hasFromRole) { cellColor = 'rgba(245,158,11,0.25)'; textColor = '#fbbf24'; }
+      else if (hasAccess2) { cellColor = 'rgba(16,185,129,0.25)'; textColor = '#34d399'; }
+      else { cellColor = 'rgba(100,116,139,0.1)'; textColor = '#475569'; }
       h += '<td style="padding:4px;text-align:center"><span style="display:inline-block;width:22px;height:22px;border-radius:4px;background:' + cellColor + ';line-height:22px;font-size:0.7rem;color:' + textColor + '">' + (hasAccess2 ? '✓' : '·') + '</span></td>';
     }
     h += '</tr>';
@@ -5481,6 +5553,7 @@ function renderAccessMatrix(users, roles, allSections, sl, rl, isAdmin) {
   h += '<div style="display:flex;gap:20px;margin-top:16px;font-size:0.78rem;color:#64748b;flex-wrap:wrap">';
   h += '<div style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:3px;background:rgba(139,92,246,0.4)"></span>Полный доступ (Главный Админ)</div>';
   h += '<div style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:3px;background:rgba(16,185,129,0.25)"></span>Доступ по роли</div>';
+  h += '<div style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:3px;background:rgba(245,158,11,0.25)"></span>Индивидуальный доступ</div>';
   h += '<div style="display:flex;align-items:center;gap:6px"><span style="width:14px;height:14px;border-radius:3px;background:rgba(100,116,139,0.1)"></span>Нет доступа</div>';
   h += '<div style="display:flex;align-items:center;gap:6px"><i class="fas fa-info-circle" style="color:#3B82F6"></i>Кликните на сотрудника для редактирования</div>';
   h += '</div>';
@@ -5567,10 +5640,12 @@ function renderUserPermissionsTab(users, allSections, sl, rl, isAdmin) {
   return h;
 }
 
-async function selectPermUser(uid) {
+async function selectPermUser(uid, skipFetch) {
   selectedPermUserId = uid;
-  var res = await api('/permissions/' + uid);
-  selectedPermSections = (res && res.permissions) || [];
+  if (!skipFetch) {
+    var res = await api('/permissions/' + uid);
+    selectedPermSections = (res && res.permissions) || [];
+  }
   var u = data.users.find(function(x) { return x.id === uid; });
   var isMainAdmin2 = u && u.role === 'main_admin';
   var isAdmin2 = currentUser && currentUser.role === 'main_admin';
@@ -5618,8 +5693,8 @@ async function selectPermUser(uid) {
     var disabled2 = !isAdmin2 || isMainAdmin2;
     var borderColor = checked2 ? '#8B5CF6' : '#334155';
     var indicator = '';
-    if (!isMainAdmin2 && checked2 && fromRole) indicator = '<span style="font-size:0.6rem;color:#10B981;margin-left:auto" title="Из роли">▪ роль</span>';
-    else if (!isMainAdmin2 && checked2 && !fromRole) indicator = '<span style="font-size:0.6rem;color:#F59E0B;margin-left:auto" title="Индивидуально">▪ свой</span>';
+    if (!isMainAdmin2 && checked2 && fromRole) indicator = '<span style="font-size:0.6rem;color:#10B981;margin-left:auto" title="Унаследовано от роли">▪ роль</span>';
+    else if (!isMainAdmin2 && checked2 && !fromRole) indicator = '<span style="font-size:0.6rem;color:#F59E0B;margin-left:auto" title="Добавлено индивидуально (не из роли)">▪ инд.</span>';
     h += '<label style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#0f172a;border:1px solid ' + borderColor + ';border-radius:8px;cursor:' + (disabled2?'default':'pointer') + ';opacity:' + (disabled2?'0.6':'1') + ';transition:all 0.2s">' +
       '<input type="checkbox" ' + (checked2?'checked':'') + ' ' + (disabled2?'disabled':'') + ' onchange="togglePermSection(&apos;' + sec2 + '&apos;)" style="accent-color:#8B5CF6;flex-shrink:0">' +
       '<span style="font-size:0.82rem">' + escHtml(sl2[sec2]||sec2) + '</span>' + indicator + '</label>';
@@ -5640,23 +5715,26 @@ function applyRoleDefaults() {
   var u = data.users.find(function(x) { return x.id === selectedPermUserId; });
   var compRole = (data.companyRoles || []).find(function(r) { return r.role_key === u?.role; });
   try { selectedPermSections = compRole ? JSON.parse(compRole.default_sections || '[]') : ['dashboard']; } catch { selectedPermSections = ['dashboard']; }
-  selectPermUser(selectedPermUserId);
+  selectPermUser(selectedPermUserId, true);
 }
 
 function selectAllPerms() {
   selectedPermSections = (rolesConfig?.sections || []).slice();
-  selectPermUser(selectedPermUserId);
+  selectPermUser(selectedPermUserId, true);
 }
 
 function clearAllPerms() {
   selectedPermSections = ['dashboard'];
-  selectPermUser(selectedPermUserId);
+  selectPermUser(selectedPermUserId, true);
 }
 
 async function savePermissions() {
   if (!selectedPermUserId) return;
   await api('/permissions/' + selectedPermUserId, { method:'PUT', body: JSON.stringify({ sections: selectedPermSections }) });
+  // Update matrix cache
+  window['_userPermsMatrix_' + selectedPermUserId] = selectedPermSections.slice();
   toast('Доступы сохранены!');
+  render();
 }
 
 // === TAB 4: TEAM STATS ===

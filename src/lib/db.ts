@@ -522,6 +522,13 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE company_roles ADD COLUMN description TEXT DEFAULT ''").run(); } catch {}
   // v13: ensure company_roles has is_active column
   try { await db.prepare("ALTER TABLE company_roles ADD COLUMN is_active INTEGER DEFAULT 1").run(); } catch {}
+  // v14: ensure company_roles has updated_at column (fix D1_ERROR: no such column: updated_at)
+  try { await db.prepare("ALTER TABLE company_roles ADD COLUMN updated_at DATETIME DEFAULT CURRENT_TIMESTAMP").run(); } catch {}
+  // v14: ensure company_roles has role_label column (fix NOT NULL constraint on legacy DBs)
+  try { await db.prepare("ALTER TABLE company_roles ADD COLUMN role_label TEXT DEFAULT ''").run(); } catch {}
+  // v14: sync role_label = role_name where role_label is empty
+  try { await db.prepare("UPDATE company_roles SET role_label = role_name WHERE role_label = '' AND role_name != ''").run(); } catch {}
+  try { await db.prepare("UPDATE company_roles SET role_name = role_label WHERE role_name = '' AND role_label != ''").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

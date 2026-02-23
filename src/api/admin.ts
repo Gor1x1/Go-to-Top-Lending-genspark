@@ -1294,8 +1294,8 @@ api.post('/company-roles', authMiddleware, async (c) => {
   if (!d.role_key || !d.role_name) return c.json({ error: 'role_key and role_name required' }, 400);
   const existing = await db.prepare('SELECT id FROM company_roles WHERE role_key = ?').bind(d.role_key).first();
   if (existing) return c.json({ error: 'Role key already exists' }, 400);
-  await db.prepare('INSERT INTO company_roles (role_key, role_name, description, default_sections, color, is_system, sort_order) VALUES (?,?,?,?,?,0,?)')
-    .bind(d.role_key, d.role_name, d.description || '', JSON.stringify(d.default_sections || ['dashboard']), d.color || '#8B5CF6', d.sort_order || 99).run();
+  await db.prepare('INSERT INTO company_roles (role_key, role_name, role_label, description, default_sections, color, is_system, sort_order) VALUES (?,?,?,?,?,?,0,?)')
+    .bind(d.role_key, d.role_name, d.role_name, d.description || '', JSON.stringify(d.default_sections || ['dashboard']), d.color || '#8B5CF6', d.sort_order || 99).run();
   return c.json({ success: true });
 });
 
@@ -1307,14 +1307,13 @@ api.put('/company-roles/:id', authMiddleware, async (c) => {
   const d = await c.req.json();
   const fields: string[] = [];
   const vals: any[] = [];
-  if (d.role_name !== undefined) { fields.push('role_name=?'); vals.push(d.role_name); }
+  if (d.role_name !== undefined) { fields.push('role_name=?'); vals.push(d.role_name); fields.push('role_label=?'); vals.push(d.role_name); }
   if (d.description !== undefined) { fields.push('description=?'); vals.push(d.description); }
   if (d.default_sections !== undefined) { fields.push('default_sections=?'); vals.push(JSON.stringify(d.default_sections)); }
   if (d.color !== undefined) { fields.push('color=?'); vals.push(d.color); }
   if (d.is_active !== undefined) { fields.push('is_active=?'); vals.push(d.is_active ? 1 : 0); }
   if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
-  fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
   await db.prepare(`UPDATE company_roles SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
   return c.json({ success: true });
@@ -2284,7 +2283,8 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
     const unpaidDeduction = Math.round(unpaidVacDays * dailySalary * 100) / 100;
     // Paid vacation: salary stays the same, no deduction
     const monthSalaryAfterVac = Math.max(0, Math.round((monthlySalary - unpaidDeduction) * 100) / 100);
-    const monthTotal = Math.round((monthSalaryAfterVac + bonusesNet) * 100) / 100;
+    // Paid vacation amount is added to total earnings as separate line
+    const monthTotal = Math.round((monthSalaryAfterVac + bonusesNet + vacationPaid) * 100) / 100;
 
     // === LIFETIME EARNINGS (since hire_date) ===
     // Count months worked
@@ -2316,16 +2316,19 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
       lifetimePenalties = Number(lifeBonus?.penalties || 0);
       const lifetimeBonusNet = Number(lifeBonus?.net || 0);
 
-      // Lifetime unpaid vacation days
+      // Lifetime unpaid vacation days + paid vacation amounts
+      let lifetimePaidVacAmount = 0;
       try {
         const lifeVac = await db.prepare(`
-          SELECT COALESCE(SUM(CASE WHEN is_paid = 0 THEN days_count ELSE 0 END),0) as unpaid_days
+          SELECT COALESCE(SUM(CASE WHEN is_paid = 0 THEN days_count ELSE 0 END),0) as unpaid_days,
+            COALESCE(SUM(paid_amount),0) as total_paid_amount
           FROM employee_vacations WHERE user_id = ? AND start_date >= ? ${endDate ? "AND start_date <= ?" : ""}
         `).bind(userId, hireDate, ...(endDate ? [endDate] : [])).first();
         lifetimeUnpaidDays = Number(lifeVac?.unpaid_days || 0);
+        lifetimePaidVacAmount = Number(lifeVac?.total_paid_amount || 0);
       } catch {}
       lifetimeUnpaidDeduction = Math.round(lifetimeUnpaidDays * dailySalary * 100) / 100;
-      lifetimeTotal = Math.round((lifetimeSalary - lifetimeUnpaidDeduction + lifetimeBonusNet) * 100) / 100;
+      lifetimeTotal = Math.round((lifetimeSalary - lifetimeUnpaidDeduction + lifetimeBonusNet + lifetimePaidVacAmount) * 100) / 100;
     }
 
     return c.json({
@@ -2350,6 +2353,7 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
         total_penalties: lifetimePenalties,
         unpaid_vac_days: lifetimeUnpaidDays,
         unpaid_deduction: lifetimeUnpaidDeduction,
+        paid_vacation_amount: lifetimePaidVacAmount,
         grand_total: lifetimeTotal
       }
     });
