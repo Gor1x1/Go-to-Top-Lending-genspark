@@ -502,20 +502,26 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
     }
   } catch {}
   // v12: ensure employee_vacations & activity_sessions tables exist
-  try { await db.exec(`CREATE TABLE IF NOT EXISTS employee_vacations (
+  // Use .prepare().run() instead of .exec() for D1 production compatibility
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS employee_vacations (
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, start_date TEXT NOT NULL DEFAULT '',
     end_date TEXT NOT NULL DEFAULT '', days_count INTEGER DEFAULT 0, is_paid INTEGER DEFAULT 1,
     paid_amount REAL DEFAULT 0, status TEXT DEFAULT 'planned', notes TEXT DEFAULT '',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`); } catch {}
-  try { await db.exec(`CREATE TABLE IF NOT EXISTS activity_sessions (
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS activity_sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL, last_action TEXT DEFAULT '',
     last_page TEXT DEFAULT '', last_seen_at DATETIME DEFAULT CURRENT_TIMESTAMP, ip TEXT DEFAULT '',
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-  )`); } catch {}
-  try { await db.exec('CREATE INDEX IF NOT EXISTS idx_vacations_user ON employee_vacations(user_id)'); } catch {}
-  try { await db.exec('CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_sessions(user_id)'); } catch {}
+  )`).run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_vacations_user ON employee_vacations(user_id)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_vacations_dates ON employee_vacations(start_date, end_date)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_activity_user ON activity_sessions(user_id)').run(); } catch {}
+  // v13: ensure company_roles has description column (fix copy/edit error)
+  try { await db.prepare("ALTER TABLE company_roles ADD COLUMN description TEXT DEFAULT ''").run(); } catch {}
+  // v13: ensure company_roles has is_active column
+  try { await db.prepare("ALTER TABLE company_roles ADD COLUMN is_active INTEGER DEFAULT 1").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

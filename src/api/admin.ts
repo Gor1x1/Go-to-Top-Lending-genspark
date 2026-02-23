@@ -2237,34 +2237,121 @@ api.get('/users/search', authMiddleware, async (c) => {
 });
 
 // ===== EMPLOYEE EARNINGS SUMMARY (salary + bonuses + penalties per month) =====
+// Returns both requested month's earnings AND total lifetime earnings since hire_date
 api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
   const db = c.env.DB;
   const userId = c.req.param('id');
   const month = c.req.param('month');
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return c.json({ error: 'Invalid month format' }, 400);
   try {
-    const user = await db.prepare('SELECT salary, salary_type FROM users WHERE id = ?').bind(userId).first();
-    const salary = Number(user?.salary || 0);
+    const user = await db.prepare('SELECT salary, salary_type, hire_date, end_date, is_active, display_name FROM users WHERE id = ?').bind(userId).first();
+    const monthlySalary = Number(user?.salary || 0);
+    const hireDate = (user?.hire_date as string) || '';
+    const endDate = (user?.end_date as string) || '';
+
+    // === CURRENT MONTH EARNINGS ===
     const bonusRes = await db.prepare(`
-      SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' THEN amount ELSE 0 END),0) as bonuses,
-        COALESCE(SUM(CASE WHEN bonus_type='penalty' THEN amount ELSE 0 END),0) as penalties,
+      SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' OR (bonus_type IS NULL AND amount > 0) THEN amount ELSE 0 END),0) as bonuses,
+        COALESCE(SUM(CASE WHEN bonus_type='penalty' OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as penalties,
         COALESCE(SUM(amount),0) as net
       FROM employee_bonuses WHERE user_id = ? AND strftime('%Y-%m', bonus_date) = ?
     `).bind(userId, month).first();
     const bonuses = Number(bonusRes?.bonuses || 0);
-    const penalties = Math.abs(Number(bonusRes?.penalties || 0));
-    const net = Number(bonusRes?.net || 0);
-    // Vacation days used this month
-    const vacRes = await db.prepare(`
-      SELECT COALESCE(SUM(days_count),0) as vacation_days, COALESCE(SUM(paid_amount),0) as vacation_paid
-      FROM employee_vacations WHERE user_id = ? AND strftime('%Y-%m', start_date) = ?
-    `).bind(userId, month).first();
+    const penalties = Number(bonusRes?.penalties || 0);
+    const bonusesNet = Number(bonusRes?.net || 0);
+
+    // Vacation days this month with paid/unpaid breakdown
+    let vacRes: any = { paid_days: 0, unpaid_days: 0, paid_amount: 0, total_days: 0 };
+    try {
+      vacRes = await db.prepare(`
+        SELECT 
+          COALESCE(SUM(CASE WHEN is_paid = 1 THEN days_count ELSE 0 END),0) as paid_days,
+          COALESCE(SUM(CASE WHEN is_paid = 0 THEN days_count ELSE 0 END),0) as unpaid_days,
+          COALESCE(SUM(days_count),0) as total_days,
+          COALESCE(SUM(paid_amount),0) as paid_amount
+        FROM employee_vacations WHERE user_id = ? AND (
+          strftime('%Y-%m', start_date) = ? OR strftime('%Y-%m', end_date) = ?
+        )
+      `).bind(userId, month, month).first();
+    } catch {}
+    const unpaidVacDays = Number(vacRes?.unpaid_days || 0);
+    const paidVacDays = Number(vacRes?.paid_days || 0);
+    const vacationPaid = Number(vacRes?.paid_amount || 0);
+
+    // Calculate salary deduction for unpaid vacation days
+    // Assume ~22 working days per month
+    const dailySalary = monthlySalary / 22;
+    const unpaidDeduction = Math.round(unpaidVacDays * dailySalary * 100) / 100;
+    // Paid vacation: salary stays the same, no deduction
+    const monthSalaryAfterVac = Math.max(0, Math.round((monthlySalary - unpaidDeduction) * 100) / 100);
+    const monthTotal = Math.round((monthSalaryAfterVac + bonusesNet) * 100) / 100;
+
+    // === LIFETIME EARNINGS (since hire_date) ===
+    // Count months worked
+    let totalMonthsWorked = 0;
+    let lifetimeSalary = 0;
+    let lifetimeBonuses = 0;
+    let lifetimePenalties = 0;
+    let lifetimeUnpaidDays = 0;
+    let lifetimeUnpaidDeduction = 0;
+    let lifetimeTotal = 0;
+
+    if (hireDate) {
+      const hd = new Date(hireDate + 'T00:00:00Z');
+      const ed = endDate ? new Date(endDate + 'T00:00:00Z') : new Date();
+      // Calculate months between hire and end/now
+      totalMonthsWorked = Math.max(1, 
+        (ed.getFullYear() - hd.getFullYear()) * 12 + (ed.getMonth() - hd.getMonth()) + 1
+      );
+      lifetimeSalary = Math.round(monthlySalary * totalMonthsWorked * 100) / 100;
+
+      // Lifetime bonuses/penalties since hire
+      const lifeBonus = await db.prepare(`
+        SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' OR (bonus_type IS NULL AND amount > 0) THEN amount ELSE 0 END),0) as bonuses,
+          COALESCE(SUM(CASE WHEN bonus_type='penalty' OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as penalties,
+          COALESCE(SUM(amount),0) as net
+        FROM employee_bonuses WHERE user_id = ? AND bonus_date >= ? ${endDate ? "AND bonus_date <= ?" : ""}
+      `).bind(userId, hireDate, ...(endDate ? [endDate] : [])).first();
+      lifetimeBonuses = Number(lifeBonus?.bonuses || 0);
+      lifetimePenalties = Number(lifeBonus?.penalties || 0);
+      const lifetimeBonusNet = Number(lifeBonus?.net || 0);
+
+      // Lifetime unpaid vacation days
+      try {
+        const lifeVac = await db.prepare(`
+          SELECT COALESCE(SUM(CASE WHEN is_paid = 0 THEN days_count ELSE 0 END),0) as unpaid_days
+          FROM employee_vacations WHERE user_id = ? AND start_date >= ? ${endDate ? "AND start_date <= ?" : ""}
+        `).bind(userId, hireDate, ...(endDate ? [endDate] : [])).first();
+        lifetimeUnpaidDays = Number(lifeVac?.unpaid_days || 0);
+      } catch {}
+      lifetimeUnpaidDeduction = Math.round(lifetimeUnpaidDays * dailySalary * 100) / 100;
+      lifetimeTotal = Math.round((lifetimeSalary - lifetimeUnpaidDeduction + lifetimeBonusNet) * 100) / 100;
+    }
+
     return c.json({
-      month, user_id: Number(userId), salary, salary_type: user?.salary_type || 'monthly',
-      bonuses, penalties, bonuses_net: net,
-      total_earnings: salary + net,
-      vacation_days: Number(vacRes?.vacation_days || 0),
-      vacation_paid: Number(vacRes?.vacation_paid || 0)
+      month, user_id: Number(userId), 
+      display_name: user?.display_name || '',
+      salary: monthlySalary, salary_type: user?.salary_type || 'monthly',
+      hire_date: hireDate, end_date: endDate,
+      // Current month breakdown
+      bonuses, penalties, bonuses_net: bonusesNet,
+      vacation_paid_days: paidVacDays,
+      vacation_unpaid_days: unpaidVacDays,
+      vacation_total_days: Number(vacRes?.total_days || 0),
+      vacation_paid_amount: vacationPaid,
+      unpaid_deduction: unpaidDeduction,
+      month_salary_after_vac: monthSalaryAfterVac,
+      total_earnings: monthTotal,
+      // Lifetime totals
+      lifetime: {
+        months_worked: totalMonthsWorked,
+        total_salary: lifetimeSalary,
+        total_bonuses: lifetimeBonuses,
+        total_penalties: lifetimePenalties,
+        unpaid_vac_days: lifetimeUnpaidDays,
+        unpaid_deduction: lifetimeUnpaidDeduction,
+        grand_total: lifetimeTotal
+      }
     });
   } catch (err: any) {
     return c.json({ error: 'Earnings error: ' + (err?.message || 'unknown') }, 500);
