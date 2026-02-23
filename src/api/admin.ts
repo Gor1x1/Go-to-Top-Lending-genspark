@@ -1275,7 +1275,12 @@ api.get('/company-roles', authMiddleware, async (c) => {
   const db = c.env.DB;
   try {
     const res = await db.prepare('SELECT * FROM company_roles ORDER BY sort_order, id').all();
-    return c.json({ roles: res.results || [] });
+    // Ensure role_name is populated (fallback to role_label for legacy data)
+    const roles = (res.results || []).map((r: any) => ({
+      ...r,
+      role_name: r.role_name || r.role_label || r.role_key || ''
+    }));
+    return c.json({ roles });
   } catch {
     return c.json({ roles: [] });
   }

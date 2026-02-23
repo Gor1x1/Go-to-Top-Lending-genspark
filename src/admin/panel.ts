@@ -4797,6 +4797,13 @@ function formatArmTime(dateStr) {
 }
 
 // ===== EMPLOYEES PAGE =====
+var _empSearch = '';
+var _empFilterRole = '';
+var _empFilterStatus = '';
+var _empViewMode = 'cards'; // cards | table
+
+function getCompanyRoleName(cr) { return cr.role_name || cr.role_label || cr.role_key || ''; }
+
 function renderEmployees() {
   const isAdmin = currentUser && currentUser.role === 'main_admin';
   const rl = rolesConfig?.role_labels || {};
@@ -4932,11 +4939,13 @@ function showEmployeeModal(userId) {
   h += '<option value="">\u2014 \u0412\u044b\u0431\u0440\u0430\u0442\u044c \u2014</option>';
   for (var cri = 0; cri < compRoles.length; cri++) {
     var cr = compRoles[cri];
-    h += '<option value="' + escHtml(cr.role_name) + '"' + (u?.position_title === cr.role_name ? ' selected' : '') + '>' + escHtml(cr.role_name) + '</option>';
+    var crName = getCompanyRoleName(cr);
+    if (!crName) continue;
+    h += '<option value="' + escHtml(crName) + '"' + (u?.position_title === crName ? ' selected' : '') + '>' + escHtml(crName) + '</option>';
   }
   h += '<option value="__custom">\u2702 \u0414\u0440\u0443\u0433\u043e\u0435 (\u0432\u0432\u0435\u0441\u0442\u0438 \u0432\u0440\u0443\u0447\u043d\u0443\u044e)...</option>';
   h += '</select>';
-  var customPosVisible = u?.position_title && !compRoles.find(function(r2){ return r2.role_name === u.position_title; });
+  var customPosVisible = u?.position_title && !compRoles.find(function(r2){ return getCompanyRoleName(r2) === u.position_title; });
   h += '<input class="input" id="empPositionCustom" placeholder="\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0434\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c" value="' + escHtml(customPosVisible ? u.position_title : '') + '" style="display:' + (customPosVisible ? 'block' : 'none') + ';margin-top:6px">';
   h += '</div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</label><input class="input" id="empPhone" value="' + escHtml(u?.phone||'') + '"></div>' +
@@ -5033,7 +5042,7 @@ function renderTeamAccess() {
     { id: 'matrix', icon: 'fa-th', label: 'Матрица доступов' },
     { id: 'roles', icon: 'fa-user-tag', label: 'Роли компании (' + roles.length + ')' },
     { id: 'users', icon: 'fa-users', label: 'По сотрудникам' },
-    { id: 'log', icon: 'fa-history', label: 'Журнал изменений' }
+    { id: 'stats', icon: 'fa-chart-pie', label: 'Статистика команды' }
   ];
   for (var ti = 0; ti < tabs.length; ti++) {
     var t = tabs[ti];
@@ -5049,8 +5058,8 @@ function renderTeamAccess() {
     h += renderRolesTab(roles, sl, isAdmin);
   } else if (_teamAccessTab === 'users') {
     h += renderUserPermissionsTab(users, allSections, sl, rl, isAdmin);
-  } else if (_teamAccessTab === 'log') {
-    h += renderAccessLog();
+  } else if (_teamAccessTab === 'stats') {
+    h += renderTeamStats();
   }
   
   h += '<div id="companyRoleModalArea"></div>';
@@ -5159,7 +5168,7 @@ function renderRolesTab(roles, sl, isAdmin) {
       h += '<div style="flex:1;min-width:200px">';
       h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">';
       h += '<span style="display:inline-block;width:14px;height:14px;border-radius:50%;background:' + escHtml(r.color || '#8B5CF6') + '"></span>';
-      h += '<span style="font-size:1.15rem;font-weight:700">' + escHtml(r.role_name) + '</span>';
+      h += '<span style="font-size:1.15rem;font-weight:700">' + escHtml(getCompanyRoleName(r)) + '</span>';
       h += '<span style="font-family:monospace;font-size:0.72rem;color:#64748b;background:#0f172a;padding:2px 8px;border-radius:4px">' + escHtml(r.role_key) + '</span>';
       if (r.is_system) h += '<span class="badge badge-purple" style="font-size:0.65rem">Системная</span>';
       if (!r.is_active) h += '<span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171;font-size:0.65rem">Неактивна</span>';
@@ -5186,7 +5195,8 @@ function renderRolesTab(roles, sl, isAdmin) {
       if (isAdmin) {
         h += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:flex-start">';
         h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.82rem" onclick="showCompanyRoleModal(' + r.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>';
-        if (!r.is_system) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',&apos;' + escHtml(r.role_name) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
+        h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.82rem" onclick="cloneCompanyRole(' + r.id + ')" title="К\u043b\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0440\u043e\u043b\u044c"><i class="fas fa-copy"></i></button>';
+        if (!r.is_system) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',&apos;' + escHtml(getCompanyRoleName(r)) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
         h += '</div>';
       }
       h += '</div></div>';
@@ -5311,27 +5321,89 @@ async function savePermissions() {
   toast('Доступы сохранены!');
 }
 
-// === TAB 4: ACCESS LOG ===
-function renderAccessLog() {
-  var h = '<div class="card" style="padding:24px">';
-  h += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:20px"><i class="fas fa-history" style="color:#8B5CF6;font-size:1.3rem"></i><div><h3 style="font-weight:700;font-size:1rem">Журнал изменений доступов</h3><p style="color:#64748b;font-size:0.78rem">Последние изменения ролей и прав доступа</p></div></div>';
-  // Simulated log from activity_log (if available) — show recent user changes
+// === TAB 4: TEAM STATS ===
+function renderTeamStats() {
   var users = data.users || [];
-  h += '<div style="display:flex;flex-direction:column;gap:8px">';
-  for (var i = 0; i < Math.min(users.length, 10); i++) {
+  var roles = data.companyRoles || [];
+  var rl = rolesConfig?.role_labels || {};
+  var h = '';
+  
+  // Salary overview
+  var totalSalary = 0;
+  var salaryByRole = {};
+  var activeCount = 0;
+  var salaryTypes = { monthly: 0, biweekly: 0, per_task: 0, percent: 0 };
+  for (var i = 0; i < users.length; i++) {
     var u = users[i];
-    var rl3 = rolesConfig?.role_labels || {};
-    h += '<div style="display:flex;align-items:center;gap:12px;padding:10px 14px;background:#0f172a;border-radius:8px;border-left:3px solid #334155">';
-    h += '<i class="fas fa-user-shield" style="color:#64748b"></i>';
-    h += '<div style="flex:1"><span style="font-weight:600;color:#e2e8f0">' + escHtml(u.display_name) + '</span>';
-    h += ' <span style="color:#64748b;font-size:0.78rem">— роль: ' + escHtml(rl3[u.role]||u.role) + '</span></div>';
-    h += '<span style="font-size:0.72rem;color:#475569">' + escHtml((u.created_at || '').substring(0, 10)) + '</span>';
-    h += '</div>';
+    var sal = Number(u.salary) || 0;
+    totalSalary += sal;
+    var rKey = u.role || 'other';
+    salaryByRole[rKey] = (salaryByRole[rKey] || 0) + sal;
+    if (u.is_active) activeCount++;
+    salaryTypes[u.salary_type || 'monthly'] = (salaryTypes[u.salary_type || 'monthly'] || 0) + 1;
   }
-  if (users.length === 0) {
-    h += '<div style="text-align:center;padding:20px;color:#475569">Нет данных</div>';
+  
+  // Stats cards
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px">';
+  h += '<div class="stat-card"><div class="stat-num">' + users.length + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432</div></div>';
+  h += '<div class="stat-card"><div class="stat-num" style="color:#10B981">' + activeCount + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0445</div></div>';
+  h += '<div class="stat-card"><div class="stat-num" style="color:#EF4444">' + (users.length - activeCount) + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u044b\u0445</div></div>';
+  h += '<div class="stat-card"><div class="stat-num" style="color:#3B82F6">' + fmtAmt(totalSalary) + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0424\u041e\u0422 / \u043c\u0435\u0441</div></div>';
+  h += '<div class="stat-card"><div class="stat-num" style="color:#F59E0B">' + roles.length + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0420\u043e\u043b\u0435\u0439</div></div>';
+  var avgSalary = users.length > 0 ? Math.round(totalSalary / users.length) : 0;
+  h += '<div class="stat-card"><div class="stat-num" style="color:#a78bfa">' + fmtAmt(avgSalary) + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0421\u0440. \u0417\u041f</div></div>';
+  h += '</div>';
+  
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  
+  // Salary by role
+  h += '<div class="card"><h3 style="font-weight:700;font-size:1rem;margin-bottom:16px"><i class="fas fa-coins" style="color:#F59E0B;margin-right:8px"></i>\u0417\u041f \u043f\u043e \u0440\u043e\u043b\u044f\u043c</h3>';
+  h += '<div style="display:flex;flex-direction:column;gap:8px">';
+  var sortedRoles = Object.keys(salaryByRole).sort(function(a,b) { return salaryByRole[b] - salaryByRole[a]; });
+  for (var ri = 0; ri < sortedRoles.length; ri++) {
+    var rk = sortedRoles[ri];
+    var pct = totalSalary > 0 ? Math.round(salaryByRole[rk] / totalSalary * 100) : 0;
+    h += '<div><div style="display:flex;justify-content:space-between;font-size:0.82rem;margin-bottom:4px"><span style="color:#e2e8f0">' + escHtml(rl[rk]||rk) + '</span><span style="color:#3B82F6;font-weight:600">' + fmtAmt(salaryByRole[rk]) + ' (' + pct + '%)</span></div>';
+    h += '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + pct + '%;background:linear-gradient(90deg,#8B5CF6,#3B82F6);border-radius:3px;transition:width 0.5s"></div></div></div>';
   }
   h += '</div></div>';
+  
+  // Users by role
+  h += '<div class="card"><h3 style="font-weight:700;font-size:1rem;margin-bottom:16px"><i class="fas fa-users" style="color:#8B5CF6;margin-right:8px"></i>\u041a\u043e\u043c\u0430\u043d\u0434\u0430 \u043f\u043e \u0440\u043e\u043b\u044f\u043c</h3>';
+  h += '<div style="display:flex;flex-direction:column;gap:10px">';
+  var roleColors2 = { main_admin: '#8B5CF6', developer: '#3B82F6', analyst: '#10B981', operator: '#F59E0B', buyer: '#EF4444', courier: '#6366F1' };
+  for (var ri2 = 0; ri2 < roles.length; ri2++) {
+    var r2 = roles[ri2];
+    var rName = getCompanyRoleName(r2);
+    var roleUsers = users.filter(function(u2) { return u2.role === r2.role_key; });
+    h += '<div style="padding:10px 14px;background:#0f172a;border-radius:8px;border-left:3px solid ' + escHtml(r2.color || roleColors2[r2.role_key] || '#64748b') + '">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><span style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(rName) + '</span><span class="badge badge-purple" style="font-size:0.72rem">' + roleUsers.length + ' \u0447\u0435\u043b.</span></div>';
+    if (roleUsers.length > 0) {
+      h += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+      for (var ru = 0; ru < roleUsers.length; ru++) {
+        h += '<span style="padding:2px 8px;border-radius:10px;font-size:0.72rem;background:#1e293b;border:1px solid #334155;color:' + (roleUsers[ru].is_active ? '#e2e8f0' : '#64748b') + ';text-decoration:' + (roleUsers[ru].is_active ? 'none' : 'line-through') + '">' + escHtml(roleUsers[ru].display_name) + '</span>';
+      }
+      h += '</div>';
+    } else {
+      h += '<span style="font-size:0.78rem;color:#475569">\u041d\u0435\u0442 \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432</span>';
+    }
+    h += '</div>';
+  }
+  h += '</div></div>';
+  h += '</div>';
+  
+  // Salary type distribution
+  h += '<div class="card" style="margin-top:16px"><h3 style="font-weight:700;font-size:1rem;margin-bottom:16px"><i class="fas fa-chart-bar" style="color:#10B981;margin-right:8px"></i>\u0420\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435 \u043f\u043e \u0442\u0438\u043f\u0443 \u043e\u043f\u043b\u0430\u0442\u044b</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">';
+  var stLabels = { monthly: '\u041f\u043e\u043c\u0435\u0441\u044f\u0447\u043d\u043e', biweekly: '\u0417\u0430 15 \u0434\u043d\u0435\u0439', per_task: '\u0417\u0430 \u0440\u0430\u0431\u043e\u0442\u0443', percent: '\u041f\u0440\u043e\u0446\u0435\u043d\u0442' };
+  var stColors = { monthly: '#3B82F6', biweekly: '#10B981', per_task: '#F59E0B', percent: '#EF4444' };
+  for (var stk in salaryTypes) {
+    if (salaryTypes[stk] > 0) {
+      h += '<div style="padding:14px;background:#0f172a;border-radius:8px;border-left:3px solid ' + (stColors[stk]||'#64748b') + ';text-align:center"><div style="font-size:1.3rem;font-weight:700;color:' + (stColors[stk]||'#64748b') + '">' + salaryTypes[stk] + '</div><div style="font-size:0.78rem;color:#94a3b8;margin-top:4px">' + (stLabels[stk]||stk) + '</div></div>';
+    }
+  }
+  h += '</div></div>';
+  
   return h;
 }
 
@@ -5412,6 +5484,25 @@ async function deleteCompanyRole(id, name) {
   var rolesRes = await api('/company-roles');
   data.companyRoles = (rolesRes && rolesRes.roles) || [];
   toast('Роль удалена');
+  render();
+}
+
+async function cloneCompanyRole(id) {
+  var r = (data.companyRoles || []).find(function(x) { return x.id === id; });
+  if (!r) return;
+  var rName = getCompanyRoleName(r);
+  var newName = prompt('Н\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043a\u043b\u043e\u043d\u0430:', rName + ' (\u043a\u043e\u043f\u0438\u044f)');
+  if (!newName) return;
+  var newKey = newName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').substring(0, 30);
+  if (!newKey) newKey = 'clone_' + Date.now();
+  var sections = [];
+  try { sections = JSON.parse(r.default_sections || '[]'); } catch {}
+  var body = { role_name: newName, role_key: newKey, description: (r.description || '') + ' (\u043a\u043e\u043f\u0438\u044f)', color: r.color || '#8B5CF6', sort_order: (r.sort_order || 0) + 1, default_sections: sections };
+  var res = await api('/company-roles', { method: 'POST', body: JSON.stringify(body) });
+  if (!res || res.error) { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430 \u043a\u043b\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f', 'error'); return; }
+  var rolesRes = await api('/company-roles');
+  data.companyRoles = (rolesRes && rolesRes.roles) || [];
+  toast('\u0420\u043e\u043b\u044c \u043a\u043b\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0430!');
   render();
 }
 
