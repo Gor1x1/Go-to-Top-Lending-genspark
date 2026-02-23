@@ -157,6 +157,9 @@ async function loadData() {
   data.expenses = (expensesData && expensesData.expenses) || [];
   // Load period snapshots
   try { var snapshotsData = await api('/period-snapshots'); data.periodSnapshots = (snapshotsData && snapshotsData.snapshots) || []; } catch(e) { data.periodSnapshots = []; }
+  // Load vacations and online activity
+  try { var vacData = await api('/vacations'); data.vacations = (vacData && vacData.vacations) || []; } catch(e) { data.vacations = []; }
+  try { var onlineData = await api('/activity/online'); data.onlineUsers = (onlineData && onlineData.online) || []; } catch(e) { data.onlineUsers = []; }
   // Preload articles for leads that have them
   var leadsWithArticles = ((data.leads && data.leads.leads) || []).filter(function(l) { return l.articles_count > 0; });
   if (leadsWithArticles.length > 0) {
@@ -4801,33 +4804,96 @@ var _empSearch = '';
 var _empFilterRole = '';
 var _empFilterStatus = '';
 var _empViewMode = 'cards'; // cards | table
+var _empEarningsCache = {};
+var _empVacationExpanded = {};
 
 function getCompanyRoleName(cr) { return cr.role_name || cr.role_label || cr.role_key || ''; }
+
+function isUserOnline(userId) {
+  return (data.onlineUsers || []).some(function(o) { return o.user_id === userId; });
+}
+function getUserActivity(userId) {
+  return (data.onlineUsers || []).find(function(o) { return o.user_id === userId; });
+}
+function getUserVacations(userId) {
+  return (data.vacations || []).filter(function(v) { return v.user_id === userId; });
+}
+function isUserOnVacation(userId) {
+  var today = new Date().toISOString().slice(0,10);
+  return (data.vacations || []).some(function(v) {
+    return v.user_id === userId && v.status === 'active' && v.start_date <= today && v.end_date >= today;
+  });
+}
+
+function filterEmployees(users) {
+  var q = (_empSearch || '').toLowerCase().trim();
+  return users.filter(function(u) {
+    // Role filter
+    if (_empFilterRole && u.role !== _empFilterRole) return false;
+    // Status filter
+    if (_empFilterStatus === 'active' && !u.is_active) return false;
+    if (_empFilterStatus === 'inactive' && u.is_active) return false;
+    if (_empFilterStatus === 'online' && !isUserOnline(u.id)) return false;
+    if (_empFilterStatus === 'vacation' && !isUserOnVacation(u.id)) return false;
+    // Search across all fields
+    if (q) {
+      var fields = [u.display_name, u.username, u.phone, u.email, u.position_title, u.role, String(u.salary||'')].join(' ').toLowerCase();
+      if (fields.indexOf(q) < 0) return false;
+    }
+    return true;
+  });
+}
 
 function renderEmployees() {
   const isAdmin = currentUser && currentUser.role === 'main_admin';
   const rl = rolesConfig?.role_labels || {};
   const roles = rolesConfig?.roles || [];
   var roleColors = { main_admin: '#8B5CF6', developer: '#3B82F6', analyst: '#10B981', operator: '#F59E0B', buyer: '#EF4444', courier: '#6366F1' };
-  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px"><div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Сотрудники</h1><p style="color:#94a3b8;margin-top:4px">Управление командой \u2014 ' + data.users.length + ' сотрудник(ов)</p></div>';
+  var filtered = filterEmployees(data.users);
+  var onlineCount = data.users.filter(function(u) { return isUserOnline(u.id); }).length;
+  var vacationCount = data.users.filter(function(u) { return isUserOnVacation(u.id); }).length;
+  var curMonth = new Date().toISOString().slice(0,7);
+  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:12px"><div><h1 style="font-size:1.8rem;font-weight:800"><i class="fas fa-users" style="color:#8B5CF6;margin-right:10px"></i>Сотрудники</h1><p style="color:#94a3b8;margin-top:4px">Управление командой \u2014 ' + data.users.length + ' сотрудник(ов)' + (onlineCount > 0 ? ' \u00b7 <span style="color:#10B981"><i class="fas fa-circle" style="font-size:0.55rem;vertical-align:middle"></i> ' + onlineCount + ' онлайн</span>' : '') + (vacationCount > 0 ? ' \u00b7 <span style="color:#f59e0b"><i class="fas fa-umbrella-beach" style="font-size:0.75rem"></i> ' + vacationCount + ' в отпуске</span>' : '') + '</p></div>';
   if (isAdmin) {
     h += '<button class="btn btn-primary" onclick="showEmployeeModal()"><i class="fas fa-user-plus" style="margin-right:6px"></i>Добавить</button>';
   }
   h += '</div>';
+  // Search & filters bar
+  h += '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center">';
+  h += '<div style="flex:1;min-width:200px;position:relative"><i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#64748b"></i><input class="input" style="padding-left:36px" placeholder="Поиск по имени, логину, телефону, email, должности..." value="' + escHtml(_empSearch) + '" oninput="_empSearch=this.value;render()"></div>';
+  h += '<select class="input" style="width:auto;min-width:140px" onchange="_empFilterRole=this.value;render()"><option value="">Все роли</option>';
+  for (var ri = 0; ri < roles.length; ri++) {
+    h += '<option value="' + roles[ri] + '"' + (_empFilterRole===roles[ri]?' selected':'') + '>' + escHtml(rl[roles[ri]]||roles[ri]) + '</option>';
+  }
+  h += '</select>';
+  h += '<select class="input" style="width:auto;min-width:130px" onchange="_empFilterStatus=this.value;render()"><option value="">Все статусы</option><option value="active"' + (_empFilterStatus==='active'?' selected':'') + '>Активные</option><option value="inactive"' + (_empFilterStatus==='inactive'?' selected':'') + '>Отключённые</option><option value="online"' + (_empFilterStatus==='online'?' selected':'') + '>Онлайн</option><option value="vacation"' + (_empFilterStatus==='vacation'?' selected':'') + '>В отпуске</option></select>';
+  h += '<span style="color:#64748b;font-size:0.82rem">' + filtered.length + ' из ' + data.users.length + '</span>';
+  h += '</div>';
   // Cards grid
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:16px">';
-  for (const u of data.users) {
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:16px">';
+  for (const u of filtered) {
     var rColor = roleColors[u.role] || '#64748b';
     var initials = (u.display_name||'U').split(' ').map(function(w){return w[0]||'';}).join('').toUpperCase().substring(0,2);
+    var online = isUserOnline(u.id);
+    var onVacation = isUserOnVacation(u.id);
+    var activity = getUserActivity(u.id);
     h += '<div class="card" style="padding:0;overflow:hidden;border-top:3px solid ' + rColor + '">';
     // Header
     h += '<div style="padding:20px 20px 12px;display:flex;gap:14px;align-items:center">';
-    h += '<div style="width:48px;height:48px;border-radius:50%;background:' + rColor + '22;border:2px solid ' + rColor + ';display:flex;align-items:center;justify-content:center;font-weight:800;color:' + rColor + ';font-size:0.95rem;flex-shrink:0">' + initials + '</div>';
-    h += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(u.display_name) + '</div>';
-    h += '<div style="display:flex;align-items:center;gap:8px;margin-top:4px">';
+    h += '<div style="position:relative;flex-shrink:0"><div style="width:48px;height:48px;border-radius:50%;background:' + rColor + '22;border:2px solid ' + rColor + ';display:flex;align-items:center;justify-content:center;font-weight:800;color:' + rColor + ';font-size:0.95rem">' + initials + '</div>';
+    if (online) h += '<div style="position:absolute;bottom:0;right:0;width:14px;height:14px;border-radius:50%;background:#10B981;border:2px solid #1e293b" title="Онлайн"></div>';
+    if (onVacation) h += '<div style="position:absolute;top:-4px;right:-4px;font-size:0.7rem" title="В отпуске">\ud83c\udfd6\ufe0f</div>';
+    h += '</div>';
+    h += '<div style="flex:1;min-width:0"><div style="font-weight:700;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px">' + escHtml(u.display_name);
+    if (online) h += '<span style="font-size:0.65rem;color:#10B981;font-weight:400">онлайн</span>';
+    if (onVacation) h += '<span style="font-size:0.65rem;color:#f59e0b;font-weight:400">отпуск</span>';
+    h += '</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap">';
     h += '<span style="padding:2px 10px;border-radius:12px;font-size:0.72rem;font-weight:600;background:' + rColor + '22;color:' + rColor + '">' + escHtml(rl[u.role]||u.role) + '</span>';
     h += '<span class="badge ' + (u.is_active?'badge-green':'bg-red-900 text-red-300') + '" style="font-size:0.68rem;cursor:pointer" onclick="toggleUserActive(' + u.id + ',' + (u.is_active?0:1) + ')">' + (u.is_active?'Активен':'Откл') + '</span>';
-    h += '</div></div></div>';
+    h += '</div>';
+    if (activity) { h += '<div style="font-size:0.68rem;color:#475569;margin-top:3px"><i class="fas fa-eye" style="margin-right:3px"></i>' + escHtml(activity.last_page || '') + '</div>'; }
+    h += '</div></div>';
     // Info fields
     h += '<div style="padding:0 20px 12px;display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:0.82rem">';
     h += '<div><span style="color:#64748b;font-size:0.72rem">Логин</span><div style="font-family:monospace;color:#94a3b8">' + escHtml(u.username) + '</div></div>';
@@ -4841,13 +4907,63 @@ function renderEmployees() {
     h += '<div><span style="color:#64748b;font-size:0.72rem">С даты</span><div style="color:#a78bfa">' + escHtml(u.hire_date || '\u2014') + '</div></div>';
     h += '<div><span style="color:#64748b;font-size:0.72rem">По дату</span><div style="color:' + (u.end_date ? '#f87171' : '#475569') + '">' + escHtml(u.end_date || 'бессрочно') + '</div></div>';
     h += '</div>';
+    // Monthly earnings summary
+    h += '<div style="padding:0 20px 12px">';
+    var earnings = _empEarningsCache[u.id + '_' + curMonth];
+    if (earnings) {
+      h += '<div style="background:#0f172a;border-radius:8px;padding:10px 14px;border:1px solid #334155">';
+      h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px"><i class="fas fa-wallet" style="margin-right:4px"></i>Заработок за ' + curMonth + '</div>';
+      h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;font-size:0.78rem">';
+      h += '<div><span style="color:#94a3b8">ЗП</span><div style="color:#3B82F6;font-weight:600">' + fmtAmt(earnings.salary) + '</div></div>';
+      h += '<div><span style="color:#94a3b8">Бонусы</span><div style="color:#10B981;font-weight:600">+' + fmtAmt(earnings.bonuses) + '</div></div>';
+      h += '<div><span style="color:#94a3b8">Штрафы</span><div style="color:#EF4444;font-weight:600">' + (earnings.penalties > 0 ? '-' : '') + fmtAmt(earnings.penalties) + '</div></div>';
+      h += '<div><span style="color:#94a3b8">Итого</span><div style="color:#a78bfa;font-weight:700">' + fmtAmt(earnings.total_earnings) + '</div></div>';
+      h += '</div></div>';
+    } else {
+      h += '<button class="btn btn-outline" style="width:100%;padding:6px;font-size:0.75rem" onclick="loadEmpEarnings(' + u.id + ',\'' + curMonth + '\')"><i class="fas fa-calculator" style="margin-right:4px"></i>Показать заработок за месяц</button>';
+    }
+    h += '</div>';
+    // Vacation summary
+    var userVacs = getUserVacations(u.id);
+    if (userVacs.length > 0 || isAdmin) {
+      h += '<div style="padding:0 20px 12px">';
+      var totalVacDays = 0; var paidVacDays = 0;
+      for (var vi = 0; vi < userVacs.length; vi++) { totalVacDays += userVacs[vi].days_count || 0; if (userVacs[vi].is_paid) paidVacDays += userVacs[vi].days_count || 0; }
+      if (userVacs.length > 0) {
+        h += '<div style="display:flex;align-items:center;gap:8px;font-size:0.78rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-umbrella-beach" style="color:#f59e0b"></i><span>Отпуск: ' + totalVacDays + ' дн. всего';
+        if (paidVacDays > 0) h += ' (' + paidVacDays + ' оплачиваемых)';
+        h += '</span>';
+        h += '<button class="btn btn-outline" style="padding:2px 8px;font-size:0.68rem;margin-left:auto" onclick="_empVacationExpanded[' + u.id + ']=!_empVacationExpanded[' + u.id + '];render()">' + (_empVacationExpanded[u.id] ? 'Скрыть' : 'Подробно') + '</button>';
+        h += '</div>';
+        if (_empVacationExpanded[u.id]) {
+          h += '<div style="margin-top:4px">';
+          for (var vj = 0; vj < userVacs.length; vj++) {
+            var v = userVacs[vj];
+            var vStatusColor = v.status === 'active' ? '#10B981' : v.status === 'completed' ? '#64748b' : '#3B82F6';
+            h += '<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:#0f172a;border-radius:6px;border-left:3px solid ' + vStatusColor + ';margin-bottom:4px;font-size:0.75rem">';
+            h += '<span style="color:#e2e8f0">' + escHtml(v.start_date) + ' \u2014 ' + escHtml(v.end_date) + '</span>';
+            h += '<span style="color:' + vStatusColor + '">' + escHtml({planned:'План',active:'Активен',completed:'Завершён',cancelled:'Отменён'}[v.status]||v.status) + '</span>';
+            h += '<span style="color:#94a3b8">' + v.days_count + ' дн.</span>';
+            h += '<span style="color:' + (v.is_paid ? '#10B981' : '#64748b') + '">' + (v.is_paid ? 'Оплач.' : 'Не оплач.') + '</span>';
+            if (v.paid_amount > 0) h += '<span style="color:#3B82F6">' + fmtAmt(v.paid_amount) + '</span>';
+            if (isAdmin) h += '<button class="btn btn-danger" style="padding:1px 6px;font-size:0.65rem;margin-left:auto" onclick="deleteVacation(' + v.id + ')"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+          }
+          h += '</div>';
+        }
+      }
+      if (isAdmin) {
+        h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;margin-top:4px" onclick="showVacationModal(' + u.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить отпуск</button>';
+      }
+      h += '</div>';
+    }
     // Actions
     if (isAdmin) {
       h += '<div style="padding:12px 20px;border-top:1px solid #334155;display:flex;gap:6px;flex-wrap:wrap">';
       h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem;flex:1" onclick="editEmployee(' + u.id + ')"><i class="fas fa-edit" style="margin-right:4px"></i>Ред.</button>';
       h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem;flex:1" onclick="showChangePassForm(' + u.id + ')"><i class="fas fa-key" style="margin-right:4px"></i>Учётные</button>';
-      h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="navigate(\\'team_access\\');editPermUserId=' + u.id + ';render()"><i class="fas fa-shield-alt"></i></button>';
-      if (u.role !== 'main_admin') h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.78rem" onclick="deleteEmployee(' + u.id + ',\\'' + escHtml(u.display_name) + '\\')"><i class="fas fa-trash"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="navigate(&apos;team_access&apos;);editPermUserId=' + u.id + ';render()"><i class="fas fa-shield-alt"></i></button>';
+      if (u.role !== 'main_admin') h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.78rem" onclick="deleteEmployee(' + u.id + ',&apos;' + escHtml(u.display_name) + '&apos;)"><i class="fas fa-trash"></i></button>';
       h += '</div>';
       // Credentials change form (login + password)
       if (_changePassUserId === u.id) {
@@ -4856,7 +4972,7 @@ function renderEmployees() {
         h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
         h += '<div><label style="font-size:0.7rem;color:#64748b;display:block;margin-bottom:3px">Логин</label><input class="input" id="newuser-' + u.id + '" type="text" placeholder="Новый логин" value="' + escHtml(u.username) + '"></div>';
         h += '<div><label style="font-size:0.7rem;color:#64748b;display:block;margin-bottom:3px">Пароль</label><div style="position:relative"><input class="input" id="newpass-' + u.id + '" type="password" placeholder="Новый пароль" style="padding-right:36px">';
-        h += '<button type="button" onclick="var i=document.getElementById(\\'newpass-' + u.id + '\\');i.type=i.type===\\'password\\'?\\'text\\':\\'password\\';this.querySelector(\\'i\\').className=\\'fas fa-\\'+(i.type===\\'password\\'?\\'eye\\':\\'eye-slash\\')" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;padding:4px"><i class="fas fa-eye"></i></button></div></div>';
+        h += '<button type="button" onclick="var i=document.getElementById(&apos;newpass-' + u.id + '&apos;);i.type=i.type===&apos;password&apos;?&apos;text&apos;:&apos;password&apos;;this.querySelector(&apos;i&apos;).className=&apos;fas fa-&apos;+(i.type===&apos;password&apos;?&apos;eye&apos;:&apos;eye-slash&apos;)" style="position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#64748b;cursor:pointer;padding:4px"><i class="fas fa-eye"></i></button></div></div>';
         h += '</div>';
         h += '<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end">';
         h += '<span style="font-size:0.7rem;color:#475569;flex:1">Оставьте поле пустым, чтобы не менять</span>';
@@ -4868,8 +4984,79 @@ function renderEmployees() {
     h += '</div>';
   }
   h += '</div>';
+  // Active client definition info
+  h += '<div class="card" style="margin-top:24px;border-left:3px solid #10B981">';
+  h += '<h3 style="font-weight:700;font-size:0.95rem;margin-bottom:8px;color:#10B981"><i class="fas fa-info-circle" style="margin-right:6px"></i>Определение "Активный клиент"</h3>';
+  h += '<div style="font-size:0.82rem;color:#94a3b8;line-height:1.6">';
+  h += '<b style="color:#e2e8f0">Активный клиент</b> \u2014 лид (заказ), имеющий статус <span class="badge badge-green" style="font-size:0.7rem">in_progress</span>, ';
+  h += '<span class="badge badge-amber" style="font-size:0.7rem">checking</span> или <span class="badge badge-purple" style="font-size:0.7rem">done</span>, ';
+  h += 'чья сумма <code>total_amount > 0</code>, и который был создан или обновлён в последние 90 дней. ';
+  h += 'Это клиенты, с которыми ведётся работа и которые приносят доход компании. ';
+  h += 'Лиды со статусами <span class="badge" style="font-size:0.7rem;background:#334155;color:#94a3b8">new</span> и <span class="badge" style="font-size:0.7rem;background:#334155;color:#94a3b8">contacted</span> считаются потенциальными, а <span class="badge" style="font-size:0.7rem;background:rgba(239,68,68,0.2);color:#f87171">rejected</span> \u2014 отклонёнными.';
+  h += '</div></div>';
   h += '<div id="employeeModalArea"></div>';
+  h += '<div id="vacationModalArea"></div>';
   return h + '</div>';
+}
+
+async function loadEmpEarnings(userId, month) {
+  try {
+    var res = await api('/users/' + userId + '/earnings/' + month);
+    if (res && !res.error) { _empEarningsCache[userId + '_' + month] = res; render(); }
+    else { toast(res?.error || 'Ошибка загрузки', 'error'); }
+  } catch(e) { toast('Ошибка загрузки', 'error'); }
+}
+
+function showVacationModal(userId) {
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center" onclick="this.remove()">';
+  h += '<div class="card" style="width:480px;max-width:90vw" onclick="event.stopPropagation()">';
+  h += '<h3 style="font-size:1.1rem;font-weight:700;margin-bottom:16px"><i class="fas fa-umbrella-beach" style="color:#f59e0b;margin-right:8px"></i>Новый отпуск</h3>';
+  h += '<form onsubmit="saveVacation(event,' + userId + ')">';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Дата начала *</label><input class="input" type="date" id="vacStartDate" required></div>';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Дата окончания *</label><input class="input" type="date" id="vacEndDate" required></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Статус</label><select class="input" id="vacStatus"><option value="planned">Запланирован</option><option value="active">Активен</option><option value="completed">Завершён</option><option value="cancelled">Отменён</option></select></div>';
+  h += '<div><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Оплачиваемый?</label><select class="input" id="vacIsPaid"><option value="1">Да</option><option value="0">Нет</option></select></div>';
+  h += '</div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Сумма оплаты (если оплачиваемый)</label><input class="input" type="number" id="vacPaidAmount" value="0" step="0.01"></div>';
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Примечание</label><input class="input" id="vacNotes" placeholder="Необязательно"></div>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Отмена</button>';
+  h += '<button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>Сохранить</button></div>';
+  h += '</form></div></div>';
+  var area = document.getElementById('vacationModalArea');
+  if (area) area.innerHTML = h;
+}
+
+async function saveVacation(e, userId) {
+  e.preventDefault();
+  var body = {
+    start_date: document.getElementById('vacStartDate').value,
+    end_date: document.getElementById('vacEndDate').value,
+    status: document.getElementById('vacStatus').value,
+    is_paid: document.getElementById('vacIsPaid').value === '1',
+    paid_amount: Number(document.getElementById('vacPaidAmount').value) || 0,
+    notes: document.getElementById('vacNotes').value
+  };
+  var res = await api('/users/' + userId + '/vacations', { method:'POST', body: JSON.stringify(body) });
+  if (res && res.success) {
+    toast('Отпуск добавлен');
+    var vacData = await api('/vacations');
+    data.vacations = (vacData && vacData.vacations) || [];
+    render();
+  } else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function deleteVacation(id) {
+  if (!confirm('Удалить запись об отпуске?')) return;
+  var res = await api('/vacations/' + id, { method:'DELETE' });
+  if (res && res.success) {
+    toast('Запись удалена');
+    var vacData = await api('/vacations');
+    data.vacations = (vacData && vacData.vacations) || [];
+    render();
+  } else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
 var _changePassUserId = 0;
@@ -4935,7 +5122,8 @@ function showEmployeeModal(userId) {
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0420\u043e\u043b\u044c *</label><select class="input" id="empRole">';
   for (const r of roles) { h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
   h += '</select></div>';
-  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="empPosition" onchange="empPosChanged(this)">';
+  // Position from company roles only (no manual entry)
+  h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="empPosition">';
   h += '<option value="">\u2014 \u0412\u044b\u0431\u0440\u0430\u0442\u044c \u2014</option>';
   for (var cri = 0; cri < compRoles.length; cri++) {
     var cr = compRoles[cri];
@@ -4943,11 +5131,7 @@ function showEmployeeModal(userId) {
     if (!crName) continue;
     h += '<option value="' + escHtml(crName) + '"' + (u?.position_title === crName ? ' selected' : '') + '>' + escHtml(crName) + '</option>';
   }
-  h += '<option value="__custom">\u2702 \u0414\u0440\u0443\u0433\u043e\u0435 (\u0432\u0432\u0435\u0441\u0442\u0438 \u0432\u0440\u0443\u0447\u043d\u0443\u044e)...</option>';
-  h += '</select>';
-  var customPosVisible = u?.position_title && !compRoles.find(function(r2){ return getCompanyRoleName(r2) === u.position_title; });
-  h += '<input class="input" id="empPositionCustom" placeholder="\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u0434\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c" value="' + escHtml(customPosVisible ? u.position_title : '') + '" style="display:' + (customPosVisible ? 'block' : 'none') + ';margin-top:6px">';
-  h += '</div></div>';
+  h += '</select></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</label><input class="input" id="empPhone" value="' + escHtml(u?.phone||'') + '"></div>' +
     '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">Email</label><input class="input" id="empEmail" value="' + escHtml(u?.email||'') + '"></div></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0417\u0430\u0440\u043f\u043b\u0430\u0442\u0430</label><input class="input" type="number" id="empSalary" value="' + (u?.salary||0) + '"></div>';
@@ -4966,14 +5150,6 @@ function showEmployeeModal(userId) {
 
 function editEmployee(id) { showEmployeeModal(id); }
 
-function empPosChanged(sel) {
-  if (sel.value === '__custom') {
-    var ci = document.getElementById('empPositionCustom');
-    if (ci) { ci.style.display = 'block'; ci.focus(); }
-    sel.style.display = 'none';
-  }
-}
-
 async function saveEmployee(e, id) {
   e.preventDefault();
   const body = { 
@@ -4981,7 +5157,7 @@ async function saveEmployee(e, id) {
     role: document.getElementById('empRole').value, 
     phone: document.getElementById('empPhone').value, 
     email: document.getElementById('empEmail').value,
-    position_title: (function(){ var sel = document.getElementById('empPosition')?.value; if (sel === '__custom' || sel === '') { var cust = document.getElementById('empPositionCustom')?.value; if (cust) return cust; } return sel || ''; })(),
+    position_title: document.getElementById('empPosition')?.value || '',
     salary: Number(document.getElementById('empSalary')?.value) || 0,
     salary_type: document.getElementById('empSalaryType')?.value || 'monthly',
     hire_date: document.getElementById('empHireDate')?.value || '',
@@ -5332,6 +5508,8 @@ function renderTeamStats() {
   var totalSalary = 0;
   var salaryByRole = {};
   var activeCount = 0;
+  var onlineCount = 0;
+  var vacationCount = 0;
   var salaryTypes = { monthly: 0, biweekly: 0, per_task: 0, percent: 0 };
   for (var i = 0; i < users.length; i++) {
     var u = users[i];
@@ -5340,19 +5518,59 @@ function renderTeamStats() {
     var rKey = u.role || 'other';
     salaryByRole[rKey] = (salaryByRole[rKey] || 0) + sal;
     if (u.is_active) activeCount++;
+    if (isUserOnline(u.id)) onlineCount++;
+    if (isUserOnVacation(u.id)) vacationCount++;
     salaryTypes[u.salary_type || 'monthly'] = (salaryTypes[u.salary_type || 'monthly'] || 0) + 1;
   }
   
   // Stats cards
-  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-bottom:24px">';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:12px;margin-bottom:24px">';
   h += '<div class="stat-card"><div class="stat-num">' + users.length + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u043e\u0432</div></div>';
   h += '<div class="stat-card"><div class="stat-num" style="color:#10B981">' + activeCount + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0410\u043a\u0442\u0438\u0432\u043d\u044b\u0445</div></div>';
   h += '<div class="stat-card"><div class="stat-num" style="color:#EF4444">' + (users.length - activeCount) + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u044b\u0445</div></div>';
+  h += '<div class="stat-card"><div class="stat-num" style="color:#22d3ee">' + onlineCount + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px"><i class="fas fa-circle" style="color:#10B981;font-size:0.5rem;margin-right:3px"></i>Онлайн</div></div>';
+  h += '<div class="stat-card"><div class="stat-num" style="color:#f59e0b">' + vacationCount + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px"><i class="fas fa-umbrella-beach" style="margin-right:3px"></i>В отпуске</div></div>';
   h += '<div class="stat-card"><div class="stat-num" style="color:#3B82F6">' + fmtAmt(totalSalary) + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0424\u041e\u0422 / \u043c\u0435\u0441</div></div>';
   h += '<div class="stat-card"><div class="stat-num" style="color:#F59E0B">' + roles.length + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0420\u043e\u043b\u0435\u0439</div></div>';
   var avgSalary = users.length > 0 ? Math.round(totalSalary / users.length) : 0;
   h += '<div class="stat-card"><div class="stat-num" style="color:#a78bfa">' + fmtAmt(avgSalary) + '</div><div style="color:#94a3b8;font-size:0.82rem;margin-top:4px">\u0421\u0440. \u0417\u041f</div></div>';
   h += '</div>';
+  
+  // Online employees panel
+  if (onlineCount > 0) {
+    var onlineUsers = (data.onlineUsers || []);
+    h += '<div class="card" style="margin-bottom:16px;border-left:3px solid #10B981">';
+    h += '<h3 style="font-weight:700;font-size:1rem;margin-bottom:12px"><i class="fas fa-circle" style="color:#10B981;font-size:0.6rem;margin-right:8px"></i>Сейчас онлайн (' + onlineCount + ')</h3>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+    for (var oi = 0; oi < onlineUsers.length; oi++) {
+      var ou = onlineUsers[oi];
+      h += '<div style="padding:10px 14px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;min-width:200px">';
+      h += '<div style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(ou.display_name) + '</div>';
+      h += '<div style="font-size:0.72rem;color:#64748b;margin-top:2px">' + escHtml(ou.position_title||ou.role) + '</div>';
+      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px"><i class="fas fa-eye" style="margin-right:3px;color:#3B82F6"></i>' + escHtml(ou.last_action || ou.last_page || 'Активен') + '</div>';
+      h += '<div style="font-size:0.65rem;color:#475569;margin-top:2px">' + escHtml(ou.last_seen_at || '') + '</div>';
+      h += '</div>';
+    }
+    h += '</div></div>';
+  }
+  
+  // Vacation panel
+  if (vacationCount > 0) {
+    var today = new Date().toISOString().slice(0,10);
+    var currentVacs = (data.vacations || []).filter(function(v) { return v.status === 'active' && v.start_date <= today && v.end_date >= today; });
+    h += '<div class="card" style="margin-bottom:16px;border-left:3px solid #f59e0b">';
+    h += '<h3 style="font-weight:700;font-size:1rem;margin-bottom:12px"><i class="fas fa-umbrella-beach" style="color:#f59e0b;margin-right:8px"></i>В отпуске (' + vacationCount + ')</h3>';
+    h += '<div style="display:flex;flex-wrap:wrap;gap:10px">';
+    for (var vi2 = 0; vi2 < currentVacs.length; vi2++) {
+      var cv = currentVacs[vi2];
+      h += '<div style="padding:10px 14px;background:#0f172a;border-radius:8px;border:1px solid #1e293b;min-width:200px">';
+      h += '<div style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(cv.display_name) + '</div>';
+      h += '<div style="font-size:0.75rem;color:#f59e0b;margin-top:4px">' + escHtml(cv.start_date) + ' \u2014 ' + escHtml(cv.end_date) + '</div>';
+      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:2px">' + cv.days_count + ' дн. \u00b7 ' + (cv.is_paid ? 'Оплачиваемый' : 'Без оплаты') + '</div>';
+      h += '</div>';
+    }
+    h += '</div></div>';
+  }
   
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
   
@@ -5730,6 +5948,18 @@ window.addEventListener('unhandledrejection', function(e) {
     try { await loadData(); } catch(err) { console.error('loadData error:', err); token = ''; localStorage.removeItem('gtt_token'); }
   }
   render();
+  // Heartbeat: send presence every 60 seconds
+  if (token) {
+    function sendHeartbeat() {
+      try { api('/activity/heartbeat', { method:'POST', body: JSON.stringify({ page: currentPage, action: 'viewing ' + currentPage }) }); } catch(e) {}
+    }
+    sendHeartbeat();
+    setInterval(sendHeartbeat, 60000);
+    // Refresh online data every 90s
+    setInterval(async function() {
+      try { var od = await api('/activity/online'); data.onlineUsers = (od && od.online) || []; } catch(e) {}
+    }, 90000);
+  }
 })();
 </script>
 </body>

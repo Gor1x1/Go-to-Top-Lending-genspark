@@ -2097,4 +2097,178 @@ api.get('/business-analytics', authMiddleware, async (c) => {
   }
 });
 
+// ===== ACTIVITY TRACKING (heartbeat / online presence) =====
+api.post('/activity/heartbeat', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId = c.get('user').sub;
+  const d = await c.req.json().catch(() => ({}));
+  const action = d.action || '';
+  const page = d.page || '';
+  try {
+    const existing = await db.prepare('SELECT id FROM activity_sessions WHERE user_id = ?').bind(userId).first();
+    if (existing) {
+      await db.prepare('UPDATE activity_sessions SET last_action = ?, last_page = ?, last_seen_at = CURRENT_TIMESTAMP WHERE user_id = ?')
+        .bind(action, page, userId).run();
+    } else {
+      await db.prepare('INSERT INTO activity_sessions (user_id, last_action, last_page) VALUES (?,?,?)')
+        .bind(userId, action, page).run();
+    }
+  } catch {}
+  return c.json({ success: true });
+});
+
+api.get('/activity/online', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    // Users active within last 5 minutes are "online"
+    const res = await db.prepare(`
+      SELECT a.user_id, a.last_action, a.last_page, a.last_seen_at,
+        u.display_name, u.role, u.position_title
+      FROM activity_sessions a
+      JOIN users u ON a.user_id = u.id
+      WHERE a.last_seen_at >= datetime('now', '-5 minutes')
+      ORDER BY a.last_seen_at DESC
+    `).all();
+    return c.json({ online: res.results || [] });
+  } catch { return c.json({ online: [] }); }
+});
+
+// ===== EMPLOYEE VACATIONS =====
+api.get('/users/:id/vacations', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId = c.req.param('id');
+  try {
+    const res = await db.prepare('SELECT * FROM employee_vacations WHERE user_id = ? ORDER BY start_date DESC').bind(userId).all();
+    return c.json({ vacations: res.results || [] });
+  } catch { return c.json({ vacations: [] }); }
+});
+
+api.get('/vacations', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare(`
+      SELECT v.*, u.display_name, u.role, u.position_title
+      FROM employee_vacations v
+      JOIN users u ON v.user_id = u.id
+      ORDER BY v.start_date DESC
+    `).all();
+    return c.json({ vacations: res.results || [] });
+  } catch { return c.json({ vacations: [] }); }
+});
+
+api.get('/vacations/current', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const res = await db.prepare(`
+      SELECT v.*, u.display_name, u.role, u.position_title
+      FROM employee_vacations v
+      JOIN users u ON v.user_id = u.id
+      WHERE v.status = 'active' AND date(v.start_date) <= date('now') AND date(v.end_date) >= date('now')
+      ORDER BY v.end_date ASC
+    `).all();
+    return c.json({ vacations: res.results || [] });
+  } catch { return c.json({ vacations: [] }); }
+});
+
+api.post('/users/:id/vacations', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage vacations' }, 403);
+  const userId = c.req.param('id');
+  const d = await c.req.json();
+  if (!d.start_date || !d.end_date) return c.json({ error: 'start_date and end_date required' }, 400);
+  // Auto-calculate days_count
+  const start = new Date(d.start_date);
+  const end = new Date(d.end_date);
+  const diffMs = end.getTime() - start.getTime();
+  const daysCount = d.days_count || Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)) + 1);
+  await db.prepare('INSERT INTO employee_vacations (user_id, start_date, end_date, days_count, is_paid, paid_amount, status, notes) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(userId, d.start_date, d.end_date, daysCount, d.is_paid !== false ? 1 : 0, d.paid_amount || 0, d.status || 'planned', d.notes || '').run();
+  return c.json({ success: true });
+});
+
+api.put('/vacations/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage vacations' }, 403);
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = [];
+  const vals: any[] = [];
+  if (d.start_date !== undefined) { fields.push('start_date=?'); vals.push(d.start_date); }
+  if (d.end_date !== undefined) { fields.push('end_date=?'); vals.push(d.end_date); }
+  if (d.days_count !== undefined) { fields.push('days_count=?'); vals.push(d.days_count); }
+  if (d.is_paid !== undefined) { fields.push('is_paid=?'); vals.push(d.is_paid ? 1 : 0); }
+  if (d.paid_amount !== undefined) { fields.push('paid_amount=?'); vals.push(d.paid_amount); }
+  if (d.status !== undefined) { fields.push('status=?'); vals.push(d.status); }
+  if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
+  if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
+  fields.push('updated_at=CURRENT_TIMESTAMP');
+  vals.push(id);
+  await db.prepare(`UPDATE employee_vacations SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  return c.json({ success: true });
+});
+
+api.delete('/vacations/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage vacations' }, 403);
+  const id = c.req.param('id');
+  await db.prepare('DELETE FROM employee_vacations WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// ===== EMPLOYEE SEARCH (global across all fields) =====
+api.get('/users/search', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const q = (c.req.query('q') || '').trim();
+  if (!q) return c.json({ results: [] });
+  const like = `%${q}%`;
+  try {
+    const res = await db.prepare(`
+      SELECT id, username, role, display_name, phone, email, is_active, salary, salary_type, 
+        position_title, hire_date, end_date, created_at
+      FROM users 
+      WHERE display_name LIKE ? OR username LIKE ? OR phone LIKE ? OR email LIKE ? OR position_title LIKE ? OR role LIKE ?
+      ORDER BY display_name
+    `).bind(like, like, like, like, like, like).all();
+    return c.json({ results: res.results || [] });
+  } catch { return c.json({ results: [] }); }
+});
+
+// ===== EMPLOYEE EARNINGS SUMMARY (salary + bonuses + penalties per month) =====
+api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const userId = c.req.param('id');
+  const month = c.req.param('month');
+  if (!month || !/^\d{4}-\d{2}$/.test(month)) return c.json({ error: 'Invalid month format' }, 400);
+  try {
+    const user = await db.prepare('SELECT salary, salary_type FROM users WHERE id = ?').bind(userId).first();
+    const salary = Number(user?.salary || 0);
+    const bonusRes = await db.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' THEN amount ELSE 0 END),0) as bonuses,
+        COALESCE(SUM(CASE WHEN bonus_type='penalty' THEN amount ELSE 0 END),0) as penalties,
+        COALESCE(SUM(amount),0) as net
+      FROM employee_bonuses WHERE user_id = ? AND strftime('%Y-%m', bonus_date) = ?
+    `).bind(userId, month).first();
+    const bonuses = Number(bonusRes?.bonuses || 0);
+    const penalties = Math.abs(Number(bonusRes?.penalties || 0));
+    const net = Number(bonusRes?.net || 0);
+    // Vacation days used this month
+    const vacRes = await db.prepare(`
+      SELECT COALESCE(SUM(days_count),0) as vacation_days, COALESCE(SUM(paid_amount),0) as vacation_paid
+      FROM employee_vacations WHERE user_id = ? AND strftime('%Y-%m', start_date) = ?
+    `).bind(userId, month).first();
+    return c.json({
+      month, user_id: Number(userId), salary, salary_type: user?.salary_type || 'monthly',
+      bonuses, penalties, bonuses_net: net,
+      total_earnings: salary + net,
+      vacation_days: Number(vacRes?.vacation_days || 0),
+      vacation_paid: Number(vacRes?.vacation_paid || 0)
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Earnings error: ' + (err?.message || 'unknown') }, 500);
+  }
+});
+
 export default api
