@@ -65,6 +65,7 @@ let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts:
 
 // ===== API HELPERS =====
 const API = '/api/admin';
+function ensureArray(v) { return Array.isArray(v) ? v : []; }
 async function api(path, methodOrOpts, bodyData) {
   const headers = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
@@ -75,9 +76,14 @@ async function api(path, methodOrOpts, bodyData) {
   } else if (methodOrOpts) {
     opts = methodOrOpts;
   }
-  const res = await fetch(API + path, { ...opts, headers });
-  if (res.status === 401) { token = ''; localStorage.removeItem('gtt_token'); render(); return null; }
-  return res.json();
+  try {
+    const res = await fetch(API + path, { ...opts, headers });
+    if (res.status === 401) { token = ''; localStorage.removeItem('gtt_token'); render(); return null; }
+    return await res.json();
+  } catch(e) {
+    console.error('API error:', path, e);
+    return null;
+  }
 }
 
 function toast(msg, type = 'success') {
@@ -152,7 +158,7 @@ async function loadData() {
   data.settings = settings || {};
   data.footer = footerData || {};
   data.photoBlocks = (photoBlocksData && photoBlocksData.blocks) || [];
-  data.users = usersData || [];
+  data.users = ensureArray(usersData);
   data.siteBlocks = (siteBlocksData && siteBlocksData.blocks) || [];
   data.companyRoles = (companyRolesData && companyRolesData.roles) || [];
   data.expenseCategories = (expenseCategoriesData && expenseCategoriesData.categories) || [];
@@ -1463,7 +1469,7 @@ function renderLeads() {
     '<select class="input" style="width:170px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'assignee\\',this.value)">' +
       '<option value="all"' + (leadsFilter.assignee==='all'?' selected':'') + '>Все ответственные</option>' +
       '<option value=""' + (leadsFilter.assignee===''?' selected':'') + '>Не назначен</option>';
-  for (var ui = 0; ui < (data.users||[]).length; ui++) {
+  for (var ui = 0; ui < ensureArray(data.users).length; ui++) {
     var usr = data.users[ui];
     h += '<option value="' + usr.id + '"' + (leadsFilter.assignee===String(usr.id)?' selected':'') + '>' + escHtml(usr.display_name) + '</option>';
   }
@@ -1538,7 +1544,7 @@ function renderLeads() {
       // Assign to employee
       h += '<select class="input" style="width:170px;padding:4px 8px;font-size:0.78rem;color:#64748b" onchange="assignLead(' + l.id + ', this.value)">' +
         '<option value="">Ответственный...</option>';
-      for (var uj = 0; uj < (data.users||[]).length; uj++) {
+      for (var uj = 0; uj < ensureArray(data.users).length; uj++) {
         var uu = data.users[uj];
         h += '<option value="' + uu.id + '"' + (l.assigned_to==uu.id?' selected':'') + '>' + escHtml(uu.display_name) + '</option>';
       }
@@ -1677,7 +1683,7 @@ async function saveLeadNotes(id) {
 }
 
 function getAssigneeName(id) {
-  var u = (data.users||[]).find(function(x) { return x.id == id; });
+  var u = ensureArray(data.users).find(function(x) { return x.id == id; });
   return u ? u.display_name : '—';
 }
 
@@ -1937,7 +1943,7 @@ function showArticleModal(leadId, articleId) {
   }
   h += (isEdit ? '</select></div>' : '') +
       '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Выкупщик</label><select class="input" id="art_buyer"><option value="">— Не назначен —</option>';
-  for (var bk = 0; bk < (data.users||[]).length; bk++) {
+  for (var bk = 0; bk < ensureArray(data.users).length; bk++) {
     var ub = data.users[bk];
     h += '<option value="' + ub.id + '"' + ((art && art.buyer_id==ub.id)?' selected':'') + '>' + escHtml(ub.display_name) + '</option>';
   }
@@ -3943,7 +3949,7 @@ async function updateUserSalary(userId, field, value) {
   var body = {};
   body[field] = value;
   var res = await api('/users/' + userId + '/salary', 'PUT', body);
-  if (res && res.success) { toast('Обновлено'); var r = await api('/users'); data.users = r || []; analyticsData = null; loadAnalyticsData(); }
+  if (res && res.success) { toast('Обновлено'); var r = await api('/users'); data.users = ensureArray(r); analyticsData = null; loadAnalyticsData(); }
   else { toast(res?.error || 'Ошибка', 'error'); }
 }
 
@@ -4867,6 +4873,7 @@ function calcWorkDuration(hireDate, endDate) {
 }
 
 function renderEmployees() {
+  if (!Array.isArray(data.users)) data.users = [];
   const isAdmin = currentUser && currentUser.role === 'main_admin';
   const rl = rolesConfig?.role_labels || {};
   const roles = rolesConfig?.roles || [];
@@ -5172,7 +5179,7 @@ async function loadEmpEarnings(userId, month) {
 
 async function loadAllEarnings() {
   var curMonth = new Date().toISOString().slice(0,7);
-  var users = data.users || [];
+  var users = ensureArray(data.users);
   toast('Загрузка данных о заработке...', 'info');
   var promises = users.filter(function(u) { return u.salary > 0 || u.hire_date; }).map(function(u) {
     return api('/users/' + u.id + '/earnings/' + curMonth).then(function(res) {
@@ -5255,7 +5262,7 @@ function showChangePassForm(id) { _changePassUserId = id; render(); }
 async function doChangeCredentials(userId) {
   var newPass = document.getElementById('newpass-' + userId)?.value || '';
   var newUser = (document.getElementById('newuser-' + userId)?.value || '').trim();
-  var currentUsr = (data.users || []).find(function(x){ return x.id === userId; });
+  var currentUsr = (ensureArray(data.users)).find(function(x){ return x.id === userId; });
   var usernameChanged = newUser && newUser !== (currentUsr?.username || '');
   if (!newPass && !usernameChanged) { toast('Внесите изменения в логин или пароль', 'error'); return; }
   if (newPass && newPass.length < 3) { toast('Пароль слишком короткий (мин. 3 символа)', 'error'); return; }
@@ -5270,7 +5277,7 @@ async function doChangeCredentials(userId) {
     if (newPass) msg.push('Пароль изменён');
     toast(msg.join(' + ') + '!'); 
     _changePassUserId = 0; 
-    data.users = await api('/users') || [];
+    data.users = ensureArray(await api('/users'));
     render(); 
   }
   else { toast(res?.error || 'Ошибка', 'error'); }
@@ -5278,7 +5285,7 @@ async function doChangeCredentials(userId) {
 
 async function toggleUserActive(id, val) {
   await api('/users/' + id, { method:'PUT', body: JSON.stringify({is_active: val}) });
-  data.users = await api('/users') || [];
+  data.users = ensureArray(await api('/users'));
   render();
 }
 
@@ -5286,7 +5293,7 @@ async function forceStopEmployee(id, name) {
   if (!confirm('\u26a0\ufe0f Принудительно завершить работу сотрудника "' + name + '"?\\n\\nСотрудник будет отключён и не сможет войти в админ-панель.\\nДата окончания работы будет установлена на сегодня.')) return;
   var today = new Date().toISOString().slice(0,10);
   await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 0, end_date: today }) });
-  data.users = await api('/users') || [];
+  data.users = ensureArray(await api('/users'));
   toast('Сотрудник "' + name + '" отключён. Вход заблокирован.');
   render();
 }
@@ -5294,7 +5301,7 @@ async function forceStopEmployee(id, name) {
 async function reactivateEmployee(id, name) {
   if (!confirm('Активировать сотрудника "' + name + '"?\\n\\nСотрудник снова сможет входить в админ-панель. Дата окончания будет очищена.')) return;
   await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 1, end_date: '' }) });
-  data.users = await api('/users') || [];
+  data.users = ensureArray(await api('/users'));
   toast('Сотрудник "' + name + '" активирован');
   render();
 }
@@ -5302,7 +5309,7 @@ async function reactivateEmployee(id, name) {
 async function deleteEmployee(id, name) {
   if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0430 "' + name + '"?')) return;
   await api('/users/' + id, { method:'DELETE' });
-  data.users = await api('/users') || [];
+  data.users = ensureArray(await api('/users'));
   toast('\u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a \u0443\u0434\u0430\u043b\u0451\u043d');
   render();
 }
@@ -5315,7 +5322,7 @@ async function resetEmployeePass(id, name) {
 function showEmployeeModal(userId) {
   const roles = rolesConfig?.roles || [];
   const rl = rolesConfig?.role_labels || {};
-  const u = userId ? data.users.find(x => x.id === userId) : null;
+  const u = userId ? ensureArray(data.users).find(x => x.id === userId) : null;
   const compRoles = data.companyRoles || [];
   let h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center" onclick="this.remove()">' +
     '<div class="card" style="width:520px;max-width:90vw;max-height:90vh;overflow-y:auto" onclick="event.stopPropagation()">' +
@@ -5373,11 +5380,11 @@ async function saveEmployee(e, id) {
   };
   // Enforce single main_admin
   if (body.role === 'main_admin' && !id) {
-    var existing = data.users.find(function(u) { return u.role === 'main_admin'; });
+    var existing = ensureArray(data.users).find(function(u) { return u.role === 'main_admin'; });
     if (existing) { toast('Главный админ уже существует: ' + existing.display_name, 'error'); return; }
   }
   if (body.role === 'main_admin' && id) {
-    var existing2 = data.users.find(function(u) { return u.role === 'main_admin' && u.id !== id; });
+    var existing2 = ensureArray(data.users).find(function(u) { return u.role === 'main_admin' && u.id !== id; });
     if (existing2) { toast('Главный админ уже существует: ' + existing2.display_name + '. Только один main_admin допускается.', 'error'); return; }
   }
   var res;
@@ -5392,7 +5399,7 @@ async function saveEmployee(e, id) {
     toast(res?.error || 'Ошибка при сохранении сотрудника', 'error');
     return;
   }
-  data.users = await api('/users') || [];
+  data.users = ensureArray(await api('/users'));
   toast(id ? 'Сотрудник обновлён' : 'Сотрудник создан');
   render();
 }
@@ -5406,7 +5413,7 @@ let selectedPermSections = [];
 function renderTeamAccess() {
   var isAdmin = currentUser && currentUser.role === 'main_admin';
   var roles = data.companyRoles || [];
-  var users = data.users || [];
+  var users = ensureArray(data.users);
   var rl = rolesConfig?.role_labels || {};
   var sl = rolesConfig?.section_labels || {};
   var allSections = rolesConfig?.sections || [];
@@ -5462,7 +5469,7 @@ function renderTeamAccess() {
 // === TAB 1: ACCESS MATRIX ===
 // Preload user permissions for matrix display
 async function loadUserPermsForMatrix() {
-  var users = data.users || [];
+  var users = ensureArray(data.users);
   for (var i = 0; i < users.length; i++) {
     var uid = users[i].id;
     try {
@@ -5579,7 +5586,7 @@ function renderRolesTab(roles, sl, isAdmin) {
       try { sections = JSON.parse(r.default_sections || '[]'); } catch { sections = []; }
       var sectionNames = sections.map(function(s) { return sl[s] || s; }).join(', ');
       // Count users with this role
-      var usersWithRole = (data.users || []).filter(function(u) { return u.role === r.role_key; });
+      var usersWithRole = (ensureArray(data.users)).filter(function(u) { return u.role === r.role_key; });
       h += '<div class="card" style="padding:0;overflow:hidden;border-left:4px solid ' + escHtml(r.color || '#8B5CF6') + '">';
       h += '<div style="padding:20px;display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">';
       h += '<div style="flex:1;min-width:200px">';
@@ -5652,7 +5659,7 @@ async function selectPermUser(uid, skipFetch) {
     var res = await api('/permissions/' + uid);
     selectedPermSections = (res && res.permissions) || [];
   }
-  var u = data.users.find(function(x) { return x.id === uid; });
+  var u = ensureArray(data.users).find(function(x) { return x.id === uid; });
   var isMainAdmin2 = u && u.role === 'main_admin';
   var isAdmin2 = currentUser && currentUser.role === 'main_admin';
   var rl2 = rolesConfig?.role_labels || {};
@@ -5718,7 +5725,7 @@ function togglePermSection(sec) {
 
 function applyRoleDefaults() {
   if (!selectedPermUserId) return;
-  var u = data.users.find(function(x) { return x.id === selectedPermUserId; });
+  var u = ensureArray(data.users).find(function(x) { return x.id === selectedPermUserId; });
   var compRole = (data.companyRoles || []).find(function(r) { return r.role_key === u?.role; });
   try { selectedPermSections = compRole ? JSON.parse(compRole.default_sections || '[]') : ['dashboard']; } catch { selectedPermSections = ['dashboard']; }
   selectPermUser(selectedPermUserId, true);
@@ -5745,7 +5752,7 @@ async function savePermissions() {
 
 // === TAB 4: TEAM STATS ===
 function renderTeamStats() {
-  var users = data.users || [];
+  var users = ensureArray(data.users);
   var roles = data.companyRoles || [];
   var rl = rolesConfig?.role_labels || {};
   var h = '';
@@ -6152,6 +6159,11 @@ async function saveSiteBlock() {
 }
 
 function render() {
+  // Ensure data arrays are always arrays (protect against API returning objects)
+  if (!Array.isArray(data.users)) data.users = [];
+  if (!Array.isArray(data.companyRoles)) data.companyRoles = [];
+  if (!Array.isArray(data.vacations)) data.vacations = [];
+  if (!Array.isArray(data.onlineUsers)) data.onlineUsers = [];
   const app = document.getElementById('app');
   if (!token) { app.innerHTML = renderLogin(); return; }
   
