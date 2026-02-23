@@ -4920,7 +4920,7 @@ function renderEmployees() {
       h += '<div><span style="color:#94a3b8">Итого</span><div style="color:#a78bfa;font-weight:700">' + fmtAmt(earnings.total_earnings) + '</div></div>';
       h += '</div></div>';
     } else {
-      h += '<button class="btn btn-outline" style="width:100%;padding:6px;font-size:0.75rem" onclick="loadEmpEarnings(' + u.id + ',\'' + curMonth + '\')"><i class="fas fa-calculator" style="margin-right:4px"></i>Показать заработок за месяц</button>';
+      h += '<button class="btn btn-outline" style="width:100%;padding:6px;font-size:0.75rem" onclick="loadEmpEarnings(' + u.id + ',&apos;' + curMonth + '&apos;)"><i class="fas fa-calculator" style="margin-right:4px"></i>Показать заработок за месяц</button>';
     }
     h += '</div>';
     // Vacation summary
