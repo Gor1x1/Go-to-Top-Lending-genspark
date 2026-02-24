@@ -113,6 +113,15 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare('SELECT * FROM period_snapshots ORDER BY date_from DESC').all(),
       db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all()
     ]);
+    // P&L related data (parallel, with fallback for new tables)
+    const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData] = await Promise.all([
+      db.prepare('SELECT * FROM tax_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM assets ORDER BY purchase_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM loans ORDER BY start_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM dividends ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM other_income_expenses ORDER BY date DESC').all().catch(() => ({results:[]}))
+    ]);
     // Stats counts (parallel)
     const [contentCount, svcCount, msgCount, scriptCount, totalLeadsCount, newLeadsCount, todayLeadsCount, todayViews, weekViews, monthViews] = await Promise.all([
       db.prepare('SELECT COUNT(*) as count FROM site_content').first().catch(() => ({count:0})),
@@ -160,7 +169,13 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       periodSnapshots: periodSnapshots.results || [],
       vacations: vacations.results || [],
       online: onlineRes.results || [],
-      leadArticles: leadArticles
+      leadArticles: leadArticles,
+      taxPayments: taxPayments.results || [],
+      assets: assetsData.results || [],
+      loans: loansData.results || [],
+      loanPayments: loanPaymentsData.results || [],
+      dividends: dividendsData.results || [],
+      otherIncomeExpenses: otherIEData.results || []
     });
   } catch(e: any) {
     console.error('bulk-data error:', e);
@@ -2498,6 +2513,377 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
     });
   } catch (err: any) {
     return c.json({ error: 'Earnings error: ' + (err?.message || 'unknown') }, 500);
+  }
+});
+
+// ===== TAX PAYMENTS =====
+api.get('/tax-payments', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM tax_payments ORDER BY payment_date DESC, id DESC').all();
+  return c.json({ payments: res.results || [] });
+});
+
+api.post('/tax-payments', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, payment_date, due_date, status, notes) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(d.tax_type||'income_tax', d.tax_name||'', d.amount||0, d.period_key||'', d.payment_date||'', d.due_date||'', d.status||'paid', d.notes||'').run();
+  return c.json({ success: true });
+});
+
+api.put('/tax-payments/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  if (d.tax_type !== undefined) { fields.push('tax_type=?'); vals.push(d.tax_type); }
+  if (d.tax_name !== undefined) { fields.push('tax_name=?'); vals.push(d.tax_name); }
+  if (d.amount !== undefined) { fields.push('amount=?'); vals.push(d.amount); }
+  if (d.period_key !== undefined) { fields.push('period_key=?'); vals.push(d.period_key); }
+  if (d.payment_date !== undefined) { fields.push('payment_date=?'); vals.push(d.payment_date); }
+  if (d.due_date !== undefined) { fields.push('due_date=?'); vals.push(d.due_date); }
+  if (d.status !== undefined) { fields.push('status=?'); vals.push(d.status); }
+  if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
+  if (fields.length) { vals.push(id); await db.prepare(`UPDATE tax_payments SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
+  return c.json({ success: true });
+});
+
+api.delete('/tax-payments/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM tax_payments WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ success: true });
+});
+
+// ===== ASSETS (Amortization) =====
+api.get('/assets', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM assets ORDER BY purchase_date DESC, id DESC').all();
+  return c.json({ assets: res.results || [] });
+});
+
+api.post('/assets', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO assets (name, purchase_date, purchase_cost, useful_life_months, residual_value, depreciation_method, category, is_active, notes) VALUES (?,?,?,?,?,?,?,?,?)')
+    .bind(d.name||'', d.purchase_date||'', d.purchase_cost||0, d.useful_life_months||60, d.residual_value||0, d.depreciation_method||'straight_line', d.category||'', d.is_active!==undefined?d.is_active:1, d.notes||'').run();
+  return c.json({ success: true });
+});
+
+api.put('/assets/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  for (const k of ['name','purchase_date','purchase_cost','useful_life_months','residual_value','depreciation_method','category','is_active','notes']) {
+    if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
+  }
+  if (fields.length) { vals.push(id); await db.prepare(`UPDATE assets SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
+  return c.json({ success: true });
+});
+
+api.delete('/assets/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM assets WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ success: true });
+});
+
+// ===== LOANS =====
+api.get('/loans', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const loans = await db.prepare('SELECT * FROM loans ORDER BY start_date DESC, id DESC').all();
+  const payments = await db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all();
+  return c.json({ loans: loans.results || [], payments: payments.results || [] });
+});
+
+api.post('/loans', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO loans (name, lender, principal, interest_rate, start_date, end_date, monthly_payment, remaining_balance, loan_type, is_active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(d.name||'', d.lender||'', d.principal||0, d.interest_rate||0, d.start_date||'', d.end_date||'', d.monthly_payment||0, d.remaining_balance||d.principal||0, d.loan_type||'bank', d.is_active!==undefined?d.is_active:1, d.notes||'').run();
+  return c.json({ success: true });
+});
+
+api.put('/loans/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  for (const k of ['name','lender','principal','interest_rate','start_date','end_date','monthly_payment','remaining_balance','loan_type','is_active','notes']) {
+    if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
+  }
+  if (fields.length) { vals.push(id); await db.prepare(`UPDATE loans SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
+  return c.json({ success: true });
+});
+
+api.delete('/loans/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM loan_payments WHERE loan_id = ?').bind(c.req.param('id')).run();
+  await db.prepare('DELETE FROM loans WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ success: true });
+});
+
+api.post('/loans/:id/payments', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const loanId = c.req.param('id');
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO loan_payments (loan_id, amount, principal_part, interest_part, payment_date, notes) VALUES (?,?,?,?,?,?)')
+    .bind(loanId, d.amount||0, d.principal_part||0, d.interest_part||0, d.payment_date||'', d.notes||'').run();
+  // Update remaining balance
+  if (d.principal_part) {
+    await db.prepare('UPDATE loans SET remaining_balance = remaining_balance - ? WHERE id = ?').bind(d.principal_part, loanId).run();
+  }
+  return c.json({ success: true });
+});
+
+// ===== DIVIDENDS =====
+api.get('/dividends', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM dividends ORDER BY payment_date DESC, id DESC').all();
+  return c.json({ dividends: res.results || [] });
+});
+
+api.post('/dividends', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO dividends (amount, recipient, payment_date, period_key, tax_amount, notes) VALUES (?,?,?,?,?,?)')
+    .bind(d.amount||0, d.recipient||'', d.payment_date||'', d.period_key||'', d.tax_amount||0, d.notes||'').run();
+  return c.json({ success: true });
+});
+
+api.put('/dividends/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  for (const k of ['amount','recipient','payment_date','period_key','tax_amount','notes']) {
+    if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
+  }
+  if (fields.length) { vals.push(id); await db.prepare(`UPDATE dividends SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
+  return c.json({ success: true });
+});
+
+api.delete('/dividends/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM dividends WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ success: true });
+});
+
+// ===== OTHER INCOME / EXPENSES =====
+api.get('/other-income-expenses', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM other_income_expenses ORDER BY date DESC, id DESC').all();
+  return c.json({ items: res.results || [] });
+});
+
+api.post('/other-income-expenses', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO other_income_expenses (type, name, amount, category, date, period_key, notes) VALUES (?,?,?,?,?,?,?)')
+    .bind(d.type||'expense', d.name||'', d.amount||0, d.category||'other', d.date||'', d.period_key||'', d.notes||'').run();
+  return c.json({ success: true });
+});
+
+api.put('/other-income-expenses/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  for (const k of ['type','name','amount','category','date','period_key','notes']) {
+    if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
+  }
+  if (fields.length) { vals.push(id); await db.prepare(`UPDATE other_income_expenses SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
+  return c.json({ success: true });
+});
+
+api.delete('/other-income-expenses/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM other_income_expenses WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ success: true });
+});
+
+// ===== P&L REPORT (aggregated for a period) =====
+// Helper: compute P&L numbers for a given period key
+async function computePnlForPeriod(db: D1Database, periodKey: string) {
+  const yearStart = periodKey.substring(0, 4) + '-01';
+  // Revenue from period_snapshots
+  const snap = await db.prepare("SELECT * FROM period_snapshots WHERE period_key = ? AND period_type = 'month'").bind(periodKey).first();
+  // Taxes for this period
+  const taxes = await db.prepare('SELECT * FROM tax_payments WHERE period_key = ?').bind(periodKey).all();
+  const totalTaxes = (taxes.results || []).reduce((s: number, t: any) => s + (t.amount || 0), 0);
+  // Taxes YTD
+  const taxesYtd = await db.prepare("SELECT SUM(amount) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
+  // Assets depreciation for this month
+  const assets = await db.prepare('SELECT * FROM assets WHERE is_active = 1').all();
+  let monthlyDepreciation = 0;
+  for (const a of (assets.results || []) as any[]) {
+    if (a.purchase_date && a.purchase_date <= periodKey + '-31') {
+      const monthly = (a.purchase_cost - (a.residual_value || 0)) / (a.useful_life_months || 60);
+      monthlyDepreciation += Math.round(monthly * 100) / 100;
+    }
+  }
+  // Loans interest for this period
+  const loanPayments = await db.prepare("SELECT SUM(interest_part) as total_interest, SUM(amount) as total_payments FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
+    .bind(periodKey + '-01', periodKey + '-31').first();
+  // Loan payments list for this period
+  const loanPaymentsList = await db.prepare("SELECT lp.*, l.name as loan_name FROM loan_payments lp LEFT JOIN loans l ON lp.loan_id = l.id WHERE lp.payment_date >= ? AND lp.payment_date <= ? ORDER BY lp.payment_date DESC")
+    .bind(periodKey + '-01', periodKey + '-31').all();
+  // Dividends for this period
+  const divs = await db.prepare('SELECT * FROM dividends WHERE period_key = ?').bind(periodKey).all();
+  const totalDividends = (divs.results || []).reduce((s: number, d: any) => s + (d.amount || 0) + (d.tax_amount || 0), 0);
+  // Dividends YTD
+  const divsYtd = await db.prepare("SELECT SUM(amount) as total_amount, SUM(tax_amount) as total_tax FROM dividends WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
+  // Other income/expenses
+  const otherIE = await db.prepare('SELECT * FROM other_income_expenses WHERE period_key = ?').bind(periodKey).all();
+  let otherIncome = 0, otherExpenses = 0;
+  for (const item of (otherIE.results || []) as any[]) {
+    if (item.type === 'income') otherIncome += item.amount || 0;
+    else otherExpenses += item.amount || 0;
+  }
+  // Salary summary for period
+  const salaryData = await db.prepare(`SELECT 
+    COALESCE(SUM(CASE WHEN u.is_active=1 THEN u.salary ELSE 0 END), 0) as total_salaries,
+    COALESCE((SELECT SUM(CASE WHEN eb.bonus_type='bonus' OR (eb.bonus_type IS NULL AND eb.amount > 0) THEN eb.amount ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as total_bonuses,
+    COALESCE((SELECT SUM(CASE WHEN eb.bonus_type IN ('penalty','fine') OR (eb.bonus_type IS NULL AND eb.amount < 0) THEN ABS(eb.amount) ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as total_penalties
+    FROM users u WHERE u.salary > 0`)
+    .bind(periodKey + '-01', periodKey + '-31', periodKey + '-01', periodKey + '-31').first();
+  // Expenses from expenses table (commercial & marketing)
+  const expData = await db.prepare(`SELECT 
+    COALESCE(SUM(CASE WHEN ec.is_marketing = 0 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as commercial,
+    COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as marketing
+    FROM expenses e 
+    LEFT JOIN expense_categories ec ON e.category_id = ec.id
+    LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
+    WHERE e.is_active = 1`).first();
+  // Build P&L cascade
+  const revenue = snap ? (snap.revenue_services as number || 0) : 0;
+  const refunds = snap ? (snap.refunds as number || 0) : 0;
+  const cogs = expData ? (expData.commercial as number || 0) : 0;
+  const grossProfit = revenue - cogs;
+  const salariesBase = salaryData?.total_salaries as number || 0;
+  const bonuses = salaryData?.total_bonuses as number || 0;
+  const penalties = salaryData?.total_penalties as number || 0;
+  const salaryTotal = salariesBase + bonuses - penalties;
+  const marketing = expData ? (expData.marketing as number || 0) : 0;
+  const totalOpex = salaryTotal + marketing + monthlyDepreciation;
+  const ebit = grossProfit - totalOpex;
+  const ebitda = ebit + monthlyDepreciation;
+  const interestExpense = loanPayments ? (loanPayments.total_interest as number || 0) : 0;
+  const otherNet = otherIncome - otherExpenses;
+  const ebt = ebit + otherNet - interestExpense;
+  const netProfit = ebt - totalTaxes;
+  const retainedEarnings = netProfit - totalDividends;
+
+  return {
+    period_key: periodKey,
+    revenue, refunds, net_revenue: revenue - refunds,
+    cogs, gross_profit: grossProfit,
+    gross_margin: revenue > 0 ? Math.round(grossProfit / revenue * 10000) / 100 : 0,
+    salaries: salariesBase, bonuses, penalties, salary_total: salaryTotal,
+    marketing, depreciation: monthlyDepreciation, total_opex: totalOpex,
+    ebit, ebit_margin: revenue > 0 ? Math.round(ebit / revenue * 10000) / 100 : 0,
+    ebitda, ebitda_margin: revenue > 0 ? Math.round(ebitda / revenue * 10000) / 100 : 0,
+    other_income: otherIncome, other_expenses: otherExpenses, other_net: otherNet,
+    interest_expense: interestExpense,
+    ebt,
+    taxes: taxes.results || [], total_taxes: totalTaxes,
+    effective_tax_rate: ebt > 0 ? Math.round(totalTaxes / ebt * 10000) / 100 : 0,
+    tax_burden: revenue > 0 ? Math.round(totalTaxes / revenue * 10000) / 100 : 0,
+    net_profit: netProfit, net_margin: revenue > 0 ? Math.round(netProfit / revenue * 10000) / 100 : 0,
+    dividends: divs.results || [], total_dividends: totalDividends,
+    retained_earnings: retainedEarnings,
+    ytd_taxes: taxesYtd?.total || 0,
+    ytd_dividends_amount: divsYtd?.total_amount || 0,
+    ytd_dividends_tax: divsYtd?.total_tax || 0,
+    monthly_burn_rate: Math.round((totalOpex + totalTaxes + interestExpense) * 100) / 100,
+    other_items: otherIE.results || [],
+    assets: assets.results || [],
+    loan_payments_list: loanPaymentsList.results || [],
+  };
+}
+
+api.get('/pnl/:periodKey', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const periodKey = c.req.param('periodKey'); // format: 2026-02
+  try {
+    // Current period
+    const current = await computePnlForPeriod(db, periodKey);
+    
+    // Previous month for MoM comparison
+    const parts = periodKey.split('-');
+    let py = parseInt(parts[0]), pm = parseInt(parts[1]) - 1;
+    if (pm < 1) { pm = 12; py--; }
+    const prevKey = py + '-' + String(pm).padStart(2, '0');
+    const prev = await computePnlForPeriod(db, prevKey);
+    
+    // YTD accumulation (Jan through current month)
+    const yearStart = periodKey.substring(0, 4) + '-01';
+    const currentMonth = parseInt(parts[1]);
+    let ytd: any = { revenue: 0, cogs: 0, gross_profit: 0, salary_total: 0, marketing: 0, depreciation: 0, total_opex: 0, ebit: 0, ebitda: 0, other_income: 0, other_expenses: 0, interest_expense: 0, ebt: 0, total_taxes: 0, net_profit: 0, total_dividends: 0, retained_earnings: 0 };
+    // Get all snapshots for this year
+    const ytdSnaps = await db.prepare("SELECT COALESCE(SUM(revenue_services),0) as revenue, COALESCE(SUM(refunds),0) as refunds FROM period_snapshots WHERE period_type='month' AND period_key >= ? AND period_key <= ?")
+      .bind(yearStart, periodKey).first();
+    const ytdTaxes = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?")
+      .bind(yearStart, periodKey).first();
+    const ytdOtherIE = await db.prepare("SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) as expenses FROM other_income_expenses WHERE period_key >= ? AND period_key <= ?")
+      .bind(yearStart, periodKey).first();
+    const ytdInterest = await db.prepare("SELECT COALESCE(SUM(interest_part),0) as total FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
+      .bind(yearStart + '-01', periodKey + '-31').first();
+    const ytdDivs = await db.prepare("SELECT COALESCE(SUM(amount),0) as amount, COALESCE(SUM(tax_amount),0) as tax FROM dividends WHERE period_key >= ? AND period_key <= ?")
+      .bind(yearStart, periodKey).first();
+    // For YTD salaries/expenses, multiply monthly rates by number of months
+    const ytdRevenue = (ytdSnaps?.revenue as number) || 0;
+    const ytdRefunds = (ytdSnaps?.refunds as number) || 0;
+    const ytdCogs = current.cogs * currentMonth; // monthly COGS * months (active expenses are recurring)
+    const ytdSalary = current.salary_total * currentMonth;
+    const ytdMarketing = current.marketing * currentMonth;
+    const ytdDepr = current.depreciation * currentMonth;
+    const ytdTotalOpex = ytdSalary + ytdMarketing + ytdDepr;
+    const ytdGross = ytdRevenue - ytdCogs;
+    const ytdEbit = ytdGross - ytdTotalOpex;
+    const ytdEbitda = ytdEbit + ytdDepr;
+    const ytdOtherNet = ((ytdOtherIE?.income as number) || 0) - ((ytdOtherIE?.expenses as number) || 0);
+    const ytdInterestTotal = (ytdInterest?.total as number) || 0;
+    const ytdEbt = ytdEbit + ytdOtherNet - ytdInterestTotal;
+    const ytdTaxTotal = (ytdTaxes?.total as number) || 0;
+    const ytdNet = ytdEbt - ytdTaxTotal;
+    const ytdDivTotal = ((ytdDivs?.amount as number) || 0) + ((ytdDivs?.tax as number) || 0);
+    
+    ytd = {
+      revenue: ytdRevenue, refunds: ytdRefunds, net_revenue: ytdRevenue - ytdRefunds,
+      cogs: ytdCogs, gross_profit: ytdGross,
+      salary_total: ytdSalary, marketing: ytdMarketing, depreciation: ytdDepr, total_opex: ytdTotalOpex,
+      ebit: ytdEbit, ebitda: ytdEbitda,
+      other_income: (ytdOtherIE?.income as number) || 0, other_expenses: (ytdOtherIE?.expenses as number) || 0,
+      interest_expense: ytdInterestTotal, ebt: ytdEbt,
+      total_taxes: ytdTaxTotal, net_profit: ytdNet,
+      total_dividends: ytdDivTotal, retained_earnings: ytdNet - ytdDivTotal,
+      gross_margin: ytdRevenue > 0 ? Math.round(ytdGross / ytdRevenue * 10000) / 100 : 0,
+      ebit_margin: ytdRevenue > 0 ? Math.round(ytdEbit / ytdRevenue * 10000) / 100 : 0,
+      net_margin: ytdRevenue > 0 ? Math.round(ytdNet / ytdRevenue * 10000) / 100 : 0,
+    };
+
+    // MoM delta (current - previous)
+    const mom: any = {};
+    const numKeys = ['revenue','cogs','gross_profit','salary_total','marketing','depreciation','total_opex','ebit','ebitda','other_income','other_expenses','interest_expense','ebt','total_taxes','net_profit','total_dividends','retained_earnings'];
+    for (const k of numKeys) {
+      mom[k] = Math.round(((current as any)[k] - (prev as any)[k]) * 100) / 100;
+    }
+    // MoM % change
+    const momPct: any = {};
+    for (const k of numKeys) {
+      const prevVal = (prev as any)[k];
+      momPct[k] = prevVal !== 0 ? Math.round(((current as any)[k] - prevVal) / Math.abs(prevVal) * 10000) / 100 : 0;
+    }
+    
+    return c.json({
+      ...current,
+      prev_period: prevKey,
+      prev: { revenue: prev.revenue, cogs: prev.cogs, gross_profit: prev.gross_profit, salary_total: prev.salary_total, marketing: prev.marketing, depreciation: prev.depreciation, total_opex: prev.total_opex, ebit: prev.ebit, ebitda: prev.ebitda, ebt: prev.ebt, total_taxes: prev.total_taxes, net_profit: prev.net_profit, total_dividends: prev.total_dividends, retained_earnings: prev.retained_earnings },
+      mom, mom_pct: momPct,
+      ytd,
+    });
+  } catch (err: any) {
+    return c.json({ error: 'P&L error: ' + (err?.message || 'unknown') }, 500);
   }
 });
 

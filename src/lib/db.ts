@@ -533,6 +533,56 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE users ADD COLUMN telegram_link TEXT DEFAULT ''").run(); } catch {}
   // v15: migrate email data to telegram_link if it looks like telegram
   try { await db.prepare("UPDATE users SET telegram_link = email WHERE email LIKE '%t.me%' AND (telegram_link = '' OR telegram_link IS NULL)").run(); } catch {}
+  // v16: P&L Financial tables — taxes, assets (amortization), loans, dividends, other_income_expenses
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS tax_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, tax_type TEXT NOT NULL DEFAULT 'income_tax',
+    tax_name TEXT DEFAULT '', amount REAL DEFAULT 0, period_key TEXT DEFAULT '',
+    payment_date TEXT DEFAULT '', due_date TEXT DEFAULT '', status TEXT DEFAULT 'paid',
+    notes TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS assets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL DEFAULT '',
+    purchase_date TEXT DEFAULT '', purchase_cost REAL DEFAULT 0,
+    useful_life_months INTEGER DEFAULT 60, residual_value REAL DEFAULT 0,
+    depreciation_method TEXT DEFAULT 'straight_line', category TEXT DEFAULT '',
+    is_active INTEGER DEFAULT 1, notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS loans (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL DEFAULT '',
+    lender TEXT DEFAULT '', principal REAL DEFAULT 0,
+    interest_rate REAL DEFAULT 0, start_date TEXT DEFAULT '',
+    end_date TEXT DEFAULT '', monthly_payment REAL DEFAULT 0,
+    remaining_balance REAL DEFAULT 0, loan_type TEXT DEFAULT 'bank',
+    is_active INTEGER DEFAULT 1, notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS loan_payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, loan_id INTEGER NOT NULL,
+    amount REAL DEFAULT 0, principal_part REAL DEFAULT 0,
+    interest_part REAL DEFAULT 0, payment_date TEXT DEFAULT '',
+    notes TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (loan_id) REFERENCES loans(id) ON DELETE CASCADE
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS dividends (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, amount REAL DEFAULT 0,
+    recipient TEXT DEFAULT '', payment_date TEXT DEFAULT '',
+    period_key TEXT DEFAULT '', tax_amount REAL DEFAULT 0,
+    notes TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS other_income_expenses (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, type TEXT DEFAULT 'expense',
+    name TEXT NOT NULL DEFAULT '', amount REAL DEFAULT 0,
+    category TEXT DEFAULT 'other', date TEXT DEFAULT '',
+    period_key TEXT DEFAULT '', notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_tax_period ON tax_payments(period_key)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_dividends_period ON dividends(period_key)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_other_ie_period ON other_income_expenses(period_key)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_loan_payments_loan ON loan_payments(loan_id)').run(); } catch {}
+  // v16: Add date column to expenses if missing (for period-based filtering)
+  try { await db.prepare("ALTER TABLE expenses ADD COLUMN date TEXT DEFAULT ''").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

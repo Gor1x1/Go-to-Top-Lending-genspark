@@ -69,7 +69,7 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [] };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [] };
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -214,6 +214,12 @@ async function loadData() {
     data.vacations = bulk.vacations || [];
     data.onlineUsers = bulk.online || [];
     if (bulk.leadArticles) { for (var k in bulk.leadArticles) { data.leadArticles[k] = bulk.leadArticles[k]; } }
+    data.taxPayments = bulk.taxPayments || [];
+    data.assets = bulk.assets || [];
+    data.loans = bulk.loans || [];
+    data.loanPayments = bulk.loanPayments || [];
+    data.dividends = bulk.dividends || [];
+    data.otherIncomeExpenses = bulk.otherIncomeExpenses || [];
   } else {
     // Fallback: load data the old way if bulk fails
     setProgress('Fallback загрузка...');
@@ -2386,6 +2392,13 @@ let analyticsDateFrom = '';
 let analyticsDateTo = '';
 let analyticsData = null;
 let bizAnalyticsTab = 'overview';
+let pnlPeriod = new Date().toISOString().slice(0, 7); // e.g. 2026-02
+let pnlData = null; // cached P&L data for current period
+let pnlLoading = false;
+let pnlSubTab = 'cascade'; // cascade | taxes | assets | loans | dividends | other | scenario
+let pnlEditId = 0; // for edit modal
+let pnlEditType = ''; // tax | asset | loan | dividend | other
+let showPnlAddForm = false;
 let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
 let addBonusType = 'bonus';
@@ -2507,6 +2520,7 @@ function renderLeadsAnalytics() {
     { id: 'costs', icon: 'fa-wallet', label: 'Затраты и ЗП' },
     { id: 'funnel', icon: 'fa-funnel-dollar', label: 'Воронка и Детали' },
     { id: 'periods', icon: 'fa-list-ol', label: 'Результативность' },
+    { id: 'pnl', icon: 'fa-file-invoice-dollar', label: 'P&L / Финотчёт' },
   ];
   var h = '<div style="padding:24px 32px">';
   // Header
@@ -2568,8 +2582,518 @@ function renderLeadsAnalytics() {
   else if (bizAnalyticsTab === 'costs') h += renderBizCostsV2(d, sd, fin);
   else if (bizAnalyticsTab === 'funnel') h += renderBizFunnelV2(d, sd, fin);
   else if (bizAnalyticsTab === 'periods') h += renderBizPeriodsV2(d, sd, fin);
+  else if (bizAnalyticsTab === 'pnl') h += renderPnLTab();
   h += '</div>';
   return h;
+}
+
+// ============ P&L / ФИНОТЧЁТ TAB ============
+async function loadPnlData() {
+  pnlLoading = true; render();
+  pnlData = await api('/pnl/' + pnlPeriod);
+  pnlLoading = false; render();
+}
+function setPnlPeriod(dir) {
+  var parts = pnlPeriod.split('-'); var y = parseInt(parts[0]); var m = parseInt(parts[1]);
+  if (dir === 'prev') { m--; if (m < 1) { m = 12; y--; } }
+  else if (dir === 'next') { m++; if (m > 12) { m = 1; y++; } }
+  pnlPeriod = y + '-' + String(m).padStart(2, '0'); pnlData = null; loadPnlData();
+}
+async function savePnlItem(type) {
+  var prefix = 'pnl_' + type + '_';
+  var d = {};
+  document.querySelectorAll('[id^="' + prefix + '"]').forEach(function(el) {
+    var key = el.id.replace(prefix, ''); d[key] = el.type === 'number' ? parseFloat(el.value) || 0 : el.value;
+  });
+  d.period_key = pnlPeriod;
+  var endpoint = type === 'tax' ? '/tax-payments' : type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
+  if (pnlEditId) { await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d) }); }
+  else { await api(endpoint, { method: 'POST', body: JSON.stringify(d) }); }
+  pnlEditId = 0; showPnlAddForm = false;
+  // Refresh bulk data
+  var bulk = await api('/bulk-data');
+  if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
+  pnlData = null; loadPnlData();
+  toast(type === 'tax' ? 'Налог сохранён' : type === 'asset' ? 'Актив сохранён' : type === 'loan' ? 'Кредит сохранён' : type === 'dividend' ? 'Дивиденд сохранён' : 'Запись сохранена');
+}
+async function deletePnlItem(type, id) {
+  if (!confirm('Удалить запись?')) return;
+  var endpoint = type === 'tax' ? '/tax-payments' : type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
+  await api(endpoint + '/' + id, { method: 'DELETE' });
+  var bulk = await api('/bulk-data');
+  if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
+  pnlData = null; loadPnlData();
+  toast('Удалено');
+}
+function editPnlItem(type, id) { pnlEditId = id; pnlEditType = type; showPnlAddForm = true; pnlSubTab = type === 'tax' ? 'taxes' : type === 'asset' ? 'assets' : type === 'loan' ? 'loans' : type === 'dividend' ? 'dividends' : 'other'; render(); }
+function showPnlForm(type) { pnlEditId = 0; pnlEditType = type; showPnlAddForm = true; pnlSubTab = type === 'tax' ? 'taxes' : type === 'asset' ? 'assets' : type === 'loan' ? 'loans' : type === 'dividend' ? 'dividends' : 'other'; render(); }
+async function saveLoanPayment(loanId) {
+  var d = { amount: parseFloat(document.getElementById('lp_amount')?.value) || 0, principal_part: parseFloat(document.getElementById('lp_principal')?.value) || 0, interest_part: parseFloat(document.getElementById('lp_interest')?.value) || 0, payment_date: document.getElementById('lp_date')?.value || '' };
+  await api('/loans/' + loanId + '/payments', { method: 'POST', body: JSON.stringify(d) });
+  var bulk = await api('/bulk-data');
+  if (bulk && !bulk.error) { data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; }
+  pnlData = null; loadPnlData(); toast('Платёж добавлен');
+}
+
+function renderPnLTab() {
+  if (!pnlData && !pnlLoading) { loadPnlData(); return '<div style="text-align:center;padding:40px"><div class="spinner" style="width:32px;height:32px;margin:0 auto"></div><p style="color:#94a3b8;margin-top:12px">Загрузка P&L...</p></div>'; }
+  if (pnlLoading) return '<div style="text-align:center;padding:40px"><div class="spinner" style="width:32px;height:32px;margin:0 auto"></div></div>';
+  var p = pnlData || {};
+  var mNames = ['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+  var mFull = ['','Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+  var mNum = parseInt(pnlPeriod.split('-')[1]) || 1;
+  var h = '';
+  // Period selector
+  h += '<div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
+  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:1rem" onclick="setPnlPeriod(\\'prev\\')"><i class="fas fa-chevron-left"></i></button>';
+  h += '<div style="font-size:1.2rem;font-weight:800;color:#a78bfa;min-width:160px;text-align:center"><i class="fas fa-calendar-alt" style="margin-right:8px"></i>' + mFull[mNum] + ' ' + pnlPeriod.split('-')[0] + '</div>';
+  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:1rem" onclick="setPnlPeriod(\\'next\\')"><i class="fas fa-chevron-right"></i></button>';
+  h += '<span style="color:#475569;margin-left:8px">|</span>';
+  h += '<input type="month" class="input" style="padding:4px 10px;width:160px;font-size:0.85rem" value="' + pnlPeriod + '" onchange="pnlPeriod=this.value;pnlData=null;loadPnlData()">';
+  h += '<span style="color:#64748b;font-size:0.78rem;margin-left:6px">\u0432\u0430\u043b\u044e\u0442\u0430: AMD</span>';
+  if (p.prev_period) h += '<span style="color:#475569;font-size:0.72rem;margin-left:8px">vs ' + p.prev_period + '</span>';
+  h += '</div>';
+  // Sub-tabs
+  var subTabs = [{id:'cascade',icon:'fa-stream',label:'P&L \u041a\u0430\u0441\u043a\u0430\u0434'},{id:'taxes',icon:'fa-landmark',label:'\u041d\u0430\u043b\u043e\u0433\u0438'},{id:'assets',icon:'fa-building',label:'\u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f'},{id:'loans',icon:'fa-hand-holding-usd',label:'\u041a\u0440\u0435\u0434\u0438\u0442\u044b'},{id:'dividends',icon:'fa-money-check-alt',label:'\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b'},{id:'other',icon:'fa-exchange-alt',label:'\u041f\u0440\u043e\u0447\u0435\u0435'},{id:'scenario',icon:'fa-flask',label:'\u0421\u0446\u0435\u043d\u0430\u0440\u0438\u0438'}];
+  h += '<div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap">';
+  for (var si = 0; si < subTabs.length; si++) {
+    var st = subTabs[si];
+    h += '<button class="tab-btn' + (pnlSubTab === st.id ? ' active' : '') + '" onclick="pnlSubTab=\\'' + st.id + '\\';render()" style="padding:8px 14px;font-size:0.82rem"><i class="fas ' + st.icon + '" style="margin-right:5px"></i>' + st.label + '</button>';
+  }
+  h += '</div>';
+  if (pnlSubTab === 'cascade') h += renderPnlCascade(p);
+  else if (pnlSubTab === 'taxes') h += renderPnlTaxes(p);
+  else if (pnlSubTab === 'assets') h += renderPnlAssets(p);
+  else if (pnlSubTab === 'loans') h += renderPnlLoans(p);
+  else if (pnlSubTab === 'dividends') h += renderPnlDividends(p);
+  else if (pnlSubTab === 'other') h += renderPnlOther(p);
+  else if (pnlSubTab === 'scenario') h += renderPnlScenario(p);
+  return h;
+}
+
+let pnlShowYtd = false; // toggle YTD column
+let pnlShowMom = true;  // toggle MoM delta column
+
+function pnlRow(label, value, opts) {
+  opts = opts || {};
+  var color = opts.color || '#e2e8f0'; var bold = opts.bold; var indent = opts.indent || 0; var pct = opts.pct; var sub = opts.sub; var icon = opts.icon || '';
+  var bg = bold ? 'background:rgba(139,92,246,0.06);' : sub ? 'background:rgba(71,85,105,0.08);' : '';
+  var pad = 12 + indent * 20;
+  var mom = opts.mom; var momPct = opts.momPct; var ytdVal = opts.ytd;
+  // How many columns: label + value + optional MoM + optional YTD
+  var cols = 2 + (pnlShowMom ? 1 : 0) + (pnlShowYtd ? 1 : 0);
+  var gridCols = 'minmax(180px,2fr)' + ' minmax(100px,1fr)'.repeat(cols - 1);
+  var h = '<div style="display:grid;grid-template-columns:' + gridCols + ';align-items:center;padding:10px ' + pad + 'px;border-bottom:1px solid #1e293b;' + bg + ';gap:8px">';
+  h += '<span style="color:' + (sub ? '#64748b' : '#94a3b8') + ';font-size:' + (bold ? '0.95rem' : '0.85rem') + ';font-weight:' + (bold ? '700' : '400') + '">' + (icon ? '<i class="fas ' + icon + '" style="width:16px;margin-right:8px;color:#8B5CF6;font-size:0.75rem"></i>' : '') + label + '</span>';
+  h += '<span style="text-align:right;color:' + color + ';font-weight:' + (bold ? '800' : '600') + ';font-size:' + (bold ? '1.02rem' : '0.88rem') + '">' + fmtAmt(value) + (pct !== undefined ? ' <span style="color:#64748b;font-size:0.72rem">(' + pct + '%)</span>' : '') + '</span>';
+  if (pnlShowMom && mom !== undefined) {
+    var mColor = mom > 0 ? '#22C55E' : mom < 0 ? '#EF4444' : '#475569';
+    var arrow = mom > 0 ? '\u25B2' : mom < 0 ? '\u25BC' : '';
+    var pctStr = momPct !== undefined && momPct !== 0 ? ' <span style="font-size:0.68rem">(' + (momPct > 0 ? '+' : '') + momPct + '%)</span>' : '';
+    h += '<span style="text-align:right;color:' + mColor + ';font-size:0.78rem;font-weight:500">' + arrow + ' ' + (mom > 0 ? '+' : '') + fmtAmt(mom) + pctStr + '</span>';
+  } else if (pnlShowMom) {
+    h += '<span></span>';
+  }
+  if (pnlShowYtd && ytdVal !== undefined) {
+    h += '<span style="text-align:right;color:#8B5CF6;font-size:0.82rem;font-weight:600">' + fmtAmt(ytdVal) + '</span>';
+  } else if (pnlShowYtd) {
+    h += '<span></span>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderPnlCascade(p) {
+  var mom = p.mom || {}; var mp = p.mom_pct || {}; var ytd = p.ytd || {};
+  var h = '';
+  // Toggle buttons
+  h += '<div style="display:flex;gap:8px;margin-bottom:12px">';
+  h += '<button class="tab-btn' + (pnlShowMom ? ' active' : '') + '" onclick="pnlShowMom=!pnlShowMom;render()" style="padding:6px 12px;font-size:0.78rem"><i class="fas fa-exchange-alt" style="margin-right:4px"></i>MoM \u0414\u0435\u043b\u044c\u0442\u0430</button>';
+  h += '<button class="tab-btn' + (pnlShowYtd ? ' active' : '') + '" onclick="pnlShowYtd=!pnlShowYtd;render()" style="padding:6px 12px;font-size:0.78rem"><i class="fas fa-calendar-check" style="margin-right:4px"></i>YTD</button>';
+  h += '</div>';
+  
+  h += '<div class="card" style="padding:0;overflow:hidden">';
+  // Header row
+  var cols = 2 + (pnlShowMom ? 1 : 0) + (pnlShowYtd ? 1 : 0);
+  var gridCols = 'minmax(180px,2fr)' + ' minmax(100px,1fr)'.repeat(cols - 1);
+  h += '<div style="display:grid;grid-template-columns:' + gridCols + ';padding:12px 12px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(59,130,246,0.08));border-bottom:2px solid #8B5CF6;gap:8px">';
+  h += '<span style="font-weight:800;font-size:1rem;color:#a78bfa"><i class="fas fa-file-invoice-dollar" style="margin-right:8px"></i>P&L \u041a\u0430\u0441\u043a\u0430\u0434</span>';
+  h += '<span style="text-align:right;font-weight:700;color:#94a3b8;font-size:0.8rem">\u0422\u0435\u043a\u0443\u0449\u0438\u0439</span>';
+  if (pnlShowMom) h += '<span style="text-align:right;font-weight:700;color:#F59E0B;font-size:0.8rem">\u0394 MoM</span>';
+  if (pnlShowYtd) h += '<span style="text-align:right;font-weight:700;color:#8B5CF6;font-size:0.8rem">YTD</span>';
+  h += '</div>';
+  
+  // Revenue
+  h += pnlRow('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (Revenue)', p.revenue, {bold:true, color:'#22C55E', icon:'fa-coins', mom:mom.revenue, momPct:mp.revenue, ytd:ytd.revenue});
+  h += pnlRow('\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b', -(p.refunds||0), {indent:1, color:'#EF4444', sub:true});
+  h += pnlRow('\u0427\u0438\u0441\u0442\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430', p.net_revenue, {indent:1, color:'#22C55E', sub:true, ytd:ytd.net_revenue});
+  // COGS
+  h += pnlRow('\u2212 \u0421\u0435\u0431\u0435\u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c / \u041a\u043e\u043c\u043c\u0435\u0440\u0447. (COGS)', p.cogs, {indent:1, color:'#F59E0B', icon:'fa-truck', mom:mom.cogs, momPct:mp.cogs, ytd:ytd.cogs});
+  // Gross
+  h += '<div style="height:2px;background:linear-gradient(90deg,#8B5CF6,transparent)"></div>';
+  h += pnlRow('\u0412\u0410\u041b\u041e\u0412\u0410\u042f \u041f\u0420\u0418\u0411\u042b\u041b\u042c (Gross)', p.gross_profit, {bold:true, color: p.gross_profit >= 0 ? '#22C55E' : '#EF4444', pct: p.gross_margin, mom:mom.gross_profit, momPct:mp.gross_profit, ytd:ytd.gross_profit});
+  // Opex
+  h += pnlRow('\u2212 \u0417\u041f + \u0411\u043e\u043d\u0443\u0441\u044b \u2212 \u0428\u0442\u0440\u0430\u0444\u044b', p.salary_total, {indent:1, color:'#F59E0B', icon:'fa-users', mom:mom.salary_total, ytd:ytd.salary_total});
+  h += pnlRow('  \u0417\u041f \u0431\u0430\u0437\u043e\u0432\u0430\u044f', p.salaries, {indent:2, sub:true});
+  h += pnlRow('  \u0411\u043e\u043d\u0443\u0441\u044b', p.bonuses, {indent:2, sub:true, color:'#22C55E'});
+  h += pnlRow('  \u0428\u0442\u0440\u0430\u0444\u044b', p.penalties, {indent:2, sub:true, color:'#EF4444'});
+  h += pnlRow('\u2212 \u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433', p.marketing, {indent:1, color:'#F59E0B', icon:'fa-bullhorn', mom:mom.marketing, ytd:ytd.marketing});
+  h += pnlRow('\u2212 \u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f', p.depreciation, {indent:1, color:'#F59E0B', icon:'fa-building', ytd:ytd.depreciation});
+  h += pnlRow('\u0418\u0442\u043e\u0433\u043e \u043e\u043f\u0435\u0440. \u0440\u0430\u0441\u0445\u043e\u0434\u044b (OPEX)', p.total_opex, {indent:1, color:'#F59E0B', mom:mom.total_opex, ytd:ytd.total_opex});
+  // EBIT
+  h += '<div style="height:2px;background:linear-gradient(90deg,#3B82F6,transparent)"></div>';
+  h += pnlRow('\u041e\u041f\u0415\u0420\u0410\u0426. \u041f\u0420\u0418\u0411\u042b\u041b\u042c (EBIT)', p.ebit, {bold:true, color: p.ebit >= 0 ? '#22C55E' : '#EF4444', pct: p.ebit_margin, mom:mom.ebit, momPct:mp.ebit, ytd:ytd.ebit});
+  h += pnlRow('EBITDA', p.ebitda, {indent:1, color:'#8B5CF6', pct: p.ebitda_margin, mom:mom.ebitda, ytd:ytd.ebitda});
+  // Other
+  h += pnlRow('+ \u041f\u0440\u043e\u0447\u0438\u0435 \u0434\u043e\u0445\u043e\u0434\u044b', p.other_income, {indent:1, color:'#22C55E', icon:'fa-plus-circle', ytd:ytd.other_income});
+  h += pnlRow('\u2212 \u041f\u0440\u043e\u0447\u0438\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b', p.other_expenses, {indent:1, color:'#EF4444', icon:'fa-minus-circle', ytd:ytd.other_expenses});
+  h += pnlRow('\u2212 \u041f\u0440\u043e\u0446\u0435\u043d\u0442\u044b \u043f\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u0430\u043c', p.interest_expense, {indent:1, color:'#EF4444', icon:'fa-percentage', ytd:ytd.interest_expense});
+  // EBT
+  h += '<div style="height:2px;background:linear-gradient(90deg,#F59E0B,transparent)"></div>';
+  h += pnlRow('\u041f\u0420\u0418\u0411\u042b\u041b\u042c \u0414\u041e \u041d\u0410\u041b\u041e\u0413\u041e\u0412 (EBT)', p.ebt, {bold:true, color: p.ebt >= 0 ? '#22C55E' : '#EF4444', mom:mom.ebt, momPct:mp.ebt, ytd:ytd.ebt});
+  // Taxes
+  h += pnlRow('\u2212 \u041d\u0430\u043b\u043e\u0433\u0438', p.total_taxes, {indent:1, color:'#EF4444', icon:'fa-landmark', mom:mom.total_taxes, ytd:ytd.total_taxes});
+  if (p.taxes && p.taxes.length) { for (var ti = 0; ti < p.taxes.length; ti++) { h += pnlRow('  ' + (p.taxes[ti].tax_name || p.taxes[ti].tax_type), p.taxes[ti].amount, {indent:2, sub:true}); } }
+  // ETR and Tax Burden — show as percentage, not amount
+  h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(71,85,105,0.08);gap:8px">';
+  h += '<span style="color:#64748b;font-size:0.82rem">ETR (\u044d\u0444\u0444. \u043d\u0430\u043b\u043e\u0433. \u0441\u0442\u0430\u0432\u043a\u0430)</span><span style="text-align:right;color:#F59E0B;font-weight:600;font-size:0.88rem">' + fmtPct(p.effective_tax_rate) + '</span></div>';
+  h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(71,85,105,0.08);gap:8px">';
+  h += '<span style="color:#64748b;font-size:0.82rem">\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u0430\u044f \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u043d\u0430 \u0432\u044b\u0440\u0443\u0447\u043a\u0443</span><span style="text-align:right;color:#F59E0B;font-weight:600;font-size:0.88rem">' + fmtPct(p.tax_burden) + '</span></div>';
+  // Net profit
+  h += '<div style="height:3px;background:linear-gradient(90deg,#22C55E,#8B5CF6,transparent)"></div>';
+  h += pnlRow('\u0427\u0418\u0421\u0422\u0410\u042f \u041f\u0420\u0418\u0411\u042b\u041b\u042c (Net Profit)', p.net_profit, {bold:true, color: p.net_profit >= 0 ? '#22C55E' : '#EF4444', pct: p.net_margin, mom:mom.net_profit, momPct:mp.net_profit, ytd:ytd.net_profit});
+  // Dividends
+  h += pnlRow('\u2212 \u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b', p.total_dividends, {indent:1, color:'#8B5CF6', icon:'fa-money-check-alt', mom:mom.total_dividends, ytd:ytd.total_dividends});
+  h += '<div style="height:2px;background:linear-gradient(90deg,#10B981,transparent)"></div>';
+  h += pnlRow('\u041d\u0415\u0420\u0410\u0421\u041f\u0420\u0415\u0414\u0415\u041b\u0401\u041d\u041d\u0410\u042f \u041f\u0420\u0418\u0411\u042b\u041b\u042c', p.retained_earnings, {bold:true, color: p.retained_earnings >= 0 ? '#10B981' : '#EF4444', mom:mom.retained_earnings, ytd:ytd.retained_earnings});
+  h += '</div>';
+  
+  // Pro metrics cards
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-top:20px">';
+  var proMetrics = [
+    {label:'Burn Rate / \u043c\u0435\u0441',val:fmtAmt(p.monthly_burn_rate),icon:'fa-fire',color:'#EF4444',desc:'\u0415\u0436\u0435\u043c\u0435\u0441. \u0440\u0430\u0441\u0445\u043e\u0434\u044b + \u043d\u0430\u043b\u043e\u0433\u0438 + %'},
+    {label:'YTD \u041d\u0430\u043b\u043e\u0433\u0438',val:fmtAmt(p.ytd_taxes),icon:'fa-landmark',color:'#F59E0B',desc:'\u0421 \u043d\u0430\u0447\u0430\u043b\u0430 \u0433\u043e\u0434\u0430'},
+    {label:'YTD \u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b',val:fmtAmt(p.ytd_dividends_amount||0),icon:'fa-money-check-alt',color:'#8B5CF6',desc:'\u0421 \u043d\u0430\u0447\u0430\u043b\u0430 \u0433\u043e\u0434\u0430'},
+    {label:'\u0412\u0430\u043b\u043e\u0432\u0430\u044f \u043c\u0430\u0440\u0436\u0430',val:fmtPct(p.gross_margin),icon:'fa-percentage',color:'#22C55E',desc:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u2212 COGS'},
+    {label:'\u041e\u043f\u0435\u0440. \u043c\u0430\u0440\u0436\u0430',val:fmtPct(p.ebit_margin),icon:'fa-chart-bar',color:'#3B82F6',desc:'EBIT / \u0412\u044b\u0440\u0443\u0447\u043a\u0430'},
+    {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043c\u0430\u0440\u0436\u0430',val:fmtPct(p.net_margin),icon:'fa-trophy',color: p.net_margin >= 0 ? '#22C55E' : '#EF4444',desc:'Net / \u0412\u044b\u0440\u0443\u0447\u043a\u0430'}
+  ];
+  for (var mi = 0; mi < proMetrics.length; mi++) {
+    var pm = proMetrics[mi];
+    h += '<div class="card" style="padding:16px;background:rgba(' + (pm.color === '#EF4444' ? '239,68,68' : pm.color === '#F59E0B' ? '245,158,11' : pm.color === '#8B5CF6' ? '139,92,246' : pm.color === '#22C55E' ? '34,197,94' : '59,130,246') + ',0.06);border-color:' + pm.color + '33">';
+    h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:4px"><i class="fas ' + pm.icon + '" style="color:' + pm.color + ';margin-right:6px"></i>' + pm.label + '</div>';
+    h += '<div style="font-size:1.4rem;font-weight:800;color:' + pm.color + '">' + pm.val + '</div>';
+    h += '<div style="font-size:0.7rem;color:#475569;margin-top:2px">' + pm.desc + '</div></div>';
+  }
+  h += '</div>';
+  
+  // Formula reference block
+  h += '<details style="margin-top:20px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-info-circle" style="margin-right:6px;color:#8B5CF6"></i>\u0424\u043e\u0440\u043c\u0443\u043b\u044b \u0440\u0430\u0441\u0447\u0451\u0442\u043e\u0432</summary>';
+  h += '<div class="card" style="margin-top:8px;font-size:0.8rem;color:#94a3b8;line-height:1.8">';
+  h += '<div><b style="color:#22C55E">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> = \u0441\u0443\u043c\u043c\u0430 \u0443\u0441\u043b\u0443\u0433 \u0438\u0437 \u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432 (period_snapshots.revenue_services)</div>';
+  h += '<div><b style="color:#F59E0B">COGS</b> = \u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435 \u0437\u0430\u0442\u0440\u0430\u0442\u044b (\u0431\u043b\u043e\u043a \u0417\u0430\u0442\u0440\u0430\u0442\u044b, is_marketing=0)</div>';
+  h += '<div><b style="color:#22C55E">\u0412\u0430\u043b\u043e\u0432\u0430\u044f</b> = \u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u2212 COGS</div>';
+  h += '<div><b style="color:#3B82F6">EBIT</b> = \u0412\u0430\u043b\u043e\u0432\u0430\u044f \u2212 \u0417\u041f \u2212 \u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433 \u2212 \u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</div>';
+  h += '<div><b style="color:#8B5CF6">EBITDA</b> = EBIT + \u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</div>';
+  h += '<div><b style="color:#F59E0B">EBT</b> = EBIT + \u041f\u0440\u043e\u0447\u0438\u0435 \u0434\u043e\u0445\u043e\u0434\u044b \u2212 \u041f\u0440\u043e\u0447\u0438\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b \u2212 % \u043f\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u0430\u043c</div>';
+  h += '<div><b style="color:#22C55E">\u0427\u0438\u0441\u0442\u0430\u044f</b> = EBT \u2212 \u041d\u0430\u043b\u043e\u0433\u0438</div>';
+  h += '<div><b style="color:#10B981">\u041d\u0435\u0440\u0430\u0441\u043f\u0440\u0435\u0434.</b> = \u0427\u0438\u0441\u0442\u0430\u044f \u2212 \u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b</div>';
+  h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #334155"><b style="color:#F59E0B">ETR</b> = \u041d\u0430\u043b\u043e\u0433\u0438 / EBT \u00d7 100% &nbsp;|&nbsp; <b style="color:#F59E0B">\u041d\u0430\u043b. \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430</b> = \u041d\u0430\u043b\u043e\u0433\u0438 / \u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u00d7 100%</div>';
+  h += '</div></details>';
+  
+  return h;
+}
+
+function renderPnlCrudForm(type, item) {
+  var h = '<div class="card" style="margin-bottom:16px;border-color:#8B5CF6">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  h += '<h4 style="font-weight:700;color:#a78bfa">' + (pnlEditId ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435' : '\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435') + '</h4>';
+  h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem" onclick="showPnlAddForm=false;pnlEditId=0;render()"><i class="fas fa-times"></i></button></div>';
+  if (type === 'tax') {
+    var taxTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'patent',l:'\u041f\u0430\u0442\u0435\u043d\u0442/\u0423\u043f\u0440\u043e\u0449\u0451\u043d\u043a\u0430'},{v:'property',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0438\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f</label><select class="input" id="pnl_tax_tax_type">';
+    for (var tt = 0; tt < taxTypes.length; tt++) h += '<option value="' + taxTypes[tt].v + '"' + (item && item.tax_type === taxTypes[tt].v ? ' selected' : '') + '>' + taxTypes[tt].l + '</option>';
+    h += '</select></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_tax_tax_name" value="' + escHtml((item && item.tax_name) || '') + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0414\u0421 \u0437\u0430 \u0444\u0435\u0432\u0440\u0430\u043b\u044c"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 (AMD)</label><input type="number" class="input" id="pnl_tax_amount" value="' + ((item && item.amount) || '') + '" placeholder="0"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u043e\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_payment_date" value="' + ((item && item.payment_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0440\u043e\u043a \u0443\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_due_date" value="' + ((item && item.due_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u0430\u0442\u0443\u0441</label><select class="input" id="pnl_tax_status"><option value="paid"' + (item && item.status === 'paid' ? ' selected' : '') + '>\u041e\u043f\u043b\u0430\u0447\u0435\u043d</option><option value="pending"' + (item && item.status === 'pending' ? ' selected' : '') + '>\u041e\u0436\u0438\u0434\u0430\u0435\u0442</option><option value="overdue"' + (item && item.status === 'overdue' ? ' selected' : '') + '>\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d</option></select></div>';
+    h += '</div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_tax_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+  } else if (type === 'asset') {
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_asset_name" value="' + escHtml((item && item.name) || '') + '" placeholder="\u041d\u043e\u0443\u0442\u0431\u0443\u043a, \u0410\u0432\u0442\u043e..."></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u043f\u043e\u043a\u0443\u043f\u043a\u0438</label><input type="date" class="input" id="pnl_asset_purchase_date" value="' + ((item && item.purchase_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c (AMD)</label><input type="number" class="input" id="pnl_asset_purchase_cost" value="' + ((item && item.purchase_cost) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0440\u043e\u043a \u0441\u043b\u0443\u0436\u0431\u044b (\u043c\u0435\u0441.)</label><input type="number" class="input" id="pnl_asset_useful_life_months" value="' + ((item && item.useful_life_months) || 60) + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u0430\u044f \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</label><input type="number" class="input" id="pnl_asset_residual_value" value="' + ((item && item.residual_value) || 0) + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f</label><input class="input" id="pnl_asset_category" value="' + escHtml((item && item.category) || '') + '" placeholder="\u041e\u0431\u043e\u0440\u0443\u0434., \u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442..."></div>';
+    h += '</div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_asset_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+  } else if (type === 'loan') {
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_loan_name" value="' + escHtml((item && item.name) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041a\u0440\u0435\u0434\u0438\u0442\u043e\u0440</label><input class="input" id="pnl_loan_lender" value="' + escHtml((item && item.lender) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u043a\u0440\u0435\u0434\u0438\u0442\u0430</label><input type="number" class="input" id="pnl_loan_principal" value="' + ((item && item.principal) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u0430\u0432\u043a\u0430 % \u0433\u043e\u0434.</label><input type="number" class="input" id="pnl_loan_interest_rate" value="' + ((item && item.interest_rate) || '') + '" step="0.1"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0447\u0430\u043b\u043e</label><input type="date" class="input" id="pnl_loan_start_date" value="' + ((item && item.start_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u0435</label><input type="date" class="input" id="pnl_loan_end_date" value="' + ((item && item.end_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0415\u0436\u0435\u043c\u0435\u0441. \u043f\u043b\u0430\u0442\u0451\u0436</label><input type="number" class="input" id="pnl_loan_monthly_payment" value="' + ((item && item.monthly_payment) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442\u043e\u043a</label><input type="number" class="input" id="pnl_loan_remaining_balance" value="' + ((item && item.remaining_balance) || '') + '"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_loan_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+  } else if (type === 'dividend') {
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="pnl_dividend_amount" value="' + ((item && item.amount) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044c</label><input class="input" id="pnl_dividend_recipient" value="' + escHtml((item && item.recipient) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u0432\u044b\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_dividend_payment_date" value="' + ((item && item.payment_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0434\u0438\u0432.</label><input type="number" class="input" id="pnl_dividend_tax_amount" value="' + ((item && item.tax_amount) || 0) + '"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_dividend_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+  } else { // other
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f</label><select class="input" id="pnl_other_type"><option value="income"' + (item && item.type === 'income' ? ' selected' : '') + '>\u0414\u043e\u0445\u043e\u0434</option><option value="expense"' + (item && item.type === 'expense' ? ' selected' : '') + '>\u0420\u0430\u0441\u0445\u043e\u0434</option></select></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_other_name" value="' + escHtml((item && item.name) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="pnl_other_amount" value="' + ((item && item.amount) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430</label><input type="date" class="input" id="pnl_other_date" value="' + ((item && item.date) || '') + '"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_other_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+  }
+  h += '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" onclick="savePnlItem(\\'' + type + '\\')"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>';
+  h += '<button class="btn btn-outline" onclick="showPnlAddForm=false;pnlEditId=0;render()">\u041e\u0442\u043c\u0435\u043d\u0430</button></div>';
+  h += '</div>';
+  return h;
+}
+
+function renderPnlTaxes(p) {
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-landmark" style="color:#F59E0B;margin-right:8px"></i>\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438</h3>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'tax\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043d\u0430\u043b\u043e\u0433</button></div>';
+  if (showPnlAddForm && pnlEditType === 'tax') {
+    var editItem = pnlEditId ? (data.taxPayments || []).find(function(t) { return t.id === pnlEditId; }) : null;
+    h += renderPnlCrudForm('tax', editItem);
+  }
+  var items = (data.taxPayments || []).filter(function(t) { return t.period_key === pnlPeriod; });
+  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px">\u041d\u0435\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0445 \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439 \u0437\u0430 \u044d\u0442\u043e\u0442 \u043f\u0435\u0440\u0438\u043e\u0434</div>'; return h; }
+  var total = 0;
+  h += '<div class="card" style="padding:0;overflow:hidden">';
+  var typeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
+  var statusColors = {paid:'#22C55E',pending:'#F59E0B',overdue:'#EF4444'};
+  for (var i = 0; i < items.length; i++) {
+    var t = items[i]; total += t.amount || 0;
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1e293b">';
+    h += '<div><div style="font-weight:600;color:#e2e8f0">' + escHtml(t.tax_name || typeLabels[t.tax_type] || t.tax_type) + '</div>';
+    h += '<div style="font-size:0.75rem;color:#64748b">' + (typeLabels[t.tax_type] || '') + (t.payment_date ? ' | ' + t.payment_date : '') + '</div></div>';
+    h += '<div style="display:flex;align-items:center;gap:10px">';
+    h += '<span style="font-weight:700;color:#F59E0B">' + fmtAmt(t.amount) + '</span>';
+    h += '<span class="badge" style="background:' + (statusColors[t.status] || '#64748b') + '22;color:' + (statusColors[t.status] || '#64748b') + '">' + (t.status === 'paid' ? '\u041e\u043f\u043b.' : t.status === 'pending' ? '\u041e\u0436\u0438\u0434.' : '\u041f\u0440\u043e\u0441\u0440.') + '</span>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'tax\\',' + t.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'tax\\',' + t.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
+    h += '</div></div>';
+  }
+  h += '<div style="padding:12px 16px;background:rgba(245,158,11,0.08);display:flex;justify-content:space-between"><span style="font-weight:700;color:#94a3b8">\u0418\u0442\u043e\u0433\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432:</span><span style="font-weight:800;color:#F59E0B">' + fmtAmt(total) + '</span></div>';
+  h += '</div>';
+  // All taxes (history)
+  var allTaxes = data.taxPayments || [];
+  if (allTaxes.length > items.length) {
+    h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem">\u0412\u0441\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f \u043d\u0430\u043b\u043e\u0433\u043e\u0432 (' + allTaxes.length + ')</summary>';
+    h += '<div class="card" style="padding:8px;margin-top:8px;max-height:300px;overflow-y:auto">';
+    for (var j = 0; j < allTaxes.length; j++) {
+      var at = allTaxes[j];
+      h += '<div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:0.82rem;border-bottom:1px solid #1e293b22">';
+      h += '<span style="color:#94a3b8">' + (at.period_key || '') + ' | ' + escHtml(at.tax_name || at.tax_type) + '</span>';
+      h += '<span style="font-weight:600;color:#F59E0B">' + fmtAmt(at.amount) + '</span></div>';
+    }
+    h += '</div></details>';
+  }
+  return h;
+}
+
+function renderPnlAssets(p) {
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-building" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430 \u0438 \u0430\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</h3>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'asset\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0430\u043a\u0442\u0438\u0432</button></div>';
+  if (showPnlAddForm && pnlEditType === 'asset') {
+    var editItem = pnlEditId ? (data.assets || []).find(function(a) { return a.id === pnlEditId; }) : null;
+    h += renderPnlCrudForm('asset', editItem);
+  }
+  var assets = data.assets || [];
+  if (!assets.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px">\u041d\u0435\u0442 \u043e\u0441\u043d\u043e\u0432\u043d\u044b\u0445 \u0441\u0440\u0435\u0434\u0441\u0442\u0432</div>'; return h; }
+  var totalDepr = 0;
+  h += '<div class="card" style="padding:0;overflow:hidden">';
+  for (var i = 0; i < assets.length; i++) {
+    var a = assets[i]; var monthlyDepr = Math.round((a.purchase_cost - (a.residual_value || 0)) / (a.useful_life_months || 60) * 100) / 100;
+    var monthsUsed = 0;
+    if (a.purchase_date) { var pd = new Date(a.purchase_date); var now = new Date(); monthsUsed = (now.getFullYear() - pd.getFullYear()) * 12 + (now.getMonth() - pd.getMonth()); }
+    var accumulated = Math.min(monthlyDepr * monthsUsed, a.purchase_cost - (a.residual_value || 0));
+    var bookValue = a.purchase_cost - accumulated;
+    totalDepr += monthlyDepr;
+    h += '<div style="padding:14px 16px;border-bottom:1px solid #1e293b">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+    h += '<div><div style="font-weight:600;color:#e2e8f0">' + escHtml(a.name) + ' <span style="color:#64748b;font-size:0.75rem">' + (a.category || '') + '</span></div>';
+    h += '<div style="font-size:0.75rem;color:#64748b">\u041a\u0443\u043f\u043b\u0435\u043d: ' + (a.purchase_date || '?') + ' | \u0421\u0440\u043e\u043a: ' + (a.useful_life_months || 60) + ' \u043c\u0435\u0441.</div></div>';
+    h += '<div style="display:flex;align-items:center;gap:8px">';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'asset\\',' + a.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'asset\\',' + a.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
+    h += '</div></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
+    h += '<div style="text-align:center"><div style="font-size:0.7rem;color:#64748b">\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</div><div style="font-weight:700;color:#3B82F6">' + fmtAmt(a.purchase_cost) + '</div></div>';
+    h += '<div style="text-align:center"><div style="font-size:0.7rem;color:#64748b">\u0410\u043c\u043e\u0440\u0442./\u043c\u0435\u0441</div><div style="font-weight:700;color:#F59E0B">' + fmtAmt(monthlyDepr) + '</div></div>';
+    h += '<div style="text-align:center"><div style="font-size:0.7rem;color:#64748b">\u041d\u0430\u043a\u043e\u043f\u043b\u0435\u043d\u043e</div><div style="font-weight:700;color:#EF4444">' + fmtAmt(accumulated) + '</div></div>';
+    h += '<div style="text-align:center"><div style="font-size:0.7rem;color:#64748b">\u0411\u0430\u043b. \u0441\u0442\u043e\u0438\u043c.</div><div style="font-weight:700;color:#22C55E">' + fmtAmt(bookValue) + '</div></div>';
+    h += '</div></div>';
+  }
+  h += '<div style="padding:12px 16px;background:rgba(59,130,246,0.08);display:flex;justify-content:space-between"><span style="font-weight:700;color:#94a3b8">\u0418\u0442\u043e\u0433\u043e \u0430\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f/\u043c\u0435\u0441:</span><span style="font-weight:800;color:#3B82F6">' + fmtAmt(totalDepr) + '</span></div>';
+  h += '</div>';
+  return h;
+}
+
+function renderPnlLoans(p) {
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:8px"></i>\u041a\u0440\u0435\u0434\u0438\u0442\u044b \u0438 \u0437\u0430\u0439\u043c\u044b</h3>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'loan\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u0440\u0435\u0434\u0438\u0442</button></div>';
+  if (showPnlAddForm && pnlEditType === 'loan') {
+    var editItem = pnlEditId ? (data.loans || []).find(function(l) { return l.id === pnlEditId; }) : null;
+    h += renderPnlCrudForm('loan', editItem);
+  }
+  var loans = data.loans || [];
+  if (!loans.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px">\u041d\u0435\u0442 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</div>'; return h; }
+  for (var i = 0; i < loans.length; i++) {
+    var l = loans[i]; var paidPct = l.principal > 0 ? Math.round((1 - (l.remaining_balance || 0) / l.principal) * 100) : 0;
+    h += '<div class="card" style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+    h += '<div><span style="font-weight:700;color:#e2e8f0">' + escHtml(l.name) + '</span> <span style="color:#64748b;font-size:0.8rem">(' + escHtml(l.lender || '') + ')</span></div>';
+    h += '<div style="display:flex;gap:6px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-edit"></i></button><button class="tier-del-btn" onclick="deletePnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:10px">';
+    h += '<div><div style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</div><div style="font-weight:700;color:#e2e8f0">' + fmtAmt(l.principal) + '</div></div>';
+    h += '<div><div style="font-size:0.7rem;color:#64748b">\u0421\u0442\u0430\u0432\u043a\u0430</div><div style="font-weight:700;color:#F59E0B">' + (l.interest_rate||0) + '%</div></div>';
+    h += '<div><div style="font-size:0.7rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442\u043e\u043a</div><div style="font-weight:700;color:#EF4444">' + fmtAmt(l.remaining_balance) + '</div></div>';
+    h += '<div><div style="font-size:0.7rem;color:#64748b">\u041f\u043e\u0433\u0430\u0448\u0435\u043d\u043e</div><div style="font-weight:700;color:#22C55E">' + paidPct + '%</div></div>';
+    h += '</div>';
+    // Progress bar
+    h += '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:' + paidPct + '%;height:100%;background:linear-gradient(90deg,#22C55E,#10B981);border-radius:3px"></div></div>';
+    // Inline payment form
+    h += '<details style="margin-top:4px"><summary style="cursor:pointer;color:#8B5CF6;font-size:0.82rem;font-weight:600"><i class="fas fa-plus-circle" style="margin-right:4px"></i>\u0417\u0430\u043f\u0438\u0441\u0430\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436</summary>';
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;padding:10px;background:#0f172a;border-radius:8px">';
+    h += '<div><label style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="lp_amount_' + l.id + '" placeholder="0"></div>';
+    h += '<div><label style="font-size:0.7rem;color:#64748b">\u041e\u0441\u043d. \u0434\u043e\u043b\u0433</label><input type="number" class="input" id="lp_principal_' + l.id + '" placeholder="0"></div>';
+    h += '<div><label style="font-size:0.7rem;color:#64748b">\u041f\u0440\u043e\u0446\u0435\u043d\u0442\u044b</label><input type="number" class="input" id="lp_interest_' + l.id + '" placeholder="0"></div>';
+    h += '<div><label style="font-size:0.7rem;color:#64748b">\u0414\u0430\u0442\u0430</label><input type="date" class="input" id="lp_date_' + l.id + '" value="' + new Date().toISOString().slice(0,10) + '"></div>';
+    h += '</div><button class="btn btn-primary" style="margin-top:8px;padding:6px 14px;font-size:0.82rem" onclick="saveLoanPaymentInline(' + l.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436</button></details>';
+    h += '</div>';
+  }
+  // Loan payments history for this period
+  var lpList = p.loan_payments_list || [];
+  if (lpList.length) {
+    h += '<div class="card" style="margin-top:16px"><h4 style="font-weight:700;color:#94a3b8;margin-bottom:10px;font-size:0.9rem"><i class="fas fa-history" style="color:#8B5CF6;margin-right:6px"></i>\u041f\u043b\u0430\u0442\u0435\u0436\u0438 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434</h4>';
+    for (var j = 0; j < lpList.length; j++) {
+      var lp = lpList[j];
+      h += '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #1e293b22;font-size:0.82rem">';
+      h += '<span style="color:#e2e8f0">' + escHtml(lp.loan_name || '') + ' <span style="color:#64748b">' + (lp.payment_date || '') + '</span></span>';
+      h += '<span style="color:#F59E0B;font-weight:600">' + fmtAmt(lp.amount) + ' <span style="color:#64748b;font-size:0.72rem">(\u043e\u0441\u043d: ' + fmtAmt(lp.principal_part) + ', %: ' + fmtAmt(lp.interest_part) + ')</span></span>';
+      h += '</div>';
+    }
+    h += '</div>';
+  }
+  return h;
+}
+async function saveLoanPaymentInline(loanId) {
+  var d = { amount: parseFloat(document.getElementById('lp_amount_' + loanId)?.value) || 0, principal_part: parseFloat(document.getElementById('lp_principal_' + loanId)?.value) || 0, interest_part: parseFloat(document.getElementById('lp_interest_' + loanId)?.value) || 0, payment_date: document.getElementById('lp_date_' + loanId)?.value || '' };
+  await api('/loans/' + loanId + '/payments', { method: 'POST', body: JSON.stringify(d) });
+  var bulk = await api('/bulk-data');
+  if (bulk && !bulk.error) { data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; }
+  pnlData = null; loadPnlData(); toast('\u041f\u043b\u0430\u0442\u0451\u0436 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d');
+}
+
+function renderPnlDividends(p) {
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-money-check-alt" style="color:#8B5CF6;margin-right:8px"></i>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b</h3>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'dividend\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
+  if (showPnlAddForm && pnlEditType === 'dividend') {
+    var editItem = pnlEditId ? (data.dividends || []).find(function(d) { return d.id === pnlEditId; }) : null;
+    h += renderPnlCrudForm('dividend', editItem);
+  }
+  var items = (data.dividends || []).filter(function(d) { return d.period_key === pnlPeriod; });
+  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px">\u041d\u0435\u0442 \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u043e\u0432 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434</div>'; return h; }
+  h += '<div class="card" style="padding:0;overflow:hidden">';
+  var total = 0;
+  for (var i = 0; i < items.length; i++) {
+    var d = items[i]; total += (d.amount || 0) + (d.tax_amount || 0);
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1e293b">';
+    h += '<div><span style="font-weight:600;color:#e2e8f0">' + escHtml(d.recipient || '\u0412\u043b\u0430\u0434\u0435\u043b\u0435\u0446') + '</span>';
+    h += '<div style="font-size:0.75rem;color:#64748b">' + (d.payment_date || '') + (d.tax_amount ? ' | \u043d\u0430\u043b\u043e\u0433: ' + fmtAmt(d.tax_amount) : '') + '</div></div>';
+    h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;color:#8B5CF6">' + fmtAmt(d.amount) + '</span>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'dividend\\',' + d.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'dividend\\',' + d.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
+  }
+  h += '<div style="padding:12px 16px;background:rgba(139,92,246,0.08);display:flex;justify-content:space-between"><span style="font-weight:700;color:#94a3b8">\u0418\u0442\u043e\u0433\u043e:</span><span style="font-weight:800;color:#8B5CF6">' + fmtAmt(total) + '</span></div>';
+  h += '</div>';
+  return h;
+}
+
+function renderPnlOther(p) {
+  var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
+  h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#10B981;margin-right:8px"></i>\u041f\u0440\u043e\u0447\u0438\u0435 \u0434\u043e\u0445\u043e\u0434\u044b / \u0440\u0430\u0441\u0445\u043e\u0434\u044b</h3>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'other\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
+  if (showPnlAddForm && pnlEditType === 'other') {
+    var editItem = pnlEditId ? (data.otherIncomeExpenses || []).find(function(o) { return o.id === pnlEditId; }) : null;
+    h += renderPnlCrudForm('other', editItem);
+  }
+  var items = (data.otherIncomeExpenses || []).filter(function(o) { return o.period_key === pnlPeriod; });
+  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px">\u041d\u0435\u0442 \u0437\u0430\u043f\u0438\u0441\u0435\u0439</div>'; return h; }
+  h += '<div class="card" style="padding:0;overflow:hidden">';
+  for (var i = 0; i < items.length; i++) {
+    var o = items[i]; var isIncome = o.type === 'income';
+    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1e293b">';
+    h += '<div><span style="font-weight:600;color:#e2e8f0">' + escHtml(o.name) + '</span>';
+    h += '<div style="font-size:0.75rem;color:#64748b">' + (o.date || '') + ' | ' + (isIncome ? '\u0414\u043e\u0445\u043e\u0434' : '\u0420\u0430\u0441\u0445\u043e\u0434') + '</div></div>';
+    h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;color:' + (isIncome ? '#22C55E' : '#EF4444') + '">' + (isIncome ? '+' : '-') + fmtAmt(o.amount) + '</span>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'other\\',' + o.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'other\\',' + o.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderPnlScenario(p) {
+  var h = '<div class="card" style="margin-bottom:16px">';
+  h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0;margin-bottom:16px"><i class="fas fa-flask" style="color:#8B5CF6;margin-right:8px"></i>\u0421\u0446\u0435\u043d\u0430\u0440\u043d\u043e\u0435 \u043c\u043e\u0434\u0435\u043b\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435</h3>';
+  h += '<p style="color:#64748b;font-size:0.85rem;margin-bottom:16px">\u041a\u0430\u043a \u0438\u0437\u043c\u0435\u043d\u0438\u0442\u0441\u044f \u0447\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u0440\u0438 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0438 \u043f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u043e\u0432?</p>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+  h += '<div><label style="font-size:0.78rem;color:#64748b">\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u0438\u0437\u043c. %</label><input type="number" class="input" id="sc_revenue" value="0" onchange="calcScenario()"></div>';
+  h += '<div><label style="font-size:0.78rem;color:#64748b">\u0420\u0430\u0441\u0445\u043e\u0434\u044b \u0438\u0437\u043c. %</label><input type="number" class="input" id="sc_expenses" value="0" onchange="calcScenario()"></div>';
+  h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u0430\u044f \u0441\u0442\u0430\u0432\u043a\u0430 %</label><input type="number" class="input" id="sc_tax_rate" value="' + (p.effective_tax_rate || 0) + '" onchange="calcScenario()"></div>';
+  h += '<div><label style="font-size:0.78rem;color:#64748b">\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433 \u0438\u0437\u043c. %</label><input type="number" class="input" id="sc_marketing" value="0" onchange="calcScenario()"></div>';
+  h += '</div>';
+  h += '<div id="scenarioResult" style="padding:16px;background:#0f172a;border-radius:8px;border:1px solid #334155"><span style="color:#64748b">\u0418\u0437\u043c\u0435\u043d\u0438\u0442\u0435 \u043f\u0430\u0440\u0430\u043c\u0435\u0442\u0440\u044b \u0432\u044b\u0448\u0435...</span></div>';
+  h += '</div>';
+  return h;
+}
+function calcScenario() {
+  var p = pnlData || {};
+  var revChg = parseFloat(document.getElementById('sc_revenue')?.value) || 0;
+  var expChg = parseFloat(document.getElementById('sc_expenses')?.value) || 0;
+  var taxRate = parseFloat(document.getElementById('sc_tax_rate')?.value) || 0;
+  var mktChg = parseFloat(document.getElementById('sc_marketing')?.value) || 0;
+  var newRev = (p.revenue || 0) * (1 + revChg / 100);
+  var newCogs = (p.cogs || 0) * (1 + expChg / 100);
+  var newMkt = (p.marketing || 0) * (1 + mktChg / 100);
+  var newGross = newRev - newCogs;
+  var newOpex = (p.salary_total || 0) + newMkt + (p.depreciation || 0);
+  var newEbit = newGross - newOpex;
+  var newEbt = newEbit + (p.other_net || 0) - (p.interest_expense || 0);
+  var newTaxes = newEbt > 0 ? newEbt * taxRate / 100 : 0;
+  var newNet = newEbt - newTaxes;
+  var diff = newNet - (p.net_profit || 0);
+  var el = document.getElementById('scenarioResult');
+  if (el) {
+    el.innerHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">' +
+      '<div><div style="font-size:0.75rem;color:#64748b">\u041d\u043e\u0432\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430</div><div style="font-weight:700;color:#22C55E">' + fmtAmt(newRev) + '</div></div>' +
+      '<div><div style="font-size:0.75rem;color:#64748b">\u041d\u043e\u0432\u044b\u0439 EBIT</div><div style="font-weight:700;color:' + (newEbit >= 0 ? '#3B82F6' : '#EF4444') + '">' + fmtAmt(newEbit) + '</div></div>' +
+      '<div><div style="font-size:0.75rem;color:#64748b">\u041d\u043e\u0432\u0430\u044f \u0447\u0438\u0441\u0442\u0430\u044f</div><div style="font-weight:700;color:' + (newNet >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(newNet) + '</div></div>' +
+      '</div><div style="margin-top:10px;padding:8px 12px;background:' + (diff >= 0 ? 'rgba(34,197,94,0.08)' : 'rgba(239,68,68,0.08)') + ';border-radius:6px;display:flex;justify-content:space-between"><span style="color:#94a3b8">\u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u0435 \u043f\u0440\u0438\u0431\u044b\u043b\u0438:</span><span style="font-weight:800;color:' + (diff >= 0 ? '#22C55E' : '#EF4444') + '">' + (diff >= 0 ? '+' : '') + fmtAmt(diff) + '</span></div>';
+  }
 }
 
 // ============ TAB 1: ОБЗОР И ФИНАНСЫ ============
