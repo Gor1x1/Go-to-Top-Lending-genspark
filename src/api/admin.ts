@@ -1325,9 +1325,9 @@ api.delete('/company-roles/:id', authMiddleware, async (c) => {
   const caller = c.get('user');
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can manage roles' }, 403);
   const id = c.req.param('id');
-  // Don't allow deleting system roles
-  const role = await db.prepare('SELECT is_system FROM company_roles WHERE id = ?').bind(id).first();
-  if (role?.is_system) return c.json({ error: 'Cannot delete system roles' }, 400);
+  // Don't allow deleting main_admin role
+  const role = await db.prepare('SELECT role_key FROM company_roles WHERE id = ?').bind(id).first();
+  if (role?.role_key === 'main_admin') return c.json({ error: 'Cannot delete main_admin role' }, 400);
   await db.prepare('DELETE FROM company_roles WHERE id = ?').bind(id).run();
   return c.json({ success: true });
 });
@@ -2266,14 +2266,47 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return c.json({ error: 'Invalid month format' }, 400);
   try {
     const user = await db.prepare('SELECT salary, salary_type, hire_date, end_date, is_active, display_name FROM users WHERE id = ?').bind(userId).first();
-    const monthlySalary = Number(user?.salary || 0);
+    const fullMonthlySalary = Number(user?.salary || 0);
+    const salaryType = (user?.salary_type as string) || 'monthly';
     const hireDate = (user?.hire_date as string) || '';
     const endDate = (user?.end_date as string) || '';
+
+    // === PROPORTIONAL SALARY CALCULATION ===
+    // Calculate working days in this month based on hire/end dates
+    const monthStart = new Date(month + '-01T00:00:00Z');
+    const monthEnd = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0); // last day of month
+    const totalDaysInMonth = monthEnd.getDate();
+    
+    let workStartDay = 1;
+    let workEndDay = totalDaysInMonth;
+    
+    if (hireDate && hireDate.slice(0,7) === month) {
+      workStartDay = Math.max(1, parseInt(hireDate.slice(8,10)));
+    }
+    if (endDate && endDate.slice(0,7) === month) {
+      workEndDay = Math.min(totalDaysInMonth, parseInt(endDate.slice(8,10)));
+    }
+    // If hire_date is after this month or end_date before this month — 0 salary
+    let monthlySalary = fullMonthlySalary;
+    let workedDays = totalDaysInMonth;
+    let isPartialMonth = false;
+    
+    if (hireDate && hireDate > month + '-' + String(totalDaysInMonth).padStart(2,'0')) {
+      monthlySalary = 0; workedDays = 0;
+    } else if (endDate && endDate < month + '-01') {
+      monthlySalary = 0; workedDays = 0;
+    } else if (workStartDay > 1 || workEndDay < totalDaysInMonth) {
+      workedDays = Math.max(0, workEndDay - workStartDay + 1);
+      if (salaryType === 'monthly' || salaryType === 'biweekly') {
+        monthlySalary = Math.round((fullMonthlySalary * workedDays / totalDaysInMonth) * 100) / 100;
+        isPartialMonth = true;
+      }
+    }
 
     // === CURRENT MONTH EARNINGS ===
     const bonusRes = await db.prepare(`
       SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' OR (bonus_type IS NULL AND amount > 0) THEN amount ELSE 0 END),0) as bonuses,
-        COALESCE(SUM(CASE WHEN bonus_type='penalty' OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as penalties,
+        COALESCE(SUM(CASE WHEN bonus_type IN ('penalty','fine') OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as penalties,
         COALESCE(SUM(amount),0) as net
       FROM employee_bonuses WHERE user_id = ? AND strftime('%Y-%m', bonus_date) = ?
     `).bind(userId, month).first();
@@ -2301,7 +2334,7 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
 
     // Calculate salary deduction for unpaid vacation days
     // Assume ~22 working days per month
-    const dailySalary = monthlySalary / 22;
+    const dailySalary = fullMonthlySalary / 22;
     const unpaidDeduction = Math.round(unpaidVacDays * dailySalary * 100) / 100;
     // Paid vacation: salary stays the same, no deduction
     const monthSalaryAfterVac = Math.max(0, Math.round((monthlySalary - unpaidDeduction) * 100) / 100);
@@ -2326,12 +2359,12 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
       totalMonthsWorked = Math.max(1, 
         (ed.getFullYear() - hd.getFullYear()) * 12 + (ed.getMonth() - hd.getMonth()) + 1
       );
-      lifetimeSalary = Math.round(monthlySalary * totalMonthsWorked * 100) / 100;
+      lifetimeSalary = Math.round(fullMonthlySalary * totalMonthsWorked * 100) / 100;
 
       // Lifetime bonuses/penalties since hire
       const lifeBonus = await db.prepare(`
         SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' OR (bonus_type IS NULL AND amount > 0) THEN amount ELSE 0 END),0) as bonuses,
-          COALESCE(SUM(CASE WHEN bonus_type='penalty' OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as penalties,
+          COALESCE(SUM(CASE WHEN bonus_type IN ('penalty','fine') OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as penalties,
           COALESCE(SUM(amount),0) as net
         FROM employee_bonuses WHERE user_id = ? AND bonus_date >= ? ${endDate ? "AND bonus_date <= ?" : ""}
       `).bind(userId, hireDate, ...(endDate ? [endDate] : [])).first();
@@ -2356,8 +2389,9 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
     return c.json({
       month, user_id: Number(userId), 
       display_name: user?.display_name || '',
-      salary: monthlySalary, salary_type: user?.salary_type || 'monthly',
+      salary: monthlySalary, full_salary: fullMonthlySalary, salary_type: salaryType,
       hire_date: hireDate, end_date: endDate,
+      is_partial_month: isPartialMonth, worked_days: workedDays, total_days_in_month: totalDaysInMonth,
       // Current month breakdown
       bonuses, penalties, bonuses_net: bonusesNet,
       vacation_paid_days: paidVacDays,

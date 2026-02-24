@@ -5036,6 +5036,10 @@ function renderEmployees() {
       h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-right:28px">';
       h += '<span style="font-size:0.75rem;color:#64748b"><i class="fas fa-chart-bar" style="margin-right:4px;color:#8B5CF6"></i>Заработок: ' + earningsMonth + '</span>';
       h += '<span style="color:#c4b5fd;font-weight:900;font-size:1rem">' + fmtAmt(earnings.total_earnings) + '</span></div>';
+      // Partial month indicator
+      if (earnings.is_partial_month) {
+        h += '<div style="font-size:0.68rem;color:#F59E0B;background:rgba(245,158,11,0.08);padding:4px 10px;border-radius:6px;margin-bottom:8px;border:1px solid rgba(245,158,11,0.15)"><i class="fas fa-calendar-day" style="margin-right:4px"></i>Неполный месяц: ' + (earnings.worked_days||0) + ' из ' + (earnings.total_days_in_month||30) + ' дней (ЗП пропорционально)</div>';
+      }
       // Visual breakdown bar
       var maxEarn = Math.max(earnings.salary || 0, 1);
       var salW = Math.min(100, Math.round(((earnings.month_salary_after_vac !== undefined ? earnings.month_salary_after_vac : earnings.salary) / maxEarn) * 100));
@@ -5290,7 +5294,7 @@ async function toggleUserActive(id, val) {
 }
 
 async function forceStopEmployee(id, name) {
-  if (!confirm('\u26a0\ufe0f Принудительно завершить работу сотрудника "' + name + '"?\\n\\nСотрудник будет отключён и не сможет войти в админ-панель.\\nДата окончания работы будет установлена на сегодня.')) return;
+  if (!confirm('\u26a0\ufe0f Принудительно завершить работу сотрудника "' + name + '"?\n\nСотрудник будет отключён и не сможет войти в админ-панель.\nДата окончания работы будет установлена на сегодня.')) return;
   var today = new Date().toISOString().slice(0,10);
   await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 0, end_date: today }) });
   data.users = ensureArray(await api('/users'));
@@ -5299,10 +5303,11 @@ async function forceStopEmployee(id, name) {
 }
 
 async function reactivateEmployee(id, name) {
-  if (!confirm('Активировать сотрудника "' + name + '"?\\n\\nСотрудник снова сможет входить в админ-панель. Дата окончания будет очищена.')) return;
-  await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 1, end_date: '' }) });
+  if (!confirm('Активировать сотрудника "' + name + '"?\n\nСотрудник снова сможет входить в админ-панель.\nДата начала работы будет установлена на сегодня, дата окончания — очищена.')) return;
+  var today = new Date().toISOString().slice(0,10);
+  await api('/users/' + id, { method:'PUT', body: JSON.stringify({ is_active: 1, hire_date: today, end_date: '' }) });
   data.users = ensureArray(await api('/users'));
-  toast('Сотрудник "' + name + '" активирован');
+  toast('Сотрудник "' + name + '" активирован с ' + today);
   render();
 }
 
@@ -5620,7 +5625,7 @@ function renderRolesTab(roles, sl, isAdmin) {
         h += '<div style="display:flex;gap:6px;flex-shrink:0;align-items:flex-start">';
         h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.82rem" onclick="showCompanyRoleModal(' + r.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>';
         h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.82rem" onclick="cloneCompanyRole(' + r.id + ')" title="К\u043b\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0440\u043e\u043b\u044c"><i class="fas fa-copy"></i></button>';
-        if (!r.is_system) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',&apos;' + escHtml(getCompanyRoleName(r)) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
+        if (r.role_key !== 'main_admin') h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.82rem" onclick="deleteCompanyRole(' + r.id + ',&apos;' + escHtml(getCompanyRoleName(r)) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
         h += '</div>';
       }
       h += '</div></div>';
