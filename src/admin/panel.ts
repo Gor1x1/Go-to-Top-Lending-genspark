@@ -2413,6 +2413,8 @@ let pnlSubTab = 'cascade'; // cascade | taxes | assets | loans | dividends | oth
 let pnlEditId = 0; // for edit modal
 let pnlEditType = ''; // tax | asset | loan | dividend | other
 let showPnlAddForm = false;
+let pnlFiscalMonth = 1; // loaded from settings
+let editingLoanPaymentId = 0; // for editing existing payments
 let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
 let addBonusType = 'bonus';
@@ -2605,7 +2607,15 @@ function renderLeadsAnalytics() {
 async function loadPnlData() {
   pnlLoading = true; render();
   pnlData = await api('/pnl/' + pnlPeriod);
+  if (pnlData && pnlData.fiscal_year_start_month) pnlFiscalMonth = pnlData.fiscal_year_start_month;
   pnlLoading = false; render();
+}
+async function saveFiscalYearStart(val) {
+  var m = parseInt(val) || 1;
+  pnlFiscalMonth = m;
+  await api('/settings', { method: 'PUT', body: JSON.stringify({ fiscal_year_start_month: String(m) }), _silent: true });
+  pnlData = null; loadPnlData();
+  toast('\u0424\u0438\u0441\u043a\u0430\u043b\u044c\u043d\u044b\u0439 \u0433\u043e\u0434: \u0441 ' + val + '-\u0433\u043e \u043c\u0435\u0441\u044f\u0446\u0430');
 }
 function setPnlPeriod(dir) {
   var parts = pnlPeriod.split('-'); var y = parseInt(parts[0]); var m = parseInt(parts[1]);
@@ -2639,8 +2649,8 @@ async function savePnlItem(type) {
   }
   try {
     var result;
-    if (pnlEditId) { result = await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d) }); }
-    else { result = await api(endpoint, { method: 'POST', body: JSON.stringify(d) }); }
+    if (pnlEditId) { result = await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d), _silent: true }); }
+    else { result = await api(endpoint, { method: 'POST', body: JSON.stringify(d), _silent: true }); }
     console.log('[PnL] API result:', JSON.stringify(result));
     if (restoreBtn) restoreBtn();
     if (!result) {
@@ -2729,6 +2739,13 @@ function renderPnLTab() {
   h += '<input type="month" class="input" style="padding:4px 10px;width:160px;font-size:0.85rem" value="' + pnlPeriod + '" onchange="pnlPeriod=this.value;pnlData=null;loadPnlData()">';
   h += '<span style="color:#64748b;font-size:0.78rem;margin-left:6px">\u0432\u0430\u043b\u044e\u0442\u0430: AMD</span>';
   if (p.prev_period) h += '<span style="color:#475569;font-size:0.72rem;margin-left:8px">vs ' + p.prev_period + '</span>';
+  // Fiscal year start selector
+  h += '<span style="color:#475569;margin-left:8px">|</span>';
+  h += '<span style="color:#64748b;font-size:0.78rem;margin-left:6px">\u0424\u0438\u0441\u043a. \u0433\u043e\u0434 \u0441:</span>';
+  h += '<select class="input" style="width:100px;padding:3px 8px;font-size:0.78rem;margin-left:4px" onchange="saveFiscalYearStart(this.value)">';
+  var fmNames = ["\u042f\u043d\u0432","\u0424\u0435\u0432","\u041c\u0430\u0440","\u0410\u043f\u0440","\u041c\u0430\u0439","\u0418\u044e\u043d","\u0418\u044e\u043b","\u0410\u0432\u0433","\u0421\u0435\u043d","\u041e\u043a\u0442","\u041d\u043e\u044f","\u0414\u0435\u043a"];
+  for (var fi = 1; fi <= 12; fi++) h += '<option value="' + fi + '"' + ((p.fiscal_year_start_month || pnlFiscalMonth || 1) === fi ? ' selected' : '') + '>' + fmNames[fi-1] + ' (' + fi + ')</option>';
+  h += '</select>';
   h += '</div>';
   // Sub-tabs
   var subTabs = [{id:'cascade',icon:'fa-stream',label:'P&L \u041a\u0430\u0441\u043a\u0430\u0434'},{id:'taxes',icon:'fa-landmark',label:'\u041d\u0430\u043b\u043e\u0433\u0438'},{id:'assets',icon:'fa-building',label:'\u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f'},{id:'loans',icon:'fa-hand-holding-usd',label:'\u041a\u0440\u0435\u0434\u0438\u0442\u044b'},{id:'dividends',icon:'fa-money-check-alt',label:'\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b'},{id:'other',icon:'fa-exchange-alt',label:'\u041f\u0440\u043e\u0447\u0435\u0435'},{id:'scenario',icon:'fa-flask',label:'\u0421\u0446\u0435\u043d\u0430\u0440\u0438\u0438'}];
@@ -3045,6 +3062,7 @@ function renderPnlTaxes(p) {
       }
     }
     if (t.due_date) { h += '<div style="font-size:0.7rem;color:#475569;margin-top:3px"><i class="fas fa-clock" style="margin-right:4px"></i>\u0421\u0440\u043e\u043a: ' + t.due_date + (t.payment_date ? ' | \u041e\u043f\u043b\u0430\u0442\u0430: ' + t.payment_date : '') + '</div>'; }
+    if (t.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-top:2px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(t.notes) + '</div>';
     h += '</div>';
     h += '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">';
     h += '<span style="font-weight:700;color:#F59E0B;font-size:1.05rem">' + fmtAmt(displayAmount) + '</span>';
@@ -3070,6 +3088,20 @@ function renderPnlTaxes(p) {
     }
     h += '</div></details>';
   }
+  // Tax workflow explanation
+  h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-question-circle" style="margin-right:6px;color:#F59E0B"></i>\u041a\u0430\u043a \u0440\u0430\u0431\u043e\u0442\u0430\u044e\u0442 \u043d\u0430\u043b\u043e\u0433\u0438 \u0432 P&L</summary>';
+  h += '<div class="card" style="margin-top:8px;font-size:0.8rem;color:#94a3b8;line-height:1.9">';
+  h += '<div style="margin-bottom:8px"><b style="color:#a78bfa">1. \u0422\u0438\u043f \u043d\u0430\u043b\u043e\u0433\u0430 (Tax Type)</b> \u2014 \u043e\u043f\u0440\u0435\u0434\u0435\u043b\u044f\u0435\u0442 \u043a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044e. \u041d\u0430\u043f\u0440\u0438\u043c\u0435\u0440: \u041d\u0414\u0421, \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c, \u0423\u0421\u041d, \u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f, \u041f\u0430\u0442\u0435\u043d\u0442.</div>';
+  h += '<div style="margin-bottom:8px"><b style="color:#a78bfa">2. \u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442</b> \u2014 \u0435\u0441\u043b\u0438 \u0432\u043a\u043b\u044e\u0447\u0451\u043d, \u0441\u0443\u043c\u043c\u0430 = \u0421\u0442\u0430\u0432\u043a\u0430% \u00d7 \u0411\u0430\u0437\u0430. \u041f\u0435\u0440\u0435\u0441\u0447\u0438\u0442\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u043f\u0440\u0438 \u043a\u0430\u0436\u0434\u043e\u043c \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u0438 P&L.</div>';
+  h += '<div style="margin-bottom:8px"><b style="color:#a78bfa">3. \u0411\u0430\u0437\u0430 \u0440\u0430\u0441\u0447\u0451\u0442\u0430:</b></div>';
+  h += '<div style="padding-left:16px;margin-bottom:4px">\u2022 <b>EBT</b> \u2014 \u0434\u043b\u044f \u043d\u0430\u043b\u043e\u0433\u0430 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c (20% \u043e\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432)</div>';
+  h += '<div style="padding-left:16px;margin-bottom:4px">\u2022 <b>\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> \u2014 \u0434\u043b\u044f \u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b (6% \u043e\u0442 \u0432\u0441\u0435\u0433\u043e \u0434\u043e\u0445\u043e\u0434\u0430)</div>';
+  h += '<div style="padding-left:16px;margin-bottom:4px">\u2022 <b>\u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b</b> \u2014 \u0434\u043b\u044f \u0423\u0421\u041d 15% (\u0434\u043e\u0445\u043e\u0434 \u043c\u0438\u043d\u0443\u0441 \u0432\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b)</div>';
+  h += '<div style="padding-left:16px;margin-bottom:4px">\u2022 <b>\u0424\u041e\u0422</b> \u2014 \u0434\u043b\u044f \u043d\u0430\u043b\u043e\u0433\u043e\u0432 \u043d\u0430 \u0417\u041f (% \u043e\u0442 \u0444\u043e\u043d\u0434\u0430 \u043e\u043f\u043b\u0430\u0442\u044b \u0442\u0440\u0443\u0434\u0430)</div>';
+  h += '<div style="padding-left:16px;margin-bottom:4px">\u2022 <b>\u041d\u0414\u0421 \u0432\u043a\u043b.</b> \u2014 \u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u00d7 \u0421\u0442\u0430\u0432\u043a\u0430/(100+\u0421\u0442\u0430\u0432\u043a\u0430)</div>';
+  h += '<div style="padding-left:16px;margin-bottom:8px">\u2022 <b>\u0424\u0438\u043a\u0441.</b> \u2014 \u0441\u0443\u043c\u043c\u0430 \u0432\u0440\u0443\u0447\u043d\u0443\u044e (\u043d\u0430\u043f\u0440. \u043f\u0430\u0442\u0435\u043d\u0442, \u0444\u0438\u043a\u0441. \u043d\u0430\u043b\u043e\u0433)</div>';
+  h += '<div style="padding-top:6px;border-top:1px solid #334155"><b style="color:#F59E0B">\u0421\u043e\u0432\u0435\u0442:</b> \u0414\u043b\u044f \u043d\u0430\u0447\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u041d\u0414\u0421 (20% \u043e\u0442 \u0432\u044b\u0440\u0443\u0447\u043a\u0438 \u0432\u043a\u043b.) \u0438 \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c (20% \u043e\u0442 EBT) \u2014 \u044d\u0442\u043e \u043f\u043e\u043a\u0440\u043e\u0435\u0442 \u043e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u043d\u0430\u043b\u043e\u0433\u0438. ETR \u043e\u0442\u043e\u0431\u0440\u0430\u0437\u0438\u0442 \u0440\u0435\u0430\u043b\u044c\u043d\u0443\u044e \u0441\u0442\u0430\u0432\u043a\u0443.</div>';
+  h += '</div></details>';
   return h;
 }
 
@@ -3164,6 +3196,7 @@ function renderPnlLoans(p) {
         if (lp.notes) h += ' <span style="color:#8B5CF6;font-size:0.68rem">' + escHtml(lp.notes) + '</span>';
         h += '</div>';
         h += '<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#F59E0B">' + fmtAmt(lp.amount) + '</span>';
+        h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.68rem" onclick="editLoanPayment(' + l.id + ',' + lp.id + ')" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c"><i class="fas fa-edit" style="font-size:0.55rem"></i></button>';
         h += '<button class="tier-del-btn" onclick="deleteLoanPayment(' + lp.id + ')" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-trash" style="font-size:0.55rem"></i></button>';
         h += '</div></div>';
       }
@@ -3171,27 +3204,39 @@ function renderPnlLoans(p) {
       h += '</div>';
     }
     // Inline payment form
-    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px;padding:10px;background:#0f172a;border-radius:8px">';
+    h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid ' + (editingLoanPaymentId > 0 ? '#F59E0B' : '#334155') + '">';
+    if (editingLoanPaymentId > 0) h += '<div style="font-size:0.78rem;color:#F59E0B;font-weight:600;margin-bottom:6px"><i class="fas fa-edit" style="margin-right:4px"></i>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0430</div>';
+    h += '<div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 1fr;gap:8px;align-items:end">';
+    h += '<div><label style="font-size:0.7rem;color:#64748b">\u0422\u0438\u043f \u043f\u043b\u0430\u0442\u0435\u0436\u0430</label><select class="input" id="lp_paytype_' + l.id + '" style="font-size:0.78rem" onchange="toggleLoanPayFields(' + l.id + ',this.value)"><option value="both">\u041e\u0441\u043d.+%</option><option value="interest_only">\u0422\u043e\u043b\u044c\u043a\u043e %</option><option value="principal_only">\u0422\u043e\u043b\u044c\u043a\u043e \u043e\u0441\u043d.</option></select></div>';
     h += '<div><label style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="lp_amount_' + l.id + '" placeholder="0"></div>';
-    h += '<div><label style="font-size:0.7rem;color:#64748b">\u041e\u0441\u043d. \u0434\u043e\u043b\u0433</label><input type="number" class="input" id="lp_principal_' + l.id + '" placeholder="0"></div>';
-    h += '<div><label style="font-size:0.7rem;color:#64748b">\u041f\u0440\u043e\u0446\u0435\u043d\u0442\u044b</label><input type="number" class="input" id="lp_interest_' + l.id + '" placeholder="0"></div>';
+    h += '<div id="lp_princ_wrap_' + l.id + '"><label style="font-size:0.7rem;color:#64748b">\u041e\u0441\u043d. \u0434\u043e\u043b\u0433</label><input type="number" class="input" id="lp_principal_' + l.id + '" placeholder="0"></div>';
+    h += '<div id="lp_int_wrap_' + l.id + '"><label style="font-size:0.7rem;color:#64748b">\u041f\u0440\u043e\u0446\u0435\u043d\u0442\u044b</label><input type="number" class="input" id="lp_interest_' + l.id + '" placeholder="0"></div>';
     h += '<div><label style="font-size:0.7rem;color:#64748b">\u0414\u0430\u0442\u0430</label><input type="date" class="input" id="lp_date_' + l.id + '" value="' + new Date().toISOString().slice(0,10) + '"></div>';
     h += '</div>';
-    h += '<div style="margin-top:6px;display:flex;gap:6px"><button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem" onclick="saveLoanPaymentInline(' + l.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436</button>';
+    h += '<div style="margin-top:6px"><label style="font-size:0.7rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="lp_notes_' + l.id + '" placeholder="\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439 \u043a \u043f\u043b\u0430\u0442\u0435\u0436\u0443" style="font-size:0.82rem"></div>';
+    h += '<div style="margin-top:6px;display:flex;gap:6px">';
+    h += '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem" onclick="saveLoanPaymentInline(' + l.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>' + (editingLoanPaymentId > 0 ? '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' : '\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436') + '</button>';
+    if (editingLoanPaymentId > 0) {
+      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="cancelEditLoanPayment()"><i class="fas fa-times" style="margin-right:4px"></i>\u041e\u0442\u043c\u0435\u043d\u0430</button>';
+    }
     if (l.monthly_payment) {
       h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="prefillLoanPayment(' + l.id + ',' + l.monthly_payment + ',' + (l.interest_rate||0) + ',' + (l.remaining_balance||0) + ')"><i class="fas fa-magic" style="margin-right:4px"></i>\u0410\u0432\u0442\u043e\u0437\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u044c</button>';
     }
-    h += '</div></details>';
+    h += '</div></div></details>';
     h += '</div>';
   }
   return h;
 }
 function prefillLoanPayment(loanId, monthlyPayment, interestRate, remainingBalance) {
-  var monthlyInterest = remainingBalance * (interestRate / 100) / 12;
-  var principalPart = Math.max(monthlyPayment - monthlyInterest, 0);
-  var el1 = document.getElementById('lp_amount_' + loanId); if (el1) el1.value = Math.round(monthlyPayment);
-  var el2 = document.getElementById('lp_principal_' + loanId); if (el2) el2.value = Math.round(principalPart);
-  var el3 = document.getElementById('lp_interest_' + loanId); if (el3) el3.value = Math.round(monthlyInterest);
+  // Correct annuity schedule: early payments have more interest, less principal
+  // Monthly interest = remaining_balance × (annual_rate / 12 / 100)
+  var monthlyInterest = Math.round(remainingBalance * (interestRate / 100 / 12) * 100) / 100;
+  var principalPart = Math.max(Math.round((monthlyPayment - monthlyInterest) * 100) / 100, 0);
+  // If interest exceeds monthly payment, set principal to 0
+  if (monthlyInterest >= monthlyPayment) { principalPart = 0; monthlyInterest = monthlyPayment; }
+  var el1 = document.getElementById('lp_amount_' + loanId); if (el1) el1.value = Math.round(monthlyPayment * 100) / 100;
+  var el2 = document.getElementById('lp_principal_' + loanId); if (el2) el2.value = principalPart;
+  var el3 = document.getElementById('lp_interest_' + loanId); if (el3) el3.value = monthlyInterest;
 }
 async function deleteLoanPayment(paymentId) {
   if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436?')) return;
@@ -3201,12 +3246,50 @@ async function deleteLoanPayment(paymentId) {
   pnlData = null; loadPnlData(); toast('\u041f\u043b\u0430\u0442\u0451\u0436 \u0443\u0434\u0430\u043b\u0451\u043d');
 }
 async function saveLoanPaymentInline(loanId) {
-  var d = { amount: parseFloat(document.getElementById('lp_amount_' + loanId)?.value) || 0, principal_part: parseFloat(document.getElementById('lp_principal_' + loanId)?.value) || 0, interest_part: parseFloat(document.getElementById('lp_interest_' + loanId)?.value) || 0, payment_date: document.getElementById('lp_date_' + loanId)?.value || '' };
+  var payType = document.getElementById('lp_paytype_' + loanId)?.value || 'both';
+  var amt = parseFloat(document.getElementById('lp_amount_' + loanId)?.value) || 0;
+  var princ = parseFloat(document.getElementById('lp_principal_' + loanId)?.value) || 0;
+  var inter = parseFloat(document.getElementById('lp_interest_' + loanId)?.value) || 0;
+  var payDate = document.getElementById('lp_date_' + loanId)?.value || '';
+  var notes = document.getElementById('lp_notes_' + loanId)?.value || '';
+  // Payment type logic
+  if (payType === 'interest_only') { princ = 0; inter = amt; }
+  else if (payType === 'principal_only') { princ = amt; inter = 0; }
+  else { /* both — use entered values or auto-split */ if (princ === 0 && inter === 0 && amt > 0) { princ = amt; } }
+  var d = { amount: amt, principal_part: princ, interest_part: inter, payment_date: payDate, notes: notes };
   if (d.amount <= 0) { toast('\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u0441\u0443\u043c\u043c\u0443 \u043f\u043b\u0430\u0442\u0435\u0436\u0430', 'error'); return; }
-  await api('/loans/' + loanId + '/payments', { method: 'POST', body: JSON.stringify(d), _silent: true });
+  var isEdit = editingLoanPaymentId > 0;
+  if (isEdit) {
+    await api('/loan-payments/' + editingLoanPaymentId, { method: 'PUT', body: JSON.stringify(d), _silent: true });
+    editingLoanPaymentId = 0;
+  } else {
+    await api('/loans/' + loanId + '/payments', { method: 'POST', body: JSON.stringify(d), _silent: true });
+  }
   var bulk = await api('/bulk-data', { _silent: true });
   if (bulk && !bulk.error) { data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; }
-  pnlData = null; loadPnlData(); toast('\u041f\u043b\u0430\u0442\u0451\u0436 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d');
+  pnlData = null; loadPnlData(); toast(isEdit ? '\u041f\u043b\u0430\u0442\u0451\u0436 \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d' : '\u041f\u043b\u0430\u0442\u0451\u0436 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d');
+}
+function editLoanPayment(loanId, paymentId) {
+  var pmts = data.loanPayments || [];
+  var p = pmts.find(function(lp) { return lp.id === paymentId; });
+  if (!p) return;
+  editingLoanPaymentId = paymentId;
+  setTimeout(function() {
+    var el1 = document.getElementById('lp_amount_' + loanId); if (el1) el1.value = p.amount || 0;
+    var el2 = document.getElementById('lp_principal_' + loanId); if (el2) el2.value = p.principal_part || 0;
+    var el3 = document.getElementById('lp_interest_' + loanId); if (el3) el3.value = p.interest_part || 0;
+    var el4 = document.getElementById('lp_date_' + loanId); if (el4) el4.value = p.payment_date || '';
+    var el5 = document.getElementById('lp_notes_' + loanId); if (el5) el5.value = p.notes || '';
+    var el6 = document.getElementById('lp_paytype_' + loanId); if (el6) { if (p.principal_part > 0 && p.interest_part > 0) el6.value = 'both'; else if (p.interest_part > 0) el6.value = 'interest_only'; else el6.value = 'principal_only'; }
+  }, 50);
+  render();
+}
+function cancelEditLoanPayment() { editingLoanPaymentId = 0; render(); }
+function toggleLoanPayFields(loanId, payType) {
+  var pw = document.getElementById('lp_princ_wrap_' + loanId);
+  var iw = document.getElementById('lp_int_wrap_' + loanId);
+  if (pw) pw.style.display = payType === 'interest_only' ? 'none' : '';
+  if (iw) iw.style.display = payType === 'principal_only' ? 'none' : '';
 }
 
 function renderPnlDividends(p) {
