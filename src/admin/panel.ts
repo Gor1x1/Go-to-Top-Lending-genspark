@@ -3185,7 +3185,7 @@ function renderPnlLoans(p) {
     // Progress bar
     h += '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:' + Math.min(paidPct, 100) + '%;height:100%;background:linear-gradient(90deg,#22C55E,#10B981);border-radius:3px"></div></div>';
     // Payments linked to this loan (expandable)
-    h += '<details' + (loanPayments.length > 0 ? ' open' : '') + ' style="margin-top:4px"><summary style="cursor:pointer;color:#8B5CF6;font-size:0.82rem;font-weight:600"><i class="fas fa-list" style="margin-right:4px"></i>\u041f\u043b\u0430\u0442\u0435\u0436\u0438 (' + loanPayments.length + ')' + (totalPaid > 0 ? ' \u2014 ' + fmtAmt(totalPaid) + ' \u0432\u0441\u0435\u0433\u043e' : '') + '</summary>';
+    h += '<details style="margin-top:4px"><summary style="cursor:pointer;color:#8B5CF6;font-size:0.82rem;font-weight:600"><i class="fas fa-list" style="margin-right:4px"></i>\u041f\u043b\u0430\u0442\u0435\u0436\u0438 (' + loanPayments.length + ')' + (totalPaid > 0 ? ' \u2014 ' + fmtAmt(totalPaid) + ' \u0432\u0441\u0435\u0433\u043e' : '') + '</summary>';
     if (loanPayments.length > 0) {
       h += '<div style="margin-top:8px;padding:8px;background:#0f172a;border-radius:8px;border:1px solid #334155">';
       for (var lpi = 0; lpi < loanPayments.length; lpi++) {
@@ -5056,22 +5056,19 @@ async function saveEditedMonth(monthKey, snapshotId) {
   }
   var customData = { adjustments: existingAdjs, status: status, status_label: statusLabel, in_progress_count: inprog, rejected_count: rejected, checking_count: checking, conversion_rate: convEdit, marginality: marginEdit, roi: roiEdit, romi: romiEdit, salary_base: liveSalBase, bonuses_net: liveBonNet };
   if (snapshotId > 0) {
-    // Update existing snapshot
+    // Update existing snapshot (including lock status)
     var res = await api('/period-snapshots/' + snapshotId, 'PUT', {
       revenue_services: svc, revenue_articles: art, refunds: ref,
       expense_salaries: expSal, expense_commercial: expComm, expense_marketing: expMkt,
       net_profit: profit, total_turnover: turnover,
       leads_done: done, leads_count: done + inprog + rejected + checking,
       avg_check: done > 0 ? Math.round(svc/done) : 0,
-      custom_data: customData
+      custom_data: customData,
+      is_locked: isLocked2
     });
     if (res && res.success) {
-      toast('Данные за ' + monthKey + ' обновлены');
+      toast('Данные за ' + monthKey + (isLocked2 ? ' закрыты и сохранены' : ' обновлены'));
       editingMonthKey = '';
-      // If status changed to locked, also lock the snapshot
-      if (isLocked2 && mSnap2 && !mSnap2.is_locked) {
-        await api('/period-snapshots', 'POST', { period_type: 'month', period_key: monthKey, revenue_services: svc, revenue_articles: art, total_turnover: turnover, refunds: ref, expense_salaries: expSal, expense_commercial: expComm, expense_marketing: expMkt, net_profit: profit, leads_count: done+inprog+rejected+checking, leads_done: done, avg_check: done > 0 ? Math.round(svc/done) : 0, is_locked: true, custom_data: customData });
-      }
       try { var snRes = await api('/period-snapshots'); data.periodSnapshots = (snRes && snRes.snapshots) || []; } catch(e) {}
       analyticsData = null; loadAnalyticsData();
     } else { toast(res?.error || 'Ошибка сохранения', 'error'); }

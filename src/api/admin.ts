@@ -1740,6 +1740,8 @@ api.put('/period-snapshots/:id', authMiddleware, async (c) => {
   if (d.leads_done !== undefined) { fields.push('leads_done=?'); vals.push(d.leads_done); }
   if (d.leads_count !== undefined) { fields.push('leads_count=?'); vals.push(d.leads_count); }
   if (d.custom_data !== undefined) { fields.push('custom_data=?'); vals.push(typeof d.custom_data === 'string' ? d.custom_data : JSON.stringify(d.custom_data)); }
+  if (d.avg_check !== undefined) { fields.push('avg_check=?'); vals.push(d.avg_check); }
+  if (d.is_locked !== undefined) { fields.push('is_locked=?'); vals.push(d.is_locked ? 1 : 0); if (d.is_locked) { fields.push('closed_at=CURRENT_TIMESTAMP'); } }
   if (fields.length === 0) return c.json({ error: 'Nothing to update' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
