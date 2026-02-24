@@ -2603,8 +2603,13 @@ async function savePnlItem(type) {
   var prefix = 'pnl_' + type + '_';
   var d = {};
   document.querySelectorAll('[id^="' + prefix + '"]').forEach(function(el) {
-    var key = el.id.replace(prefix, ''); d[key] = el.type === 'number' ? parseFloat(el.value) || 0 : el.value;
+    var key = el.id.replace(prefix, '');
+    if (el.type === 'checkbox') { d[key] = el.checked ? 1 : 0; }
+    else if (el.type === 'number') { d[key] = parseFloat(el.value) || 0; }
+    else { d[key] = el.value; }
   });
+  // For auto-calc taxes: amount will be computed server-side, set 0
+  if (type === 'tax' && d.is_auto) { d.amount = 0; }
   d.period_key = pnlPeriod;
   var endpoint = type === 'tax' ? '/tax-payments' : type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
   if (pnlEditId) { await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d) }); }
@@ -2712,6 +2717,18 @@ function renderPnlCascade(p) {
   h += '<button class="tab-btn' + (pnlShowYtd ? ' active' : '') + '" onclick="pnlShowYtd=!pnlShowYtd;render()" style="padding:6px 12px;font-size:0.78rem"><i class="fas fa-calendar-check" style="margin-right:4px"></i>YTD</button>';
   h += '</div>';
   
+  // Data sources info
+  h += '<div style="margin-bottom:14px;padding:10px 14px;background:rgba(34,197,94,0.05);border-radius:8px;border:1px solid rgba(34,197,94,0.15);font-size:0.75rem;color:#94a3b8;line-height:1.6">';
+  h += '<div style="font-weight:600;color:#22C55E;font-size:0.82rem;margin-bottom:4px"><i class="fas fa-link" style="margin-right:6px"></i>\u041e\u0442\u043a\u0443\u0434\u0430 \u0434\u0430\u043d\u043d\u044b\u0435 \u0432 P&L:</div>';
+  h += '<span style="color:#22C55E">\u2713</span> <b>\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> \u2190 \u041f\u0435\u0440\u0438\u043e\u0434\u044b (\u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u044b) &nbsp; ';
+  h += '<span style="color:#22C55E">\u2713</span> <b>COGS</b> \u2190 \u0417\u0430\u0442\u0440\u0430\u0442\u044b (\u043a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435) &nbsp; ';
+  h += '<span style="color:#22C55E">\u2713</span> <b>\u0417\u041f</b> \u2190 \u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438 (\u0441\u0442\u0430\u0432\u043a\u0438 + \u0431\u043e\u043d\u0443\u0441\u044b \u2212 \u0448\u0442\u0440\u0430\u0444\u044b) &nbsp; ';
+  h += '<span style="color:#22C55E">\u2713</span> <b>\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433</b> \u2190 \u0417\u0430\u0442\u0440\u0430\u0442\u044b (is_marketing) &nbsp; ';
+  h += '<span style="color:#22C55E">\u2713</span> <b>\u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</b> \u2190 \u041e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430 &nbsp; ';
+  h += '<span style="color:#22C55E">\u2713</span> <b>\u041d\u0430\u043b\u043e\u0433\u0438</b> \u2190 \u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 (% \u00d7 \u0431\u0430\u0437\u0430) &nbsp; ';
+  h += '<span style="color:#F59E0B">\u270E</span> <b>\u0412\u0440\u0443\u0447\u043d\u0443\u044e:</b> \u041a\u0440\u0435\u0434\u0438\u0442\u044b, \u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b, \u041f\u0440\u043e\u0447. \u0434\u043e\u0445\u043e\u0434\u044b/\u0440\u0430\u0441\u0445\u043e\u0434\u044b';
+  h += '</div>';
+  
   h += '<div class="card" style="padding:0;overflow:hidden">';
   // Header row
   var cols = 2 + (pnlShowMom ? 1 : 0) + (pnlShowYtd ? 1 : 0);
@@ -2753,7 +2770,7 @@ function renderPnlCascade(p) {
   h += pnlRow('\u041f\u0420\u0418\u0411\u042b\u041b\u042c \u0414\u041e \u041d\u0410\u041b\u041e\u0413\u041e\u0412 (EBT)', p.ebt, {bold:true, color: p.ebt >= 0 ? '#22C55E' : '#EF4444', mom:mom.ebt, momPct:mp.ebt, ytd:ytd.ebt});
   // Taxes
   h += pnlRow('\u2212 \u041d\u0430\u043b\u043e\u0433\u0438', p.total_taxes, {indent:1, color:'#EF4444', icon:'fa-landmark', mom:mom.total_taxes, ytd:ytd.total_taxes});
-  if (p.taxes && p.taxes.length) { for (var ti = 0; ti < p.taxes.length; ti++) { h += pnlRow('  ' + (p.taxes[ti].tax_name || p.taxes[ti].tax_type), p.taxes[ti].amount, {indent:2, sub:true}); } }
+  if (p.taxes && p.taxes.length) { for (var ti = 0; ti < p.taxes.length; ti++) { var tx = p.taxes[ti]; var txLabel = '  ' + (tx.tax_name || tx.tax_type); if (tx.is_auto && tx.tax_rate) txLabel += ' [' + tx.tax_rate + '%]'; h += pnlRow(txLabel, tx.amount, {indent:2, sub:true}); } }
   // ETR and Tax Burden — show as percentage, not amount
   h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(71,85,105,0.08);gap:8px">';
   h += '<span style="color:#64748b;font-size:0.82rem">ETR (\u044d\u0444\u0444. \u043d\u0430\u043b\u043e\u0433. \u0441\u0442\u0430\u0432\u043a\u0430)</span><span style="text-align:right;color:#F59E0B;font-weight:600;font-size:0.88rem">' + fmtPct(p.effective_tax_rate) + '</span></div>';
@@ -2810,16 +2827,41 @@ function renderPnlCrudForm(type, item) {
   h += '<h4 style="font-weight:700;color:#a78bfa">' + (pnlEditId ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435' : '\u0414\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0438\u0435') + '</h4>';
   h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem" onclick="showPnlAddForm=false;pnlEditId=0;render()"><i class="fas fa-times"></i></button></div>';
   if (type === 'tax') {
-    var taxTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'patent',l:'\u041f\u0430\u0442\u0435\u043d\u0442/\u0423\u043f\u0440\u043e\u0449\u0451\u043d\u043a\u0430'},{v:'property',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0438\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
+    var taxTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'usn_income',l:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b'},{v:'usn_income_expense',l:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b \u2212 \u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'patent',l:'\u041f\u0430\u0442\u0435\u043d\u0442'},{v:'property',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0438\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
+    var taxBases = [{v:'ebt',l:'EBT (\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432)'},{v:'revenue',l:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (\u0434\u043e\u0445\u043e\u0434\u044b)'},{v:'income_minus_expenses',l:'\u0414\u043e\u0445\u043e\u0434\u044b \u2212 \u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'payroll',l:'\u0424\u041e\u0422 (\u0444\u043e\u043d\u0434 \u043e\u043f\u043b. \u0442\u0440\u0443\u0434\u0430)'},{v:'vat_inclusive',l:'\u041d\u0414\u0421 (\u0432\u043a\u043b\u044e\u0447\u0451\u043d \u0432 \u0446\u0435\u043d\u0443)'},{v:'fixed',l:'\u0424\u0438\u043a\u0441. \u0441\u0443\u043c\u043c\u0430 (\u0432\u0440\u0443\u0447\u043d\u0443\u044e)'}];
+    var isAuto = item ? !!item.is_auto : true; // default to auto for new taxes
+    var curBase = (item && item.tax_base) || 'ebt';
+    h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(139,92,246,0.08);border-radius:8px;border:1px solid rgba(139,92,246,0.2)">';
+    h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#a78bfa;font-weight:600"><input type="checkbox" id="pnl_tax_is_auto"' + (isAuto ? ' checked' : '') + ' onchange="document.getElementById(\\'taxManualRow\\').style.display=this.checked?\\'none\\':\\'\\';document.getElementById(\\'taxAutoRow\\').style.display=this.checked?\\'grid\\':\\'none\\'"> <i class="fas fa-magic" style="margin-right:2px"></i>\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 \u2014 \u0441\u0443\u043c\u043c\u0430 = \u0441\u0442\u0430\u0432\u043a\u0430 % \u00d7 \u0431\u0430\u0437\u0430 (\u0434\u043e\u0445\u043e\u0434/\u043f\u0440\u0438\u0431\u044b\u043b\u044c/\u0424\u041e\u0422)</label>';
+    h += '</div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f</label><select class="input" id="pnl_tax_tax_type">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f \u043d\u0430\u043b\u043e\u0433\u0430</label><select class="input" id="pnl_tax_tax_type">';
     for (var tt = 0; tt < taxTypes.length; tt++) h += '<option value="' + taxTypes[tt].v + '"' + (item && item.tax_type === taxTypes[tt].v ? ' selected' : '') + '>' + taxTypes[tt].l + '</option>';
     h += '</select></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_tax_tax_name" value="' + escHtml((item && item.tax_name) || '') + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0414\u0421 \u0437\u0430 \u0444\u0435\u0432\u0440\u0430\u043b\u044c"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 (AMD)</label><input type="number" class="input" id="pnl_tax_amount" value="' + ((item && item.amount) || '') + '" placeholder="0"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u043e\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_payment_date" value="' + ((item && item.payment_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_tax_tax_name" value="' + escHtml((item && item.tax_name) || '') + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0414\u0421 20% \u0437\u0430 \u0444\u0435\u0432\u0440\u0430\u043b\u044c"></div>';
+    // Auto: rate + base
+    h += '</div><div id="taxAutoRow" style="' + (isAuto ? 'display:grid;' : 'display:none;') + 'grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-percent" style="color:#8B5CF6;margin-right:4px"></i>\u0421\u0442\u0430\u0432\u043a\u0430 %</label><input type="number" class="input" id="pnl_tax_tax_rate" value="' + ((item && item.tax_rate) || '') + '" step="0.1" placeholder="\u041d\u0430\u043f\u0440. 20"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:4px"></i>\u0411\u0430\u0437\u0430 \u0440\u0430\u0441\u0447\u0451\u0442\u0430</label><select class="input" id="pnl_tax_tax_base">';
+    for (var tb = 0; tb < taxBases.length; tb++) h += '<option value="' + taxBases[tb].v + '"' + (curBase === taxBases[tb].v ? ' selected' : '') + '>' + taxBases[tb].l + '</option>';
+    h += '</select></div>';
+    h += '</div>';
+    // Manual: amount field
+    h += '<div id="taxManualRow" style="display:' + (isAuto ? 'none' : '') + ';margin-top:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 (AMD) \u0432\u0440\u0443\u0447\u043d\u0443\u044e</label><input type="number" class="input" id="pnl_tax_amount" value="' + ((item && item.amount) || '') + '" placeholder="0"></div></div></div>';
+    // Info block with detailed examples
+    h += '<div style="margin-top:10px;padding:10px 14px;background:rgba(59,130,246,0.06);border-radius:8px;border:1px solid rgba(59,130,246,0.15);font-size:0.78rem;color:#94a3b8;line-height:1.7">';
+    h += '<i class="fas fa-info-circle" style="color:#3B82F6;margin-right:6px"></i>';
+    h += '<b style="color:#e2e8f0">\u041a\u0430\u043a \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442:</b><br>';
+    h += '\u2022 <b style="color:#22C55E">\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c:</b> \u0421\u0442\u0430\u0432\u043a\u0430 20% \u00d7 \u0411\u0430\u0437\u0430 EBT (\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432)<br>';
+    h += '\u2022 <b style="color:#3B82F6">\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b:</b> \u0421\u0442\u0430\u0432\u043a\u0430 6% \u00d7 \u0412\u044b\u0440\u0443\u0447\u043a\u0430<br>';
+    h += '\u2022 <b style="color:#8B5CF6">\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b:</b> \u0421\u0442\u0430\u0432\u043a\u0430 15% \u00d7 (\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u2212 \u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b)<br>';
+    h += '\u2022 <b style="color:#F59E0B">\u041d\u0414\u0421:</b> \u0421\u0442\u0430\u0432\u043a\u0430 20% \u00d7 \u0412\u044b\u0440\u0443\u0447\u043a\u0430 / (100+20) \u2014 \u0432\u043a\u043b\u044e\u0447\u0451\u043d \u0432 \u0446\u0435\u043d\u0443<br>';
+    h += '\u2022 <b style="color:#EF4444">\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0417\u041f:</b> \u0421\u0442\u0430\u0432\u043a\u0430 % \u00d7 \u0424\u041e\u0422 (\u0437\u0430\u0440\u043f\u043b\u0430\u0442\u044b + \u0431\u043e\u043d\u0443\u0441\u044b)<br>';
+    h += '<span style="color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u043f\u0435\u0440\u0435\u0441\u0447\u0438\u0442\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043f\u0440\u0438 \u043a\u0430\u0436\u0434\u043e\u043c \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u0438 P&L \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0435 \u0444\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0445 \u0434\u0430\u043d\u043d\u044b\u0445.</span></div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0440\u043e\u043a \u0443\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_due_date" value="' + ((item && item.due_date) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u0430\u0442\u0443\u0441</label><select class="input" id="pnl_tax_status"><option value="paid"' + (item && item.status === 'paid' ? ' selected' : '') + '>\u041e\u043f\u043b\u0430\u0447\u0435\u043d</option><option value="pending"' + (item && item.status === 'pending' ? ' selected' : '') + '>\u041e\u0436\u0438\u0434\u0430\u0435\u0442</option><option value="overdue"' + (item && item.status === 'overdue' ? ' selected' : '') + '>\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d</option></select></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u043e\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_payment_date" value="' + ((item && item.payment_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u0430\u0442\u0443\u0441</label><select class="input" id="pnl_tax_status"><option value="pending"' + (item && item.status === 'pending' ? ' selected' : '') + '>\u041e\u0436\u0438\u0434\u0430\u0435\u0442</option><option value="paid"' + (item && item.status === 'paid' ? ' selected' : '') + '>\u041e\u043f\u043b\u0430\u0447\u0435\u043d</option><option value="overdue"' + (item && item.status === 'overdue' ? ' selected' : '') + '>\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d</option></select></div>';
     h += '</div>';
     h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_tax_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
   } else if (type === 'asset') {
@@ -2828,9 +2870,13 @@ function renderPnlCrudForm(type, item) {
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u043f\u043e\u043a\u0443\u043f\u043a\u0438</label><input type="date" class="input" id="pnl_asset_purchase_date" value="' + ((item && item.purchase_date) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c (AMD)</label><input type="number" class="input" id="pnl_asset_purchase_cost" value="' + ((item && item.purchase_cost) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0440\u043e\u043a \u0441\u043b\u0443\u0436\u0431\u044b (\u043c\u0435\u0441.)</label><input type="number" class="input" id="pnl_asset_useful_life_months" value="' + ((item && item.useful_life_months) || 60) + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u0430\u044f \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</label><input type="number" class="input" id="pnl_asset_residual_value" value="' + ((item && item.residual_value) || 0) + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442. \u0441\u0442-\u0441\u0442\u044c <i class=\"fas fa-question-circle\" style=\"color:#8B5CF6;cursor:help\" title=\"\u041b\u0438\u043a\u0432\u0438\u0434\u0430\u0446. \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c: \u0437\u0430 \u0441\u043a\u043e\u043b\u044c\u043a\u043e \u043c\u043e\u0436\u043d\u043e \u043f\u0440\u043e\u0434\u0430\u0442\u044c \u0430\u043a\u0442\u0438\u0432 \u043f\u043e\u0441\u043b\u0435 \u0441\u0440\u043e\u043a\u0430. \u0415\u0441\u043b\u0438 \u043d\u0435 \u0437\u043d\u0430\u0435\u0442\u0435, \u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 0.\"></i></label><input type="number" class="input" id="pnl_asset_residual_value" value="' + ((item && item.residual_value) || 0) + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f</label><input class="input" id="pnl_asset_category" value="' + escHtml((item && item.category) || '') + '" placeholder="\u041e\u0431\u043e\u0440\u0443\u0434., \u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442..."></div>';
     h += '</div>';
+    h += '<div style="margin-top:8px;padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);font-size:0.75rem;color:#94a3b8;line-height:1.6">';
+    h += '<i class="fas fa-info-circle" style="color:#3B82F6;margin-right:6px"></i>';
+    h += '<b style="color:#e2e8f0">\u041e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u0430\u044f (\u043b\u0438\u043a\u0432\u0438\u0434\u0430\u0446\u0438\u043e\u043d\u043d\u0430\u044f) \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</b> \u2014 \u0441\u0443\u043c\u043c\u0430, \u0437\u0430 \u043a\u043e\u0442\u043e\u0440\u0443\u044e \u043c\u043e\u0436\u043d\u043e \u043f\u0440\u043e\u0434\u0430\u0442\u044c \u0430\u043a\u0442\u0438\u0432 \u043f\u043e\u0441\u043b\u0435 \u0441\u0440\u043e\u043a\u0430 \u0441\u043b\u0443\u0436\u0431\u044b.<br>';
+    h += '\u041f\u0440\u0438\u043c\u0435\u0440: \u041d\u043e\u0443\u0442\u0431\u0443\u043a 500k, \u043e\u0441\u0442\u0430\u0442. = 50k \u2192 \u0410\u043c\u043e\u0440\u0442. (500k\u221250k) / 36\u043c\u0435\u0441 = 12 500/\u043c\u0435\u0441. <b>\u0415\u0441\u043b\u0438 \u043d\u0435 \u0437\u043d\u0430\u0435\u0442\u0435 \u2014 \u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 0.</b></div>';
     h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_asset_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
   } else if (type === 'loan') {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
@@ -2868,42 +2914,81 @@ function renderPnlCrudForm(type, item) {
 }
 
 function renderPnlTaxes(p) {
+  var typeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',usn_income:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b',usn_income_expense:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
+  var baseLabels = {ebt:'EBT',revenue:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430',income_minus_expenses:'\u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll:'\u0424\u041e\u0422',vat_inclusive:'\u041d\u0414\u0421 \u0432\u043a\u043b.',fixed:'\u0424\u0438\u043a\u0441.'};
+  var statusColors = {paid:'#22C55E',pending:'#F59E0B',overdue:'#EF4444'};
+  var statusLabels = {paid:'\u041e\u043f\u043b\u0430\u0447\u0435\u043d',pending:'\u041e\u0436\u0438\u0434\u0430\u0435\u0442',overdue:'\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d'};
+  // Use P&L data for showing calculated amounts from taxes with is_auto
+  var pnlTaxes = (p && p.taxes) || [];
+  // Bases from P&L for display
+  var bases = (p && p._bases) || {};
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-landmark" style="color:#F59E0B;margin-right:8px"></i>\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'tax\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043d\u0430\u043b\u043e\u0433</button></div>';
+  // Current bases info
+  h += '<div class="card" style="padding:12px 16px;margin-bottom:14px;background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.2)">';
+  h += '<div style="font-weight:600;color:#a78bfa;font-size:0.82rem;margin-bottom:8px"><i class="fas fa-database" style="margin-right:6px"></i>\u0411\u0430\u0437\u044b \u0434\u043b\u044f \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442\u0430 (\u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0435\u0440\u0438\u043e\u0434):</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;font-size:0.78rem">';
+  h += '<div style="padding:6px 10px;background:rgba(34,197,94,0.06);border-radius:6px;border:1px solid rgba(34,197,94,0.15)"><span style="color:#64748b">\u0412\u044b\u0440\u0443\u0447\u043a\u0430:</span> <b style="color:#22C55E">' + fmtAmt(bases.revenue || 0) + '</b></div>';
+  h += '<div style="padding:6px 10px;background:rgba(245,158,11,0.06);border-radius:6px;border:1px solid rgba(245,158,11,0.15)"><span style="color:#64748b">EBT:</span> <b style="color:#F59E0B">' + fmtAmt(bases.ebt || 0) + '</b></div>';
+  h += '<div style="padding:6px 10px;background:rgba(139,92,246,0.06);border-radius:6px;border:1px solid rgba(139,92,246,0.15)"><span style="color:#64748b">\u0414\u043e\u0445\u2212\u0420\u0430\u0441\u0445:</span> <b style="color:#8B5CF6">' + fmtAmt(bases.income_minus_expenses || 0) + '</b></div>';
+  h += '<div style="padding:6px 10px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15)"><span style="color:#64748b">\u0424\u041e\u0422:</span> <b style="color:#3B82F6">' + fmtAmt(bases.payroll || 0) + '</b></div>';
+  h += '</div></div>';
   if (showPnlAddForm && pnlEditType === 'tax') {
     var editItem = pnlEditId ? (data.taxPayments || []).find(function(t) { return t.id === pnlEditId; }) : null;
     h += renderPnlCrudForm('tax', editItem);
   }
   var items = (data.taxPayments || []).filter(function(t) { return t.period_key === pnlPeriod; });
-  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px">\u041d\u0435\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0445 \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439 \u0437\u0430 \u044d\u0442\u043e\u0442 \u043f\u0435\u0440\u0438\u043e\u0434</div>'; return h; }
+  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px"><i class="fas fa-info-circle" style="margin-right:8px;color:#8B5CF6"></i>\u041d\u0435\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0445 \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439 \u0437\u0430 \u044d\u0442\u043e\u0442 \u043f\u0435\u0440\u0438\u043e\u0434.<br><span style="font-size:0.78rem;color:#475569">\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043d\u0430\u043b\u043e\u0433 \u0441 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442\u043e\u043c \u2014 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u0441\u0442\u0430\u0432\u043a\u0443 % \u0438 \u0431\u0430\u0437\u0443, \u0441\u0443\u043c\u043c\u0430 \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438.</span></div>'; return h; }
   var total = 0;
   h += '<div class="card" style="padding:0;overflow:hidden">';
-  var typeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
-  var statusColors = {paid:'#22C55E',pending:'#F59E0B',overdue:'#EF4444'};
   for (var i = 0; i < items.length; i++) {
-    var t = items[i]; total += t.amount || 0;
-    h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1e293b">';
-    h += '<div><div style="font-weight:600;color:#e2e8f0">' + escHtml(t.tax_name || typeLabels[t.tax_type] || t.tax_type) + '</div>';
-    h += '<div style="font-size:0.75rem;color:#64748b">' + (typeLabels[t.tax_type] || '') + (t.payment_date ? ' | ' + t.payment_date : '') + '</div></div>';
-    h += '<div style="display:flex;align-items:center;gap:10px">';
-    h += '<span style="font-weight:700;color:#F59E0B">' + fmtAmt(t.amount) + '</span>';
-    h += '<span class="badge" style="background:' + (statusColors[t.status] || '#64748b') + '22;color:' + (statusColors[t.status] || '#64748b') + '">' + (t.status === 'paid' ? '\u041e\u043f\u043b.' : t.status === 'pending' ? '\u041e\u0436\u0438\u0434.' : '\u041f\u0440\u043e\u0441\u0440.') + '</span>';
+    var t = items[i];
+    // Find the calculated version from P&L data (which has computed amounts for is_auto taxes)
+    var pnlT = pnlTaxes.find(function(pt) { return pt.id === t.id; });
+    var displayAmount = pnlT ? (pnlT.amount || 0) : (t.amount || 0);
+    total += displayAmount;
+    h += '<div style="padding:14px 16px;border-bottom:1px solid #1e293b">';
+    h += '<div style="display:flex;justify-content:space-between;align-items:flex-start">';
+    h += '<div style="flex:1">';
+    h += '<div style="font-weight:600;color:#e2e8f0;font-size:0.95rem">' + escHtml(t.tax_name || typeLabels[t.tax_type] || t.tax_type) + '</div>';
+    h += '<div style="font-size:0.75rem;color:#64748b;margin-top:2px">' + (typeLabels[t.tax_type] || t.tax_type);
+    if (t.is_auto && t.tax_rate) {
+      h += ' <span style="color:#a78bfa;font-weight:600"><i class="fas fa-magic" style="font-size:0.65rem;margin:0 3px"></i>' + t.tax_rate + '% \u00d7 ' + (baseLabels[t.tax_base] || t.tax_base) + '</span>';
+    }
+    h += '</div>';
+    // Show formula and calculation
+    if (t.is_auto && t.tax_rate && pnlT) {
+      var calcBase = pnlT.calculated_base || 0;
+      var bName = baseLabels[pnlT.calculated_base_name || t.tax_base] || t.tax_base;
+      if (t.tax_base === 'vat_inclusive') {
+        h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-top:4px;padding:3px 8px;background:rgba(139,92,246,0.06);border-radius:4px;display:inline-block"><i class="fas fa-calculator" style="margin-right:4px"></i>' + fmtAmt(calcBase) + ' \u00d7 ' + t.tax_rate + '% / (100+' + t.tax_rate + ') = <b>' + fmtAmt(displayAmount) + '</b></div>';
+      } else {
+        h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-top:4px;padding:3px 8px;background:rgba(139,92,246,0.06);border-radius:4px;display:inline-block"><i class="fas fa-calculator" style="margin-right:4px"></i>' + bName + ': ' + fmtAmt(calcBase) + ' \u00d7 ' + t.tax_rate + '% = <b>' + fmtAmt(displayAmount) + '</b></div>';
+      }
+    }
+    if (t.due_date) { h += '<div style="font-size:0.7rem;color:#475569;margin-top:3px"><i class="fas fa-clock" style="margin-right:4px"></i>\u0421\u0440\u043e\u043a: ' + t.due_date + (t.payment_date ? ' | \u041e\u043f\u043b\u0430\u0442\u0430: ' + t.payment_date : '') + '</div>'; }
+    h += '</div>';
+    h += '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">';
+    h += '<span style="font-weight:700;color:#F59E0B;font-size:1.05rem">' + fmtAmt(displayAmount) + '</span>';
+    h += '<span class="badge" style="background:' + (statusColors[t.status] || '#64748b') + '22;color:' + (statusColors[t.status] || '#64748b') + '">' + (statusLabels[t.status] || t.status) + '</span>';
     h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'tax\\',' + t.id + ')"><i class="fas fa-edit"></i></button>';
     h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'tax\\',' + t.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
-    h += '</div></div>';
+    h += '</div></div></div>';
   }
-  h += '<div style="padding:12px 16px;background:rgba(245,158,11,0.08);display:flex;justify-content:space-between"><span style="font-weight:700;color:#94a3b8">\u0418\u0442\u043e\u0433\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432:</span><span style="font-weight:800;color:#F59E0B">' + fmtAmt(total) + '</span></div>';
+  h += '<div style="padding:14px 16px;background:rgba(245,158,11,0.08);display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:#94a3b8"><i class="fas fa-sigma" style="margin-right:6px"></i>\u0418\u0442\u043e\u0433\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432:</span><span style="font-weight:800;color:#F59E0B;font-size:1.1rem">' + fmtAmt(total) + '</span></div>';
   h += '</div>';
   // All taxes (history)
   var allTaxes = data.taxPayments || [];
   if (allTaxes.length > items.length) {
-    h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem">\u0412\u0441\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f \u043d\u0430\u043b\u043e\u0433\u043e\u0432 (' + allTaxes.length + ')</summary>';
+    h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem"><i class="fas fa-history" style="margin-right:6px"></i>\u0412\u0441\u044f \u0438\u0441\u0442\u043e\u0440\u0438\u044f \u043d\u0430\u043b\u043e\u0433\u043e\u0432 (' + allTaxes.length + ')</summary>';
     h += '<div class="card" style="padding:8px;margin-top:8px;max-height:300px;overflow-y:auto">';
     for (var j = 0; j < allTaxes.length; j++) {
       var at = allTaxes[j];
       h += '<div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:0.82rem;border-bottom:1px solid #1e293b22">';
-      h += '<span style="color:#94a3b8">' + (at.period_key || '') + ' | ' + escHtml(at.tax_name || at.tax_type) + '</span>';
+      h += '<span style="color:#94a3b8">' + (at.period_key || '') + ' | ' + escHtml(at.tax_name || typeLabels[at.tax_type] || at.tax_type);
+      if (at.is_auto && at.tax_rate) h += ' <span style="color:#a78bfa">[' + at.tax_rate + '% \u00d7 ' + (baseLabels[at.tax_base] || '') + ']</span>';
+      h += '</span>';
       h += '<span style="font-weight:600;color:#F59E0B">' + fmtAmt(at.amount) + '</span></div>';
     }
     h += '</div></details>';

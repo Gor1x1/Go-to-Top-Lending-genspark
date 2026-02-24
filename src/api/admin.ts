@@ -2526,8 +2526,8 @@ api.get('/tax-payments', authMiddleware, async (c) => {
 api.post('/tax-payments', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, payment_date, due_date, status, notes) VALUES (?,?,?,?,?,?,?,?)')
-    .bind(d.tax_type||'income_tax', d.tax_name||'', d.amount||0, d.period_key||'', d.payment_date||'', d.due_date||'', d.status||'paid', d.notes||'').run();
+  await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, payment_date, due_date, status, notes, tax_rate, tax_base, is_auto) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(d.tax_type||'income_tax', d.tax_name||'', d.amount||0, d.period_key||'', d.payment_date||'', d.due_date||'', d.status||'paid', d.notes||'', d.tax_rate||0, d.tax_base||'fixed', d.is_auto ? 1 : 0).run();
   return c.json({ success: true });
 });
 
@@ -2544,6 +2544,9 @@ api.put('/tax-payments/:id', authMiddleware, async (c) => {
   if (d.due_date !== undefined) { fields.push('due_date=?'); vals.push(d.due_date); }
   if (d.status !== undefined) { fields.push('status=?'); vals.push(d.status); }
   if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
+  if (d.tax_rate !== undefined) { fields.push('tax_rate=?'); vals.push(d.tax_rate); }
+  if (d.tax_base !== undefined) { fields.push('tax_base=?'); vals.push(d.tax_base); }
+  if (d.is_auto !== undefined) { fields.push('is_auto=?'); vals.push(d.is_auto ? 1 : 0); }
   if (fields.length) { vals.push(id); await db.prepare(`UPDATE tax_payments SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
   return c.json({ success: true });
 });
@@ -2707,11 +2710,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const yearStart = periodKey.substring(0, 4) + '-01';
   // Revenue from period_snapshots
   const snap = await db.prepare("SELECT * FROM period_snapshots WHERE period_key = ? AND period_type = 'month'").bind(periodKey).first();
-  // Taxes for this period
-  const taxes = await db.prepare('SELECT * FROM tax_payments WHERE period_key = ?').bind(periodKey).all();
-  const totalTaxes = (taxes.results || []).reduce((s: number, t: any) => s + (t.amount || 0), 0);
-  // Taxes YTD
-  const taxesYtd = await db.prepare("SELECT SUM(amount) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
+  // Taxes for this period (raw — will be processed below with auto-calculation)
+  const taxesRaw = await db.prepare('SELECT * FROM tax_payments WHERE period_key = ?').bind(periodKey).all();
   // Assets depreciation for this month
   const assets = await db.prepare('SELECT * FROM assets WHERE is_active = 1').all();
   let monthlyDepreciation = 0;
@@ -2754,15 +2754,15 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     LEFT JOIN expense_categories ec ON e.category_id = ec.id
     LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
     WHERE e.is_active = 1`).first();
-  // Build P&L cascade
+  // Build P&L cascade (before taxes)
   const revenue = snap ? (snap.revenue_services as number || 0) : 0;
   const refunds = snap ? (snap.refunds as number || 0) : 0;
   const cogs = expData ? (expData.commercial as number || 0) : 0;
   const grossProfit = revenue - cogs;
   const salariesBase = salaryData?.total_salaries as number || 0;
-  const bonuses = salaryData?.total_bonuses as number || 0;
+  const bonusesVal = salaryData?.total_bonuses as number || 0;
   const penalties = salaryData?.total_penalties as number || 0;
-  const salaryTotal = salariesBase + bonuses - penalties;
+  const salaryTotal = salariesBase + bonusesVal - penalties;
   const marketing = expData ? (expData.marketing as number || 0) : 0;
   const totalOpex = salaryTotal + marketing + monthlyDepreciation;
   const ebit = grossProfit - totalOpex;
@@ -2770,6 +2770,33 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const interestExpense = loanPayments ? (loanPayments.total_interest as number || 0) : 0;
   const otherNet = otherIncome - otherExpenses;
   const ebt = ebit + otherNet - interestExpense;
+  const totalExpensesAll = cogs + totalOpex; // for income-minus-expenses base
+
+  // Auto-calculate tax amounts for taxes with is_auto=1
+  // tax_base: 'revenue', 'ebt', 'income_minus_expenses', 'payroll', 'vat_inclusive', 'fixed'
+  const taxItems = (taxesRaw.results || []).map((t: any) => {
+    if (t.is_auto && t.tax_rate > 0) {
+      let base = 0;
+      switch (t.tax_base) {
+        case 'revenue': base = revenue; break;
+        case 'ebt': base = Math.max(ebt, 0); break;
+        case 'income_minus_expenses': base = Math.max(revenue - totalExpensesAll, 0); break;
+        case 'payroll': base = salariesBase + bonusesVal; break;
+        case 'vat_inclusive': base = revenue;
+          return { ...t, amount: Math.round(revenue * t.tax_rate / (100 + t.tax_rate) * 100) / 100, calculated_base: base, calculated_base_name: 'vat_inclusive' };
+        default: return t; // fixed — use manual amount
+      }
+      return { ...t, amount: Math.round(base * t.tax_rate / 100 * 100) / 100, calculated_base: base, calculated_base_name: t.tax_base };
+    }
+    return t;
+  });
+
+  const totalTaxes = taxItems.reduce((s: number, t: any) => s + (t.amount || 0), 0);
+  // Taxes YTD
+  const taxesYtd = await db.prepare("SELECT SUM(amount) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
+  const autoTaxDelta = totalTaxes - (taxesRaw.results || []).reduce((s: number, t: any) => s + (t.amount || 0), 0);
+  const ytdTaxTotal = ((taxesYtd?.total as number) || 0) + autoTaxDelta;
+
   const netProfit = ebt - totalTaxes;
   const retainedEarnings = netProfit - totalDividends;
 
@@ -2778,26 +2805,27 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     revenue, refunds, net_revenue: revenue - refunds,
     cogs, gross_profit: grossProfit,
     gross_margin: revenue > 0 ? Math.round(grossProfit / revenue * 10000) / 100 : 0,
-    salaries: salariesBase, bonuses, penalties, salary_total: salaryTotal,
+    salaries: salariesBase, bonuses: bonusesVal, penalties, salary_total: salaryTotal,
     marketing, depreciation: monthlyDepreciation, total_opex: totalOpex,
     ebit, ebit_margin: revenue > 0 ? Math.round(ebit / revenue * 10000) / 100 : 0,
     ebitda, ebitda_margin: revenue > 0 ? Math.round(ebitda / revenue * 10000) / 100 : 0,
     other_income: otherIncome, other_expenses: otherExpenses, other_net: otherNet,
     interest_expense: interestExpense,
     ebt,
-    taxes: taxes.results || [], total_taxes: totalTaxes,
+    taxes: taxItems, total_taxes: totalTaxes,
     effective_tax_rate: ebt > 0 ? Math.round(totalTaxes / ebt * 10000) / 100 : 0,
     tax_burden: revenue > 0 ? Math.round(totalTaxes / revenue * 10000) / 100 : 0,
     net_profit: netProfit, net_margin: revenue > 0 ? Math.round(netProfit / revenue * 10000) / 100 : 0,
     dividends: divs.results || [], total_dividends: totalDividends,
     retained_earnings: retainedEarnings,
-    ytd_taxes: taxesYtd?.total || 0,
+    ytd_taxes: ytdTaxTotal,
     ytd_dividends_amount: divsYtd?.total_amount || 0,
     ytd_dividends_tax: divsYtd?.total_tax || 0,
     monthly_burn_rate: Math.round((totalOpex + totalTaxes + interestExpense) * 100) / 100,
     other_items: otherIE.results || [],
     assets: assets.results || [],
     loan_payments_list: loanPaymentsList.results || [],
+    _bases: { revenue, ebt, income_minus_expenses: Math.max(revenue - totalExpensesAll, 0), payroll: salariesBase + bonusesVal },
   };
 }
 
@@ -2845,7 +2873,11 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     const ytdInterestTotal = (ytdInterest?.total as number) || 0;
     const ytdEbt = ytdEbit + ytdOtherNet - ytdInterestTotal;
     const ytdTaxTotal = (ytdTaxes?.total as number) || 0;
-    const ytdNet = ytdEbt - ytdTaxTotal;
+    // Adjust YTD taxes for auto-calculated taxes in current month
+    // (DB stores 0 for is_auto taxes but computePnlForPeriod calculates real amounts)
+    const currentAutoTaxDelta = current.total_taxes - ((current.taxes || []) as any[]).reduce((s: number, t: any) => s + (t.is_auto ? 0 : (t.amount || 0)), 0);
+    const adjustedYtdTax = ytdTaxTotal + currentAutoTaxDelta;
+    const ytdNet = ytdEbt - adjustedYtdTax;
     const ytdDivTotal = ((ytdDivs?.amount as number) || 0) + ((ytdDivs?.tax as number) || 0);
     
     ytd = {
@@ -2855,7 +2887,7 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
       ebit: ytdEbit, ebitda: ytdEbitda,
       other_income: (ytdOtherIE?.income as number) || 0, other_expenses: (ytdOtherIE?.expenses as number) || 0,
       interest_expense: ytdInterestTotal, ebt: ytdEbt,
-      total_taxes: ytdTaxTotal, net_profit: ytdNet,
+      total_taxes: adjustedYtdTax, net_profit: ytdNet,
       total_dividends: ytdDivTotal, retained_earnings: ytdNet - ytdDivTotal,
       gross_margin: ytdRevenue > 0 ? Math.round(ytdGross / ytdRevenue * 10000) / 100 : 0,
       ebit_margin: ytdRevenue > 0 ? Math.round(ytdEbit / ytdRevenue * 10000) / 100 : 0,

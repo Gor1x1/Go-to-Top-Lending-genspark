@@ -583,6 +583,10 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_loan_payments_loan ON loan_payments(loan_id)').run(); } catch {}
   // v16: Add date column to expenses if missing (for period-based filtering)
   try { await db.prepare("ALTER TABLE expenses ADD COLUMN date TEXT DEFAULT ''").run(); } catch {}
+  // v17: Add tax_rate and tax_base columns to tax_payments for auto-calculation
+  try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN tax_rate REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN tax_base TEXT DEFAULT 'fixed'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN is_auto INTEGER DEFAULT 0").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
