@@ -2638,6 +2638,36 @@ api.post('/loans/:id/payments', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+api.delete('/loan-payments/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const paymentId = c.req.param('id');
+  // Restore remaining balance before deleting
+  const payment = await db.prepare('SELECT * FROM loan_payments WHERE id = ?').bind(paymentId).first();
+  if (payment && payment.principal_part) {
+    await db.prepare('UPDATE loans SET remaining_balance = remaining_balance + ? WHERE id = ?').bind(payment.principal_part, payment.loan_id).run();
+  }
+  await db.prepare('DELETE FROM loan_payments WHERE id = ?').bind(paymentId).run();
+  return c.json({ success: true });
+});
+
+api.put('/loan-payments/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const paymentId = c.req.param('id');
+  const d = await c.req.json();
+  // Restore old principal first
+  const old = await db.prepare('SELECT * FROM loan_payments WHERE id = ?').bind(paymentId).first();
+  if (old && old.principal_part) {
+    await db.prepare('UPDATE loans SET remaining_balance = remaining_balance + ? WHERE id = ?').bind(old.principal_part, old.loan_id).run();
+  }
+  await db.prepare('UPDATE loan_payments SET amount=?, principal_part=?, interest_part=?, payment_date=?, notes=? WHERE id=?')
+    .bind(d.amount||0, d.principal_part||0, d.interest_part||0, d.payment_date||'', d.notes||'', paymentId).run();
+  // Apply new principal
+  if (d.principal_part && old) {
+    await db.prepare('UPDATE loans SET remaining_balance = remaining_balance - ? WHERE id = ?').bind(d.principal_part, old.loan_id).run();
+  }
+  return c.json({ success: true });
+});
+
 // ===== DIVIDENDS =====
 api.get('/dividends', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -2843,28 +2873,45 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     const prevKey = py + '-' + String(pm).padStart(2, '0');
     const prev = await computePnlForPeriod(db, prevKey);
     
-    // YTD accumulation (Jan through current month)
-    const yearStart = periodKey.substring(0, 4) + '-01';
-    const currentMonth = parseInt(parts[1]);
-    let ytd: any = { revenue: 0, cogs: 0, gross_profit: 0, salary_total: 0, marketing: 0, depreciation: 0, total_opex: 0, ebit: 0, ebitda: 0, other_income: 0, other_expenses: 0, interest_expense: 0, ebt: 0, total_taxes: 0, net_profit: 0, total_dividends: 0, retained_earnings: 0 };
-    // Get all snapshots for this year
+    // Fiscal year start month from settings (default: 1 = January = calendar year)
+    const fiscalRow = await db.prepare("SELECT value FROM site_settings WHERE key = 'fiscal_year_start_month'").first().catch(() => null);
+    const fiscalStartMonth = fiscalRow ? (parseInt(fiscalRow.value as string) || 1) : 1;
+    
+    // Calculate fiscal year start period_key
+    const curYear = parseInt(parts[0]);
+    const curMonth = parseInt(parts[1]);
+    let fiscalYearStart: string;
+    if (curMonth >= fiscalStartMonth) {
+      fiscalYearStart = curYear + '-' + String(fiscalStartMonth).padStart(2, '0');
+    } else {
+      fiscalYearStart = (curYear - 1) + '-' + String(fiscalStartMonth).padStart(2, '0');
+    }
+    const fiscalYearStartDate = fiscalYearStart + '-01';
+    
+    // Count months from fiscal year start to current month
+    const fStartYear = parseInt(fiscalYearStart.split('-')[0]);
+    const fStartMonth = parseInt(fiscalYearStart.split('-')[1]);
+    const monthsInFiscalYear = (curYear - fStartYear) * 12 + (curMonth - fStartMonth) + 1;
+    
+    // YTD accumulation (fiscal year start through current month)
+    let ytd: any = {};
     const ytdSnaps = await db.prepare("SELECT COALESCE(SUM(revenue_services),0) as revenue, COALESCE(SUM(refunds),0) as refunds FROM period_snapshots WHERE period_type='month' AND period_key >= ? AND period_key <= ?")
-      .bind(yearStart, periodKey).first();
+      .bind(fiscalYearStart, periodKey).first();
     const ytdTaxes = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?")
-      .bind(yearStart, periodKey).first();
+      .bind(fiscalYearStart, periodKey).first();
     const ytdOtherIE = await db.prepare("SELECT COALESCE(SUM(CASE WHEN type='income' THEN amount ELSE 0 END),0) as income, COALESCE(SUM(CASE WHEN type='expense' THEN amount ELSE 0 END),0) as expenses FROM other_income_expenses WHERE period_key >= ? AND period_key <= ?")
-      .bind(yearStart, periodKey).first();
+      .bind(fiscalYearStart, periodKey).first();
     const ytdInterest = await db.prepare("SELECT COALESCE(SUM(interest_part),0) as total FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
-      .bind(yearStart + '-01', periodKey + '-31').first();
+      .bind(fiscalYearStartDate, periodKey + '-31').first();
     const ytdDivs = await db.prepare("SELECT COALESCE(SUM(amount),0) as amount, COALESCE(SUM(tax_amount),0) as tax FROM dividends WHERE period_key >= ? AND period_key <= ?")
-      .bind(yearStart, periodKey).first();
-    // For YTD salaries/expenses, multiply monthly rates by number of months
+      .bind(fiscalYearStart, periodKey).first();
+    // For YTD salaries/expenses, multiply monthly rates by number of months in fiscal year
     const ytdRevenue = (ytdSnaps?.revenue as number) || 0;
     const ytdRefunds = (ytdSnaps?.refunds as number) || 0;
-    const ytdCogs = current.cogs * currentMonth; // monthly COGS * months (active expenses are recurring)
-    const ytdSalary = current.salary_total * currentMonth;
-    const ytdMarketing = current.marketing * currentMonth;
-    const ytdDepr = current.depreciation * currentMonth;
+    const ytdCogs = current.cogs * monthsInFiscalYear;
+    const ytdSalary = current.salary_total * monthsInFiscalYear;
+    const ytdMarketing = current.marketing * monthsInFiscalYear;
+    const ytdDepr = current.depreciation * monthsInFiscalYear;
     const ytdTotalOpex = ytdSalary + ytdMarketing + ytdDepr;
     const ytdGross = ytdRevenue - ytdCogs;
     const ytdEbit = ytdGross - ytdTotalOpex;
@@ -2874,7 +2921,6 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     const ytdEbt = ytdEbit + ytdOtherNet - ytdInterestTotal;
     const ytdTaxTotal = (ytdTaxes?.total as number) || 0;
     // Adjust YTD taxes for auto-calculated taxes in current month
-    // (DB stores 0 for is_auto taxes but computePnlForPeriod calculates real amounts)
     const currentAutoTaxDelta = current.total_taxes - ((current.taxes || []) as any[]).reduce((s: number, t: any) => s + (t.is_auto ? 0 : (t.amount || 0)), 0);
     const adjustedYtdTax = ytdTaxTotal + currentAutoTaxDelta;
     const ytdNet = ytdEbt - adjustedYtdTax;
@@ -2910,6 +2956,8 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     return c.json({
       ...current,
       prev_period: prevKey,
+      fiscal_year_start: fiscalYearStart,
+      fiscal_year_start_month: fiscalStartMonth,
       prev: { revenue: prev.revenue, cogs: prev.cogs, gross_profit: prev.gross_profit, salary_total: prev.salary_total, marketing: prev.marketing, depreciation: prev.depreciation, total_opex: prev.total_opex, ebit: prev.ebit, ebitda: prev.ebitda, ebt: prev.ebt, total_taxes: prev.total_taxes, net_profit: prev.net_profit, total_dividends: prev.total_dividends, retained_earnings: prev.retained_earnings },
       mom, mom_pct: momPct,
       ytd,
