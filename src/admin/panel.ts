@@ -2600,26 +2600,57 @@ function setPnlPeriod(dir) {
   pnlPeriod = y + '-' + String(m).padStart(2, '0'); pnlData = null; loadPnlData();
 }
 async function savePnlItem(type) {
+  console.log('[PnL] savePnlItem called, type:', type);
   var prefix = 'pnl_' + type + '_';
   var d = {};
+  var foundFields = 0;
   document.querySelectorAll('[id^="' + prefix + '"]').forEach(function(el) {
     var key = el.id.replace(prefix, '');
     if (el.type === 'checkbox') { d[key] = el.checked ? 1 : 0; }
     else if (el.type === 'number') { d[key] = parseFloat(el.value) || 0; }
     else { d[key] = el.value; }
+    foundFields++;
   });
+  console.log('[PnL] collected fields:', foundFields, 'data:', JSON.stringify(d));
+  if (foundFields === 0) { toast('Ошибка: форма не найдена. Попробуйте ещё раз.', 'error'); return; }
   // For auto-calc taxes: amount will be computed server-side, set 0
   if (type === 'tax' && d.is_auto) { d.amount = 0; }
   d.period_key = pnlPeriod;
   var endpoint = type === 'tax' ? '/tax-payments' : type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
-  if (pnlEditId) { await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d) }); }
-  else { await api(endpoint, { method: 'POST', body: JSON.stringify(d) }); }
+  console.log('[PnL] endpoint:', endpoint, 'editId:', pnlEditId);
+  var saveBtn = document.querySelector('[onclick*="savePnlItem"]');
+  var restoreBtn = null;
+  if (saveBtn) {
+    restoreBtn = btnLoading(saveBtn, 'Сохранение...');
+  }
+  try {
+    var result;
+    if (pnlEditId) { result = await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d) }); }
+    else { result = await api(endpoint, { method: 'POST', body: JSON.stringify(d) }); }
+    console.log('[PnL] API result:', JSON.stringify(result));
+    if (restoreBtn) restoreBtn();
+    if (!result) {
+      toast('Ошибка: нет ответа от сервера. Проверьте соединение.', 'error');
+      return;
+    }
+    if (result.error) {
+      toast('Ошибка: ' + result.error, 'error');
+      return;
+    }
+  } catch(e) {
+    if (restoreBtn) restoreBtn();
+    toast('Ошибка сохранения: ' + (e.message || e), 'error');
+    console.error('[PnL] savePnlItem exception:', e);
+    return;
+  }
   pnlEditId = 0; showPnlAddForm = false;
   // Refresh bulk data
-  var bulk = await api('/bulk-data');
-  if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
+  try {
+    var bulk = await api('/bulk-data');
+    if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
+  } catch(bulkErr) { console.error('[PnL] bulk-data refresh error:', bulkErr); }
   pnlData = null; loadPnlData();
-  toast(type === 'tax' ? 'Налог сохранён' : type === 'asset' ? 'Актив сохранён' : type === 'loan' ? 'Кредит сохранён' : type === 'dividend' ? 'Дивиденд сохранён' : 'Запись сохранена');
+  toast(type === 'tax' ? '✓ Налог сохранён' : type === 'asset' ? '✓ Актив сохранён' : type === 'loan' ? '✓ Кредит сохранён' : type === 'dividend' ? '✓ Дивиденд сохранён' : '✓ Запись сохранена');
 }
 async function deletePnlItem(type, id) {
   if (!confirm('Удалить запись?')) return;
@@ -2717,17 +2748,6 @@ function renderPnlCascade(p) {
   h += '<button class="tab-btn' + (pnlShowYtd ? ' active' : '') + '" onclick="pnlShowYtd=!pnlShowYtd;render()" style="padding:6px 12px;font-size:0.78rem"><i class="fas fa-calendar-check" style="margin-right:4px"></i>YTD</button>';
   h += '</div>';
   
-  // Data sources info
-  h += '<div style="margin-bottom:14px;padding:10px 14px;background:rgba(34,197,94,0.05);border-radius:8px;border:1px solid rgba(34,197,94,0.15);font-size:0.75rem;color:#94a3b8;line-height:1.6">';
-  h += '<div style="font-weight:600;color:#22C55E;font-size:0.82rem;margin-bottom:4px"><i class="fas fa-link" style="margin-right:6px"></i>\u041e\u0442\u043a\u0443\u0434\u0430 \u0434\u0430\u043d\u043d\u044b\u0435 \u0432 P&L:</div>';
-  h += '<span style="color:#22C55E">\u2713</span> <b>\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> \u2190 \u041f\u0435\u0440\u0438\u043e\u0434\u044b (\u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0435 \u043f\u0435\u0440\u0438\u043e\u0434\u044b) &nbsp; ';
-  h += '<span style="color:#22C55E">\u2713</span> <b>COGS</b> \u2190 \u0417\u0430\u0442\u0440\u0430\u0442\u044b (\u043a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435) &nbsp; ';
-  h += '<span style="color:#22C55E">\u2713</span> <b>\u0417\u041f</b> \u2190 \u0421\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u043a\u0438 (\u0441\u0442\u0430\u0432\u043a\u0438 + \u0431\u043e\u043d\u0443\u0441\u044b \u2212 \u0448\u0442\u0440\u0430\u0444\u044b) &nbsp; ';
-  h += '<span style="color:#22C55E">\u2713</span> <b>\u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433</b> \u2190 \u0417\u0430\u0442\u0440\u0430\u0442\u044b (is_marketing) &nbsp; ';
-  h += '<span style="color:#22C55E">\u2713</span> <b>\u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</b> \u2190 \u041e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430 &nbsp; ';
-  h += '<span style="color:#22C55E">\u2713</span> <b>\u041d\u0430\u043b\u043e\u0433\u0438</b> \u2190 \u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 (% \u00d7 \u0431\u0430\u0437\u0430) &nbsp; ';
-  h += '<span style="color:#F59E0B">\u270E</span> <b>\u0412\u0440\u0443\u0447\u043d\u0443\u044e:</b> \u041a\u0440\u0435\u0434\u0438\u0442\u044b, \u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b, \u041f\u0440\u043e\u0447. \u0434\u043e\u0445\u043e\u0434\u044b/\u0440\u0430\u0441\u0445\u043e\u0434\u044b';
-  h += '</div>';
   
   h += '<div class="card" style="padding:0;overflow:hidden">';
   // Header row
@@ -2818,6 +2838,18 @@ function renderPnlCascade(p) {
   h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #334155"><b style="color:#F59E0B">ETR</b> = \u041d\u0430\u043b\u043e\u0433\u0438 / EBT \u00d7 100% &nbsp;|&nbsp; <b style="color:#F59E0B">\u041d\u0430\u043b. \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430</b> = \u041d\u0430\u043b\u043e\u0433\u0438 / \u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u00d7 100%</div>';
   h += '</div></details>';
   
+  // Data sources — collapsible
+  h += '<details style="margin-top:12px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-link" style="margin-right:6px;color:#22C55E"></i>Откуда данные в P&L</summary>';
+  h += '<div class="card" style="margin-top:8px;font-size:0.78rem;color:#94a3b8;line-height:1.8">';
+  h += '<div><span style="color:#22C55E">✓</span> <b>Выручка</b> ← Периоды (закрытые периоды)</div>';
+  h += '<div><span style="color:#22C55E">✓</span> <b>COGS</b> ← Затраты (коммерческие, is_marketing=0)</div>';
+  h += '<div><span style="color:#22C55E">✓</span> <b>ЗП + Бонусы − Штрафы</b> ← Сотрудники</div>';
+  h += '<div><span style="color:#22C55E">✓</span> <b>Маркетинг</b> ← Затраты (is_marketing=1)</div>';
+  h += '<div><span style="color:#22C55E">✓</span> <b>Амортизация</b> ← Основные средства (вкладка Амортизация)</div>';
+  h += '<div><span style="color:#22C55E">✓</span> <b>Налоги</b> ← Авторасчёт (ставка % × база)</div>';
+  h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #334155"><span style="color:#F59E0B">✎</span> <b>Вручную:</b> Кредиты и %, Дивиденды, Прочие доходы/расходы</div>';
+  h += '</div></details>';
+  
   return h;
 }
 
@@ -2832,7 +2864,7 @@ function renderPnlCrudForm(type, item) {
     var isAuto = item ? !!item.is_auto : true; // default to auto for new taxes
     var curBase = (item && item.tax_base) || 'ebt';
     h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(139,92,246,0.08);border-radius:8px;border:1px solid rgba(139,92,246,0.2)">';
-    h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#a78bfa;font-weight:600"><input type="checkbox" id="pnl_tax_is_auto"' + (isAuto ? ' checked' : '') + ' onchange="document.getElementById(\\'taxManualRow\\').style.display=this.checked?\\'none\\':\\'\\';document.getElementById(\\'taxAutoRow\\').style.display=this.checked?\\'grid\\':\\'none\\'"> <i class="fas fa-magic" style="margin-right:2px"></i>\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 \u2014 \u0441\u0443\u043c\u043c\u0430 = \u0441\u0442\u0430\u0432\u043a\u0430 % \u00d7 \u0431\u0430\u0437\u0430 (\u0434\u043e\u0445\u043e\u0434/\u043f\u0440\u0438\u0431\u044b\u043b\u044c/\u0424\u041e\u0422)</label>';
+    h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#a78bfa;font-weight:600"><input type="checkbox" id="pnl_tax_is_auto"' + (isAuto ? ' checked' : '') + ' onchange="document.getElementById(\\'taxManualRow\\').style.display=this.checked?\\'none\\':\\'\\';document.getElementById(\\'taxAutoRow\\').style.display=this.checked?\\'grid\\':\\'none\\'"> <i class="fas fa-magic" style="margin-right:2px"></i>\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 (\u0441\u0443\u043c\u043c\u0430 = \u0441\u0442\u0430\u0432\u043a\u0430% \u00d7 \u0431\u0430\u0437\u0430)</label>';
     h += '</div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f \u043d\u0430\u043b\u043e\u0433\u0430</label><select class="input" id="pnl_tax_tax_type">';
@@ -2848,22 +2880,25 @@ function renderPnlCrudForm(type, item) {
     h += '</div>';
     // Manual: amount field
     h += '<div id="taxManualRow" style="display:' + (isAuto ? 'none' : '') + ';margin-top:10px"><div style="display:grid;grid-template-columns:1fr 1fr;gap:10px"><div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 (AMD) \u0432\u0440\u0443\u0447\u043d\u0443\u044e</label><input type="number" class="input" id="pnl_tax_amount" value="' + ((item && item.amount) || '') + '" placeholder="0"></div></div></div>';
-    // Info block with detailed examples
-    h += '<div style="margin-top:10px;padding:10px 14px;background:rgba(59,130,246,0.06);border-radius:8px;border:1px solid rgba(59,130,246,0.15);font-size:0.78rem;color:#94a3b8;line-height:1.7">';
-    h += '<i class="fas fa-info-circle" style="color:#3B82F6;margin-right:6px"></i>';
-    h += '<b style="color:#e2e8f0">\u041a\u0430\u043a \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442:</b><br>';
-    h += '\u2022 <b style="color:#22C55E">\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c:</b> \u0421\u0442\u0430\u0432\u043a\u0430 20% \u00d7 \u0411\u0430\u0437\u0430 EBT (\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432)<br>';
-    h += '\u2022 <b style="color:#3B82F6">\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b:</b> \u0421\u0442\u0430\u0432\u043a\u0430 6% \u00d7 \u0412\u044b\u0440\u0443\u0447\u043a\u0430<br>';
-    h += '\u2022 <b style="color:#8B5CF6">\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b:</b> \u0421\u0442\u0430\u0432\u043a\u0430 15% \u00d7 (\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u2212 \u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b)<br>';
-    h += '\u2022 <b style="color:#F59E0B">\u041d\u0414\u0421:</b> \u0421\u0442\u0430\u0432\u043a\u0430 20% \u00d7 \u0412\u044b\u0440\u0443\u0447\u043a\u0430 / (100+20) \u2014 \u0432\u043a\u043b\u044e\u0447\u0451\u043d \u0432 \u0446\u0435\u043d\u0443<br>';
-    h += '\u2022 <b style="color:#EF4444">\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0417\u041f:</b> \u0421\u0442\u0430\u0432\u043a\u0430 % \u00d7 \u0424\u041e\u0422 (\u0437\u0430\u0440\u043f\u043b\u0430\u0442\u044b + \u0431\u043e\u043d\u0443\u0441\u044b)<br>';
-    h += '<span style="color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u043f\u0435\u0440\u0435\u0441\u0447\u0438\u0442\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043f\u0440\u0438 \u043a\u0430\u0436\u0434\u043e\u043c \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u0438 P&L \u043d\u0430 \u043e\u0441\u043d\u043e\u0432\u0435 \u0444\u0430\u043a\u0442\u0438\u0447\u0435\u0441\u043a\u0438\u0445 \u0434\u0430\u043d\u043d\u044b\u0445.</span></div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0440\u043e\u043a \u0443\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_due_date" value="' + ((item && item.due_date) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u043e\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_tax_payment_date" value="' + ((item && item.payment_date) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0442\u0430\u0442\u0443\u0441</label><select class="input" id="pnl_tax_status"><option value="pending"' + (item && item.status === 'pending' ? ' selected' : '') + '>\u041e\u0436\u0438\u0434\u0430\u0435\u0442</option><option value="paid"' + (item && item.status === 'paid' ? ' selected' : '') + '>\u041e\u043f\u043b\u0430\u0447\u0435\u043d</option><option value="overdue"' + (item && item.status === 'overdue' ? ' selected' : '') + '>\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d</option></select></div>';
     h += '</div>';
     h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_tax_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+    // Collapsible explanation of auto-calc
+    h += '<details style="margin-top:12px"><summary style="cursor:pointer;color:#8B5CF6;font-size:0.8rem;font-weight:600"><i class="fas fa-question-circle" style="margin-right:6px"></i>\u041a\u0430\u043a \u0440\u0430\u0431\u043e\u0442\u0430\u0435\u0442 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 \u0438 \u0431\u0430\u0437\u0430 \u0440\u0430\u0441\u0447\u0451\u0442\u0430</summary>';
+    h += '<div style="margin-top:8px;padding:10px 14px;background:rgba(139,92,246,0.06);border-radius:8px;border:1px solid rgba(139,92,246,0.15);font-size:0.78rem;color:#94a3b8;line-height:1.8">';
+    h += '<div style="margin-bottom:6px"><b style="color:#a78bfa">\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442</b> \u2014 \u0441\u0443\u043c\u043c\u0430 \u043d\u0430\u043b\u043e\u0433\u0430 \u0432\u044b\u0447\u0438\u0441\u043b\u044f\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438: <b>\u0421\u0443\u043c\u043c\u0430 = \u0421\u0442\u0430\u0432\u043a\u0430% \u00d7 \u0411\u0430\u0437\u0430</b></div>';
+    h += '<div style="margin-bottom:4px"><b style="color:#e2e8f0">\u0411\u0430\u0437\u044b \u0440\u0430\u0441\u0447\u0451\u0442\u0430:</b></div>';
+    h += '<div>\u2022 <b style="color:#F59E0B">EBT</b> \u2014 \u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432 (\u0434\u043b\u044f \u043d\u0430\u043b\u043e\u0433\u0430 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c). \u041f\u0440\u0438\u043c\u0435\u0440: EBT 500 000 \u00d7 20% = 100 000</div>';
+    h += '<div>\u2022 <b style="color:#22C55E">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> \u2014 \u0432\u0435\u0441\u044c \u0434\u043e\u0445\u043e\u0434 (\u0434\u043b\u044f \u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b 6%). \u041f\u0440\u0438\u043c\u0435\u0440: 800 000 \u00d7 6% = 48 000</div>';
+    h += '<div>\u2022 <b style="color:#8B5CF6">\u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b</b> \u2014 \u0434\u043b\u044f \u0423\u0421\u041d 15%. \u041f\u0440\u0438\u043c\u0435\u0440: (800k\u2212300k) \u00d7 15% = 75 000</div>';
+    h += '<div>\u2022 <b style="color:#3B82F6">\u0424\u041e\u0422</b> \u2014 \u0444\u043e\u043d\u0434 \u043e\u043f\u043b\u0430\u0442\u044b \u0442\u0440\u0443\u0434\u0430 (\u0434\u043b\u044f \u043d\u0430\u043b\u043e\u0433\u043e\u0432 \u043d\u0430 \u0417\u041f). \u041f\u0440\u0438\u043c\u0435\u0440: \u0417\u041f 200k \u00d7 30% = 60 000</div>';
+    h += '<div>\u2022 <b style="color:#F59E0B">\u041d\u0414\u0421 \u0432\u043a\u043b.</b> \u2014 \u0444\u043e\u0440\u043c\u0443\u043b\u0430: \u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u00d7 \u0421\u0442\u0430\u0432\u043a\u0430 / (100 + \u0421\u0442\u0430\u0432\u043a\u0430). \u041f\u0440\u0438\u043c\u0435\u0440: 1.2M \u00d7 20/(100+20) = 200 000</div>';
+    h += '<div>\u2022 <b style="color:#64748b">\u0424\u0438\u043a\u0441.</b> \u2014 \u0432\u0432\u043e\u0434\u0438\u0442\u0435 \u0441\u0443\u043c\u043c\u0443 \u0432\u0440\u0443\u0447\u043d\u0443\u044e (\u043d\u0430\u043f\u0440. \u043f\u0430\u0442\u0435\u043d\u0442)</div>';
+    h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #334155">\u0415\u0441\u043b\u0438 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 <b>\u0432\u043a\u043b\u044e\u0447\u0451\u043d</b> (\u2714) \u2014 \u0441\u0443\u043c\u043c\u0430 \u043f\u0435\u0440\u0435\u0441\u0447\u0438\u0442\u044b\u0432\u0430\u0435\u0442\u0441\u044f \u043a\u0430\u0436\u0434\u044b\u0439 \u0440\u0430\u0437 \u043f\u0440\u0438 \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u0438 P&L.<br>\u0415\u0441\u043b\u0438 <b>\u0432\u044b\u043a\u043b\u044e\u0447\u0435\u043d</b> \u2014 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u0443\u0435\u0442\u0441\u044f \u0444\u0438\u043a\u0441\u0438\u0440\u043e\u0432\u0430\u043d\u043d\u0430\u044f \u0441\u0443\u043c\u043c\u0430, \u043a\u043e\u0442\u043e\u0440\u0443\u044e \u0432\u044b \u0443\u043a\u0430\u0437\u0430\u043b\u0438.</div>';
+    h += '</div></details>';
   } else if (type === 'asset') {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_asset_name" value="' + escHtml((item && item.name) || '') + '" placeholder="\u041d\u043e\u0443\u0442\u0431\u0443\u043a, \u0410\u0432\u0442\u043e..."></div>';
@@ -2873,10 +2908,7 @@ function renderPnlCrudForm(type, item) {
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442. \u0441\u0442-\u0441\u0442\u044c <i class=\"fas fa-question-circle\" style=\"color:#8B5CF6;cursor:help\" title=\"\u041b\u0438\u043a\u0432\u0438\u0434\u0430\u0446. \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c: \u0437\u0430 \u0441\u043a\u043e\u043b\u044c\u043a\u043e \u043c\u043e\u0436\u043d\u043e \u043f\u0440\u043e\u0434\u0430\u0442\u044c \u0430\u043a\u0442\u0438\u0432 \u043f\u043e\u0441\u043b\u0435 \u0441\u0440\u043e\u043a\u0430. \u0415\u0441\u043b\u0438 \u043d\u0435 \u0437\u043d\u0430\u0435\u0442\u0435, \u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 0.\"></i></label><input type="number" class="input" id="pnl_asset_residual_value" value="' + ((item && item.residual_value) || 0) + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041a\u0430\u0442\u0435\u0433\u043e\u0440\u0438\u044f</label><input class="input" id="pnl_asset_category" value="' + escHtml((item && item.category) || '') + '" placeholder="\u041e\u0431\u043e\u0440\u0443\u0434., \u0422\u0440\u0430\u043d\u0441\u043f\u043e\u0440\u0442..."></div>';
     h += '</div>';
-    h += '<div style="margin-top:8px;padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);font-size:0.75rem;color:#94a3b8;line-height:1.6">';
-    h += '<i class="fas fa-info-circle" style="color:#3B82F6;margin-right:6px"></i>';
-    h += '<b style="color:#e2e8f0">\u041e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u0430\u044f (\u043b\u0438\u043a\u0432\u0438\u0434\u0430\u0446\u0438\u043e\u043d\u043d\u0430\u044f) \u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</b> \u2014 \u0441\u0443\u043c\u043c\u0430, \u0437\u0430 \u043a\u043e\u0442\u043e\u0440\u0443\u044e \u043c\u043e\u0436\u043d\u043e \u043f\u0440\u043e\u0434\u0430\u0442\u044c \u0430\u043a\u0442\u0438\u0432 \u043f\u043e\u0441\u043b\u0435 \u0441\u0440\u043e\u043a\u0430 \u0441\u043b\u0443\u0436\u0431\u044b.<br>';
-    h += '\u041f\u0440\u0438\u043c\u0435\u0440: \u041d\u043e\u0443\u0442\u0431\u0443\u043a 500k, \u043e\u0441\u0442\u0430\u0442. = 50k \u2192 \u0410\u043c\u043e\u0440\u0442. (500k\u221250k) / 36\u043c\u0435\u0441 = 12 500/\u043c\u0435\u0441. <b>\u0415\u0441\u043b\u0438 \u043d\u0435 \u0437\u043d\u0430\u0435\u0442\u0435 \u2014 \u043e\u0441\u0442\u0430\u0432\u044c\u0442\u0435 0.</b></div>';
+    // Residual value info block removed — tooltip ? on the field is sufficient
     h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_asset_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
   } else if (type === 'loan') {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
