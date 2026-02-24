@@ -260,6 +260,15 @@ async function loadData() {
       var artPromises = leadsWithArticles.map(function(l) { return api('/leads/' + l.id + '/articles').then(function(res) { data.leadArticles[l.id] = (res && res.articles) ? res.articles : []; }); });
       await Promise.all(artPromises);
     }
+    // P&L data fallback
+    try {
+      var [tpF,asF,loF,dvF,oiF] = await Promise.all([api('/tax-payments'),api('/assets'),api('/loans'),api('/dividends'),api('/other-income-expenses')]);
+      data.taxPayments = (tpF && tpF.payments) || [];
+      data.assets = (asF && asF.assets) || [];
+      if (loF) { data.loans = loF.loans || []; data.loanPayments = loF.payments || []; }
+      data.dividends = (dvF && dvF.dividends) || [];
+      data.otherIncomeExpenses = (oiF && oiF.items) || [];
+    } catch(e) { console.error('P&L fallback load error:', e); }
   }
   setProgress('');
 }
@@ -2644,11 +2653,29 @@ async function savePnlItem(type) {
     return;
   }
   pnlEditId = 0; showPnlAddForm = false;
-  // Refresh bulk data
+  // Refresh P&L data via individual endpoints (more reliable than bulk-data)
   try {
     var bulk = await api('/bulk-data');
     if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
-  } catch(bulkErr) { console.error('[PnL] bulk-data refresh error:', bulkErr); }
+    else {
+      console.warn('[PnL] bulk-data failed, loading P&L data directly...');
+      var [tp,as,lo,dv,oi] = await Promise.all([api('/tax-payments'),api('/assets'),api('/loans'),api('/dividends'),api('/other-income-expenses')]);
+      if (tp) data.taxPayments = tp.payments || [];
+      if (as) data.assets = as.assets || [];
+      if (lo) { data.loans = lo.loans || []; data.loanPayments = lo.payments || []; }
+      if (dv) data.dividends = dv.dividends || [];
+      if (oi) data.otherIncomeExpenses = oi.items || [];
+    }
+  } catch(bulkErr) {
+    console.error('[PnL] data refresh error:', bulkErr);
+    // Last resort: just reload individual endpoints
+    try {
+      var [tp2,as2,lo2] = await Promise.all([api('/tax-payments'),api('/assets'),api('/loans')]);
+      if (tp2) data.taxPayments = tp2.payments || [];
+      if (as2) data.assets = as2.assets || [];
+      if (lo2) { data.loans = lo2.loans || []; data.loanPayments = lo2.payments || []; }
+    } catch(e2) { console.error('[PnL] fallback load failed:', e2); }
+  }
   pnlData = null; loadPnlData();
   toast(type === 'tax' ? '✓ Налог сохранён' : type === 'asset' ? '✓ Актив сохранён' : type === 'loan' ? '✓ Кредит сохранён' : type === 'dividend' ? '✓ Дивиденд сохранён' : '✓ Запись сохранена');
 }
@@ -2656,8 +2683,18 @@ async function deletePnlItem(type, id) {
   if (!confirm('Удалить запись?')) return;
   var endpoint = type === 'tax' ? '/tax-payments' : type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
   await api(endpoint + '/' + id, { method: 'DELETE' });
-  var bulk = await api('/bulk-data');
-  if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
+  try {
+    var bulk = await api('/bulk-data');
+    if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; data.assets = bulk.assets || []; data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; data.dividends = bulk.dividends || []; data.otherIncomeExpenses = bulk.otherIncomeExpenses || []; }
+    else {
+      var [tp,as,lo,dv,oi] = await Promise.all([api('/tax-payments'),api('/assets'),api('/loans'),api('/dividends'),api('/other-income-expenses')]);
+      if (tp) data.taxPayments = tp.payments || [];
+      if (as) data.assets = as.assets || [];
+      if (lo) { data.loans = lo.loans || []; data.loanPayments = lo.payments || []; }
+      if (dv) data.dividends = dv.dividends || [];
+      if (oi) data.otherIncomeExpenses = oi.items || [];
+    }
+  } catch(e) { console.error('[PnL] delete refresh error:', e); }
   pnlData = null; loadPnlData();
   toast('Удалено');
 }

@@ -90,28 +90,28 @@ api.get('/bulk-data', authMiddleware, async (c) => {
   const db = c.env.DB;
   try {
     const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations] = await Promise.all([
-      db.prepare('SELECT * FROM site_content ORDER BY sort_order').all(),
-      db.prepare('SELECT * FROM calculator_tabs ORDER BY sort_order').all(),
-      db.prepare('SELECT * FROM calculator_services ORDER BY tab_id, sort_order').all(),
-      db.prepare('SELECT * FROM telegram_messages ORDER BY sort_order').all(),
-      db.prepare('SELECT * FROM custom_scripts ORDER BY id').all(),
-      db.prepare('SELECT * FROM referral_codes ORDER BY id DESC').all(),
-      db.prepare('SELECT * FROM section_order ORDER BY sort_order').all(),
-      db.prepare('SELECT * FROM leads ORDER BY created_at DESC LIMIT 200').all(),
-      db.prepare('SELECT * FROM telegram_bot_config ORDER BY id').all(),
-      db.prepare('SELECT * FROM pdf_templates ORDER BY id DESC LIMIT 1').all(),
-      db.prepare('SELECT * FROM slot_counter ORDER BY id').all(),
-      db.prepare('SELECT * FROM site_settings ORDER BY id DESC LIMIT 1').all(),
-      db.prepare('SELECT * FROM footer_settings ORDER BY id DESC LIMIT 1').all(),
-      db.prepare('SELECT * FROM photo_blocks ORDER BY sort_order').all(),
-      db.prepare('SELECT * FROM users ORDER BY id').all(),
-      db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all(),
-      db.prepare('SELECT * FROM company_roles ORDER BY sort_order, id').all(),
-      db.prepare('SELECT * FROM expense_categories ORDER BY name').all(),
-      db.prepare('SELECT * FROM expense_frequency_types ORDER BY name').all(),
-      db.prepare('SELECT * FROM expenses ORDER BY date DESC').all(),
-      db.prepare('SELECT * FROM period_snapshots ORDER BY date_from DESC').all(),
-      db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all()
+      db.prepare('SELECT * FROM site_content ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM calculator_tabs ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM calculator_services ORDER BY tab_id, sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM telegram_messages ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM custom_scripts ORDER BY id').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM referral_codes ORDER BY id DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM section_order ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM leads ORDER BY created_at DESC LIMIT 200').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM telegram_bot_config ORDER BY id').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM pdf_templates ORDER BY id DESC LIMIT 1').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM slot_counter ORDER BY id').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM site_settings ORDER BY id DESC LIMIT 1').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM footer_settings ORDER BY id DESC LIMIT 1').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM photo_blocks ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM users ORDER BY id').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM company_roles ORDER BY sort_order, id').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM expense_categories ORDER BY name').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM expense_frequency_types ORDER BY name').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM expenses ORDER BY id DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM period_snapshots ORDER BY date_from DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all().catch(() => ({results:[]}))
     ]);
     // P&L related data (parallel, with fallback for new tables)
     const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData] = await Promise.all([
@@ -135,7 +135,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-7 days')").first().catch(() => ({count:0})),
       db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-30 days')").first().catch(() => ({count:0}))
     ]);
-    const onlineRes = await db.prepare("SELECT * FROM activity_sessions WHERE last_active > datetime('now', '-3 minutes')").all();
+    const onlineRes = await db.prepare("SELECT * FROM activity_sessions WHERE last_active > datetime('now', '-3 minutes')").all().catch(() => ({results:[]}));
     // Lead articles
     const leadsArr = leads.results || [];
     const leadsWithArticles = leadsArr.filter((l: any) => l.articles_count > 0);
@@ -178,8 +178,8 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       otherIncomeExpenses: otherIEData.results || []
     });
   } catch(e: any) {
-    console.error('bulk-data error:', e);
-    return c.json({ error: e.message }, 500);
+    console.error('bulk-data error:', e?.message, e?.stack);
+    return c.json({ error: 'bulk-data: ' + (e?.message || 'Unknown error') }, 500);
   }
 });
 
