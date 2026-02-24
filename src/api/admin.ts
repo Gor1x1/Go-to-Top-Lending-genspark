@@ -85,6 +85,89 @@ api.post('/init-db', authMiddleware, async (c) => {
   return c.json({ success: true, message: 'Database initialized' });
 });
 
+// ===== BULK DATA LOAD (single request instead of 21) =====
+api.get('/bulk-data', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations] = await Promise.all([
+      db.prepare('SELECT * FROM site_content ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM calculator_tabs ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM calculator_services ORDER BY tab_id, sort_order').all(),
+      db.prepare('SELECT * FROM telegram_messages ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM custom_scripts ORDER BY id').all(),
+      db.prepare('SELECT * FROM referral_codes ORDER BY id DESC').all(),
+      db.prepare('SELECT * FROM section_order ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM leads ORDER BY created_at DESC LIMIT 200').all(),
+      db.prepare('SELECT * FROM telegram_bot_config ORDER BY id').all(),
+      db.prepare('SELECT * FROM pdf_templates ORDER BY id DESC LIMIT 1').all(),
+      db.prepare('SELECT * FROM slot_counter ORDER BY id').all(),
+      db.prepare('SELECT * FROM site_settings ORDER BY id DESC LIMIT 1').all(),
+      db.prepare('SELECT * FROM footer_settings ORDER BY id DESC LIMIT 1').all(),
+      db.prepare('SELECT * FROM photo_blocks ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM users ORDER BY id').all(),
+      db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM company_roles ORDER BY sort_order, id').all(),
+      db.prepare('SELECT * FROM expense_categories ORDER BY name').all(),
+      db.prepare('SELECT * FROM expense_frequency_types ORDER BY name').all(),
+      db.prepare('SELECT * FROM expenses ORDER BY date DESC').all(),
+      db.prepare('SELECT * FROM period_snapshots ORDER BY date_from DESC').all(),
+      db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all()
+    ]);
+    // Stats counts (parallel)
+    const [contentCount, svcCount, msgCount, scriptCount, totalLeadsCount, newLeadsCount, todayLeadsCount, todayViews, weekViews, monthViews] = await Promise.all([
+      db.prepare('SELECT COUNT(*) as count FROM site_content').first().catch(() => ({count:0})),
+      db.prepare('SELECT COUNT(*) as count FROM calculator_services').first().catch(() => ({count:0})),
+      db.prepare('SELECT COUNT(*) as count FROM telegram_messages').first().catch(() => ({count:0})),
+      db.prepare('SELECT COUNT(*) as count FROM custom_scripts').first().catch(() => ({count:0})),
+      db.prepare('SELECT COUNT(*) as count FROM leads').first().catch(() => ({count:0})),
+      db.prepare("SELECT COUNT(*) as count FROM leads WHERE status = 'new'").first().catch(() => ({count:0})),
+      db.prepare("SELECT COUNT(*) as count FROM leads WHERE date(created_at) = date('now')").first().catch(() => ({count:0})),
+      db.prepare("SELECT COUNT(*) as count FROM page_views WHERE date(created_at) = date('now')").first().catch(() => ({count:0})),
+      db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-7 days')").first().catch(() => ({count:0})),
+      db.prepare("SELECT COUNT(*) as count FROM page_views WHERE created_at >= datetime('now', '-30 days')").first().catch(() => ({count:0}))
+    ]);
+    const onlineRes = await db.prepare("SELECT * FROM activity_sessions WHERE last_active > datetime('now', '-3 minutes')").all();
+    // Lead articles
+    const leadsArr = leads.results || [];
+    const leadsWithArticles = leadsArr.filter((l: any) => l.articles_count > 0);
+    let leadArticles: any = {};
+    if (leadsWithArticles.length > 0) {
+      const artResults = await Promise.all(leadsWithArticles.map((l: any) => db.prepare('SELECT * FROM lead_articles WHERE lead_id = ? ORDER BY id DESC').bind(l.id).all()));
+      leadsWithArticles.forEach((l: any, i: number) => { leadArticles[l.id] = artResults[i].results || []; });
+    }
+    return c.json({
+      content: content.results || [],
+      calcTabs: calcTabs.results || [],
+      calcServices: calcServices.results || [],
+      telegram: telegram.results || [],
+      scripts: scripts.results || [],
+      stats: { content: contentCount?.count||0, services: svcCount?.count||0, messages: msgCount?.count||0, scripts: scriptCount?.count||0, totalLeads: totalLeadsCount?.count||0, newLeads: newLeadsCount?.count||0, todayLeads: todayLeadsCount?.count||0, todayViews: todayViews?.count||0, weekViews: weekViews?.count||0, monthViews: monthViews?.count||0 },
+      referrals: referrals.results || [],
+      sectionOrder: sectionOrder.results || [],
+      leads: { leads: leadsArr, total: totalLeadsCount?.count || leadsArr.length },
+      telegramBot: telegramBot.results || [],
+      pdfTemplate: pdfTemplate.results?.[0] || {},
+      slotCounters: slotCounter.results || [],
+      settings: settings.results?.[0] || {},
+      footer: footer.results?.[0] || {},
+      photoBlocks: photoBlocks.results || [],
+      users: users.results || [],
+      siteBlocks: siteBlocks.results || [],
+      companyRoles: companyRoles.results || [],
+      expenseCategories: expenseCategories.results || [],
+      expenseFreqTypes: expenseFreqTypes.results || [],
+      expenses: expenses.results || [],
+      periodSnapshots: periodSnapshots.results || [],
+      vacations: vacations.results || [],
+      online: onlineRes.results || [],
+      leadArticles: leadArticles
+    });
+  } catch(e: any) {
+    console.error('bulk-data error:', e);
+    return c.json({ error: e.message }, 500);
+  }
+});
+
 // ===== SITE CONTENT =====
 api.get('/content', authMiddleware, async (c) => {
   const db = c.env.DB;
