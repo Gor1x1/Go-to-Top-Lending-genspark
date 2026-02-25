@@ -88,6 +88,8 @@ api.post('/init-db', authMiddleware, async (c) => {
 // ===== BULK DATA LOAD (single request instead of 21) =====
 api.get('/bulk-data', authMiddleware, async (c) => {
   const db = c.env.DB;
+  // Ensure DB migrations are applied (critical for new tables like tax_rules)
+  try { await initDatabase(db); } catch {}
   try {
     const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations] = await Promise.all([
       db.prepare('SELECT * FROM site_content ORDER BY sort_order').all().catch(() => ({results:[]})),
@@ -2565,6 +2567,12 @@ api.delete('/tax-payments/:id', authMiddleware, async (c) => {
 api.get('/tax-rules', authMiddleware, async (c) => {
   const db = c.env.DB;
   try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS tax_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, rule_name TEXT NOT NULL DEFAULT '', tax_type TEXT NOT NULL DEFAULT 'income_tax',
+      tax_base TEXT DEFAULT 'revenue', tax_rate REAL DEFAULT 0, frequency TEXT DEFAULT 'monthly',
+      is_active INTEGER DEFAULT 1, apply_from TEXT DEFAULT '', apply_to TEXT DEFAULT '',
+      notes TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
     const res = await db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all();
     return c.json({ rules: res.results || [] });
   } catch {
@@ -2576,6 +2584,12 @@ api.post('/tax-rules', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
   try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS tax_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, rule_name TEXT NOT NULL DEFAULT '', tax_type TEXT NOT NULL DEFAULT 'income_tax',
+      tax_base TEXT DEFAULT 'revenue', tax_rate REAL DEFAULT 0, frequency TEXT DEFAULT 'monthly',
+      is_active INTEGER DEFAULT 1, apply_from TEXT DEFAULT '', apply_to TEXT DEFAULT '',
+      notes TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
     await db.prepare('INSERT INTO tax_rules (rule_name, tax_type, tax_base, tax_rate, frequency, is_active, apply_from, apply_to, notes) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(d.rule_name||'', d.tax_type||'income_tax', d.tax_base||'revenue', d.tax_rate||0, d.frequency||'monthly', d.is_active!==undefined ? (d.is_active?1:0) : 1, d.apply_from||'', d.apply_to||'', d.notes||'').run();
     return c.json({ success: true });
@@ -2607,6 +2621,21 @@ api.post('/tax-rules/generate/:periodKey', authMiddleware, async (c) => {
   const db = c.env.DB;
   const periodKey = c.req.param('periodKey'); // e.g. 2026-02
   try {
+    // Ensure tax_rules table exists (might not after fresh deploy)
+    await db.prepare(`CREATE TABLE IF NOT EXISTS tax_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      rule_name TEXT NOT NULL DEFAULT '',
+      tax_type TEXT NOT NULL DEFAULT 'income_tax',
+      tax_base TEXT DEFAULT 'revenue',
+      tax_rate REAL DEFAULT 0,
+      frequency TEXT DEFAULT 'monthly',
+      is_active INTEGER DEFAULT 1,
+      apply_from TEXT DEFAULT '',
+      apply_to TEXT DEFAULT '',
+      notes TEXT DEFAULT '',
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
     const rules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
     let generated = 0;
     for (const rule of (rules.results || []) as any[]) {
