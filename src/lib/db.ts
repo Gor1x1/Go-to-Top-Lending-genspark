@@ -587,6 +587,27 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN tax_rate REAL DEFAULT 0").run(); } catch {}
   try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN tax_base TEXT DEFAULT 'fixed'").run(); } catch {}
   try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN is_auto INTEGER DEFAULT 0").run(); } catch {}
+  // v18: Tax Rules engine — recurring rules that auto-generate monthly tax payments
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS tax_rules (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    rule_name TEXT NOT NULL DEFAULT '',
+    tax_type TEXT NOT NULL DEFAULT 'income_tax',
+    tax_base TEXT DEFAULT 'revenue',
+    tax_rate REAL DEFAULT 0,
+    frequency TEXT DEFAULT 'monthly',
+    is_active INTEGER DEFAULT 1,
+    apply_from TEXT DEFAULT '',
+    apply_to TEXT DEFAULT '',
+    notes TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_tax_rules_active ON tax_rules(is_active)').run(); } catch {}
+  // v18: Add rule_id to tax_payments to link auto-generated payments to their rule
+  try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN rule_id INTEGER DEFAULT NULL").run(); } catch {}
+  // v19: Add hire_date/end_date to users for payroll tax period filtering
+  try { await db.prepare("ALTER TABLE users ADD COLUMN hire_date TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE users ADD COLUMN end_date TEXT DEFAULT ''").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

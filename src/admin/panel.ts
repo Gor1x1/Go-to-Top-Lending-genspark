@@ -2415,6 +2415,8 @@ let pnlEditType = ''; // tax | asset | loan | dividend | other
 let showPnlAddForm = false;
 let pnlFiscalMonth = 1; // loaded from settings
 let editingLoanPaymentId = 0; // for editing existing payments
+let showTaxRuleForm = false;
+let editTaxRuleId = 0;
 let showAddExpenseForm = false;
 let showAddBonusUserId = 0;
 let addBonusType = 'bonus';
@@ -2722,6 +2724,54 @@ async function saveLoanPayment(loanId) {
   pnlData = null; loadPnlData(); toast('Платёж добавлен');
 }
 
+// ===== TAX RULES CRUD =====
+async function saveTaxRule() {
+  var d = {
+    rule_name: document.getElementById('tax_rule_name')?.value || '',
+    tax_type: document.getElementById('tax_rule_type')?.value || 'income_tax',
+    tax_rate: parseFloat(document.getElementById('tax_rule_rate')?.value) || 0,
+    tax_base: document.getElementById('tax_rule_base')?.value || 'revenue',
+    frequency: document.getElementById('tax_rule_freq')?.value || 'monthly',
+    apply_from: document.getElementById('tax_rule_from')?.value || '',
+    notes: document.getElementById('tax_rule_notes')?.value || '',
+    is_active: 1
+  };
+  if (!d.rule_name) { toast('Укажите название правила', 'error'); return; }
+  if (editTaxRuleId) {
+    await api('/tax-rules/' + editTaxRuleId, { method: 'PUT', body: JSON.stringify(d), _silent: true });
+  } else {
+    await api('/tax-rules', { method: 'POST', body: JSON.stringify(d), _silent: true });
+  }
+  var bulk = await api('/bulk-data', { _silent: true });
+  if (bulk && !bulk.error) { data.taxRules = bulk.taxRules || []; data.taxPayments = bulk.taxPayments || []; }
+  showTaxRuleForm = false; editTaxRuleId = 0;
+  pnlData = null; loadPnlData();
+  toast('✓ Правило сохранено');
+}
+
+async function deleteTaxRule(id) {
+  if (!confirm('Удалить правило?')) return;
+  await api('/tax-rules/' + id, { method: 'DELETE', _silent: true });
+  var bulk = await api('/bulk-data', { _silent: true });
+  if (bulk && !bulk.error) { data.taxRules = bulk.taxRules || []; }
+  pnlData = null; loadPnlData();
+  toast('Правило удалено');
+}
+
+async function generateTaxFromRules() {
+  var res = await api('/tax-rules/generate/' + pnlPeriod, { method: 'POST', _silent: true });
+  if (res && res.generated > 0) {
+    var bulk = await api('/bulk-data', { _silent: true });
+    if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; }
+    pnlData = null; loadPnlData();
+    toast('✓ Создано платежей: ' + res.generated);
+  } else if (res && res.generated === 0) {
+    toast('Платежи уже существуют или нет применимых правил', 'info');
+  } else {
+    toast('Ошибка генерации', 'error');
+  }
+}
+
 function renderPnLTab() {
   if (!pnlData && !pnlLoading) { loadPnlData(); return '<div style="text-align:center;padding:40px"><div class="spinner" style="width:32px;height:32px;margin:0 auto"></div><p style="color:#94a3b8;margin-top:12px">Загрузка P&L...</p></div>'; }
   if (pnlLoading) return '<div style="text-align:center;padding:40px"><div class="spinner" style="width:32px;height:32px;margin:0 auto"></div></div>';
@@ -2922,7 +2972,7 @@ function renderPnlCrudForm(type, item) {
   h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.8rem" onclick="showPnlAddForm=false;pnlEditId=0;render()"><i class="fas fa-times"></i></button></div>';
   if (type === 'tax') {
     var taxTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'usn_income',l:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b'},{v:'usn_income_expense',l:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b \u2212 \u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'patent',l:'\u041f\u0430\u0442\u0435\u043d\u0442'},{v:'property',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0438\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
-    var taxBases = [{v:'ebt',l:'EBT (\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432)'},{v:'revenue',l:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (\u0434\u043e\u0445\u043e\u0434\u044b)'},{v:'income_minus_expenses',l:'\u0414\u043e\u0445\u043e\u0434\u044b \u2212 \u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'payroll',l:'\u0424\u041e\u0422 (\u0444\u043e\u043d\u0434 \u043e\u043f\u043b. \u0442\u0440\u0443\u0434\u0430)'},{v:'vat_inclusive',l:'\u041d\u0414\u0421 (\u0432\u043a\u043b\u044e\u0447\u0451\u043d \u0432 \u0446\u0435\u043d\u0443)'},{v:'fixed',l:'\u0424\u0438\u043a\u0441. \u0441\u0443\u043c\u043c\u0430 (\u0432\u0440\u0443\u0447\u043d\u0443\u044e)'}];
+    var taxBases = [{v:'ebt',l:'EBT (\u043f\u0440\u0438\u0431\u044b\u043b\u044c \u0434\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432)'},{v:'revenue',l:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (\u0434\u043e\u0445\u043e\u0434\u044b \u0437\u0430 \u0443\u0441\u043b\u0443\u0433\u0438)'},{v:'total_turnover',l:'\u041e\u0431\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442 (\u0443\u0441\u043b\u0443\u0433\u0438 + \u0432\u044b\u043a\u0443\u043f\u044b)'},{v:'turnover_excl_transit',l:'\u041e\u0431\u043e\u0440\u043e\u0442 \u0431\u0435\u0437 \u0442\u0440\u0430\u043d\u0437\u0438\u0442\u0430 (\u0442\u043e\u043b\u044c\u043a\u043e \u0443\u0441\u043b\u0443\u0433\u0438)'},{v:'income_minus_expenses',l:'\u0414\u043e\u0445\u043e\u0434\u044b \u2212 \u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'payroll',l:'\u0424\u041e\u0422 (\u0444\u043e\u043d\u0434 \u043e\u043f\u043b. \u0442\u0440\u0443\u0434\u0430)'},{v:'vat_inclusive',l:'\u041d\u0414\u0421 (\u0432\u043a\u043b\u044e\u0447\u0451\u043d \u0432 \u0446\u0435\u043d\u0443 \u0443\u0441\u043b\u0443\u0433)'},{v:'vat_turnover',l:'\u041d\u0414\u0421 (\u0432\u043a\u043b\u044e\u0447\u0451\u043d \u0432 \u043e\u0431\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442)'},{v:'fixed',l:'\u0424\u0438\u043a\u0441. \u0441\u0443\u043c\u043c\u0430 (\u0432\u0440\u0443\u0447\u043d\u0443\u044e)'}];
     var isAuto = item ? !!item.is_auto : true; // default to auto for new taxes
     var curBase = (item && item.tax_base) || 'ebt';
     h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(139,92,246,0.08);border-radius:8px;border:1px solid rgba(139,92,246,0.2)">';
@@ -3009,7 +3059,7 @@ function renderPnlCrudForm(type, item) {
 
 function renderPnlTaxes(p) {
   var typeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',usn_income:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b',usn_income_expense:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
-  var baseLabels = {ebt:'EBT',revenue:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430',income_minus_expenses:'\u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll:'\u0424\u041e\u0422',vat_inclusive:'\u041d\u0414\u0421 \u0432\u043a\u043b.',fixed:'\u0424\u0438\u043a\u0441.'};
+  var baseLabels = {ebt:'EBT',revenue:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430',total_turnover:'\u041e\u0431\u0449. \u043e\u0431\u043e\u0440\u043e\u0442',turnover_excl_transit:'\u041e\u0431\u043e\u0440\u043e\u0442 \u0431\u0435\u0437 \u0442\u0440.',income_minus_expenses:'\u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll:'\u0424\u041e\u0422',vat_inclusive:'\u041d\u0414\u0421 \u0432\u043a\u043b.',vat_turnover:'\u041d\u0414\u0421 \u043e\u0431\u043e\u0440\u043e\u0442',fixed:'\u0424\u0438\u043a\u0441.'};
   var statusColors = {paid:'#22C55E',pending:'#F59E0B',overdue:'#EF4444'};
   var statusLabels = {paid:'\u041e\u043f\u043b\u0430\u0447\u0435\u043d',pending:'\u041e\u0436\u0438\u0434\u0430\u0435\u0442',overdue:'\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d'};
   // Use P&L data for showing calculated amounts from taxes with is_auto
@@ -3024,6 +3074,7 @@ function renderPnlTaxes(p) {
   h += '<div style="font-weight:600;color:#a78bfa;font-size:0.82rem;margin-bottom:8px"><i class="fas fa-database" style="margin-right:6px"></i>\u0411\u0430\u0437\u044b \u0434\u043b\u044f \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442\u0430 (\u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0435\u0440\u0438\u043e\u0434):</div>';
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;font-size:0.78rem">';
   h += '<div style="padding:6px 10px;background:rgba(34,197,94,0.06);border-radius:6px;border:1px solid rgba(34,197,94,0.15)"><span style="color:#64748b">\u0412\u044b\u0440\u0443\u0447\u043a\u0430:</span> <b style="color:#22C55E">' + fmtAmt(bases.revenue || 0) + '</b></div>';
+  h += '<div style="padding:6px 10px;background:rgba(167,139,250,0.06);border-radius:6px;border:1px solid rgba(167,139,250,0.15)"><span style="color:#64748b">\u041e\u0431\u0449. \u043e\u0431\u043e\u0440\u043e\u0442:</span> <b style="color:#a78bfa">' + fmtAmt(bases.total_turnover || 0) + '</b></div>';
   h += '<div style="padding:6px 10px;background:rgba(245,158,11,0.06);border-radius:6px;border:1px solid rgba(245,158,11,0.15)"><span style="color:#64748b">EBT:</span> <b style="color:#F59E0B">' + fmtAmt(bases.ebt || 0) + '</b></div>';
   h += '<div style="padding:6px 10px;background:rgba(139,92,246,0.06);border-radius:6px;border:1px solid rgba(139,92,246,0.15)"><span style="color:#64748b">\u0414\u043e\u0445\u2212\u0420\u0430\u0441\u0445:</span> <b style="color:#8B5CF6">' + fmtAmt(bases.income_minus_expenses || 0) + '</b></div>';
   h += '<div style="padding:6px 10px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15)"><span style="color:#64748b">\u0424\u041e\u0422:</span> <b style="color:#3B82F6">' + fmtAmt(bases.payroll || 0) + '</b></div>';
@@ -3102,10 +3153,64 @@ function renderPnlTaxes(p) {
   h += '<div style="padding-left:16px;margin-bottom:8px">\u2022 <b>\u0424\u0438\u043a\u0441.</b> \u2014 \u0441\u0443\u043c\u043c\u0430 \u0432\u0440\u0443\u0447\u043d\u0443\u044e (\u043d\u0430\u043f\u0440. \u043f\u0430\u0442\u0435\u043d\u0442, \u0444\u0438\u043a\u0441. \u043d\u0430\u043b\u043e\u0433)</div>';
   h += '<div style="padding-top:6px;border-top:1px solid #334155"><b style="color:#F59E0B">\u0421\u043e\u0432\u0435\u0442:</b> \u0414\u043b\u044f \u043d\u0430\u0447\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u041d\u0414\u0421 (20% \u043e\u0442 \u0432\u044b\u0440\u0443\u0447\u043a\u0438 \u0432\u043a\u043b.) \u0438 \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c (20% \u043e\u0442 EBT) \u2014 \u044d\u0442\u043e \u043f\u043e\u043a\u0440\u043e\u0435\u0442 \u043e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u043d\u0430\u043b\u043e\u0433\u0438. ETR \u043e\u0442\u043e\u0431\u0440\u0430\u0437\u0438\u0442 \u0440\u0435\u0430\u043b\u044c\u043d\u0443\u044e \u0441\u0442\u0430\u0432\u043a\u0443.</div>';
   h += '</div></details>';
+  // ===== TAX RULES ENGINE =====
+  var taxRules = (data.taxRules || (p && p.tax_rules) || []);
+  h += '<div style="margin-top:20px;border-top:2px solid #334155;padding-top:16px">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  h += '<h4 style="font-weight:700;color:#F59E0B;font-size:0.95rem"><i class="fas fa-cog" style="margin-right:6px"></i>\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u0430 <span style="font-size:0.7rem;color:#64748b;font-weight:400">(\u0430\u0432\u0442\u043e\u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439)</span></h4>';
+  h += '<div style="display:flex;gap:6px">';
+  h += '<button class="btn btn-success" style="padding:6px 12px;font-size:0.78rem" onclick="generateTaxFromRules()" title="\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0438\u0437 \u043f\u0440\u0430\u0432\u0438\u043b \u0437\u0430 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0435\u0440\u0438\u043e\u0434"><i class="fas fa-bolt" style="margin-right:4px"></i>\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0437\u0430 ' + pnlPeriod + '</button>';
+  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="showTaxRuleForm=!showTaxRuleForm;editTaxRuleId=0;render()"><i class="fas fa-plus" style="margin-right:4px"></i>\u041f\u0440\u0430\u0432\u0438\u043b\u043e</button>';
+  h += '</div></div>';
+  // Tax rule explanation
+  h += '<div style="font-size:0.75rem;color:#64748b;margin-bottom:12px;line-height:1.6"><i class="fas fa-info-circle" style="color:#8B5CF6;margin-right:4px"></i>\u041f\u0440\u0430\u0432\u0438\u043b\u0430 \u2014 \u044d\u0442\u043e \u0448\u0430\u0431\u043b\u043e\u043d\u044b. \u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u00bb \u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u0430 \u0441\u043e\u0437\u0434\u0430\u0441\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u044e\u0442\u0441\u044f \u043e\u0442 \u0431\u0430\u0437\u044b.</div>';
+  // Tax rule add/edit form
+  if (typeof showTaxRuleForm !== 'undefined' && showTaxRuleForm) {
+    var editRule = editTaxRuleId ? taxRules.find(function(r){return r.id===editTaxRuleId;}) : null;
+    var ruleBaseOpts = [{v:'revenue',l:'\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (\u0443\u0441\u043b\u0443\u0433\u0438)'},{v:'total_turnover',l:'\u041e\u0431\u0449\u0438\u0439 \u043e\u0431\u043e\u0440\u043e\u0442'},{v:'turnover_excl_transit',l:'\u041e\u0431\u043e\u0440\u043e\u0442 \u0431\u0435\u0437 \u0442\u0440\u0430\u043d\u0437\u0438\u0442\u0430'},{v:'ebt',l:'EBT'},{v:'income_minus_expenses',l:'\u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'payroll',l:'\u0424\u041e\u0422'},{v:'vat_inclusive',l:'\u041d\u0414\u0421 \u0432\u043a\u043b. (\u0443\u0441\u043b\u0443\u0433\u0438)'},{v:'vat_turnover',l:'\u041d\u0414\u0421 \u0432\u043a\u043b. (\u043e\u0431\u043e\u0440\u043e\u0442)'},{v:'fixed',l:'\u0424\u0438\u043a\u0441.'}];
+    h += '<div class="card" style="margin-bottom:12px;border-color:#F59E0B">';
+    h += '<div style="font-weight:600;color:#F59E0B;margin-bottom:10px">' + (editRule ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u0430' : '\u041d\u043e\u0432\u043e\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u043e') + '</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+    h += '<div><label style="font-size:0.75rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="tax_rule_name" value="' + escHtml((editRule && editRule.rule_name) || '') + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442 5%"></div>';
+    h += '<div><label style="font-size:0.75rem;color:#64748b">\u0422\u0438\u043f \u043d\u0430\u043b\u043e\u0433\u0430</label><select class="input" id="tax_rule_type">';
+    var ruleTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'turnover_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
+    for (var rt = 0; rt < ruleTypes.length; rt++) h += '<option value="' + ruleTypes[rt].v + '"' + (editRule && editRule.tax_type === ruleTypes[rt].v ? ' selected' : '') + '>' + ruleTypes[rt].l + '</option>';
+    h += '</select></div>';
+    h += '<div><label style="font-size:0.75rem;color:#64748b">\u0421\u0442\u0430\u0432\u043a\u0430 %</label><input type="number" class="input" id="tax_rule_rate" value="' + ((editRule && editRule.tax_rate) || '') + '" step="0.1"></div>';
+    h += '<div><label style="font-size:0.75rem;color:#64748b">\u0411\u0430\u0437\u0430 \u0440\u0430\u0441\u0447\u0451\u0442\u0430</label><select class="input" id="tax_rule_base">';
+    for (var rb = 0; rb < ruleBaseOpts.length; rb++) h += '<option value="' + ruleBaseOpts[rb].v + '"' + (editRule && editRule.tax_base === ruleBaseOpts[rb].v ? ' selected' : '') + '>' + ruleBaseOpts[rb].l + '</option>';
+    h += '</select></div>';
+    h += '<div><label style="font-size:0.75rem;color:#64748b">\u041f\u0435\u0440\u0438\u043e\u0434\u0438\u0447\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="tax_rule_freq"><option value="monthly"' + (editRule && editRule.frequency === 'monthly' ? ' selected' : '') + '>\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u043e</option><option value="quarterly"' + (editRule && editRule.frequency === 'quarterly' ? ' selected' : '') + '>\u0415\u0436\u0435\u043a\u0432\u0430\u0440\u0442\u0430\u043b\u044c\u043d\u043e</option></select></div>';
+    h += '<div><label style="font-size:0.75rem;color:#64748b">\u041d\u0430\u0447\u0430\u043b\u043e \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u044f</label><input type="month" class="input" id="tax_rule_from" value="' + ((editRule && editRule.apply_from) || '') + '"></div>';
+    h += '</div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.75rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="tax_rule_notes" value="' + escHtml((editRule && editRule.notes) || '') + '"></div>';
+    h += '<div style="margin-top:10px;display:flex;gap:8px"><button class="btn btn-primary" style="font-size:0.82rem" onclick="saveTaxRule()"><i class="fas fa-save" style="margin-right:4px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button><button class="btn btn-outline" style="font-size:0.82rem" onclick="showTaxRuleForm=false;editTaxRuleId=0;render()">\u041e\u0442\u043c\u0435\u043d\u0430</button></div>';
+    h += '</div>';
+  }
+  // Existing rules list
+  if (taxRules.length > 0) {
+    h += '<div class="card" style="padding:0;overflow:hidden">';
+    for (var ri = 0; ri < taxRules.length; ri++) {
+      var rule = taxRules[ri];
+      var freqLabel = rule.frequency === 'quarterly' ? '\u041a\u0432\u0430\u0440\u0442\u0430\u043b' : '\u041c\u0435\u0441\u044f\u0446';
+      h += '<div style="padding:10px 14px;border-bottom:1px solid #1e293b;display:flex;justify-content:space-between;align-items:center">';
+      h += '<div><span style="font-weight:600;color:#e2e8f0">' + escHtml(rule.rule_name) + '</span>';
+      h += ' <span style="color:#a78bfa;font-size:0.78rem">' + rule.tax_rate + '% \u00d7 ' + (baseLabels[rule.tax_base] || rule.tax_base) + '</span>';
+      h += ' <span style="padding:2px 6px;background:#334155;border-radius:4px;font-size:0.68rem;color:#94a3b8">' + freqLabel + '</span>';
+      if (!rule.is_active) h += ' <span style="color:#EF4444;font-size:0.68rem">\u041e\u0442\u043a\u043b\u044e\u0447\u0435\u043d\u043e</span>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:6px">';
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.68rem" onclick="editTaxRuleId=' + rule.id + ';showTaxRuleForm=true;render()"><i class="fas fa-edit"></i></button>';
+      h += '<button class="tier-del-btn" onclick="deleteTaxRule(' + rule.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button>';
+      h += '</div></div>';
+    }
+    h += '</div>';
+  } else {
+    h += '<div style="text-align:center;color:#475569;font-size:0.82rem;padding:16px"><i class="fas fa-cog" style="margin-right:6px"></i>\u041d\u0435\u0442 \u043f\u0440\u0430\u0432\u0438\u043b. \u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u043e \u0447\u0442\u043e\u0431\u044b \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u0441\u043e\u0437\u0434\u0430\u0432\u0430\u0442\u044c \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u043a\u0430\u0436\u0434\u044b\u0439 \u043c\u0435\u0441\u044f\u0446.</div>';
+  }
+  h += '</div>';
   return h;
 }
-
-function renderPnlAssets(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-building" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430 \u0438 \u0430\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'asset\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0430\u043a\u0442\u0438\u0432</button></div>';
@@ -3141,10 +3246,17 @@ function renderPnlAssets(p) {
   }
   h += '<div style="padding:12px 16px;background:rgba(59,130,246,0.08);display:flex;justify-content:space-between"><span style="font-weight:700;color:#94a3b8">\u0418\u0442\u043e\u0433\u043e \u0430\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f/\u043c\u0435\u0441:</span><span style="font-weight:800;color:#3B82F6">' + fmtAmt(totalDepr) + '</span></div>';
   h += '</div>';
+  // Amortization explanation
+  h += '<details style="margin-top:12px"><summary style="cursor:pointer;color:#64748b;font-size:0.82rem;font-weight:600"><i class="fas fa-question-circle" style="margin-right:6px;color:#3B82F6"></i>Как считается амортизация и «Накоплено»</summary>';
+  h += '<div class="card" style="margin-top:8px;font-size:0.78rem;color:#94a3b8;line-height:1.8">';
+  h += '<div><b style="color:#F59E0B">Ежемесячная амортизация</b> = (Стоимость − Остаточная стоимость) / Срок службы (мес.)</div>';
+  h += '<div><b style="color:#EF4444">Накоплено</b> = Ежемесячная амортизация × Количество месяцев с даты покупки до текущего момента</div>';
+  h += '<div>Это общая сумма износа актива за всё время использования. Она начисляется каждый месяц автоматически с момента покупки.</div>';
+  h += '<div><b style="color:#22C55E">Балансовая стоимость</b> = Стоимость покупки − Накопленная амортизация</div>';
+  h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid #334155"><b style="color:#3B82F6">Пример:</b> Ноутбук 600 000 ֏, остаточная 0, срок 36 мес. → Ежемесячно: 16 667 ֏. Через 12 мес.: Накоплено = 200 000 ֏, Балансовая = 400 000 ֏</div>';
+  h += '</div></details>';
   return h;
 }
-
-function renderPnlLoans(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:8px"></i>\u041a\u0440\u0435\u0434\u0438\u0442\u044b \u0438 \u0437\u0430\u0439\u043c\u044b</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'loan\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u0440\u0435\u0434\u0438\u0442</button></div>';
@@ -4073,11 +4185,13 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6;white-space:nowrap">Услуги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap">Расходы</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#22C55E;white-space:nowrap" title="Услуги - Расходы">Прибыль</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap" title="Налоги за месяц">Налоги</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#10B981;white-space:nowrap" title="Прибыль после налогов">Чистая</th>';
   h += '<th style="padding:8px 6px;text-align:center;color:#94a3b8;white-space:nowrap">Статус</th>';
   h += '<th style="padding:8px 6px;width:60px"></th>';
   h += '</tr></thead><tbody>';
   var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, refunds:0, expenses:0, profit:0};
+  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, refunds:0, expenses:0, profit:0, taxes:0, netProfit:0};
   for (var mi3 = 1; mi3 <= 12; mi3++) {
     var mKey = currentYear + '-' + String(mi3).padStart(2,'0');
     var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
@@ -4151,11 +4265,19 @@ function renderBizPeriodsV2(d, sd, fin) {
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
       mSvc = 0; mArt = 0; mRefunds = 0; mExp = 0; mTurnover = 0; mProfit = 0;
     }
+    // Tax data for this month (from tax_payments in bulk data)
+    var mTaxes = 0;
+    var allTaxPayments = data.taxPayments || [];
+    for (var ti = 0; ti < allTaxPayments.length; ti++) {
+      if (allTaxPayments[ti].period_key === mKey) mTaxes += Number(allTaxPayments[ti].amount) || 0;
+    }
+    var mNetProfit = mProfit - mTaxes;
     yearTotals.done += mDone; yearTotals.inProgress += mInProg;
     yearTotals.rejected += mRejected; yearTotals.checking += mChecking;
     yearTotals.turnover += mTurnover; yearTotals.services += mSvc;
     yearTotals.articles += mArt; yearTotals.refunds += mRefunds;
     yearTotals.expenses += mExp; yearTotals.profit += mProfit;
+    yearTotals.taxes += mTaxes; yearTotals.netProfit += mNetProfit;
     var rowBg = isCurrent ? 'background:rgba(139,92,246,0.06);' : isFuture ? 'opacity:0.4;' : '';
     h += '<tr style="border-bottom:1px solid #1e293b;' + rowBg + '">';
     h += '<td style="padding:8px 12px;font-weight:700;color:' + (isCurrent ? '#a78bfa' : isLocked ? '#34d399' : '#e2e8f0') + '">' + monthNames[mi3-1];
@@ -4173,6 +4295,8 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + ((mProfit || isCurrent) ? fmtAmt(mProfit) : '\u2014');
     if (mAdjTotal !== 0) h += '<div style="font-size:0.6rem;color:' + (mAdjTotal > 0 ? '#22C55E' : '#EF4444') + '">' + (mAdjTotal > 0 ? '+' : '') + fmtAmt(mAdjTotal) + '</div>';
     h += '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mTaxes ? fmtAmt(mTaxes) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:' + (mNetProfit >= 0 ? '#10B981' : '#EF4444') + '">' + ((mNetProfit || isCurrent) ? fmtAmt(mNetProfit) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:center">';
     // Check custom status from snapshot
     var customStatus = '';
@@ -4199,7 +4323,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       var snapStatus = '';
       if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; snapStatus = cd4.status || ''; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch {} }
       if (!snapStatus) { snapStatus = isLocked ? 'locked' : isCurrent ? 'current' : isPast ? 'open' : ''; }
-      h += '<tr style="background:#0f172a"><td colspan="13" style="padding:12px 16px">';
+      h += '<tr style="background:#0f172a"><td colspan="15" style="padding:12px 16px">';
       h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
       // Row 1: Lead counts
       h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
@@ -4272,6 +4396,8 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? '-' + fmtAmt(Math.abs(yearTotals.expenses)) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (yearTotals.profit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearTotals.profit) + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:#F59E0B">' + (yearTotals.taxes ? fmtAmt(yearTotals.taxes) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (yearTotals.netProfit >= 0 ? '#10B981' : '#EF4444') + '">' + fmtAmt(yearTotals.netProfit) + '</td>';
   h += '<td colspan="2"></td></tr>';
   h += '</tbody></table></div></div>';
 
@@ -4290,6 +4416,8 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6">Услуги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444">Расходы</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#22C55E" title="Услуги - Расходы">Прибыль</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B" title="Налоги за квартал">Налоги</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#10B981" title="Чистая прибыль">Чистая</th>';
   h += '<th style="padding:8px;width:50px"></th></tr></thead><tbody>';
   var qMonthsMap = [[1,2,3],[4,5,6],[7,8,9],[10,11,12]];
   var qNames = ['Q1 (Янв\u2013Мар)','Q2 (Апр\u2013Июн)','Q3 (Июл\u2013Сен)','Q4 (Окт\u2013Дек)'];
@@ -4300,7 +4428,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     var qIsCurrent = qNum === currentQ;
     var qLocked = qSnap && qSnap.is_locked;
     var closedInQ = 0;
-    var qTurnover = 0, qSvc = 0, qArt = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0;
+    var qTurnover = 0, qSvc = 0, qArt = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0, qTaxes = 0;
     for (var qmi = 0; qmi < 3; qmi++) {
       var qmNum = qMonthsMap[qi2][qmi];
       var qmKey = currentYear + '-' + String(qmNum).padStart(2,'0');
@@ -4348,6 +4476,15 @@ function renderBizPeriodsV2(d, sd, fin) {
       qProfit = qSvc - qExp; // Прибыль = Услуги - Расходы
       qDone = Number(qSnap.leads_done)||0;
     }
+    // Sum taxes for this quarter from tax_payments
+    var allTP = data.taxPayments || [];
+    for (var qti = 0; qti < 3; qti++) {
+      var qtmKey = currentYear + '-' + String(qMonthsMap[qi2][qti]).padStart(2,'0');
+      for (var qtj = 0; qtj < allTP.length; qtj++) {
+        if (allTP[qtj].period_key === qtmKey) qTaxes += Number(allTP[qtj].amount) || 0;
+      }
+    }
+    var qNetProfit = qProfit - qTaxes;
     var qColor = qIsCurrent ? '#F59E0B' : qLocked ? '#22C55E' : '#e2e8f0';
     h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 12px;font-weight:700;color:' + qColor + '">' + qNames[qi2] + '</td>';
     h += '<td style="padding:8px 6px;color:#64748b;font-size:0.72rem">' + qMonthsMap[qi2].map(function(m){return monthNames[m-1];}).join(', ') + '</td>';
@@ -4359,6 +4496,8 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (qSvc ? fmtAmt(qSvc) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (qExp ? '-' + fmtAmt(Math.abs(qExp)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (qProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + (qProfit ? fmtAmt(qProfit) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (qTaxes ? fmtAmt(qTaxes) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:' + (qNetProfit >= 0 ? '#10B981' : '#EF4444') + '">' + (qNetProfit || qTaxes ? fmtAmt(qNetProfit) : '\u2014') + '</td>';
     h += '<td style="padding:8px;text-align:center">';
     if (qNum < currentQ && closedInQ === 3 && !qLocked) {
       h += '<button class="btn btn-primary" style="padding:3px 10px;font-size:0.72rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)"><i class="fas fa-lock"></i></button>';
@@ -4589,6 +4728,26 @@ function renderBizPeriodsV2(d, sd, fin) {
       if (snap2 && !snap2ROMI && mkt2 > 0) { snap2ROMI = Math.round((((Number(snap2.revenue_services)||0) - mkt2) / mkt2) * 1000) / 10; }
       // LTV is already set from live data or snapshot - no fallback overwrite
 
+      // Compute taxes for each comparison period from tax_payments
+      var snap1Taxes = 0, snap2Taxes = 0;
+      var allTxP = data.taxPayments || [];
+      if (snap1 && snap1.period_type === 'month') {
+        for (var txI = 0; txI < allTxP.length; txI++) { if (allTxP[txI].period_key === snap1.period_key) snap1Taxes += Number(allTxP[txI].amount) || 0; }
+      } else if (snap1 && snap1.period_type === 'quarter') {
+        var qmMap = {1:[1,2,3],2:[4,5,6],3:[7,8,9],4:[10,11,12]};
+        var qn = parseInt((snap1.period_key||'').replace(/.*Q/,'')) || 0;
+        var qy = parseInt((snap1.period_key||'').split('-')[0]) || currentYear;
+        if (qmMap[qn]) { for (var qmi2 = 0; qmi2 < qmMap[qn].length; qmi2++) { var qmk2 = qy + '-' + String(qmMap[qn][qmi2]).padStart(2,'0'); for (var txJ = 0; txJ < allTxP.length; txJ++) { if (allTxP[txJ].period_key === qmk2) snap1Taxes += Number(allTxP[txJ].amount) || 0; } } }
+      }
+      if (snap2 && snap2.period_type === 'month') {
+        for (var txK = 0; txK < allTxP.length; txK++) { if (allTxP[txK].period_key === snap2.period_key) snap2Taxes += Number(allTxP[txK].amount) || 0; }
+      } else if (snap2 && snap2.period_type === 'quarter') {
+        var qmMap2 = {1:[1,2,3],2:[4,5,6],3:[7,8,9],4:[10,11,12]};
+        var qn2 = parseInt((snap2.period_key||'').replace(/.*Q/,'')) || 0;
+        var qy2 = parseInt((snap2.period_key||'').split('-')[0]) || currentYear;
+        if (qmMap2[qn2]) { for (var qmi3 = 0; qmi3 < qmMap2[qn2].length; qmi3++) { var qmk3 = qy2 + '-' + String(qmMap2[qn2][qmi3]).padStart(2,'0'); for (var txL = 0; txL < allTxP.length; txL++) { if (allTxP[txL].period_key === qmk3) snap2Taxes += Number(allTxP[txL].amount) || 0; } } }
+      }
+
       // Section separator helper
       var SECTION = '__section__';
 
@@ -4611,6 +4770,10 @@ function renderBizPeriodsV2(d, sd, fin) {
         {label:'\u041f\u0440\u0438\u0431\u044b\u043b\u044c',section:true},
         {label:'\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c',v1:snap1NP,v2:snap2NP,color:'#22C55E',icon:'fa-chart-line',bold:true},
         {label:'\u041c\u0430\u0440\u0436\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 %',v1:snap1ProfitMargin,v2:snap2ProfitMargin,color:'#10B981',icon:'fa-percentage',isPct:true},
+        // ===== TAXES =====
+        {label:'\u041d\u0430\u043b\u043e\u0433\u0438',section:true},
+        {label:'\u041d\u0430\u043b\u043e\u0433\u0438 (\u0438\u0442\u043e\u0433\u043e)',v1:snap1Taxes,v2:snap2Taxes,color:'#F59E0B',icon:'fa-landmark',isExpense:true},
+        {label:'\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043d\u0430\u043b\u043e\u0433\u043e\u0432',v1:snap1NP - snap1Taxes,v2:snap2NP - snap2Taxes,color:'#10B981',icon:'fa-check-double',bold:true},
         // ===== LEADS =====
         {label:'\u041b\u0438\u0434\u044b',section:true},
         {label:'\u041b\u0438\u0434\u044b (\u0432\u0441\u0435\u0433\u043e)',v1:Number(snap1.leads_count)||0,v2:snap2 ? Number(snap2.leads_count)||0 : 0,color:'#10B981',icon:'fa-users',isCnt:true},

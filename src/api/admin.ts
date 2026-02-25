@@ -114,13 +114,14 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all().catch(() => ({results:[]}))
     ]);
     // P&L related data (parallel, with fallback for new tables)
-    const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData] = await Promise.all([
+    const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData] = await Promise.all([
       db.prepare('SELECT * FROM tax_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM assets ORDER BY purchase_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loans ORDER BY start_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM dividends ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
-      db.prepare('SELECT * FROM other_income_expenses ORDER BY date DESC').all().catch(() => ({results:[]}))
+      db.prepare('SELECT * FROM other_income_expenses ORDER BY date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all().catch(() => ({results:[]}))
     ]);
     // Stats counts (parallel)
     const [contentCount, svcCount, msgCount, scriptCount, totalLeadsCount, newLeadsCount, todayLeadsCount, todayViews, weekViews, monthViews] = await Promise.all([
@@ -175,7 +176,8 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       loans: loansData.results || [],
       loanPayments: loanPaymentsData.results || [],
       dividends: dividendsData.results || [],
-      otherIncomeExpenses: otherIEData.results || []
+      otherIncomeExpenses: otherIEData.results || [],
+      taxRules: taxRulesData.results || []
     });
   } catch(e: any) {
     console.error('bulk-data error:', e?.message, e?.stack);
@@ -2559,6 +2561,63 @@ api.delete('/tax-payments/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== TAX RULES (recurring auto-generate) =====
+api.get('/tax-rules', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all();
+  return c.json({ rules: res.results || [] });
+});
+
+api.post('/tax-rules', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO tax_rules (rule_name, tax_type, tax_base, tax_rate, frequency, is_active, apply_from, apply_to, notes) VALUES (?,?,?,?,?,?,?,?,?)')
+    .bind(d.rule_name||'', d.tax_type||'income_tax', d.tax_base||'revenue', d.tax_rate||0, d.frequency||'monthly', d.is_active!==undefined ? (d.is_active?1:0) : 1, d.apply_from||'', d.apply_to||'', d.notes||'').run();
+  return c.json({ success: true });
+});
+
+api.put('/tax-rules/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  const fields: string[] = []; const vals: any[] = [];
+  for (const k of ['rule_name','tax_type','tax_base','tax_rate','frequency','is_active','apply_from','apply_to','notes']) {
+    if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(k==='is_active' ? (d[k]?1:0) : d[k]); }
+  }
+  if (fields.length) { fields.push('updated_at=CURRENT_TIMESTAMP'); vals.push(id); await db.prepare(`UPDATE tax_rules SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
+  return c.json({ success: true });
+});
+
+api.delete('/tax-rules/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM tax_rules WHERE id = ?').bind(c.req.param('id')).run();
+  return c.json({ success: true });
+});
+
+// Generate tax payments from rules for a specific period
+api.post('/tax-rules/generate/:periodKey', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const periodKey = c.req.param('periodKey'); // e.g. 2026-02
+  const rules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
+  let generated = 0;
+  for (const rule of (rules.results || []) as any[]) {
+    // Check period range
+    if (rule.apply_from && periodKey < rule.apply_from) continue;
+    if (rule.apply_to && periodKey > rule.apply_to) continue;
+    // Check frequency (quarterly = only q-end months: 03,06,09,12)
+    const month = parseInt(periodKey.split('-')[1]);
+    if (rule.frequency === 'quarterly' && ![3,6,9,12].includes(month)) continue;
+    // Check if already exists for this rule+period
+    const existing = await db.prepare('SELECT id FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
+    if (existing) continue;
+    // Insert payment from rule
+    await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,0,?,?,?,?,1,?)')
+      .bind(rule.tax_type, rule.rule_name, periodKey, 'pending', rule.tax_rate, rule.tax_base, rule.id).run();
+    generated++;
+  }
+  return c.json({ success: true, generated });
+});
+
 // ===== ASSETS (Amortization) =====
 api.get('/assets', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -2771,13 +2830,16 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     if (item.type === 'income') otherIncome += item.amount || 0;
     else otherExpenses += item.amount || 0;
   }
-  // Salary summary for period
+  // Salary summary for period — only count employees active during this period
+  const periodStart = periodKey + '-01';
+  const periodEnd = periodKey + '-31';
   const salaryData = await db.prepare(`SELECT 
-    COALESCE(SUM(CASE WHEN u.is_active=1 THEN u.salary ELSE 0 END), 0) as total_salaries,
+    COALESCE(SUM(CASE WHEN u.is_active=1 AND (u.hire_date = '' OR u.hire_date IS NULL OR u.hire_date <= ?) AND (u.end_date = '' OR u.end_date IS NULL OR u.end_date >= ?) THEN u.salary ELSE 0 END), 0) as total_salaries,
+    COUNT(CASE WHEN u.is_active=1 AND (u.hire_date = '' OR u.hire_date IS NULL OR u.hire_date <= ?) AND (u.end_date = '' OR u.end_date IS NULL OR u.end_date >= ?) AND u.salary > 0 THEN 1 END) as active_employee_count,
     COALESCE((SELECT SUM(CASE WHEN eb.bonus_type='bonus' OR (eb.bonus_type IS NULL AND eb.amount > 0) THEN eb.amount ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as total_bonuses,
     COALESCE((SELECT SUM(CASE WHEN eb.bonus_type IN ('penalty','fine') OR (eb.bonus_type IS NULL AND eb.amount < 0) THEN ABS(eb.amount) ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as total_penalties
     FROM users u WHERE u.salary > 0`)
-    .bind(periodKey + '-01', periodKey + '-31', periodKey + '-01', periodKey + '-31').first();
+    .bind(periodEnd, periodStart, periodEnd, periodStart, periodStart, periodEnd, periodStart, periodEnd).first();
   // Expenses from expenses table (commercial & marketing)
   const expData = await db.prepare(`SELECT 
     COALESCE(SUM(CASE WHEN ec.is_marketing = 0 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as commercial,
@@ -2787,13 +2849,18 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
     WHERE e.is_active = 1`).first();
   // Build P&L cascade (before taxes)
-  const revenue = snap ? (snap.revenue_services as number || 0) : 0;
+  const revenueServices = snap ? (snap.revenue_services as number || 0) : 0;
+  const revenueArticles = snap ? (snap.revenue_articles as number || 0) : 0;
+  const revenue = revenueServices; // revenue for P&L = services only
+  const totalTurnover = revenueServices + revenueArticles; // total money coming in
+  const turnoverExclTransit = revenueServices; // excluding transit (buyouts)
   const refunds = snap ? (snap.refunds as number || 0) : 0;
   const cogs = expData ? (expData.commercial as number || 0) : 0;
   const grossProfit = revenue - cogs;
   const salariesBase = salaryData?.total_salaries as number || 0;
   const bonusesVal = salaryData?.total_bonuses as number || 0;
   const penalties = salaryData?.total_penalties as number || 0;
+  const activeEmployeeCount = salaryData?.active_employee_count as number || 0;
   const salaryTotal = salariesBase + bonusesVal - penalties;
   const marketing = expData ? (expData.marketing as number || 0) : 0;
   const totalOpex = salaryTotal + marketing + monthlyDepreciation;
@@ -2805,17 +2872,21 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const totalExpensesAll = cogs + totalOpex; // for income-minus-expenses base
 
   // Auto-calculate tax amounts for taxes with is_auto=1
-  // tax_base: 'revenue', 'ebt', 'income_minus_expenses', 'payroll', 'vat_inclusive', 'fixed'
+  // tax_base: 'revenue', 'ebt', 'income_minus_expenses', 'payroll', 'vat_inclusive', 'fixed', 'total_turnover', 'turnover_excl_transit'
   const taxItems = (taxesRaw.results || []).map((t: any) => {
     if (t.is_auto && t.tax_rate > 0) {
       let base = 0;
       switch (t.tax_base) {
         case 'revenue': base = revenue; break;
+        case 'total_turnover': base = totalTurnover; break;
+        case 'turnover_excl_transit': base = turnoverExclTransit; break;
         case 'ebt': base = Math.max(ebt, 0); break;
         case 'income_minus_expenses': base = Math.max(revenue - totalExpensesAll, 0); break;
         case 'payroll': base = salariesBase + bonusesVal; break;
         case 'vat_inclusive': base = revenue;
           return { ...t, amount: Math.round(revenue * t.tax_rate / (100 + t.tax_rate) * 100) / 100, calculated_base: base, calculated_base_name: 'vat_inclusive' };
+        case 'vat_turnover': base = totalTurnover;
+          return { ...t, amount: Math.round(totalTurnover * t.tax_rate / (100 + t.tax_rate) * 100) / 100, calculated_base: base, calculated_base_name: 'vat_turnover' };
         default: return t; // fixed — use manual amount
       }
       return { ...t, amount: Math.round(base * t.tax_rate / 100 * 100) / 100, calculated_base: base, calculated_base_name: t.tax_base };
@@ -2832,12 +2903,18 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const netProfit = ebt - totalTaxes;
   const retainedEarnings = netProfit - totalDividends;
 
+  // Tax rules for reference
+  const taxRules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
+
   return {
     period_key: periodKey,
-    revenue, refunds, net_revenue: revenue - refunds,
+    revenue, revenue_services: revenueServices, revenue_articles: revenueArticles,
+    total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit,
+    refunds, net_revenue: revenue - refunds,
     cogs, gross_profit: grossProfit,
     gross_margin: revenue > 0 ? Math.round(grossProfit / revenue * 10000) / 100 : 0,
     salaries: salariesBase, bonuses: bonusesVal, penalties, salary_total: salaryTotal,
+    active_employee_count: activeEmployeeCount,
     marketing, depreciation: monthlyDepreciation, total_opex: totalOpex,
     ebit, ebit_margin: revenue > 0 ? Math.round(ebit / revenue * 10000) / 100 : 0,
     ebitda, ebitda_margin: revenue > 0 ? Math.round(ebitda / revenue * 10000) / 100 : 0,
@@ -2857,9 +2934,29 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     other_items: otherIE.results || [],
     assets: assets.results || [],
     loan_payments_list: loanPaymentsList.results || [],
-    _bases: { revenue, ebt, income_minus_expenses: Math.max(revenue - totalExpensesAll, 0), payroll: salariesBase + bonusesVal },
+    tax_rules: taxRules.results || [],
+    _bases: { revenue, ebt, income_minus_expenses: Math.max(revenue - totalExpensesAll, 0), payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
 }
+
+// Tax summary for a specific month (for Performance section integration)
+api.get('/tax-summary/:periodKey', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const periodKey = c.req.param('periodKey');
+  try {
+    const pnl = await computePnlForPeriod(db, periodKey);
+    return c.json({
+      period_key: periodKey,
+      total_taxes: pnl.total_taxes,
+      tax_burden: pnl.tax_burden,
+      effective_tax_rate: pnl.effective_tax_rate,
+      taxes: pnl.taxes,
+      net_profit_after_tax: pnl.net_profit,
+    });
+  } catch (err: any) {
+    return c.json({ error: 'Tax summary error: ' + (err?.message || 'unknown') }, 500);
+  }
+});
 
 api.get('/pnl/:periodKey', authMiddleware, async (c) => {
   const db = c.env.DB;
