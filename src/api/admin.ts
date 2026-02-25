@@ -1689,7 +1689,7 @@ api.post('/period-snapshots', authMiddleware, async (c) => {
   if (!d.period_type || !d.period_key) return c.json({ error: 'period_type and period_key required' }, 400);
   // Check if already exists
   const existing = await db.prepare('SELECT id, is_locked FROM period_snapshots WHERE period_type = ? AND period_key = ?').bind(d.period_type, d.period_key).first();
-  if (existing && existing.is_locked) return c.json({ error: 'Period already locked' }, 400);
+  // Allow re-saving locked periods (for editing data or re-locking)
   if (existing) {
     // Update
     await db.prepare(`UPDATE period_snapshots SET revenue_services=?, revenue_articles=?, total_turnover=?, refunds=?,
@@ -2564,16 +2564,24 @@ api.delete('/tax-payments/:id', authMiddleware, async (c) => {
 // ===== TAX RULES (recurring auto-generate) =====
 api.get('/tax-rules', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const res = await db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all();
-  return c.json({ rules: res.results || [] });
+  try {
+    const res = await db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all();
+    return c.json({ rules: res.results || [] });
+  } catch {
+    return c.json({ rules: [] });
+  }
 });
 
 api.post('/tax-rules', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('INSERT INTO tax_rules (rule_name, tax_type, tax_base, tax_rate, frequency, is_active, apply_from, apply_to, notes) VALUES (?,?,?,?,?,?,?,?,?)')
-    .bind(d.rule_name||'', d.tax_type||'income_tax', d.tax_base||'revenue', d.tax_rate||0, d.frequency||'monthly', d.is_active!==undefined ? (d.is_active?1:0) : 1, d.apply_from||'', d.apply_to||'', d.notes||'').run();
-  return c.json({ success: true });
+  try {
+    await db.prepare('INSERT INTO tax_rules (rule_name, tax_type, tax_base, tax_rate, frequency, is_active, apply_from, apply_to, notes) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(d.rule_name||'', d.tax_type||'income_tax', d.tax_base||'revenue', d.tax_rate||0, d.frequency||'monthly', d.is_active!==undefined ? (d.is_active?1:0) : 1, d.apply_from||'', d.apply_to||'', d.notes||'').run();
+    return c.json({ success: true });
+  } catch (err: any) {
+    return c.json({ error: err?.message || 'Failed to create tax rule' }, 500);
+  }
 });
 
 api.put('/tax-rules/:id', authMiddleware, async (c) => {
@@ -2598,24 +2606,32 @@ api.delete('/tax-rules/:id', authMiddleware, async (c) => {
 api.post('/tax-rules/generate/:periodKey', authMiddleware, async (c) => {
   const db = c.env.DB;
   const periodKey = c.req.param('periodKey'); // e.g. 2026-02
-  const rules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
-  let generated = 0;
-  for (const rule of (rules.results || []) as any[]) {
-    // Check period range
-    if (rule.apply_from && periodKey < rule.apply_from) continue;
-    if (rule.apply_to && periodKey > rule.apply_to) continue;
-    // Check frequency (quarterly = only q-end months: 03,06,09,12)
-    const month = parseInt(periodKey.split('-')[1]);
-    if (rule.frequency === 'quarterly' && ![3,6,9,12].includes(month)) continue;
-    // Check if already exists for this rule+period
-    const existing = await db.prepare('SELECT id FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
-    if (existing) continue;
-    // Insert payment from rule
-    await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,0,?,?,?,?,1,?)')
-      .bind(rule.tax_type, rule.rule_name, periodKey, 'pending', rule.tax_rate, rule.tax_base, rule.id).run();
-    generated++;
+  try {
+    const rules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
+    let generated = 0;
+    for (const rule of (rules.results || []) as any[]) {
+      // Check period range
+      if (rule.apply_from && periodKey < rule.apply_from) continue;
+      if (rule.apply_to && periodKey > rule.apply_to) continue;
+      // Check frequency (quarterly = only q-end months: 03,06,09,12)
+      const month = parseInt(periodKey.split('-')[1]);
+      if (rule.frequency === 'quarterly' && ![3,6,9,12].includes(month)) continue;
+      // Check if already exists for this rule+period
+      const existing = await db.prepare('SELECT id FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
+      if (existing) continue;
+      // Insert payment from rule
+      await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,0,?,?,?,?,1,?)')
+        .bind(rule.tax_type, rule.rule_name, periodKey, 'pending', rule.tax_rate, rule.tax_base, rule.id).run();
+      generated++;
+    }
+    return c.json({ success: true, generated });
+  } catch (err: any) {
+    // Handle missing table or other DB errors
+    if (err?.message?.includes('no such table')) {
+      return c.json({ error: 'Tax rules table not found. Please redeploy to create the table.', generated: 0 }, 500);
+    }
+    return c.json({ error: err?.message || 'Generation failed', generated: 0 }, 500);
   }
-  return c.json({ success: true, generated });
 });
 
 // ===== ASSETS (Amortization) =====

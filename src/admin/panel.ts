@@ -2781,13 +2781,15 @@ async function deleteTaxRule(id) {
 
 async function generateTaxFromRules() {
   var res = await api('/tax-rules/generate/' + pnlPeriod, { method: 'POST', _silent: true });
-  if (res && res.generated > 0) {
+  if (res && res.success && res.generated > 0) {
     var bulk = await api('/bulk-data', { _silent: true });
     if (bulk && !bulk.error) { data.taxPayments = bulk.taxPayments || []; }
     pnlData = null; loadPnlData();
     toast('✓ Создано платежей: ' + res.generated);
-  } else if (res && res.generated === 0) {
+  } else if (res && res.generated === 0 && !res.error) {
     toast('Платежи уже существуют или нет применимых правил', 'info');
+  } else if (res && res.error) {
+    toast(res.error, 'error');
   } else {
     toast('Ошибка генерации', 'error');
   }
@@ -3209,7 +3211,7 @@ function renderPnlTaxes(p) {
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     h += '<div><label style="font-size:0.75rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="tax_rule_name" value="' + escHtml((editRule && editRule.rule_name) || '') + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442 5%"></div>';
     h += '<div><label style="font-size:0.75rem;color:#64748b">\u0422\u0438\u043f \u043d\u0430\u043b\u043e\u0433\u0430</label><select class="input" id="tax_rule_type">';
-    var ruleTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'turnover_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
+    var ruleTypes = [{v:'income_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c'},{v:'vat',l:'\u041d\u0414\u0421'},{v:'usn_income',l:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b'},{v:'usn_income_expense',l:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b \u2212 \u0420\u0430\u0441\u0445\u043e\u0434\u044b'},{v:'turnover_tax',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442'},{v:'payroll_tax',l:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f'},{v:'patent',l:'\u041f\u0430\u0442\u0435\u043d\u0442'},{v:'property',l:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0438\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e'},{v:'other',l:'\u041f\u0440\u043e\u0447\u0435\u0435'}];
     for (var rt = 0; rt < ruleTypes.length; rt++) h += '<option value="' + ruleTypes[rt].v + '"' + (editRule && editRule.tax_type === ruleTypes[rt].v ? ' selected' : '') + '>' + ruleTypes[rt].l + '</option>';
     h += '</select></div>';
     h += '<div><label style="font-size:0.75rem;color:#64748b">\u0421\u0442\u0430\u0432\u043a\u0430 %</label><input type="number" class="input" id="tax_rule_rate" value="' + ((editRule && editRule.tax_rate) || '') + '" step="0.1"></div>';
@@ -4338,15 +4340,15 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mTaxes ? fmtAmt(mTaxes) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:' + (mNetProfit >= 0 ? '#10B981' : '#EF4444') + '">' + ((mNetProfit || isCurrent) ? fmtAmt(mNetProfit) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:center">';
-    // Check custom status from snapshot
+    // Check custom status from snapshot — is_locked ALWAYS takes priority
     var customStatus = '';
     if (mSnap) { try { var cd8 = JSON.parse(mSnap.custom_data || '{}'); customStatus = cd8.status || ''; } catch {} }
-    if (customStatus === 'locked' || (isLocked && !customStatus)) h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
+    if (isLocked) h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
+    else if (customStatus === 'locked') h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
     else if (customStatus === 'checking') h += '<span style="color:#3B82F6;font-size:0.68rem"><i class="fas fa-search"></i> Проверка</span>';
     else if (customStatus === 'custom') { var customLabel2 = ''; try { customLabel2 = JSON.parse(mSnap.custom_data || '{}').status_label || ''; } catch {} h += '<span style="color:#a78bfa;font-size:0.68rem">' + (customLabel2 || 'Другое') + '</span>'; }
-    else if (isCurrent && !customStatus) h += '<span style="color:#F59E0B;font-size:0.68rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.5rem;margin-right:3px"></i>Текущий</span>';
-    else if (isPast && !customStatus) h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
-    else if (customStatus === 'open') h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
+    else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.68rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.5rem;margin-right:3px"></i>Текущий</span>';
+    else if (isPast) h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
     else h += '<span style="color:#334155;font-size:0.68rem">\u2014</span>';
     h += '</td>';
     h += '<td style="padding:8px 6px;text-align:center;white-space:nowrap">';
@@ -4362,7 +4364,9 @@ function renderBizPeriodsV2(d, sd, fin) {
       var existingAdjs = [];
       var snapStatus = '';
       if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; snapStatus = cd4.status || ''; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch {} }
-      if (!snapStatus) { snapStatus = isLocked ? 'locked' : isCurrent ? 'current' : isPast ? 'open' : ''; }
+      // is_locked in DB always overrides custom_data.status
+      if (isLocked) { snapStatus = 'locked'; }
+      else if (!snapStatus) { snapStatus = isCurrent ? 'current' : isPast ? 'open' : ''; }
       h += '<tr style="background:#0f172a"><td colspan="15" style="padding:12px 16px">';
       h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
       // Row 1: Lead counts
@@ -4385,6 +4389,19 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '<div><label style="font-size:0.7rem;color:#EC4899">Маркетинг</label><input class="input" id="edit-expmkt-' + mKey + '" type="number" value="' + mExpMkt + '" style="width:100%;padding:6px 10px"></div>';
       h += '</div>';
       // Auto-fetch salary breakdown from DB for editing month (triggered by edit button onclick)
+      // Row 2.5: Computed summary (read-only, matches table headers)
+      var editTurnover = mSvc + mArt;
+      var editExpTotal = mExpSal + mExpComm + mExpMkt;
+      var editProfit = mSvc - editExpTotal + mAdjTotal;
+      var editTaxes = mTaxes;
+      var editNetProfit = editProfit - editTaxes;
+      h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;padding:10px 12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b">';
+      h += '<div><label style="font-size:0.65rem;color:#a78bfa;text-transform:uppercase">\u041f\u0440\u0438\u0445\u043e\u0434 (\u0438\u0442\u043e\u0433\u043e)</label><div style="font-weight:700;color:#a78bfa;font-size:0.95rem">' + fmtAmt(editTurnover) + '</div><div style="font-size:0.6rem;color:#475569">\u0423\u0441\u043b\u0443\u0433\u0438 + \u0412\u044b\u043a\u0443\u043f\u044b</div></div>';
+      h += '<div><label style="font-size:0.65rem;color:#EF4444;text-transform:uppercase">\u0420\u0430\u0441\u0445\u043e\u0434\u044b (\u0438\u0442\u043e\u0433\u043e)</label><div style="font-weight:700;color:#EF4444;font-size:0.95rem">-' + fmtAmt(Math.abs(editExpTotal)) + '</div><div style="font-size:0.6rem;color:#475569">\u0417\u041f + \u041a\u043e\u043c\u043c. + \u041c\u043a\u0442.</div></div>';
+      h += '<div><label style="font-size:0.65rem;color:' + (editProfit >= 0 ? '#22C55E' : '#EF4444') + ';text-transform:uppercase">\u041f\u0440\u0438\u0431\u044b\u043b\u044c</label><div style="font-weight:700;color:' + (editProfit >= 0 ? '#22C55E' : '#EF4444') + ';font-size:0.95rem">' + fmtAmt(editProfit) + '</div><div style="font-size:0.6rem;color:#475569">\u0423\u0441\u043b\u0443\u0433\u0438 - \u0420\u0430\u0441\u0445\u043e\u0434\u044b' + (mAdjTotal !== 0 ? ' + \u041a\u043e\u0440\u0440.' : '') + '</div></div>';
+      h += '<div><label style="font-size:0.65rem;color:#F59E0B;text-transform:uppercase">\u041d\u0430\u043b\u043e\u0433\u0438</label><div style="font-weight:700;color:#F59E0B;font-size:0.95rem">' + (editTaxes ? fmtAmt(editTaxes) : '\u2014') + '</div><div style="font-size:0.6rem;color:#475569">\u0418\u0437 \u043b\u0438\u0441\u0442\u0430 P&L</div></div>';
+      h += '<div><label style="font-size:0.65rem;color:' + (editNetProfit >= 0 ? '#10B981' : '#EF4444') + ';text-transform:uppercase">\u0427\u0438\u0441\u0442\u0430\u044f</label><div style="font-weight:700;color:' + (editNetProfit >= 0 ? '#10B981' : '#EF4444') + ';font-size:0.95rem">' + fmtAmt(editNetProfit) + '</div><div style="font-size:0.6rem;color:#475569">\u041f\u0440\u0438\u0431\u044b\u043b\u044c - \u041d\u0430\u043b\u043e\u0433\u0438</div></div>';
+      h += '</div>';
       // Row 3: Status selector
       h += '<div style="display:grid;grid-template-columns:1fr 3fr;gap:10px;margin-bottom:12px">';
       h += '<div><label style="font-size:0.7rem;color:#94a3b8">Статус</label><select class="input" id="edit-status-' + mKey + '" style="width:100%;padding:6px 10px">';
@@ -4450,6 +4467,9 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:left;color:#94a3b8;font-size:0.72rem">Месяцы</th>';
   h += '<th style="padding:8px 6px;text-align:center;color:#94a3b8">Закрыто</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#22C55E" title="Закрытые лиды">Закрытые</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B" title="В работе">В работе</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#EF4444" title="Отказы">Отказы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#3B82F6" title="На проверке">Проверка</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#a78bfa">Приход</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B">Выкупы</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#f87171">Возврат</th>';
@@ -4468,7 +4488,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     var qIsCurrent = qNum === currentQ;
     var qLocked = qSnap && qSnap.is_locked;
     var closedInQ = 0;
-    var qTurnover = 0, qSvc = 0, qArt = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0, qTaxes = 0;
+    var qTurnover = 0, qSvc = 0, qArt = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0, qTaxes = 0, qInProg = 0, qRejected = 0, qChecking = 0;
     for (var qmi = 0; qmi < 3; qmi++) {
       var qmNum = qMonthsMap[qi2][qmi];
       var qmKey = currentYear + '-' + String(qmNum).padStart(2,'0');
@@ -4488,6 +4508,9 @@ function renderBizPeriodsV2(d, sd, fin) {
         qTurnover += cSvc + cArt;
         qProfit += cSvc - cExp;
         qDone += (sd.done ? Number(sd.done.count)||0 : 0);
+        qInProg += (sd.in_progress ? Number(sd.in_progress.count)||0 : 0) + (sd.contacted ? Number(sd.contacted.count)||0 : 0);
+        qRejected += (sd.rejected ? Number(sd.rejected.count)||0 : 0);
+        qChecking += (sd.checking ? Number(sd.checking.count)||0 : 0);
       } else if (qmSnap) {
         // Use snapshot data for past months
         var qmSvc = Number(qmSnap.revenue_services)||0;
@@ -4502,6 +4525,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         qTurnover += qmSvc + qmArt;
         qProfit += qmSvc - qmExp + qmAdj;
         qDone += Number(qmSnap.leads_done)||0;
+        try { var qmCD2 = JSON.parse(qmSnap.custom_data || '{}'); qInProg += Number(qmCD2.in_progress_count)||0; qRejected += Number(qmCD2.rejected_count)||0; qChecking += Number(qmCD2.checking_count)||0; } catch {}
       }
     }
     // Use quarter snapshot if locked
@@ -4530,6 +4554,9 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;color:#64748b;font-size:0.72rem">' + qMonthsMap[qi2].map(function(m){return monthNames[m-1];}).join(', ') + '</td>';
     h += '<td style="padding:8px 6px;text-align:center">' + closedInQ + '/3</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#22C55E">' + (qDone || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (qInProg || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (qRejected || '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (qChecking || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (qTurnover ? fmtAmt(qTurnover) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (qArt ? fmtAmt(qArt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (qRef ? '-' + fmtAmt(Math.abs(qRef)) : '\u2014') + '</td>';
