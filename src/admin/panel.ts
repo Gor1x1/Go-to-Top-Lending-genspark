@@ -2631,7 +2631,10 @@ async function loadPnlData() {
     pnlData = result;
   }
   if (pnlData && pnlData.fiscal_year_start_month) pnlFiscalMonth = pnlData.fiscal_year_start_month;
-  pnlLoading = false; render();
+  pnlLoading = false;
+  // After P&L computed, re-fetch tax payments (auto-calc amounts are now written to DB)
+  try { var tpRes = await api('/tax-payments', { _silent: true }); if (tpRes && tpRes.payments) data.taxPayments = tpRes.payments; } catch {}
+  render();
 }
 async function saveFiscalYearStart(val) {
   var m = parseInt(val) || 1;
@@ -3197,10 +3200,11 @@ function renderPnlTaxes(p) {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
   h += '<h4 style="font-weight:700;color:#F59E0B;font-size:0.95rem"><i class="fas fa-cog" style="margin-right:6px"></i>\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u0430 <span style="font-size:0.7rem;color:#64748b;font-weight:400">(\u0430\u0432\u0442\u043e\u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439)</span></h4>';
   h += '<div style="display:flex;gap:6px">';
-  h += '<button class="btn btn-success" style="padding:6px 12px;font-size:0.78rem" onclick="generateTaxFromRules()" title="\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0438\u0437 \u043f\u0440\u0430\u0432\u0438\u043b \u0437\u0430 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0435\u0440\u0438\u043e\u0434"><i class="fas fa-bolt" style="margin-right:4px"></i>\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0437\u0430 ' + pnlPeriod + '</button>';
+  h += '<button class="btn btn-success" style="padding:6px 12px;font-size:0.78rem" onclick="generateTaxFromRules()" title="\u0420\u0443\u0447\u043d\u0430\u044f \u0433\u0435\u043d\u0435\u0440\u0430\u0446\u0438\u044f (\u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043f\u0440\u043e\u0438\u0441\u0445\u043e\u0434\u0438\u0442 \u043f\u0440\u0438 \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u0438 P&L)"><i class="fas fa-bolt" style="margin-right:4px"></i>\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0437\u0430 ' + pnlPeriod + '</button>';
   h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="showTaxRuleForm=!showTaxRuleForm;editTaxRuleId=0;render()"><i class="fas fa-plus" style="margin-right:4px"></i>\u041f\u0440\u0430\u0432\u0438\u043b\u043e</button>';
   h += '</div></div>';
   // Tax rule explanation
+  h += '<div style="font-size:0.75rem;color:#64748b;margin-bottom:12px;line-height:1.6"><i class="fas fa-magic" style="color:#22C55E;margin-right:4px"></i><strong style="color:#22C55E">\u0410\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438:</strong> \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0441\u043e\u0437\u0434\u0430\u044e\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043f\u0440\u0438 \u043e\u0442\u043a\u0440\u044b\u0442\u0438\u0438 P&L \u0437\u0430 \u043b\u044e\u0431\u043e\u0439 \u043f\u0435\u0440\u0438\u043e\u0434. \u041a\u043d\u043e\u043f\u043a\u0430 \u00ab\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u00bb \u2014 \u0434\u043b\u044f \u0440\u0443\u0447\u043d\u043e\u0433\u043e \u0437\u0430\u043f\u0443\u0441\u043a\u0430, \u0435\u0441\u043b\u0438 \u043d\u0443\u0436\u043d\u043e.</div>';
   h += '<div style="font-size:0.75rem;color:#64748b;margin-bottom:12px;line-height:1.6"><i class="fas fa-info-circle" style="color:#8B5CF6;margin-right:4px"></i>\u041f\u0440\u0430\u0432\u0438\u043b\u0430 \u2014 \u044d\u0442\u043e \u0448\u0430\u0431\u043b\u043e\u043d\u044b. \u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u0413\u0435\u043d\u0435\u0440\u0438\u0440\u043e\u0432\u0430\u0442\u044c\u00bb \u0438 \u0441\u0438\u0441\u0442\u0435\u043c\u0430 \u0441\u043e\u0437\u0434\u0430\u0441\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434, \u043a\u043e\u0442\u043e\u0440\u044b\u0435 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u044e\u0442\u0441\u044f \u043e\u0442 \u0431\u0430\u0437\u044b.</div>';
   // Tax rule add/edit form
   if (typeof showTaxRuleForm !== 'undefined' && showTaxRuleForm) {
@@ -5358,6 +5362,20 @@ async function refreshAnalytics() {
   expandedMonth = '';
   analyticsData = null;
   try {
+    // Re-fetch ALL data (bulk-data includes taxPayments, periodSnapshots, etc.)
+    var bulk = await api('/bulk-data', { _silent: true });
+    if (bulk && !bulk.error) {
+      data.taxPayments = bulk.taxPayments || [];
+      data.periodSnapshots = bulk.periodSnapshots || [];
+      data.expenses = bulk.expenses || [];
+      data.assets = bulk.assets || [];
+      data.loans = bulk.loans || [];
+      data.loanPayments = bulk.loanPayments || [];
+      data.dividends = bulk.dividends || [];
+      data.otherIncomeExpenses = bulk.otherIncomeExpenses || [];
+      data.users = bulk.users || [];
+      data.taxRules = bulk.taxRules || [];
+    }
     await loadAnalyticsData();
   } catch(e) { console.error('Refresh error:', e); }
   analyticsRefreshing = false;

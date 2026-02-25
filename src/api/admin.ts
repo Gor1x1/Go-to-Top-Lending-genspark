@@ -2846,7 +2846,29 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const yearStart = periodKey.substring(0, 4) + '-01';
   // Revenue from period_snapshots
   const snap = await db.prepare("SELECT * FROM period_snapshots WHERE period_key = ? AND period_type = 'month'").bind(periodKey).first();
-  // Taxes for this period (raw — will be processed below with auto-calculation)
+  // Auto-generate tax payments from rules if none exist for this period
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS tax_rules (
+      id INTEGER PRIMARY KEY AUTOINCREMENT, rule_name TEXT NOT NULL DEFAULT '', tax_type TEXT NOT NULL DEFAULT 'income_tax',
+      tax_base TEXT DEFAULT 'revenue', tax_rate REAL DEFAULT 0, frequency TEXT DEFAULT 'monthly',
+      is_active INTEGER DEFAULT 1, apply_from TEXT DEFAULT '', apply_to TEXT DEFAULT '',
+      notes TEXT DEFAULT '', created_at DATETIME DEFAULT CURRENT_TIMESTAMP, updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    const rules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
+    const month = parseInt(periodKey.split('-')[1]);
+    for (const rule of (rules.results || []) as any[]) {
+      if (rule.apply_from && periodKey < rule.apply_from) continue;
+      if (rule.apply_to && periodKey > rule.apply_to) continue;
+      if (rule.frequency === 'quarterly' && ![3,6,9,12].includes(month)) continue;
+      const existing = await db.prepare('SELECT id FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
+      if (!existing) {
+        await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,0,?,?,?,?,1,?)')
+          .bind(rule.tax_type, rule.rule_name, periodKey, 'pending', rule.tax_rate, rule.tax_base, rule.id).run();
+      }
+    }
+  } catch {}
+
+  // Re-read taxes after auto-generation
   const taxesRaw = await db.prepare('SELECT * FROM tax_payments WHERE period_key = ?').bind(periodKey).all();
   // Assets depreciation for this month
   const assets = await db.prepare('SELECT * FROM assets WHERE is_active = 1').all();
@@ -2940,6 +2962,14 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   });
 
   const totalTaxes = taxItems.reduce((s: number, t: any) => s + (t.amount || 0), 0);
+
+  // Write back auto-calculated amounts to DB so other endpoints see correct values
+  for (const t of taxItems) {
+    if (t.is_auto && t.tax_rate > 0 && t.id) {
+      try { await db.prepare('UPDATE tax_payments SET amount = ? WHERE id = ? AND is_auto = 1').bind(t.amount || 0, t.id).run(); } catch {}
+    }
+  }
+
   // Taxes YTD
   const taxesYtd = await db.prepare("SELECT SUM(amount) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
   const autoTaxDelta = totalTaxes - (taxesRaw.results || []).reduce((s: number, t: any) => s + (t.amount || 0), 0);
