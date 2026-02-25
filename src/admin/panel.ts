@@ -3211,6 +3211,8 @@ function renderPnlTaxes(p) {
   h += '</div>';
   return h;
 }
+
+function renderPnlAssets(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-building" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430 \u0438 \u0430\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'asset\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0430\u043a\u0442\u0438\u0432</button></div>';
@@ -3257,6 +3259,8 @@ function renderPnlTaxes(p) {
   h += '</div></details>';
   return h;
 }
+
+function renderPnlLoans(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:8px"></i>\u041a\u0440\u0435\u0434\u0438\u0442\u044b \u0438 \u0437\u0430\u0439\u043c\u044b</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'loan\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u0440\u0435\u0434\u0438\u0442</button></div>';
