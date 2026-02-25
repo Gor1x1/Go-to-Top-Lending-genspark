@@ -2903,8 +2903,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const netProfit = ebt - totalTaxes;
   const retainedEarnings = netProfit - totalDividends;
 
-  // Tax rules for reference
-  const taxRules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all();
+  // Tax rules for reference (catch in case table doesn't exist yet on production)
+  const taxRules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all().catch(() => ({results:[]}));
 
   return {
     period_key: periodKey,
