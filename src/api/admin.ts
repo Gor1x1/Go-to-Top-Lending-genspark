@@ -3027,7 +3027,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const loanPaymentsList = await db.prepare("SELECT lp.*, l.name as loan_name FROM loan_payments lp LEFT JOIN loans l ON lp.loan_id = l.id WHERE lp.payment_date >= ? AND lp.payment_date <= ? ORDER BY lp.payment_date DESC")
     .bind(periodKey + '-01', periodKey + '-31').all();
   // Loan summary: total debt, monthly payments, load info
-  const loanSummary = await db.prepare("SELECT SUM(CASE WHEN loan_type != 'overdraft' THEN remaining_balance ELSE 0 END) as total_debt, SUM(CASE WHEN loan_type != 'overdraft' THEN monthly_payment ELSE 0 END) as total_monthly, SUM(CASE WHEN loan_type = 'overdraft' THEN overdraft_used ELSE 0 END) as overdraft_debt, COUNT(*) as loan_count FROM loans WHERE is_active = 1").first();
+  const loanSummary = await db.prepare("SELECT SUM(CASE WHEN loan_type != 'overdraft' THEN remaining_balance ELSE 0 END) as total_debt, SUM(CASE WHEN loan_type != 'overdraft' THEN COALESCE(NULLIF(bank_monthly_payment, 0), monthly_payment) ELSE 0 END) as total_monthly, SUM(CASE WHEN loan_type = 'overdraft' THEN overdraft_used ELSE 0 END) as overdraft_debt, COUNT(*) as loan_count FROM loans WHERE is_active = 1").first();
   // Loan settings (system-wide)
   let loanRepayMode = 'standard', loanAggrPct = 10, loanStdExtraPct = 0;
   try {

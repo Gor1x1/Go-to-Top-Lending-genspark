@@ -3813,7 +3813,7 @@ function renderPnlLoans(p) {
   } else if (isAggr) {
     var aggrAmt2 = Math.round((netProfitV) * (ls.aggressive_pct||10) / 100);
     var sortedLns = loans.filter(function(l) { return l.is_active !== 0 && l.loan_type !== 'overdraft' && (l.remaining_balance||0) > 0; }).sort(function(a,b) { return (a.priority||10)-(b.priority||10); });
-    var minPmts = sortedLns.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
+    var minPmts = sortedLns.reduce(function(s,l) { return s + ((l.bank_monthly_payment && l.bank_monthly_payment > 0) ? l.bank_monthly_payment : (l.monthly_payment||0)); }, 0);
     var eBudget = Math.max(aggrAmt2 - minPmts, 0);
     // Even if eBudget=0, in aggressive mode we still show PMT allocation
     // Case 1: budget >= total PMT => distribute extra on top of PMT
@@ -3822,22 +3822,23 @@ function renderPnlLoans(p) {
       var othLns = sortedLns.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
       var priSh = priLns.length > 0 ? Math.round(eBudget * 0.8) : 0;
       var othSh = eBudget - priSh;
-      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=(priLns[xi].monthly_payment||0)+pp; } }
-      else if (sortedLns.length > 0) { loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.8); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.8 / netProfitV * 10000)/100 : 0; loanAggrPmtMap[sortedLns[0].id]=(sortedLns[0].monthly_payment||0)+Math.round(eBudget * 0.8); }
-      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=(othLns[yi].monthly_payment||0)+(loanExtraMap[othLns[yi].id]||0); } }
+      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { var xAP = (priLns[xi].bank_monthly_payment && priLns[xi].bank_monthly_payment > 0) ? priLns[xi].bank_monthly_payment : (priLns[xi].monthly_payment||0); loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=xAP+pp; } }
+      else if (sortedLns.length > 0) { var s0AP = (sortedLns[0].bank_monthly_payment && sortedLns[0].bank_monthly_payment > 0) ? sortedLns[0].bank_monthly_payment : (sortedLns[0].monthly_payment||0); loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.8); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.8 / netProfitV * 10000)/100 : 0; loanAggrPmtMap[sortedLns[0].id]=s0AP+Math.round(eBudget * 0.8); }
+      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { var yAP = (othLns[yi].bank_monthly_payment && othLns[yi].bank_monthly_payment > 0) ? othLns[yi].bank_monthly_payment : (othLns[yi].monthly_payment||0); loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=yAP+(loanExtraMap[othLns[yi].id]||0); } }
       // Fill PMT map for loans without extra
-      for (var fi=0;fi<sortedLns.length;fi++) { if (!loanAggrPmtMap[sortedLns[fi].id]) loanAggrPmtMap[sortedLns[fi].id] = sortedLns[fi].monthly_payment || 0; }
+      for (var fi=0;fi<sortedLns.length;fi++) { if (!loanAggrPmtMap[sortedLns[fi].id]) { var fAP = (sortedLns[fi].bank_monthly_payment && sortedLns[fi].bank_monthly_payment > 0) ? sortedLns[fi].bank_monthly_payment : (sortedLns[fi].monthly_payment||0); loanAggrPmtMap[sortedLns[fi].id] = fAP; } }
     }
     // Case 2: budget < total PMT => proportional distribution
     else if (aggrAmt2 > 0 && minPmts > 0) {
       for (var qi=0;qi<sortedLns.length;qi++) {
-        var proportion = (sortedLns[qi].monthly_payment||0) / minPmts;
+        var qAP = (sortedLns[qi].bank_monthly_payment && sortedLns[qi].bank_monthly_payment > 0) ? sortedLns[qi].bank_monthly_payment : (sortedLns[qi].monthly_payment||0);
+        var proportion = qAP / minPmts;
         loanAggrPmtMap[sortedLns[qi].id] = Math.round(aggrAmt2 * proportion);
       }
     }
     // Case 3: aggrAmt2 = 0 (no profit) => just show PMT as is
     else {
-      for (var ri=0;ri<sortedLns.length;ri++) { loanAggrPmtMap[sortedLns[ri].id] = sortedLns[ri].monthly_payment || 0; }
+      for (var ri=0;ri<sortedLns.length;ri++) { var rAP = (sortedLns[ri].bank_monthly_payment && sortedLns[ri].bank_monthly_payment > 0) ? sortedLns[ri].bank_monthly_payment : (sortedLns[ri].monthly_payment||0); loanAggrPmtMap[sortedLns[ri].id] = rAP; }
     }
   }
   // Type labels
@@ -3923,23 +3924,25 @@ function renderPnlLoans(p) {
       continue;
     }
     // === ANNUITY / MANUAL CARD ===
+    // Determine actual payment: bank_monthly_payment (contract) takes priority over calculated PMT
+    var actualPmt = (l.bank_monthly_payment && l.bank_monthly_payment > 0) ? l.bank_monthly_payment : (l.monthly_payment || 0);
     var monthlyInterest = Math.round((l.remaining_balance || 0) * ((l.interest_rate || 0) / 100 / 12));
-    var monthlyPrincipal = Math.max((l.monthly_payment || 0) - monthlyInterest, 0);
-    if (monthlyInterest >= (l.monthly_payment || 0)) { monthlyPrincipal = 0; monthlyInterest = l.monthly_payment || 0; }
-    // Correct months remaining calculation
+    var monthlyPrincipal = Math.max(actualPmt - monthlyInterest, 0);
+    if (monthlyInterest >= actualPmt) { monthlyPrincipal = 0; monthlyInterest = actualPmt; }
+    // Correct months remaining calculation — based on actual payment
     var monthsRemaining = 0;
-    if (l.monthly_payment > 0 && l.remaining_balance > 0 && l.interest_rate > 0) {
+    if (actualPmt > 0 && l.remaining_balance > 0 && l.interest_rate > 0) {
       // Use logarithmic formula for accurate remaining months
       var mr = l.interest_rate / 100 / 12;
-      var pmt = l.monthly_payment;
+      var pmt = actualPmt;
       var bal = l.remaining_balance;
       if (pmt > bal * mr) {
         monthsRemaining = Math.ceil(-Math.log(1 - bal * mr / pmt) / Math.log(1 + mr));
       } else {
         monthsRemaining = 999; // Interest exceeds payment
       }
-    } else if (l.monthly_payment > 0 && l.remaining_balance > 0) {
-      monthsRemaining = Math.ceil(l.remaining_balance / l.monthly_payment);
+    } else if (actualPmt > 0 && l.remaining_balance > 0) {
+      monthsRemaining = Math.ceil(l.remaining_balance / actualPmt);
     }
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:10px">';
     h += '<div><div style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</div><div style="font-weight:700;color:#e2e8f0">' + fmtAmt(l.principal) + '</div></div>';
@@ -3952,21 +3955,23 @@ function renderPnlLoans(p) {
     if (monthsRemaining > 0 && monthsRemaining < 999) h += '<div><div style="font-size:0.7rem;color:#64748b">Ост. мес.</div><div style="font-weight:700;color:#a78bfa">' + monthsRemaining + '</div></div>';
     h += '</div>';
     // Current month breakdown (highlighted)
-    if (l.monthly_payment || aggrTargetPmt > 0) {
+    if (actualPmt > 0 || aggrTargetPmt > 0) {
       var breakdownBorder = isAggr ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)';
       var breakdownBg = isAggr ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)';
       var breakdownColor = isAggr ? '#F59E0B' : '#3B82F6';
       h += '<div style="padding:8px 12px;background:' + breakdownBg + ';border-radius:6px;border:1px solid ' + breakdownBorder + ';margin-bottom:8px;font-size:0.82rem">';
       h += '<div style="font-weight:600;color:' + breakdownColor + ';margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>' + loanPeriodLabel + ' — ' + (isAggr ? '\u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043d\u044b\u0439 \u043f\u043b\u0430\u043d' : '\u0440\u0430\u0437\u0431\u0438\u0432\u043a\u0430 \u043f\u043b\u0430\u0442\u0435\u0436\u0430') + '</div>';
       h += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
-      h += '<span style="color:#94a3b8">PMT: <b style="color:#e2e8f0">' + fmtAmt(l.monthly_payment) + '</b></span>';
+      // Show PMT label: if bank_monthly_payment differs, clarify which is shown
+      var pmtLabel = (l.bank_monthly_payment && l.bank_monthly_payment > 0 && l.bank_monthly_payment !== l.monthly_payment) ? '\u041f\u043b\u0430\u0442\u0451\u0436' : 'PMT';
+      h += '<span style="color:#94a3b8">' + pmtLabel + ': <b style="color:#e2e8f0">' + fmtAmt(actualPmt) + '</b></span>';
       h += '<span style="color:#94a3b8">\u0422\u0435\u043b\u043e: <b style="color:#22C55E">' + fmtAmt(monthlyPrincipal) + '</b></span>';
       h += '<span style="color:#94a3b8">\u041f\u0440\u043e\u0446\u0435\u043d\u0442: <b style="color:#EF4444">' + fmtAmt(monthlyInterest) + '</b></span>';
       if (isAggr && aggrTargetPmt > 0) {
         h += '</div><div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(245,158,11,0.2);display:flex;gap:16px;flex-wrap:wrap;align-items:center">';
         h += '<span style="color:#F59E0B;font-weight:700"><i class="fas fa-bolt" style="margin-right:4px"></i>\u0426\u0435\u043b\u0435\u0432\u043e\u0439: <b style="font-size:1rem">' + fmtAmt(aggrTargetPmt) + '</b></span>';
-        if (extraAmt > 0) h += '<span style="color:#94a3b8">(PMT ' + fmtAmt(l.monthly_payment) + ' + \u0434\u043e\u043f. <b style="color:#F59E0B">' + fmtAmt(extraAmt) + '</b>)</span>';
-        else if (aggrTargetPmt < (l.monthly_payment||0)) h += '<span style="color:#EF4444;font-size:0.72rem">(\u0431\u044e\u0434\u0436\u0435\u0442 < PMT, \u043f\u0440\u043e\u043f\u043e\u0440\u0446. ' + fmtAmt(aggrTargetPmt) + ')</span>';
+        if (extraAmt > 0) h += '<span style="color:#94a3b8">(' + pmtLabel + ' ' + fmtAmt(actualPmt) + ' + \u0434\u043e\u043f. <b style="color:#F59E0B">' + fmtAmt(extraAmt) + '</b>)</span>';
+        else if (aggrTargetPmt < actualPmt) h += '<span style="color:#EF4444;font-size:0.72rem">(\u0431\u044e\u0434\u0436\u0435\u0442 < ' + pmtLabel + ', \u043f\u0440\u043e\u043f\u043e\u0440\u0446. ' + fmtAmt(aggrTargetPmt) + ')</span>';
       } else if (!isAggr && extraAmt > 0) {
         h += '<span style="color:#F59E0B;font-weight:700">\u0414\u043e\u043f. \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430: <b>+' + fmtAmt(extraAmt) + '</b></span>';
       }
@@ -3975,7 +3980,7 @@ function renderPnlLoans(p) {
       if (isAggr && aggrTargetPmt > 0) {
         totalMonthlyDue = aggrTargetPmt;
       } else {
-        totalMonthlyDue = (l.monthly_payment || 0) + extraAmt;
+        totalMonthlyDue = actualPmt + extraAmt;
       }
       h += '</div>';
       h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid ' + breakdownBorder + ';display:flex;justify-content:space-between;align-items:center">';
