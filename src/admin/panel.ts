@@ -2792,9 +2792,11 @@ async function savePnlItem(type) {
         if (d.start_date_od !== undefined) { d.start_date = d.start_date_od; delete d.start_date_od; }
         if (d.end_date_od !== undefined) { d.end_date = d.end_date_od; delete d.end_date_od; }
         if (d.term_months_od !== undefined) { d.term_months = d.term_months_od; delete d.term_months_od; }
+        if (d.bank_monthly_payment_od !== undefined) { d.bank_monthly_payment = d.bank_monthly_payment_od; delete d.bank_monthly_payment_od; }
+        // payment_day and min_payment pass through as-is (no suffix mapping needed)
       } else if (type === 'loan') {
         // Clean up overdraft-only fields for non-overdraft types
-        delete d.start_date_od; delete d.end_date_od; delete d.term_months_od;
+        delete d.start_date_od; delete d.end_date_od; delete d.term_months_od; delete d.bank_monthly_payment_od;
       } else if (type === 'dividend') {
         // Force: if dividend amount is 0 or negative, tax must be 0
         if (!d.amount || d.amount <= 0) { d.amount = 0; d.tax_amount = 0; }
@@ -3274,10 +3276,14 @@ function renderPnlCrudForm(type, item) {
     h += '<div><label style="font-size:0.78rem;color:#64748b">Лимит</label><input type="number" class="input" id="pnl_loan_overdraft_limit" value="' + ((item && item.overdraft_limit) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Использовано</label><input type="number" class="input" id="pnl_loan_overdraft_used" value="' + ((item && item.overdraft_used) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Ставка % год.</label><input type="number" class="input" id="pnl_loan_overdraft_rate" value="' + ((item && item.overdraft_rate) || '') + '" step="0.01"></div>';
-    // Additional overdraft fields: dates, term
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Начало</label><input type="date" class="input" id="pnl_loan_start_date_od" value="' + ((item && item.start_date) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Окончание</label><input type="date" class="input" id="pnl_loan_end_date_od" value="' + ((item && item.end_date) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Срок (мес.)</label><input type="number" class="input" id="pnl_loan_term_months_od" value="' + ((item && item.term_months) || '') + '"></div>';
+    // Additional overdraft fields: dates, term — with auto-calc
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Начало</label><input type="date" class="input" id="pnl_loan_start_date_od" value="' + ((item && item.start_date) || '') + '" onchange="calcLoanTermFromDatesOD()"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Окончание</label><input type="date" class="input" id="pnl_loan_end_date_od" value="' + ((item && item.end_date) || '') + '" onchange="calcLoanTermFromDatesOD()"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Срок (мес.) <span style="font-size:0.65rem;color:#8B5CF6">авто из дат</span></label><input type="number" class="input" id="pnl_loan_term_months_od" value="' + ((item && item.term_months) || '') + '"></div>';
+    // Payment date + min payment + bank monthly payment for overdraft
+    h += '<div><label style="font-size:0.78rem;color:#3B82F6;font-weight:600"><i class="fas fa-calendar-check" style="margin-right:4px"></i>День оплаты</label><input type="number" class="input" id="pnl_loan_payment_day" value="' + ((item && item.payment_day) || '') + '" min="1" max="31" placeholder="25" style="border-color:rgba(59,130,246,0.3)"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#22C55E;font-weight:600"><i class="fas fa-coins" style="margin-right:4px"></i>Мин. платёж</label><input type="number" class="input" id="pnl_loan_min_payment" value="' + ((item && item.min_payment) || '') + '" placeholder="1725" style="border-color:rgba(34,197,94,0.3)"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#EF4444;font-weight:600"><i class="fas fa-file-invoice-dollar" style="margin-right:4px"></i>Платёж по договору</label><input type="number" class="input" id="pnl_loan_bank_monthly_payment_od" value="' + ((item && item.bank_monthly_payment) || '') + '" placeholder="32031" style="border-color:rgba(239,68,68,0.3)"></div>';
     h += '</div>';
     // Collateral
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
@@ -3887,23 +3893,35 @@ function renderPnlLoans(p) {
       var odAvail = odLimit - odUsed;
       var odRate = l.overdraft_rate || 0;
       var odMonthlyInt = Math.round(odUsed * odRate / 100 / 12);
+      var odBankPmt = (l.bank_monthly_payment && l.bank_monthly_payment > 0) ? l.bank_monthly_payment : 0;
+      var odMinPay = l.min_payment || 0;
+      var odPayDay = l.payment_day || 0;
       h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:10px">';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Лимит</div><div style="font-weight:700;color:#e2e8f0">' + fmtAmt(odLimit) + '</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Использовано</div><div style="font-weight:700;color:#EF4444">' + fmtAmt(odUsed) + '</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Доступно</div><div style="font-weight:700;color:#22C55E">' + fmtAmt(odAvail) + '</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Ставка</div><div style="font-weight:700;color:#F59E0B">' + odRate + '%</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">% в мес.</div><div style="font-weight:700;color:#F59E0B">' + fmtAmt(odMonthlyInt) + '</div></div>';
-      if (l.monthly_payment) h += '<div><div style="font-size:0.7rem;color:#64748b">Платёж/мес</div><div style="font-weight:700;color:#3B82F6">' + fmtAmt(l.monthly_payment) + '</div></div>';
+      if (odBankPmt > 0) h += '<div><div style="font-size:0.7rem;color:#64748b">Платёж по договору</div><div style="font-weight:700;color:#3B82F6">' + fmtAmt(odBankPmt) + '</div></div>';
+      if (odMinPay > 0) h += '<div><div style="font-size:0.7rem;color:#64748b">Мин. платёж</div><div style="font-weight:700;color:#22C55E">' + fmtAmt(odMinPay) + '</div></div>';
+      if (odPayDay > 0) h += '<div><div style="font-size:0.7rem;color:#64748b">День оплаты</div><div style="font-weight:700;color:#8B5CF6">' + odPayDay + '-е число</div></div>';
       h += '</div>';
       // Overdraft current month breakdown
-      if (odMonthlyInt > 0) {
-        var odTotal = odMonthlyInt + (l.monthly_payment || 0) + extraAmt;
+      var odActualPmt = odBankPmt > 0 ? odBankPmt : odMonthlyInt;
+      var odTotal = odActualPmt + extraAmt;
+      if (odActualPmt > 0) {
         h += '<div style="padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);margin-bottom:8px;font-size:0.82rem">';
         h += '<div style="font-weight:600;color:#3B82F6;margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>' + loanPeriodLabel + ' — \u043e\u0432\u0435\u0440\u0434\u0440\u0430\u0444\u0442</div>';
-        h += '<div style="display:flex;gap:16px">';
-        h += '<span style="color:#94a3b8">Проценты: <b style="color:#EF4444">' + fmtAmt(odMonthlyInt) + '</b></span>';
+        h += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
+        if (odBankPmt > 0) {
+          h += '<span style="color:#94a3b8">По договору: <b style="color:#3B82F6">' + fmtAmt(odBankPmt) + '</b></span>';
+          h += '<span style="color:#94a3b8;font-size:0.75rem">(в т.ч. %: ~' + fmtAmt(odMonthlyInt) + ')</span>';
+        } else {
+          h += '<span style="color:#94a3b8">Проценты: <b style="color:#EF4444">' + fmtAmt(odMonthlyInt) + '</b></span>';
+        }
         if (extraAmt > 0) h += '<span style="color:#F59E0B">Доп. нагрузка: <b>+' + fmtAmt(extraAmt) + '</b></span>';
         h += '</div>';
+        if (odPayDay > 0) h += '<div style="margin-top:4px;font-size:0.75rem;color:#8B5CF6"><i class="fas fa-bell" style="margin-right:4px"></i>Срок оплаты: ' + odPayDay + '-е число</div>';
         h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(59,130,246,0.15);display:flex;justify-content:space-between;align-items:center">';
         h += '<span style="font-weight:700;font-size:0.92rem;color:#e2e8f0"><i class="fas fa-wallet" style="margin-right:6px;color:#3B82F6"></i>\u0418\u0422\u041e\u0413\u041e \u043a \u043e\u043f\u043b\u0430\u0442\u0435:</span>';
         h += '<span style="font-weight:800;font-size:1.05rem;color:#3B82F6">' + fmtAmt(odTotal) + '</span>';
@@ -4171,6 +4189,19 @@ function calcLoanEndFromTerm() {
     sd.setMonth(sd.getMonth() + t);
     var el = document.getElementById('pnl_loan_end_date');
     if (el) el.value = sd.toISOString().slice(0, 10);
+  }
+}
+// Auto-calc term from dates for OVERDRAFT
+function calcLoanTermFromDatesOD() {
+  var s = document.getElementById('pnl_loan_start_date_od')?.value;
+  var e = document.getElementById('pnl_loan_end_date_od')?.value;
+  if (s && e) {
+    var sd = new Date(s); var ed = new Date(e);
+    var months = (ed.getFullYear() - sd.getFullYear()) * 12 + (ed.getMonth() - sd.getMonth());
+    if (months > 0) {
+      var el = document.getElementById('pnl_loan_term_months_od');
+      if (el) el.value = months;
+    }
   }
 }
 // Save loan settings (system-wide repayment mode)
