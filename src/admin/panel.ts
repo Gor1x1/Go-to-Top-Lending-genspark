@@ -2707,8 +2707,21 @@ async function savePnlItem(type) {
           await api('/tax-rules/generate/' + pnlPeriod, { method: 'POST', _silent: true });
         } else {
           // New: create rule + generate payment
-          await api('/tax-rules', { method: 'POST', body: JSON.stringify(ruleData), _silent: true });
-          await api('/tax-rules/generate/' + pnlPeriod, { method: 'POST', _silent: true });
+          var createRes = await api('/tax-rules', { method: 'POST', body: JSON.stringify(ruleData), _silent: true });
+          console.log('[PnL] Rule created:', JSON.stringify(createRes));
+          var newRuleId = createRes && createRes.rule_id;
+          // Generate payment from newly created rule
+          var genRes = await api('/tax-rules/generate/' + pnlPeriod, { method: 'POST', _silent: true });
+          console.log('[PnL] Generate result:', JSON.stringify(genRes));
+          // Fallback: if generate created 0 payments, create payment manually linked to rule
+          if (!genRes || genRes.generated === 0) {
+            console.warn('[PnL] Generate returned 0, creating payment as fallback');
+            await api('/tax-payments', { method: 'POST', body: JSON.stringify({
+              tax_type: ruleData.tax_type, tax_name: ruleData.rule_name, amount: 0,
+              period_key: pnlPeriod, status: 'pending', tax_rate: ruleData.tax_rate,
+              tax_base: ruleData.tax_base, is_auto: 1, rule_id: newRuleId || null
+            }), _silent: true });
+          }
         }
       } else {
         // MANUAL MODE: Create/update tax_payment directly (no rule)
@@ -3086,14 +3099,14 @@ function renderPnlCrudForm(type, item) {
     // Common fields: name, type, rate, base
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_tax_tax_name" value="' + escHtml(curName) + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442 5%"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f \u043d\u0430\u043b\u043e\u0433\u0430</label><select class="input" id="pnl_tax_tax_type">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Тип налога <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Категория для отчётности. НЕ влияет на расчёт суммы — только на группировку в P&L"></i></label><select class="input" id="pnl_tax_tax_type">';
     for (var tt = 0; tt < taxTypes.length; tt++) h += '<option value="' + taxTypes[tt].v + '"' + (curType === taxTypes[tt].v ? ' selected' : '') + '>' + taxTypes[tt].l + '</option>';
     h += '</select></div>';
     h += '</div>';
     // Auto fields: rate + base (always shown for auto, also for manual auto-calc)
     h += '<div id="taxAutoRow" style="' + (isAuto ? 'display:grid;' : 'display:none;') + 'grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-percent" style="color:#8B5CF6;margin-right:4px"></i>\u0421\u0442\u0430\u0432\u043a\u0430 %</label><input type="number" class="input" id="pnl_tax_tax_rate" value="' + curRate + '" step="0.1" placeholder="\u041d\u0430\u043f\u0440. 20"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:4px"></i>\u0411\u0430\u0437\u0430 \u0440\u0430\u0441\u0447\u0451\u0442\u0430</label><select class="input" id="pnl_tax_tax_base">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:4px"></i>База расчёта <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Формула: от какой суммы считается налог. ВЛИЯЕТ на итоговую сумму = Ставка% × эта база"></i></label><select class="input" id="pnl_tax_tax_base">';
     for (var tb = 0; tb < taxBases.length; tb++) h += '<option value="' + taxBases[tb].v + '"' + (curBase === taxBases[tb].v ? ' selected' : '') + '>' + taxBases[tb].l + '</option>';
     h += '</select></div>';
     h += '</div>';

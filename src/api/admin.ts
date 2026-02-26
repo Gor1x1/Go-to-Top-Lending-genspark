@@ -2532,8 +2532,8 @@ api.get('/tax-payments', authMiddleware, async (c) => {
 api.post('/tax-payments', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, payment_date, due_date, status, notes, tax_rate, tax_base, is_auto) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-    .bind(d.tax_type||'income_tax', d.tax_name||'', d.amount||0, d.period_key||'', d.payment_date||'', d.due_date||'', d.status||'paid', d.notes||'', d.tax_rate||0, d.tax_base||'fixed', d.is_auto ? 1 : 0).run();
+  await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, payment_date, due_date, status, notes, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(d.tax_type||'income_tax', d.tax_name||'', d.amount||0, d.period_key||'', d.payment_date||'', d.due_date||'', d.status||'paid', d.notes||'', d.tax_rate||0, d.tax_base||'fixed', d.is_auto ? 1 : 0, d.rule_id || null).run();
   return c.json({ success: true });
 });
 
@@ -2601,7 +2601,9 @@ api.post('/tax-rules', authMiddleware, async (c) => {
     )`).run();
     await db.prepare('INSERT INTO tax_rules (rule_name, tax_type, tax_base, tax_rate, frequency, is_active, apply_from, apply_to, notes) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(d.rule_name||'', d.tax_type||'income_tax', d.tax_base||'revenue', d.tax_rate||0, d.frequency||'monthly', d.is_active!==undefined ? (d.is_active?1:0) : 1, d.apply_from||'', d.apply_to||'', d.notes||'').run();
-    return c.json({ success: true });
+    // Get the ID of the newly created rule
+    const lastRule = await db.prepare('SELECT id FROM tax_rules ORDER BY id DESC LIMIT 1').first() as any;
+    return c.json({ success: true, rule_id: lastRule?.id || null });
   } catch (err: any) {
     return c.json({ error: err?.message || 'Failed to create tax rule' }, 500);
   }
