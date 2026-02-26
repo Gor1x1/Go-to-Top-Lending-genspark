@@ -2944,7 +2944,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     if (t.is_auto && t.tax_rate > 0) {
       let base = 0;
       switch (t.tax_base) {
-        case 'revenue': base = revenue; break;
+        case 'revenue': base = turnoverExclTransit; break; // 'revenue' mapped to turnover_excl_transit (same value)
         case 'total_turnover': base = totalTurnover; break;
         case 'turnover_excl_transit': base = turnoverExclTransit; break;
         case 'ebt': base = Math.max(ebt, 0); break;
