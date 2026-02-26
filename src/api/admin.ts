@@ -2729,7 +2729,7 @@ api.delete('/assets/:id', authMiddleware, async (c) => {
 // ===== LOANS =====
 // Helper: ensure new loan columns exist (safe idempotent migration)
 async function ensureLoanColumns(db: any) {
-  try { await db.prepare('ALTER TABLE loans ADD COLUMN payment_day INTEGER DEFAULT 0').run(); } catch {}
+  try { await db.prepare('ALTER TABLE loans ADD COLUMN payment_day TEXT DEFAULT \'\'').run(); } catch {}
   try { await db.prepare('ALTER TABLE loans ADD COLUMN min_payment REAL DEFAULT 0').run(); } catch {}
 }
 
@@ -2793,7 +2793,7 @@ api.post('/loans', authMiddleware, async (c) => {
   }
 
   await db.prepare(`INSERT INTO loans (name, lender, principal, interest_rate, start_date, end_date, monthly_payment, remaining_balance, loan_type, is_active, notes, term_months, desired_term_months, original_monthly_payment, collateral_type, collateral_desc, priority, repayment_mode, aggressive_pct, overdraft_limit, overdraft_used, overdraft_rate, actual_end_date, bank_monthly_payment, payment_day, min_payment) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(d.name||'', d.lender||'', principal, annualRate, d.start_date||'', endDate, monthlyPayment, d.remaining_balance||principal, loanType, d.is_active!==undefined?d.is_active:1, d.notes||'', termMonths, desiredTerm, originalMonthly, collateralType, d.collateral_desc||'', priority, d.repayment_mode||'standard', d.aggressive_pct||0, d.overdraft_limit||0, d.overdraft_used||0, d.overdraft_rate||0, d.actual_end_date||'', d.bank_monthly_payment||0, d.payment_day||0, d.min_payment||0).run();
+    .bind(d.name||'', d.lender||'', principal, annualRate, d.start_date||'', endDate, monthlyPayment, d.remaining_balance||principal, loanType, d.is_active!==undefined?d.is_active:1, d.notes||'', termMonths, desiredTerm, originalMonthly, collateralType, d.collateral_desc||'', priority, d.repayment_mode||'standard', d.aggressive_pct||0, d.overdraft_limit||0, d.overdraft_used||0, d.overdraft_rate||0, d.actual_end_date||'', d.bank_monthly_payment||0, d.payment_day||'', d.min_payment||0).run();
   return c.json({ success: true });
 });
 
