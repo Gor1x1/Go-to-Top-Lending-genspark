@@ -2918,8 +2918,10 @@ api.get('/dividends', authMiddleware, async (c) => {
 api.post('/dividends', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('INSERT INTO dividends (amount, recipient, payment_date, period_key, tax_amount, notes, schedule) VALUES (?,?,?,?,?,?,?)')
-    .bind(d.amount||0, d.recipient||'', d.payment_date||'', d.period_key||'', d.tax_amount||0, d.notes||'', d.schedule||'monthly').run();
+  // Ensure dividend_pct column exists
+  try { await db.prepare("ALTER TABLE dividends ADD COLUMN dividend_pct REAL DEFAULT 0").run(); } catch {}
+  await db.prepare('INSERT INTO dividends (amount, recipient, payment_date, period_key, tax_amount, notes, schedule, dividend_pct) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(d.amount||0, d.recipient||'', d.payment_date||'', d.period_key||'', d.tax_amount||0, d.notes||'', d.schedule||'monthly', d.dividend_pct||0).run();
   return c.json({ success: true });
 });
 
@@ -2928,7 +2930,9 @@ api.put('/dividends/:id', authMiddleware, async (c) => {
   const id = c.req.param('id');
   const d = await c.req.json();
   const fields: string[] = []; const vals: any[] = [];
-  for (const k of ['amount','recipient','payment_date','period_key','tax_amount','notes','schedule']) {
+  // Ensure dividend_pct column exists
+  try { await db.prepare("ALTER TABLE dividends ADD COLUMN dividend_pct REAL DEFAULT 0").run(); } catch {}
+  for (const k of ['amount','recipient','payment_date','period_key','tax_amount','notes','schedule','dividend_pct']) {
     if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
   }
   if (fields.length) { vals.push(id); await db.prepare(`UPDATE dividends SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
