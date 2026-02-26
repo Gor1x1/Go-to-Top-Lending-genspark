@@ -2918,10 +2918,11 @@ api.get('/dividends', authMiddleware, async (c) => {
 api.post('/dividends', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  // Ensure dividend_pct column exists
+  // Ensure new columns exist
   try { await db.prepare("ALTER TABLE dividends ADD COLUMN dividend_pct REAL DEFAULT 0").run(); } catch {}
-  await db.prepare('INSERT INTO dividends (amount, recipient, payment_date, period_key, tax_amount, notes, schedule, dividend_pct) VALUES (?,?,?,?,?,?,?,?)')
-    .bind(d.amount||0, d.recipient||'', d.payment_date||'', d.period_key||'', d.tax_amount||0, d.notes||'', d.schedule||'monthly', d.dividend_pct||0).run();
+  try { await db.prepare("ALTER TABLE dividends ADD COLUMN calc_base TEXT DEFAULT 'after_loans'").run(); } catch {}
+  await db.prepare('INSERT INTO dividends (amount, recipient, payment_date, period_key, tax_amount, notes, schedule, dividend_pct, calc_base) VALUES (?,?,?,?,?,?,?,?,?)')
+    .bind(d.amount||0, d.recipient||'', d.payment_date||'', d.period_key||'', d.tax_amount||0, d.notes||'', d.schedule||'monthly', d.dividend_pct||0, d.calc_base||'after_loans').run();
   return c.json({ success: true });
 });
 
@@ -2930,9 +2931,10 @@ api.put('/dividends/:id', authMiddleware, async (c) => {
   const id = c.req.param('id');
   const d = await c.req.json();
   const fields: string[] = []; const vals: any[] = [];
-  // Ensure dividend_pct column exists
+  // Ensure new columns exist
   try { await db.prepare("ALTER TABLE dividends ADD COLUMN dividend_pct REAL DEFAULT 0").run(); } catch {}
-  for (const k of ['amount','recipient','payment_date','period_key','tax_amount','notes','schedule','dividend_pct']) {
+  try { await db.prepare("ALTER TABLE dividends ADD COLUMN calc_base TEXT DEFAULT 'after_loans'").run(); } catch {}
+  for (const k of ['amount','recipient','payment_date','period_key','tax_amount','notes','schedule','dividend_pct','calc_base']) {
     if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
   }
   if (fields.length) { vals.push(id); await db.prepare(`UPDATE dividends SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
@@ -3127,6 +3129,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const ytdTaxTotal = ((taxesYtd?.total as number) || 0) + autoTaxDelta;
 
   const netProfit = ebt - totalTaxes;
+  const totalLoanPaymentsPeriod = loanPayments?.total_payments as number || 0;
+  const netProfitAfterLoans = netProfit - totalLoanPaymentsPeriod;
   const retainedEarnings = netProfit - totalDividends;
 
   // Tax rules for reference (catch in case table doesn't exist yet on production)
@@ -3151,6 +3155,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     effective_tax_rate: ebt > 0 ? Math.round(totalTaxes / ebt * 10000) / 100 : 0,
     tax_burden: revenue > 0 ? Math.round(totalTaxes / revenue * 10000) / 100 : 0,
     net_profit: netProfit, net_margin: revenue > 0 ? Math.round(netProfit / revenue * 10000) / 100 : 0,
+    net_profit_after_loans: netProfitAfterLoans,
     dividends: divs.results || [], total_dividends: totalDividends,
     retained_earnings: retainedEarnings,
     ytd_taxes: ytdTaxTotal,
