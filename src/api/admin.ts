@@ -3248,6 +3248,8 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
       .bind(fiscalYearStart, periodKey).first();
     const ytdInterest = await db.prepare("SELECT COALESCE(SUM(interest_part),0) as total FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
       .bind(fiscalYearStartDate, periodKey + '-31').first();
+    const ytdLoanPay = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
+      .bind(fiscalYearStartDate, periodKey + '-31').first();
     const ytdDivs = await db.prepare("SELECT COALESCE(SUM(amount),0) as amount, COALESCE(SUM(tax_amount),0) as tax FROM dividends WHERE period_key >= ? AND period_key <= ?")
       .bind(fiscalYearStart, periodKey).first();
     // For YTD salaries/expenses, multiply monthly rates by number of months in fiscal year
@@ -3270,6 +3272,10 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     const adjustedYtdTax = ytdTaxTotal + currentAutoTaxDelta;
     const ytdNet = ytdEbt - adjustedYtdTax;
     const ytdDivTotal = ((ytdDivs?.amount as number) || 0) + ((ytdDivs?.tax as number) || 0);
+    // YTD loan payments: use actual payments from DB, plus plan for months without actual payments
+    const ytdActualLoanPay = Number((ytdLoanPay?.total as number) || 0);
+    const ytdEffLoanPayments = Math.max(ytdActualLoanPay, current.loan_total_monthly * monthsInFiscalYear);
+    const ytdNetAfterLoans = ytdNet - ytdEffLoanPayments;
     
     ytd = {
       revenue: ytdRevenue, refunds: ytdRefunds, net_revenue: ytdRevenue - ytdRefunds,
@@ -3279,7 +3285,8 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
       other_income: (ytdOtherIE?.income as number) || 0, other_expenses: (ytdOtherIE?.expenses as number) || 0,
       interest_expense: ytdInterestTotal, ebt: ytdEbt,
       total_taxes: adjustedYtdTax, net_profit: ytdNet,
-      total_dividends: ytdDivTotal, retained_earnings: ytdNet - ytdDivTotal,
+      effective_loan_payments: ytdEffLoanPayments, net_profit_after_loans: ytdNetAfterLoans,
+      total_dividends: ytdDivTotal, retained_earnings: ytdNetAfterLoans - ytdDivTotal,
       gross_margin: ytdRevenue > 0 ? Math.round(ytdGross / ytdRevenue * 10000) / 100 : 0,
       ebit_margin: ytdRevenue > 0 ? Math.round(ytdEbit / ytdRevenue * 10000) / 100 : 0,
       net_margin: ytdRevenue > 0 ? Math.round(ytdNet / ytdRevenue * 10000) / 100 : 0,
@@ -3287,7 +3294,7 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
 
     // MoM delta (current - previous)
     const mom: any = {};
-    const numKeys = ['revenue','cogs','gross_profit','salary_total','marketing','depreciation','total_opex','ebit','ebitda','other_income','other_expenses','interest_expense','ebt','total_taxes','net_profit','total_dividends','retained_earnings'];
+    const numKeys = ['revenue','cogs','gross_profit','salary_total','marketing','depreciation','total_opex','ebit','ebitda','other_income','other_expenses','interest_expense','ebt','total_taxes','net_profit','effective_loan_payments','net_profit_after_loans','total_dividends','retained_earnings'];
     for (const k of numKeys) {
       mom[k] = Math.round(((current as any)[k] - (prev as any)[k]) * 100) / 100;
     }
@@ -3303,7 +3310,7 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
       prev_period: prevKey,
       fiscal_year_start: fiscalYearStart,
       fiscal_year_start_month: fiscalStartMonth,
-      prev: { revenue: prev.revenue, cogs: prev.cogs, gross_profit: prev.gross_profit, salary_total: prev.salary_total, marketing: prev.marketing, depreciation: prev.depreciation, total_opex: prev.total_opex, ebit: prev.ebit, ebitda: prev.ebitda, ebt: prev.ebt, total_taxes: prev.total_taxes, net_profit: prev.net_profit, total_dividends: prev.total_dividends, retained_earnings: prev.retained_earnings },
+      prev: { revenue: prev.revenue, cogs: prev.cogs, gross_profit: prev.gross_profit, salary_total: prev.salary_total, marketing: prev.marketing, depreciation: prev.depreciation, total_opex: prev.total_opex, ebit: prev.ebit, ebitda: prev.ebitda, ebt: prev.ebt, total_taxes: prev.total_taxes, net_profit: prev.net_profit, effective_loan_payments: prev.effective_loan_payments, net_profit_after_loans: prev.net_profit_after_loans, total_dividends: prev.total_dividends, retained_earnings: prev.retained_earnings },
       mom, mom_pct: momPct,
       ytd,
     });

@@ -3293,8 +3293,13 @@ function renderPnlCrudForm(type, item) {
     h += '</div>';
     // Net profit hint + auto-calc from %
     var divNetProfit = (pnlData && pnlData.net_profit) || 0;
-    var divEffLoanPayments = (pnlData && pnlData.effective_loan_payments) || Math.max((pnlData && pnlData.loan_total_payments_period) || 0, (pnlData && pnlData.loan_total_monthly) || 0);
-    var divProfitAfterLoans = (pnlData && pnlData.net_profit_after_loans !== undefined) ? pnlData.net_profit_after_loans : (divNetProfit - divEffLoanPayments);
+    // Force compute effective loan payments: always use max(actual, plan) even if backend field is 0
+    var divActualPay = Number((pnlData && pnlData.loan_total_payments_period) || 0);
+    var divPlanPay = Number((pnlData && pnlData.loan_total_monthly) || 0);
+    var divEffLoanPayments = Number((pnlData && pnlData.effective_loan_payments) || 0);
+    if (divEffLoanPayments === 0 && (divActualPay > 0 || divPlanPay > 0)) divEffLoanPayments = Math.max(divActualPay, divPlanPay);
+    // Always compute profit after loans locally to guarantee correctness
+    var divProfitAfterLoans = divNetProfit - divEffLoanPayments;
     var curDivPct = (item && item.dividend_pct) || 0;
     var curCalcBase = (item && item.calc_base) || 'after_loans';
     h += '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(34,197,94,0.06);border-radius:8px;border:1px solid rgba(34,197,94,0.15)">';
@@ -3305,11 +3310,22 @@ function renderPnlCrudForm(type, item) {
     h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='after_loans'?'rgba(34,197,94,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='after_loans'?'#22C55E':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="after_loans"' + (curCalcBase==='after_loans'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_calc_base\\').value=\\'after_loans\\';calcDividendFromPct()"> <span><b>\u041f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
     h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='before_loans'?'rgba(245,158,11,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='before_loans'?'#F59E0B':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="before_loans"' + (curCalcBase==='before_loans'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_calc_base\\').value=\\'before_loans\\';calcDividendFromPct()"> <span><b>\u0414\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
     h += '</div><input type="hidden" id="pnl_dividend_calc_base" value="' + curCalcBase + '"></div>';
-    // Show cascaded info
+    // Dynamic info block — updated by calcDividendFromPct
+    h += '<div id="div_calc_info">';
     h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c (\u043f\u043e\u0441\u043b\u0435 \u043d\u0430\u043b\u043e\u0433\u043e\u0432): <b style="color:' + (divNetProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(divNetProfit) + '</b></div>';
-    if (divEffLoanPayments > 0 || divProfitAfterLoans !== divNetProfit) {
-      h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u2212 \u041a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434: <b style="color:#EF4444">' + fmtAmt(divEffLoanPayments) + '</b></div>';
+    if (divEffLoanPayments > 0) {
+      h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u2212 \u041a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438: <b style="color:#EF4444">' + fmtAmt(divEffLoanPayments) + '</b></div>';
       h += '<div style="font-size:0.78rem;color:' + (divProfitAfterLoans >= 0 ? '#10B981' : '#EF4444') + ';font-weight:600;margin-bottom:6px">=\u00a0\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432: <b>' + fmtAmt(divProfitAfterLoans) + '</b>' + (divProfitAfterLoans < 0 ? ' <span style="color:#EF4444;font-size:0.7rem"><i class="fas fa-exclamation-triangle"></i> \u0432 \u043c\u0438\u043d\u0443\u0441\u0435!</span>' : '') + '</div>';
+    }
+    h += '</div>';
+    // Negative profit warning for after_loans mode
+    if (curCalcBase === 'after_loans' && divProfitAfterLoans < 0) {
+      h += '<div style="margin-bottom:8px;padding:8px 12px;background:rgba(239,68,68,0.1);border-radius:6px;border:1px solid rgba(239,68,68,0.25)">';
+      h += '<div style="font-size:0.78rem;color:#EF4444;font-weight:600"><i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b \u0432 \u044d\u0442\u043e\u043c \u043c\u0435\u0441\u044f\u0446\u0435 \u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u043d\u044b</div>';
+      h += '<div style="font-size:0.72rem;color:#94a3b8;margin-top:4px">\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432: <b style="color:#EF4444">' + fmtAmt(divProfitAfterLoans) + '</b>. ';
+      h += '\u041a\u0440\u0435\u0434\u0438\u0442\u043d\u0430\u044f \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430 (' + fmtAmt(divEffLoanPayments) + ') \u043f\u0440\u0435\u0432\u044b\u0448\u0430\u0435\u0442 \u0447\u0438\u0441\u0442\u0443\u044e \u043f\u0440\u0438\u0431\u044b\u043b\u044c (' + fmtAmt(divNetProfit) + '). ';
+      h += '\u041f\u0435\u0440\u0435\u043a\u043b\u044e\u0447\u0438\u0442\u0435\u0441\u044c \u043d\u0430 \u00ab\u0414\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432\u00bb \u0438\u043b\u0438 \u0432\u0432\u0435\u0434\u0438\u0442\u0435 \u0441\u0443\u043c\u043c\u0443 \u0432\u0440\u0443\u0447\u043d\u0443\u044e.</div>';
+      h += '</div>';
     }
     h += '<div style="display:flex;align-items:center;gap:10px">';
     h += '<label style="font-size:0.78rem;color:#94a3b8;white-space:nowrap">% \u043e\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438</label>';
@@ -4150,8 +4166,23 @@ function calcDividendFromPct() {
   var pct = parseFloat(pctEl.value) || 0;
   var base = baseEl ? baseEl.value : 'after_loans';
   var netProfit = (pnlData && pnlData.net_profit) || 0;
-  var profitAfterLoans = (pnlData && pnlData.net_profit_after_loans !== undefined) ? pnlData.net_profit_after_loans : (netProfit - Math.max((pnlData && pnlData.loan_total_payments_period) || 0, (pnlData && pnlData.loan_total_monthly) || 0));
+  // Force compute: always use max(actual, plan) for loan payments
+  var actualPay = Number((pnlData && pnlData.loan_total_payments_period) || 0);
+  var planPay = Number((pnlData && pnlData.loan_total_monthly) || 0);
+  var effPay = Number((pnlData && pnlData.effective_loan_payments) || 0);
+  if (effPay === 0 && (actualPay > 0 || planPay > 0)) effPay = Math.max(actualPay, planPay);
+  var profitAfterLoans = netProfit - effPay;
   var profitBase = base === 'after_loans' ? profitAfterLoans : netProfit;
+  // Update info labels
+  var infoEl = document.getElementById('div_calc_info');
+  if (infoEl) {
+    var ih = '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c (\u043f\u043e\u0441\u043b\u0435 \u043d\u0430\u043b\u043e\u0433\u043e\u0432): <b style="color:' + (netProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(netProfit) + '</b></div>';
+    if (effPay > 0) {
+      ih += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u2212 \u041a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438: <b style="color:#EF4444">' + fmtAmt(effPay) + '</b></div>';
+      ih += '<div style="font-size:0.78rem;color:' + (profitAfterLoans >= 0 ? '#10B981' : '#EF4444') + ';font-weight:600;margin-bottom:2px">=\u00a0\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432: <b>' + fmtAmt(profitAfterLoans) + '</b>' + (profitAfterLoans < 0 ? ' <span style="color:#EF4444;font-size:0.7rem"><i class="fas fa-exclamation-triangle"></i> \u0432 \u043c\u0438\u043d\u0443\u0441\u0435!</span>' : '') + '</div>';
+    }
+    infoEl.innerHTML = ih;
+  }
   // Update preview text
   var prevEl = document.getElementById('div_calc_preview');
   if (pct > 0 && profitBase > 0) {
