@@ -2672,8 +2672,11 @@ async function savePnlItem(type) {
     // ===== UNIFIED TAX LOGIC =====
     if (type === 'tax') {
       var isAutoTax = !!d.is_auto;
-      var taxName = d.tax_name || '';
-      if (!taxName) { if (restoreBtn) restoreBtn(); toast('\u0423\u043a\u0430\u0436\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043d\u0430\u043b\u043e\u0433\u0430', 'error'); return; }
+      // Auto-generate tax_name from type + rate (no manual name field)
+      var taxTypeLabelsMap = {income_tax:'Налог на прибыль',vat:'НДС',usn_income:'УСН Доходы',usn_income_expense:'УСН Доходы−Расходы',turnover_tax:'Налог на оборот',payroll_tax:'Налоги на ЗП',patent:'Патент',property:'Налог на имущество',other:'Прочее'};
+      var taxTypeSel = d.tax_type || 'income_tax';
+      var taxRateSel = d.tax_rate || 0;
+      var taxName = (taxTypeLabelsMap[taxTypeSel] || taxTypeSel) + (taxRateSel ? ' ' + taxRateSel + '%' : '');
       
       if (isAutoTax) {
         // AUTO MODE: Create/update RULE, then generate payment for current period
@@ -2725,6 +2728,7 @@ async function savePnlItem(type) {
         }
       } else {
         // MANUAL MODE: Create/update tax_payment directly (no rule)
+        d.tax_name = taxName;
         d.amount = d.amount || 0;
         d.is_auto = 0;
         d.period_key = pnlPeriod;
@@ -2954,7 +2958,7 @@ function renderPnlCascade(p) {
   var mom = p.mom || {}; var mp = p.mom_pct || {}; var ytd = p.ytd || {};
   var h = '';
   // Tax type labels for cascade display
-  var taxTypeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',usn_income:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b',usn_income_expense:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
+  var taxTypeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',usn_income:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b',usn_income_expense:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',turnover_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
   // Tooltip helper
   function tip(text) { return ' <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.65rem;cursor:help;vertical-align:super" title="' + text.replace(/"/g, '&quot;') + '"></i>'; }
   // Toggle buttons
@@ -3096,10 +3100,9 @@ function renderPnlCrudForm(type, item) {
     h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#a78bfa;font-weight:600"><input type="checkbox" id="pnl_tax_is_auto"' + (isAuto ? ' checked' : '') + ' onchange="document.getElementById(\\'taxManualRow\\').style.display=this.checked?\\'none\\':\\'\\';document.getElementById(\\'taxAutoRow\\').style.display=this.checked?\\'grid\\':\\'none\\';document.getElementById(\\'taxRecurRow\\').style.display=this.checked?\\'grid\\':\\'none\\'"> <i class="fas fa-magic" style="margin-right:2px"></i>\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 (\u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0435\u0442\u0441\u044f \u043a\u0430\u0436\u0434\u044b\u0439 \u043c\u0435\u0441\u044f\u0446/\u043a\u0432\u0430\u0440\u0442\u0430\u043b)</label>';
     h += '<div style="font-size:0.72rem;color:#64748b;margin-top:4px;padding-left:28px">\u0412\u041a\u041b = \u0441\u043e\u0437\u0434\u0430\u0451\u0442\u0441\u044f \u043f\u0440\u0430\u0432\u0438\u043b\u043e + \u043f\u043b\u0430\u0442\u0451\u0436 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043a\u0430\u0436\u0434\u044b\u0439 \u043f\u0435\u0440\u0438\u043e\u0434. \u0412\u042b\u041a\u041b = \u0440\u0430\u0437\u043e\u0432\u044b\u0439 \u043f\u043b\u0430\u0442\u0451\u0436 \u0437\u0430 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043c\u0435\u0441\u044f\u0446.</div>';
     h += '</div>';
-    // Common fields: name, type, rate, base
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435</label><input class="input" id="pnl_tax_tax_name" value="' + escHtml(curName) + '" placeholder="\u041d\u0430\u043f\u0440. \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442 5%"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Тип налога <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Категория для отчётности. НЕ влияет на расчёт суммы — только на группировку в P&L"></i></label><select class="input" id="pnl_tax_tax_type">';
+    // Common fields: type (full width, no separate name — name auto-generated from type+rate)
+    h += '<div style="display:grid;grid-template-columns:1fr;gap:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Тип налога <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Категория для отчётности. Название формируется автоматически из типа + ставки"></i></label><select class="input" id="pnl_tax_tax_type">';
     for (var tt = 0; tt < taxTypes.length; tt++) h += '<option value="' + taxTypes[tt].v + '"' + (curType === taxTypes[tt].v ? ' selected' : '') + '>' + taxTypes[tt].l + '</option>';
     h += '</select></div>';
     h += '</div>';
@@ -3171,7 +3174,7 @@ function renderPnlCrudForm(type, item) {
 }
 
 function renderPnlTaxes(p) {
-  var typeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',usn_income:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b',usn_income_expense:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
+  var typeLabels = {income_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c',vat:'\u041d\u0414\u0421',usn_income:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b',usn_income_expense:'\u0423\u0421\u041d \u0414\u043e\u0445\u043e\u0434\u044b\u2212\u0420\u0430\u0441\u0445\u043e\u0434\u044b',turnover_tax:'\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u043e\u0431\u043e\u0440\u043e\u0442',payroll_tax:'\u041d\u0430\u043b\u043e\u0433\u0438 \u043d\u0430 \u0417\u041f',patent:'\u041f\u0430\u0442\u0435\u043d\u0442',property:'\u0418\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u043e',other:'\u041f\u0440\u043e\u0447\u0435\u0435'};
   var baseLabels = {ebt:'EBT (\u0414\u043e\u0445\u2212\u0420\u0430\u0441\u0445)',revenue:'\u041e\u0431\u043e\u0440\u043e\u0442 \u0431\u0435\u0437 \u0442\u0440.',total_turnover:'\u041e\u0431\u0449. \u043e\u0431\u043e\u0440\u043e\u0442',turnover_excl_transit:'\u041e\u0431\u043e\u0440\u043e\u0442 \u0431\u0435\u0437 \u0442\u0440.',income_minus_expenses:'EBT (\u0414\u043e\u0445\u2212\u0420\u0430\u0441\u0445)',payroll:'\u0424\u041e\u0422',vat_inclusive:'\u041d\u0414\u0421 \u0432\u043a\u043b.',vat_turnover:'\u041d\u0414\u0421 \u043e\u0431\u043e\u0440\u043e\u0442',fixed:'\u0424\u0438\u043a\u0441.'};
   var statusColors = {paid:'#22C55E',pending:'#F59E0B',overdue:'#EF4444'};
   var statusLabels = {paid:'\u041e\u043f\u043b\u0430\u0447\u0435\u043d',pending:'\u041e\u0436\u0438\u0434\u0430\u0435\u0442',overdue:'\u041f\u0440\u043e\u0441\u0440\u043e\u0447\u0435\u043d'};
@@ -3264,11 +3267,11 @@ function renderPnlTaxes(p) {
   h += '<div style="padding:8px 12px;background:rgba(34,197,94,0.06);border-radius:6px;border:1px solid rgba(34,197,94,0.15)">';
   h += '<b style="color:#22C55E">☑ Галочка ВКЛ = Автоматический налог</b>';
   h += '<div style="margin-top:4px;color:#94a3b8">Создаётся <b>правило</b> (шаблон) + <b>платёж</b> за текущий период. Правило повторяется каждый месяц/квартал — платежи генерируются автоматически при открытии P&L.</div>';
-  h += '<div style="margin-top:4px;color:#64748b;font-size:0.78rem">Поля: название, тип, ставка %, база расчёта, периодичность, начало действия.</div></div>';
+  h += '<div style="margin-top:4px;color:#64748b;font-size:0.78rem">Поля: тип налога, ставка %, база расчёта, периодичность, начало действия. Название формируется автоматически (например, «НДС 20%»).</div></div>';
   h += '<div style="padding:8px 12px;background:rgba(245,158,11,0.06);border-radius:6px;border:1px solid rgba(245,158,11,0.15)">';
   h += '<b style="color:#F59E0B">☐ Галочка ВЫКЛ = Ручной налог</b>';
   h += '<div style="margin-top:4px;color:#94a3b8">Создаётся <b>один платёж</b> за текущий месяц. Без правила — не повторяется. Подходит для разовых начислений (штраф, доплата, корректировка).</div>';
-  h += '<div style="margin-top:4px;color:#64748b;font-size:0.78rem">Поля: название, тип, сумма (AMD), срок уплаты, дата оплаты, статус.</div></div>';
+  h += '<div style="margin-top:4px;color:#64748b;font-size:0.78rem">Поля: тип налога, сумма (AMD), срок уплаты, дата оплаты, статус. Название формируется автоматически.</div></div>';
   h += '</div></div>';
   // Section 2 - How auto-calc works
   h += '<div style="margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #334155">';
