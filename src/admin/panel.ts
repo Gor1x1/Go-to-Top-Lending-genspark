@@ -2660,6 +2660,14 @@ async function loadPnlData() {
     pnlData = result;
   }
   if (pnlData && pnlData.fiscal_year_start_month) pnlFiscalMonth = pnlData.fiscal_year_start_month;
+  // Sync loan settings from P&L response (always up-to-date from DB)
+  if (pnlData && pnlData.loan_repayment_mode !== undefined) {
+    data.loanSettings = {
+      repayment_mode: pnlData.loan_repayment_mode || 'standard',
+      aggressive_pct: pnlData.loan_aggressive_pct || 10,
+      standard_extra_pct: pnlData.loan_standard_extra_pct || 0
+    };
+  }
   pnlLoading = false;
   // After P&L computed, re-fetch tax payments (auto-calc amounts are now written to DB)
   try { var tpRes = await api('/tax-payments', { _silent: true }); if (tpRes && tpRes.payments) data.taxPayments = tpRes.payments; } catch {}
@@ -3651,7 +3659,7 @@ function renderPnlLoans(p) {
     }
   }
   h += '</div>';
-  h += '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem;margin-top:4px" onclick="saveLoanSettings()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить режим</button>';
+  h += '<button id="loanSettingsSaveBtn" class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem;margin-top:4px" onclick="saveLoanSettings()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить режим</button>';
   h += '</div>';
   // Show add form if open
   if (showPnlAddForm && pnlEditType === 'loan') {
@@ -3976,16 +3984,39 @@ function calcLoanEndFromTerm() {
 }
 // Save loan settings (system-wide repayment mode)
 async function saveLoanSettings() {
-  var btn = event && event.target ? event.target.closest('button') : null;
+  var btn = null;
+  try { btn = document.getElementById('loanSettingsSaveBtn'); } catch(e) {}
   var restore = btnLoading(btn, 'Сохранение...');
-  var mode = document.getElementById('loan_global_mode_select')?.value || 'standard';
-  var pct = parseFloat(document.getElementById('loan_global_aggr_pct')?.value) || 10;
-  var stdExtraPct = parseFloat(document.getElementById('loan_global_std_extra_pct')?.value) || 0;
-  var res = await api('/loan-settings', { method: 'PUT', body: JSON.stringify({ repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct }), _silent: true });
-  if (!res || res.error) { if (restore) restore(); toast('Ошибка сохранения', 'error'); return; }
-  data.loanSettings = { repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct };
-  toast('✅ Режим погашения сохранён');
-  pnlData = null; loadPnlData();
+  try {
+    var modeEl = document.getElementById('loan_global_mode_select');
+    var pctEl = document.getElementById('loan_global_aggr_pct');
+    var stdEl = document.getElementById('loan_global_std_extra_pct');
+    var mode = modeEl ? modeEl.value : 'standard';
+    var pct = pctEl ? (parseFloat(pctEl.value) || 10) : 10;
+    var stdExtraPct = stdEl ? (parseFloat(stdEl.value) || 0) : 0;
+    console.log('[saveLoanSettings]', mode, pct, stdExtraPct);
+    var res = await api('/loan-settings', 'PUT', { repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct });
+    console.log('[saveLoanSettings] result:', res);
+    if (!res || res.error) {
+      if (restore) restore();
+      toast('Ошибка сохранения: ' + (res && res.error ? res.error : 'нет ответа'), 'error');
+      return;
+    }
+    data.loanSettings = { repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct };
+    toast('✅ Режим погашения сохранён');
+    // Refresh bulk data to sync loanSettings
+    var bulk = await api('/bulk-data', { _silent: true });
+    if (bulk && !bulk.error) {
+      data.loans = bulk.loans || data.loans;
+      data.loanPayments = bulk.loanPayments || data.loanPayments;
+      if (bulk.loanSettings) data.loanSettings = bulk.loanSettings;
+    }
+    pnlData = null; loadPnlData();
+  } catch(e) {
+    console.error('[saveLoanSettings] exception:', e);
+    if (restore) restore();
+    toast('Ошибка: ' + (e && e.message ? e.message : 'unknown'), 'error');
+  }
 }
 function onLoanModeChange(mode) {
   var stdEl = document.getElementById('standardModeFields');
