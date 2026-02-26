@@ -116,14 +116,16 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all().catch(() => ({results:[]}))
     ]);
     // P&L related data (parallel, with fallback for new tables)
-    const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData] = await Promise.all([
+    const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData, loanSettingsMode, loanSettingsPct] = await Promise.all([
       db.prepare('SELECT * FROM tax_payments WHERE (is_suppressed IS NULL OR is_suppressed = 0) ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM assets ORDER BY purchase_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loans ORDER BY priority ASC, start_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM dividends ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM other_income_expenses ORDER BY date DESC').all().catch(() => ({results:[]})),
-      db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all().catch(() => ({results:[]}))
+      db.prepare('SELECT * FROM tax_rules ORDER BY id DESC').all().catch(() => ({results:[]})),
+      db.prepare("SELECT value FROM site_settings WHERE key = 'loan_repayment_mode'").first().catch(() => null),
+      db.prepare("SELECT value FROM site_settings WHERE key = 'loan_aggressive_pct'").first().catch(() => null)
     ]);
     // Stats counts (parallel)
     const [contentCount, svcCount, msgCount, scriptCount, totalLeadsCount, newLeadsCount, todayLeadsCount, todayViews, weekViews, monthViews] = await Promise.all([
@@ -179,7 +181,11 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       loanPayments: loanPaymentsData.results || [],
       dividends: dividendsData.results || [],
       otherIncomeExpenses: otherIEData.results || [],
-      taxRules: taxRulesData.results || []
+      taxRules: taxRulesData.results || [],
+      loanSettings: {
+        repayment_mode: loanSettingsMode?.value || 'standard',
+        aggressive_pct: loanSettingsPct?.value ? parseFloat(loanSettingsPct.value as string) : 10
+      }
     });
   } catch(e: any) {
     console.error('bulk-data error:', e?.message, e?.stack);
@@ -2750,8 +2756,13 @@ api.post('/loans', authMiddleware, async (c) => {
     endDate = sd.toISOString().slice(0, 10);
   }
 
-  await db.prepare(`INSERT INTO loans (name, lender, principal, interest_rate, start_date, end_date, monthly_payment, remaining_balance, loan_type, is_active, notes, term_months, desired_term_months, original_monthly_payment, collateral_type, collateral_desc, priority, repayment_mode, aggressive_pct, overdraft_limit, overdraft_used, overdraft_rate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(d.name||'', d.lender||'', principal, annualRate, d.start_date||'', endDate, monthlyPayment, d.remaining_balance||principal, loanType, d.is_active!==undefined?d.is_active:1, d.notes||'', termMonths, desiredTerm, originalMonthly, collateralType, d.collateral_desc||'', priority, d.repayment_mode||'standard', d.aggressive_pct||0, d.overdraft_limit||0, d.overdraft_used||0, d.overdraft_rate||0).run();
+  // For manual (займ с рук) type: use provided monthly_payment if set
+  if (loanType === 'manual' && d.monthly_payment && d.monthly_payment > 0) {
+    monthlyPayment = d.monthly_payment;
+  }
+
+  await db.prepare(`INSERT INTO loans (name, lender, principal, interest_rate, start_date, end_date, monthly_payment, remaining_balance, loan_type, is_active, notes, term_months, desired_term_months, original_monthly_payment, collateral_type, collateral_desc, priority, repayment_mode, aggressive_pct, overdraft_limit, overdraft_used, overdraft_rate, actual_end_date) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(d.name||'', d.lender||'', principal, annualRate, d.start_date||'', endDate, monthlyPayment, d.remaining_balance||principal, loanType, d.is_active!==undefined?d.is_active:1, d.notes||'', termMonths, desiredTerm, originalMonthly, collateralType, d.collateral_desc||'', priority, d.repayment_mode||'standard', d.aggressive_pct||0, d.overdraft_limit||0, d.overdraft_used||0, d.overdraft_rate||0, d.actual_end_date||'').run();
   return c.json({ success: true });
 });
 
@@ -2777,7 +2788,12 @@ api.put('/loans/:id', authMiddleware, async (c) => {
   }
 
   const fields: string[] = []; const vals: any[] = [];
-  for (const k of ['name','lender','principal','interest_rate','start_date','end_date','monthly_payment','remaining_balance','loan_type','is_active','notes','term_months','desired_term_months','original_monthly_payment','collateral_type','collateral_desc','priority','repayment_mode','aggressive_pct','overdraft_limit','overdraft_used','overdraft_rate']) {
+  // For manual (займ с рук) type: use provided monthly_payment directly
+  if (d.loan_type === 'manual' && d.monthly_payment && d.monthly_payment > 0) {
+    // Don't override — let it pass through
+  }
+
+  for (const k of ['name','lender','principal','interest_rate','start_date','end_date','monthly_payment','remaining_balance','loan_type','is_active','notes','term_months','desired_term_months','original_monthly_payment','collateral_type','collateral_desc','priority','repayment_mode','aggressive_pct','overdraft_limit','overdraft_used','overdraft_rate','actual_end_date']) {
     if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
   }
   if (fields.length) { vals.push(id); await db.prepare(`UPDATE loans SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
@@ -2831,6 +2847,38 @@ api.put('/loan-payments/:id', authMiddleware, async (c) => {
   if (d.principal_part && old) {
     await db.prepare('UPDATE loans SET remaining_balance = remaining_balance - ? WHERE id = ?').bind(d.principal_part, old.loan_id).run();
   }
+  return c.json({ success: true });
+});
+
+// ===== LOAN SETTINGS (system-wide repayment mode) =====
+api.get('/loan-settings', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  // Store loan settings in a simple key-value in the settings mechanism
+  try {
+    const mode = await db.prepare("SELECT value FROM site_settings WHERE key = 'loan_repayment_mode'").first();
+    const pct = await db.prepare("SELECT value FROM site_settings WHERE key = 'loan_aggressive_pct'").first();
+    return c.json({
+      repayment_mode: mode?.value || 'standard',
+      aggressive_pct: pct?.value ? parseFloat(pct.value as string) : 10
+    });
+  } catch {
+    return c.json({ repayment_mode: 'standard', aggressive_pct: 10 });
+  }
+});
+
+api.put('/loan-settings', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  try {
+    // Ensure site_settings table exists
+    await db.prepare("CREATE TABLE IF NOT EXISTS site_settings (key TEXT PRIMARY KEY, value TEXT DEFAULT '')").run();
+    if (d.repayment_mode !== undefined) {
+      await db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('loan_repayment_mode', ?)").bind(d.repayment_mode).run();
+    }
+    if (d.aggressive_pct !== undefined) {
+      await db.prepare("INSERT OR REPLACE INTO site_settings (key, value) VALUES ('loan_aggressive_pct', ?)").bind(String(d.aggressive_pct)).run();
+    }
+  } catch {}
   return c.json({ success: true });
 });
 
@@ -2941,11 +2989,21 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     }
   }
   // Loans interest for this period
-  const loanPayments = await db.prepare("SELECT SUM(interest_part) as total_interest, SUM(amount) as total_payments FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
+  const loanPayments = await db.prepare("SELECT SUM(interest_part) as total_interest, SUM(amount) as total_payments, SUM(principal_part) as total_principal FROM loan_payments WHERE payment_date >= ? AND payment_date <= ?")
     .bind(periodKey + '-01', periodKey + '-31').first();
   // Loan payments list for this period
   const loanPaymentsList = await db.prepare("SELECT lp.*, l.name as loan_name FROM loan_payments lp LEFT JOIN loans l ON lp.loan_id = l.id WHERE lp.payment_date >= ? AND lp.payment_date <= ? ORDER BY lp.payment_date DESC")
     .bind(periodKey + '-01', periodKey + '-31').all();
+  // Loan summary: total debt, monthly payments, load info
+  const loanSummary = await db.prepare("SELECT SUM(CASE WHEN loan_type != 'overdraft' THEN remaining_balance ELSE 0 END) as total_debt, SUM(CASE WHEN loan_type != 'overdraft' THEN monthly_payment ELSE 0 END) as total_monthly, SUM(CASE WHEN loan_type = 'overdraft' THEN overdraft_used ELSE 0 END) as overdraft_debt, COUNT(*) as loan_count FROM loans WHERE is_active = 1").first();
+  // Loan settings (system-wide)
+  let loanRepayMode = 'standard', loanAggrPct = 10;
+  try {
+    const modeRow = await db.prepare("SELECT value FROM site_settings WHERE key = 'loan_repayment_mode'").first();
+    const pctRow = await db.prepare("SELECT value FROM site_settings WHERE key = 'loan_aggressive_pct'").first();
+    if (modeRow?.value) loanRepayMode = modeRow.value as string;
+    if (pctRow?.value) loanAggrPct = parseFloat(pctRow.value as string) || 10;
+  } catch {}
   // Dividends for this period
   const divs = await db.prepare('SELECT * FROM dividends WHERE period_key = ?').bind(periodKey).all();
   const totalDividends = (divs.results || []).reduce((s: number, d: any) => s + (d.amount || 0) + (d.tax_amount || 0), 0);
@@ -3070,6 +3128,16 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     other_items: otherIE.results || [],
     assets: assets.results || [],
     loan_payments_list: loanPaymentsList.results || [],
+    // Loan load data
+    loan_total_debt: (loanSummary?.total_debt as number || 0) + (loanSummary?.overdraft_debt as number || 0),
+    loan_total_monthly: loanSummary?.total_monthly as number || 0,
+    loan_total_payments_period: loanPayments?.total_payments as number || 0,
+    loan_total_principal_period: loanPayments?.total_principal as number || 0,
+    loan_count: loanSummary?.loan_count as number || 0,
+    loan_repayment_mode: loanRepayMode,
+    loan_aggressive_pct: loanAggrPct,
+    loan_load_on_revenue: revenue > 0 ? Math.round((loanPayments?.total_payments as number || 0) / revenue * 10000) / 100 : 0,
+    loan_load_on_profit: netProfit > 0 ? Math.round((loanSummary?.total_monthly as number || 0) / netProfit * 10000) / 100 : 0,
     tax_rules: taxRules.results || [],
     _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };

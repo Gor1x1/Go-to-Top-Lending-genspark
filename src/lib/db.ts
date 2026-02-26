@@ -625,6 +625,10 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   // v20: Add period_key and extra_principal to loan_payments for tracking extra payments
   try { await db.prepare("ALTER TABLE loan_payments ADD COLUMN period_key TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE loan_payments ADD COLUMN is_extra INTEGER DEFAULT 0").run(); } catch {}
+  // v21: actual_end_date for loans (when a credit is actually paid off early)
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN actual_end_date TEXT DEFAULT ''").run(); } catch {}
+  // v21: Global loan settings stored in site_settings — repayment_mode + aggressive_pct apply system-wide
+  // Settings are stored via the existing settings table mechanism
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
