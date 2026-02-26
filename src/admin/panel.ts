@@ -3100,7 +3100,7 @@ function renderPnlCascade(p) {
     }
     // Total credit load line
     var totalCreditLoad = p.loan_total_monthly;
-    if (p.loan_repayment_mode === 'aggressive') { totalCreditLoad = Math.round((p.net_profit||0) * (p.loan_aggressive_pct||10) / 100); }
+    if (p.loan_repayment_mode === 'aggressive') { totalCreditLoad = Math.max(Math.round((p.net_profit||0) * (p.loan_aggressive_pct||10) / 100), p.loan_total_monthly); }
     else if (p.loan_standard_extra_pct > 0) { totalCreditLoad += Math.round((p.net_profit||0) * p.loan_standard_extra_pct / 100); }
     h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(239,68,68,0.1);gap:8px">';
     h += '<span style="color:#EF4444;font-size:0.82rem;font-weight:700"><i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>ИТОГО нагрузка на кредиты' + tip('Полная сумма ежемесячных платежей включая доп. нагрузку') + '</span>';
@@ -3658,7 +3658,10 @@ function renderPnlLoans(p) {
   var modeLabel = isAggr ? 'Агрессивный' : 'Стандартный';
   var netProfit = (p && p.net_profit) || 0;
   var stdExtraPct = ls.standard_extra_pct || 0;
-  var activeLoans = (data.loans || []).filter(function(l) { return l.is_active !== 0 && (l.remaining_balance || 0) > 0 && l.loan_type !== 'overdraft'; });
+  // Helper: get actual payment for any loan type (prefers bank_monthly_payment)
+  function getActPmt(loan) { return (loan.bank_monthly_payment && loan.bank_monthly_payment > 0) ? loan.bank_monthly_payment : (loan.monthly_payment || 0); }
+  // Active loans = all with balance (including overdraft with overdraft_used)
+  var activeLoans = (data.loans || []).filter(function(l) { return l.is_active !== 0 && ((l.remaining_balance || 0) > 0 || (l.loan_type === 'overdraft' && (l.overdraft_used || 0) > 0)); });
   var activeLoanCount = activeLoans.length;
 
   h += '<details id="loanModeDetails" class="card" style="margin-bottom:16px;border-left:3px solid ' + modeColor + ';background:linear-gradient(135deg,rgba(' + (isAggr ? '245,158,11' : '34,197,94') + ',0.06),transparent)" ontoggle="loanModeDetailsOpen=this.open"' + (loanModeDetailsOpen ? ' open' : '') + '>';
@@ -3694,8 +3697,8 @@ function renderPnlLoans(p) {
   if (isAggr) {
     var aggrPctVal = ls.aggressive_pct || 10;
     var aggrAmount = Math.round(netProfit * aggrPctVal / 100);
-    var sortedLoansPreview = (data.loans || []).slice().sort(function(a,b) { return (a.priority||10) - (b.priority||10); }).filter(function(l) { return l.is_active !== 0 && l.loan_type !== 'overdraft' && (l.remaining_balance || 0) > 0; });
-    var totalMinPMT = sortedLoansPreview.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
+    var sortedLoansPreview = (data.loans || []).slice().sort(function(a,b) { return (a.priority||10) - (b.priority||10); }).filter(function(l) { return l.is_active !== 0 && ((l.remaining_balance || 0) > 0 || (l.loan_type === 'overdraft' && (l.overdraft_used || 0) > 0)); });
+    var totalMinPMT = sortedLoansPreview.reduce(function(s,l) { return s + getActPmt(l); }, 0);
     var extraBudget = Math.max(aggrAmount - totalMinPMT, 0);
     var budgetInsufficient = aggrAmount > 0 && aggrAmount < totalMinPMT;
     var coveragePct = totalMinPMT > 0 ? (Math.round(aggrAmount / totalMinPMT * 1000) / 10) : 0;
@@ -3706,9 +3709,9 @@ function renderPnlLoans(p) {
 
     // Status indicator
     if (budgetInsufficient) {
-      h += '<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.78rem;color:#EF4444;font-weight:600"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>\u0411\u044e\u0434\u0436\u0435\u0442 \u043f\u043e\u043a\u0440\u044b\u0432\u0430\u0435\u0442 ' + coveragePct + '% \u043e\u0442 PMT \u2192 \u043f\u0440\u043e\u043f\u043e\u0440\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e\u0435 \u0440\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u0435\u043d\u0438\u0435</div>';
+      h += '<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.78rem;color:#EF4444;font-weight:600"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>\u0411\u044e\u0434\u0436\u0435\u0442 \u043f\u043e\u043a\u0440\u044b\u0432\u0430\u0435\u0442 ' + coveragePct + '% \u043e\u0442 PMT \u2014 \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u043e\u0435 \u043f\u043e \u0433\u0440\u0430\u0444\u0438\u043a\u0443</div>';
     } else if (extraBudget > 0) {
-      h += '<div style="margin-top:6px;padding:6px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;font-size:0.78rem;color:#22C55E;font-weight:600"><i class="fas fa-check-circle" style="margin-right:4px"></i>\u0411\u044e\u0434\u0436\u0435\u0442 > PMT \u2192 <b>+' + fmtAmt(extraBudget) + '</b> \u043d\u0430 \u0434\u043e\u0441\u0440\u043e\u0447\u043d\u043e\u0435 (80/20)</div>';
+      h += '<div style="margin-top:6px;padding:6px 10px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:6px;font-size:0.78rem;color:#22C55E;font-weight:600"><i class="fas fa-check-circle" style="margin-right:4px"></i>\u0411\u044e\u0434\u0436\u0435\u0442 > PMT \u2192 <b>+' + fmtAmt(extraBudget) + '</b> \u043d\u0430 \u0434\u043e\u0441\u0440\u043e\u0447\u043d\u043e\u0435 (70% \u043f\u0440\u0438\u043e\u0440\u0438\u0442\u0435\u0442 / 30% \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u0435)</div>';
     } else if (netProfit <= 0) {
       h += '<div style="margin-top:6px;padding:6px 10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.78rem;color:#EF4444;font-weight:600"><i class="fas fa-times-circle" style="margin-right:4px"></i>\u041d\u0435\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 \u2014 \u0431\u044e\u0434\u0436\u0435\u0442 = 0</div>';
     }
@@ -3719,7 +3722,7 @@ function renderPnlLoans(p) {
       if (extraBudget > 0) {
         var priLoans = sortedLoansPreview.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
         var othLoans = sortedLoansPreview.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
-        var priShare = priLoans.length > 0 ? Math.round(extraBudget * 0.8) : 0;
+        var priShare = priLoans.length > 0 ? Math.round(extraBudget * 0.7) : 0;
         var othShare = extraBudget - priShare;
         h += '<table style="width:100%;border-collapse:collapse;font-size:0.75rem">';
         h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><th style="text-align:left;color:#64748b;padding:4px 0;font-weight:600">\u041a\u0440\u0435\u0434\u0438\u0442</th><th style="text-align:right;color:#64748b;padding:4px 0;font-weight:600">PMT</th><th style="text-align:right;color:#64748b;padding:4px 0;font-weight:600">\u0414\u043e\u043f.</th><th style="text-align:right;color:#64748b;padding:4px 0;font-weight:600">\u0418\u0442\u043e\u0433\u043e</th></tr>';
@@ -3729,11 +3732,11 @@ function renderPnlLoans(p) {
           var splExtra = 0;
           if (isPri && priLoans.length > 0) splExtra = Math.round(priShare / priLoans.length);
           else if (!isPri && othLoans.length > 0) splExtra = Math.round(othShare / othLoans.length);
-          var splTotal = (spl.monthly_payment||0) + splExtra;
+          var splTotal = getActPmt(spl) + splExtra;
           var groupTag = isPri ? '<span style="color:#EF4444;font-size:0.6rem"> 80%</span>' : '<span style="color:#3B82F6;font-size:0.6rem"> 20%</span>';
           h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">';
           h += '<td style="padding:3px 0;color:#e2e8f0">' + escHtml(spl.name) + (spl.collateral_type && spl.collateral_type !== 'none' ? ' \ud83d\udee1\ufe0f' : '') + groupTag + '</td>';
-          h += '<td style="text-align:right;color:#94a3b8">' + fmtAmt(spl.monthly_payment||0) + '</td>';
+          h += '<td style="text-align:right;color:#94a3b8">' + fmtAmt(getActPmt(spl)) + '</td>';
           h += '<td style="text-align:right;color:#F59E0B;font-weight:700">+' + fmtAmt(splExtra) + '</td>';
           h += '<td style="text-align:right;color:#22C55E;font-weight:700">' + fmtAmt(splTotal) + '</td>';
           h += '</tr>';
@@ -3745,12 +3748,12 @@ function renderPnlLoans(p) {
         h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.06)"><th style="text-align:left;color:#64748b;padding:4px 0;font-weight:600">\u041a\u0440\u0435\u0434\u0438\u0442</th><th style="text-align:right;color:#64748b;padding:4px 0;font-weight:600">PMT</th><th style="text-align:right;color:#64748b;padding:4px 0;font-weight:600">\u0414\u043e\u043b\u044f</th><th style="text-align:right;color:#64748b;padding:4px 0;font-weight:600">\u041f\u043e\u043b\u0443\u0447\u0438\u0442</th></tr>';
         for (var di = 0; di < sortedLoansPreview.length; di++) {
           var sdl = sortedLoansPreview[di];
-          var proportion = totalMinPMT > 0 ? (sdl.monthly_payment||0) / totalMinPMT : 0;
+          var proportion = totalMinPMT > 0 ? getActPmt(sdl) / totalMinPMT : 0;
           var allocated = Math.round(aggrAmount * proportion);
           var pctOfBudget = Math.round(proportion * 100);
           h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">';
           h += '<td style="padding:3px 0;color:#e2e8f0">' + escHtml(sdl.name) + (sdl.collateral_type && sdl.collateral_type !== 'none' ? ' \ud83d\udee1\ufe0f' : '') + '</td>';
-          h += '<td style="text-align:right;color:#94a3b8">' + fmtAmt(sdl.monthly_payment||0) + '</td>';
+          h += '<td style="text-align:right;color:#94a3b8">' + fmtAmt(getActPmt(sdl)) + '</td>';
           h += '<td style="text-align:right;color:#64748b">' + pctOfBudget + '%</td>';
           h += '<td style="text-align:right;color:#F59E0B;font-weight:700">' + fmtAmt(allocated) + '</td>';
           h += '</tr>';
@@ -3760,7 +3763,7 @@ function renderPnlLoans(p) {
       } else {
         h += '<div style="color:#64748b;font-size:0.75rem">\u041c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u043f\u043e \u0433\u0440\u0430\u0444\u0438\u043a\u0443:</div>';
         for (var ni = 0; ni < sortedLoansPreview.length; ni++) {
-          h += '<div style="color:#94a3b8;padding:2px 0;font-size:0.75rem">\u2192 ' + escHtml(sortedLoansPreview[ni].name) + ': <b>' + fmtAmt(sortedLoansPreview[ni].monthly_payment||0) + '</b></div>';
+          h += '<div style="color:#94a3b8;padding:2px 0;font-size:0.75rem">\u2192 ' + escHtml(sortedLoansPreview[ni].name) + ': <b>' + fmtAmt(getActPmt(sortedLoansPreview[ni])) + '</b></div>';
         }
       }
       h += '</div>';
@@ -3782,7 +3785,7 @@ function renderPnlLoans(p) {
   h += '<div style="font-weight:700;color:#a78bfa;margin-top:8px;margin-bottom:6px"><i class="fas fa-bolt" style="margin-right:4px;color:#F59E0B"></i>\u0410\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043d\u044b\u0439 \u0440\u0435\u0436\u0438\u043c</div>';
   h += '<div>\u0412\u044b \u0432\u044b\u0434\u0435\u043b\u044f\u0435\u0442\u0435 X% \u043e\u0442 \u0447\u0438\u0441\u0442\u043e\u0439 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 \u043a\u0430\u043a \u0435\u0434\u0438\u043d\u044b\u0439 \u0431\u044e\u0434\u0436\u0435\u0442 \u043d\u0430 \u0432\u0441\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u044b. \u0414\u0430\u043b\u0435\u0435 3 \u0441\u0446\u0435\u043d\u0430\u0440\u0438\u044f:</div>';
   h += '<div style="padding-left:12px;margin-top:4px">';
-  h += '<div><b style="color:#22C55E">\u0411\u044e\u0434\u0436\u0435\u0442 > PMT:</b> \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043f\u043e\u043a\u0440\u044b\u0432\u0430\u044e\u0442\u0441\u044f \u0432\u0441\u0435 \u043c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438. \u041e\u0441\u0442\u0430\u0442\u043e\u043a \u0438\u0434\u0451\u0442 \u043d\u0430 \u0434\u043e\u0441\u0440\u043e\u0447\u043d\u043e\u0435: <b>80%</b> \u2014 \u0437\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u043c/\u043f\u0440\u0438\u043e\u0440\u0438\u0442\u0435\u0442\u043d\u044b\u043c, <b>20%</b> \u2014 \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u043c.</div>';
+  h += '<div><b style="color:#22C55E">\u0411\u044e\u0434\u0436\u0435\u0442 > PMT:</b> \u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u043f\u043e\u043a\u0440\u044b\u0432\u0430\u044e\u0442\u0441\u044f \u0432\u0441\u0435 \u043c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438. \u041e\u0441\u0442\u0430\u0442\u043e\u043a \u0438\u0434\u0451\u0442 \u043d\u0430 \u0434\u043e\u0441\u0440\u043e\u0447\u043d\u043e\u0435: <b>70%</b> \u2014 \u043f\u0440\u0438\u043e\u0440\u0438\u0442\u0435\u0442\u043d\u044b\u043c, <b>30%</b> \u2014 \u043e\u0441\u0442\u0430\u043b\u044c\u043d\u044b\u043c.</div>';
   h += '<div style="margin-top:3px"><b style="color:#F59E0B">\u0411\u044e\u0434\u0436\u0435\u0442 < PMT:</b> \u0414\u0435\u043d\u0435\u0433 \u043d\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u0434\u0430\u0436\u0435 \u043d\u0430 \u043c\u0438\u043d\u0438\u043c\u0430\u043b\u044c\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438. \u0411\u044e\u0434\u0436\u0435\u0442 \u0440\u0430\u0441\u043f\u0440\u0435\u0434\u0435\u043b\u044f\u0435\u0442\u0441\u044f <b>\u043f\u0440\u043e\u043f\u043e\u0440\u0446\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u043e</b> \u0440\u0430\u0437\u043c\u0435\u0440\u0443 PMT \u043a\u0430\u0436\u0434\u043e\u0433\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u0430.</div>';
   h += '<div style="margin-top:3px"><b style="color:#EF4444">\u041d\u0435\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438:</b> \u0411\u044e\u0434\u0436\u0435\u0442 = 0. \u041f\u043b\u0430\u0442\u0435\u0436\u0438 \u0438\u0434\u0443\u0442 \u043f\u043e \u0433\u0440\u0430\u0444\u0438\u043a\u0443.</div>';
   h += '</div>';
@@ -3802,8 +3805,8 @@ function renderPnlLoans(p) {
   var totalDebt = 0; var totalMonthly = 0; var totalPrincipalAll = 0;
   for (var si = 0; si < loans.length; si++) {
     var sl = loans[si];
-    if (sl.loan_type === 'overdraft') { totalDebt += (sl.overdraft_used || 0); totalMonthly += (sl.monthly_payment || 0); }
-    else { totalDebt += (sl.remaining_balance || 0); totalMonthly += (sl.monthly_payment || 0); }
+    if (sl.loan_type === 'overdraft') { totalDebt += (sl.overdraft_used || 0); totalMonthly += getActPmt(sl); }
+    else { totalDebt += (sl.remaining_balance || 0); totalMonthly += getActPmt(sl); }
     totalPrincipalAll += (sl.principal || 0);
   }
   var netProfitV = (p && p.net_profit) || 0;
@@ -3831,43 +3834,41 @@ function renderPnlLoans(p) {
     var allActiveLns = loans.filter(function(l) { return l.is_active !== 0 && ((l.remaining_balance||0) > 0 || (l.loan_type === 'overdraft' && (l.overdraft_used||0) > 0)); }).sort(function(a,b) { return (a.priority||10)-(b.priority||10); });
     var sortedLns = allActiveLns.filter(function(l) { return l.loan_type !== 'overdraft'; });
     var odLns = allActiveLns.filter(function(l) { return l.loan_type === 'overdraft'; });
-    var minPmts = sortedLns.reduce(function(s,l) { return s + ((l.bank_monthly_payment && l.bank_monthly_payment > 0) ? l.bank_monthly_payment : (l.monthly_payment||0)); }, 0);
+    var minPmts = sortedLns.reduce(function(s,l) { return s + getActPmt(l); }, 0);
     // Include overdraft payments in total minimum payments
-    var odMinPmts = odLns.reduce(function(s,l) { var odPmt = (l.bank_monthly_payment && l.bank_monthly_payment > 0) ? l.bank_monthly_payment : (l.monthly_payment||0); return s + odPmt; }, 0);
+    var odMinPmts = odLns.reduce(function(s,l) { return s + getActPmt(l); }, 0);
     var totalMinPmts = minPmts + odMinPmts;
     // Fill AggrPmtMap for overdrafts (they always pay their base amount)
-    for (var odi=0;odi<odLns.length;odi++) { var odAP = (odLns[odi].bank_monthly_payment && odLns[odi].bank_monthly_payment > 0) ? odLns[odi].bank_monthly_payment : (odLns[odi].monthly_payment||0); loanAggrPmtMap[odLns[odi].id] = odAP; }
+    for (var odi=0;odi<odLns.length;odi++) { loanAggrPmtMap[odLns[odi].id] = getActPmt(odLns[odi]); }
     var eBudget = Math.max(aggrAmt2 - totalMinPmts, 0);
     // Even if eBudget=0, in aggressive mode we still show PMT allocation
     // Case 1: budget >= total PMT => distribute extra on top of PMT
     if (eBudget > 0) {
       var priLns = sortedLns.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
       var othLns = sortedLns.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
-      var priSh = priLns.length > 0 ? Math.round(eBudget * 0.8) : 0;
+      var priSh = priLns.length > 0 ? Math.round(eBudget * 0.7) : 0;
       var othSh = eBudget - priSh;
-      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { var xAP = (priLns[xi].bank_monthly_payment && priLns[xi].bank_monthly_payment > 0) ? priLns[xi].bank_monthly_payment : (priLns[xi].monthly_payment||0); loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=xAP+pp; } }
-      else if (sortedLns.length > 0) { var s0AP = (sortedLns[0].bank_monthly_payment && sortedLns[0].bank_monthly_payment > 0) ? sortedLns[0].bank_monthly_payment : (sortedLns[0].monthly_payment||0); loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.8); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.8 / netProfitV * 10000)/100 : 0; loanAggrPmtMap[sortedLns[0].id]=s0AP+Math.round(eBudget * 0.8); }
-      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { var yAP = (othLns[yi].bank_monthly_payment && othLns[yi].bank_monthly_payment > 0) ? othLns[yi].bank_monthly_payment : (othLns[yi].monthly_payment||0); loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=yAP+(loanExtraMap[othLns[yi].id]||0); } }
+      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { var xAP = getActPmt(priLns[xi]); loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=xAP+pp; } }
+      else if (sortedLns.length > 0) { var s0AP = getActPmt(sortedLns[0]); loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.7); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.7 / netProfitV * 10000)/100 : 0; loanAggrPmtMap[sortedLns[0].id]=s0AP+Math.round(eBudget * 0.7); }
+      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { var yAP = getActPmt(othLns[yi]); loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=yAP+(loanExtraMap[othLns[yi].id]||0); } }
       // Fill PMT map for loans without extra
-      for (var fi=0;fi<sortedLns.length;fi++) { if (!loanAggrPmtMap[sortedLns[fi].id]) { var fAP = (sortedLns[fi].bank_monthly_payment && sortedLns[fi].bank_monthly_payment > 0) ? sortedLns[fi].bank_monthly_payment : (sortedLns[fi].monthly_payment||0); loanAggrPmtMap[sortedLns[fi].id] = fAP; } }
+      for (var fi=0;fi<sortedLns.length;fi++) { if (!loanAggrPmtMap[sortedLns[fi].id]) { loanAggrPmtMap[sortedLns[fi].id] = getActPmt(sortedLns[fi]); } }
     }
-    // Case 2: budget < total PMT => proportional distribution
+    // Case 2: budget < total PMT => each loan gets at least its PMT, budget used proportionally for what it can cover
     else if (aggrAmt2 > 0 && totalMinPmts > 0) {
       for (var qi=0;qi<sortedLns.length;qi++) {
-        var qAP = (sortedLns[qi].bank_monthly_payment && sortedLns[qi].bank_monthly_payment > 0) ? sortedLns[qi].bank_monthly_payment : (sortedLns[qi].monthly_payment||0);
-        var proportion = qAP / totalMinPmts;
+        var proportion = getActPmt(sortedLns[qi]) / totalMinPmts;
         loanAggrPmtMap[sortedLns[qi].id] = Math.round(aggrAmt2 * proportion);
       }
       for (var qoi=0;qoi<odLns.length;qoi++) {
-        var qoAP = (odLns[qoi].bank_monthly_payment && odLns[qoi].bank_monthly_payment > 0) ? odLns[qoi].bank_monthly_payment : (odLns[qoi].monthly_payment||0);
-        var oProportion = qoAP / totalMinPmts;
+        var oProportion = getActPmt(odLns[qoi]) / totalMinPmts;
         loanAggrPmtMap[odLns[qoi].id] = Math.round(aggrAmt2 * oProportion);
       }
     }
     // Case 3: aggrAmt2 = 0 (no profit) => just show PMT as is
     else {
-      for (var ri=0;ri<sortedLns.length;ri++) { var rAP = (sortedLns[ri].bank_monthly_payment && sortedLns[ri].bank_monthly_payment > 0) ? sortedLns[ri].bank_monthly_payment : (sortedLns[ri].monthly_payment||0); loanAggrPmtMap[sortedLns[ri].id] = rAP; }
-      for (var roi=0;roi<odLns.length;roi++) { var roAP = (odLns[roi].bank_monthly_payment && odLns[roi].bank_monthly_payment > 0) ? odLns[roi].bank_monthly_payment : (odLns[roi].monthly_payment||0); loanAggrPmtMap[odLns[roi].id] = roAP; }
+      for (var ri=0;ri<sortedLns.length;ri++) { loanAggrPmtMap[sortedLns[ri].id] = getActPmt(sortedLns[ri]); }
+      for (var roi=0;roi<odLns.length;roi++) { loanAggrPmtMap[odLns[roi].id] = getActPmt(odLns[roi]); }
     }
   }
   // Type labels
@@ -3931,7 +3932,7 @@ function renderPnlLoans(p) {
       h += '</div>';
       // Overdraft current month breakdown
       var odActualPmt = odBankPmt > 0 ? odBankPmt : odMonthlyInt;
-      var odTotal = odActualPmt + extraAmt;
+      var odTotal = isAggr && aggrTargetPmt > 0 ? aggrTargetPmt : (odActualPmt + extraAmt);
       if (odActualPmt > 0) {
         h += '<div style="padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);margin-bottom:8px;font-size:0.82rem">';
         h += '<div style="font-weight:600;color:#3B82F6;margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>' + loanPeriodLabel + ' — \u043e\u0432\u0435\u0440\u0434\u0440\u0430\u0444\u0442</div>';
