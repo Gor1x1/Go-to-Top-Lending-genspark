@@ -3040,7 +3040,12 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   } catch {}
   // Dividends for this period
   const divs = await db.prepare('SELECT * FROM dividends WHERE period_key = ?').bind(periodKey).all();
-  const totalDividends = (divs.results || []).reduce((s: number, d: any) => s + (d.amount || 0) + (d.tax_amount || 0), 0);
+  const totalDividends = (divs.results || []).reduce((s: number, d: any) => {
+    const amt = Number(d.amount) || 0;
+    // Only count tax when there's an actual dividend amount
+    const tax = amt > 0 ? (Number(d.tax_amount) || 0) : 0;
+    return s + amt + tax;
+  }, 0);
   // Dividends YTD
   const divsYtd = await db.prepare("SELECT SUM(amount) as total_amount, SUM(tax_amount) as total_tax FROM dividends WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
   // Other income/expenses

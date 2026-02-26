@@ -2795,6 +2795,11 @@ async function savePnlItem(type) {
       } else if (type === 'loan') {
         // Clean up overdraft-only fields for non-overdraft types
         delete d.start_date_od; delete d.end_date_od; delete d.term_months_od;
+      } else if (type === 'dividend') {
+        // Force: if dividend amount is 0 or negative, tax must be 0
+        if (!d.amount || d.amount <= 0) { d.amount = 0; d.tax_amount = 0; }
+        // If no tax_pct provided or 0, tax_amount must be 0
+        if (!d.tax_pct || d.tax_pct <= 0) { d.tax_amount = 0; d.tax_pct = 0; }
       }
       var endpoint = type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
       var result;
@@ -3330,24 +3335,44 @@ function renderPnlCrudForm(type, item) {
     h += '<div style="display:flex;align-items:center;gap:10px">';
     h += '<label style="font-size:0.78rem;color:#94a3b8;white-space:nowrap">% \u043e\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438</label>';
     h += '<input type="number" class="input" id="pnl_dividend_dividend_pct" value="' + curDivPct + '" step="1" min="0" max="100" style="max-width:80px;border-color:rgba(34,197,94,0.3)" oninput="calcDividendFromPct()">';
-    h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;flex-shrink:0" onclick="calcDividendFromPct()"><i class="fas fa-magic" style="margin-right:4px"></i>\u0420\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u0442\u044c</button>';
     h += '</div>';
+    h += '<div id="div_calc_preview" style="margin-top:6px;font-size:0.75rem;display:none"></div>';
+    h += '</div>';
+    // Schedule preview block
+    var schedNames = {monthly:'\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u043e',quarterly:'\u0415\u0436\u0435\u043a\u0432\u0430\u0440\u0442\u0430\u043b\u044c\u043d\u043e',yearly:'\u0415\u0436\u0435\u0433\u043e\u0434\u043d\u043e'};
+    var curSchedule2 = (item && item.schedule) || 'monthly';
     var divActiveBase = curCalcBase === 'after_loans' ? divProfitAfterLoans : divNetProfit;
-    h += '<div id="div_calc_preview" style="margin-top:6px;font-size:0.75rem;' + (curDivPct > 0 ? '' : 'display:none;') + 'color:' + (divActiveBase >= 0 ? '#22C55E' : '#EF4444') + '">';
-    if (curDivPct > 0 && divActiveBase > 0) {
-      h += '<i class="fas fa-check" style="margin-right:4px"></i>' + (curCalcBase === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c') + ': <b>' + fmtAmt(divActiveBase) + '</b> \u00d7 ' + curDivPct + '% = <b>' + fmtAmt(Math.round(divActiveBase * curDivPct / 100)) + '</b>';
-    } else if (curDivPct > 0 && divActiveBase <= 0) {
-      h += '<i class="fas fa-exclamation-triangle" style="margin-right:4px"></i><b>\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u0441\u0440\u0435\u0434\u0441\u0442\u0432!</b> ' + (curCalcBase === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c') + ': <b>' + fmtAmt(divActiveBase) + '</b> \u2014 \u0432\u044b \u0432 \u043c\u0438\u043d\u0443\u0441\u0435, \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434 \u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u0435\u043d';
+    var autoCalcAmt = curDivPct > 0 && divActiveBase > 0 ? Math.round(divActiveBase * curDivPct / 100) : 0;
+    var initAmt = (item && item.amount) ? item.amount : autoCalcAmt;
+    h += '<div id="div_schedule_preview" class="card" style="margin-bottom:10px;padding:10px 14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15)">';
+    if (initAmt > 0) {
+      var perQtr = Math.round(initAmt / 3), perYear = Math.round(initAmt * 12);
+      h += '<div style="font-size:0.78rem;color:#8B5CF6;font-weight:600;margin-bottom:6px"><i class="fas fa-calendar-check" style="margin-right:6px"></i>\u0413\u0440\u0430\u0444\u0438\u043a \u0432\u044b\u043f\u043b\u0430\u0442 (' + schedNames[curSchedule2] + ')</div>';
+      if (curSchedule2 === 'monthly') h += '<div style="font-size:0.82rem;color:#e2e8f0">\u041a\u0430\u0436\u0434\u044b\u0439 \u043c\u0435\u0441\u044f\u0446: <b style="color:#8B5CF6">' + fmtAmt(initAmt) + '</b> &nbsp;|&nbsp; \u0417\u0430 \u0433\u043e\u0434: <b>' + fmtAmt(initAmt * 12) + '</b></div>';
+      else if (curSchedule2 === 'quarterly') h += '<div style="font-size:0.82rem;color:#e2e8f0">\u041a\u0430\u0436\u0434\u044b\u0439 \u043a\u0432\u0430\u0440\u0442\u0430\u043b: <b style="color:#8B5CF6">' + fmtAmt(initAmt) + '</b> &nbsp;|&nbsp; \u0412 \u043c\u0435\u0441\u044f\u0446: ~<b>' + fmtAmt(perQtr) + '</b> &nbsp;|&nbsp; \u0417\u0430 \u0433\u043e\u0434: <b>' + fmtAmt(initAmt * 4) + '</b></div>';
+      else h += '<div style="font-size:0.82rem;color:#e2e8f0">\u0420\u0430\u0437 \u0432 \u0433\u043e\u0434: <b style="color:#8B5CF6">' + fmtAmt(initAmt) + '</b> &nbsp;|&nbsp; \u0412 \u043c\u0435\u0441\u044f\u0446: ~<b>' + fmtAmt(Math.round(initAmt / 12)) + '</b></div>';
+    } else {
+      h += '<div style="font-size:0.78rem;color:#94a3b8"><i class="fas fa-info-circle" style="margin-right:6px;color:#64748b"></i>\u0423\u043a\u0430\u0436\u0438\u0442\u0435 % \u043e\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438 \u0434\u043b\u044f \u0440\u0430\u0441\u0447\u0451\u0442\u0430</div>';
     }
     h += '</div>';
-    h += '</div>';
+    // Amount + recipient + tax
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Сумма</label><input type="number" class="input" id="pnl_dividend_amount" value="' + ((item && item.amount) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Получатель</label><input class="input" id="pnl_dividend_recipient" value="' + escHtml((item && item.recipient) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Дата выплаты</label><input type="date" class="input" id="pnl_dividend_payment_date" value="' + ((item && item.payment_date) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Налог на див.</label><input type="number" class="input" id="pnl_dividend_tax_amount" value="' + ((item && item.tax_amount) || 0) + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u0430</label><input type="number" class="input" id="pnl_dividend_amount" value="' + (initAmt || 0) + '" style="' + (curDivPct > 0 ? 'background:rgba(139,92,246,0.1);border-color:#8B5CF6;color:#8B5CF6;font-weight:700' : '') + '" readonly></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044c</label><input class="input" id="pnl_dividend_recipient" value="' + escHtml((item && item.recipient) || '') + '" oninput="updateDivPayoutSummary()"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u0414\u0430\u0442\u0430 \u0432\u044b\u043f\u043b\u0430\u0442\u044b</label><input type="date" class="input" id="pnl_dividend_payment_date" value="' + ((item && item.payment_date) || '') + '" onchange="updateDivPayoutSummary()"></div>';
+    var initTaxPct = (item && typeof item.tax_pct === 'number') ? item.tax_pct : 0;
+    var initTaxAmt = initAmt > 0 ? Math.round(initAmt * initTaxPct / 100) : 0;
+    if (item && typeof item.tax_amount === 'number' && initAmt > 0) initTaxAmt = item.tax_amount;
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0434\u0438\u0432. (%)</label>';
+    h += '<div style="display:flex;gap:6px;align-items:center">';
+    h += '<input type="number" class="input" id="pnl_dividend_tax_pct" value="' + initTaxPct + '" step="0.1" min="0" max="100" style="max-width:70px" oninput="calcDivTax()">';
+    h += '<span style="color:#64748b;font-size:0.75rem">=</span>';
+    h += '<input type="number" class="input" id="pnl_dividend_tax_amount" value="' + initTaxAmt + '" style="flex:1;background:rgba(239,68,68,0.06);border-color:rgba(239,68,68,0.2);color:#EF4444;font-weight:600" readonly>';
+    h += '</div></div>';
     h += '</div>';
-    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">Заметки</label><input class="input" id="pnl_dividend_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+    h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_dividend_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
+    // Summary block: shows final dividend amount, tax, net payout, and date
+    h += '<div id="div_payout_summary" class="card" style="margin-top:10px;padding:12px 14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);display:none"></div>';
   } else { // other
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0422\u0438\u043f</label><select class="input" id="pnl_other_type"><option value="income"' + (item && item.type === 'income' ? ' selected' : '') + '>\u0414\u043e\u0445\u043e\u0434</option><option value="expense"' + (item && item.type === 'expense' ? ' selected' : '') + '>\u0420\u0430\u0441\u0445\u043e\u0434</option></select></div>';
@@ -4190,19 +4215,96 @@ function calcDividendFromPct() {
     amtEl.value = calcAmt;
     if (prevEl) {
       var baseLabel = base === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c';
-      prevEl.innerHTML = '<i class="fas fa-check" style="margin-right:4px"></i>' + baseLabel + ': <b>' + fmtAmt(profitBase) + '</b> \u00d7 ' + pct + '% = <b>' + fmtAmt(calcAmt) + '</b>';
+      prevEl.innerHTML = '<i class="fas fa-check" style="margin-right:4px"></i>' + baseLabel + ': <b>' + fmtAmt(profitBase) + '</b> \u00d7 ' + pct + '% = <b style="color:#8B5CF6">' + fmtAmt(calcAmt) + '</b>';
       prevEl.style.color = '#22C55E';
       prevEl.style.display = '';
     }
+    calcDivTax();
+    updateDivSchedulePreview(calcAmt);
+    updateDivPayoutSummary();
   } else if (pct > 0 && profitBase <= 0) {
-    amtEl.value = '';
+    amtEl.value = 0;
     if (prevEl) {
       var baseLabel2 = base === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c';
-      prevEl.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:4px"></i><b>\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u0441\u0440\u0435\u0434\u0441\u0442\u0432!</b> ' + baseLabel2 + ': <b>' + fmtAmt(profitBase) + '</b> \u2014 \u0432\u044b \u0432 \u043c\u0438\u043d\u0443\u0441\u0435, \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434 \u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u0435\u043d';
+      var reasonText = '';
+      if (base === 'after_loans' && effPay > 0) reasonText = '. \u041f\u0440\u0438\u0447\u0438\u043d\u0430: \u043a\u0440\u0435\u0434\u0438\u0442\u043d\u0430\u044f \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430 (' + fmtAmt(effPay) + ') \u043f\u0440\u0435\u0432\u044b\u0448\u0430\u0435\u0442 \u0447\u0438\u0441\u0442\u0443\u044e \u043f\u0440\u0438\u0431\u044b\u043b\u044c (' + fmtAmt(netProfit) + ')';
+      else if (netProfit <= 0) reasonText = '. \u041f\u0440\u0438\u0447\u0438\u043d\u0430: \u043e\u0442\u0440\u0438\u0446\u0430\u0442\u0435\u043b\u044c\u043d\u0430\u044f \u0447\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c';
+      prevEl.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:4px"></i><b>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434 = 0</b>. ' + baseLabel2 + ': <b>' + fmtAmt(profitBase) + '</b> \u2014 \u0432\u044b\u043f\u043b\u0430\u0442\u0430 \u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u043d\u0430' + reasonText;
       prevEl.style.color = '#EF4444';
       prevEl.style.display = '';
     }
-  } else if (prevEl) { prevEl.style.display = 'none'; }
+    calcDivTax();
+    updateDivSchedulePreview(0);
+    updateDivPayoutSummary();
+  } else {
+    amtEl.value = 0;
+    if (prevEl) { prevEl.style.display = 'none'; }
+    calcDivTax();
+    updateDivSchedulePreview(0);
+    updateDivPayoutSummary();
+  }
+}
+function calcDivTax() {
+  var amtEl = document.getElementById('pnl_dividend_amount');
+  var taxPctEl = document.getElementById('pnl_dividend_tax_pct');
+  var taxAmtEl = document.getElementById('pnl_dividend_tax_amount');
+  if (!amtEl || !taxPctEl || !taxAmtEl) return;
+  var amt = parseFloat(amtEl.value) || 0;
+  var taxPct = parseFloat(taxPctEl.value) || 0;
+  // If dividend amount is 0 or negative, tax is always 0
+  if (amt <= 0) { taxAmtEl.value = 0; taxPct = 0; }
+  else { taxAmtEl.value = Math.round(amt * taxPct / 100); }
+  // Update payout summary
+  updateDivPayoutSummary();
+}
+function updateDivPayoutSummary() {
+  var el = document.getElementById('div_payout_summary');
+  if (!el) return;
+  var amtEl = document.getElementById('pnl_dividend_amount');
+  var taxAmtEl = document.getElementById('pnl_dividend_tax_amount');
+  var dateEl = document.getElementById('pnl_dividend_payment_date');
+  var recipientEl = document.getElementById('pnl_dividend_recipient');
+  var amt = amtEl ? (parseFloat(amtEl.value) || 0) : 0;
+  var taxAmt = taxAmtEl ? (parseFloat(taxAmtEl.value) || 0) : 0;
+  var netPayout = amt - taxAmt;
+  var payDate = dateEl ? dateEl.value : '';
+  var recipient = recipientEl ? recipientEl.value : '';
+  if (amt <= 0) {
+    el.style.display = 'block';
+    el.innerHTML = '<div style="font-size:0.82rem;color:#EF4444;font-weight:600"><i class="fas fa-times-circle" style="margin-right:6px"></i>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434 \u043d\u0435 \u043d\u0430\u0447\u0438\u0441\u043b\u0435\u043d</div>' +
+      '<div style="font-size:0.75rem;color:#94a3b8;margin-top:4px">\u0421\u0443\u043c\u043c\u0430 \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u0430 = 0. \u041d\u0430\u043b\u043e\u0433 \u043d\u0430 \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b: <b>0</b>. \u0412\u044b\u043f\u043b\u0430\u0442\u0430 \u043d\u0435 \u043f\u0440\u043e\u0438\u0437\u0432\u043e\u0434\u0438\u0442\u0441\u044f.</div>';
+    return;
+  }
+  el.style.display = 'block';
+  var h3 = '<div style="font-size:0.82rem;color:#8B5CF6;font-weight:600;margin-bottom:6px"><i class="fas fa-receipt" style="margin-right:6px"></i>\u0418\u0442\u043e\u0433 \u0432\u044b\u043f\u043b\u0430\u0442\u044b</div>';
+  h3 += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;font-size:0.82rem">';
+  h3 += '<div style="color:#94a3b8">\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434: <b style="color:#e2e8f0">' + fmtAmt(amt) + '</b></div>';
+  h3 += '<div style="color:#94a3b8">\u041d\u0430\u043b\u043e\u0433: <b style="color:#EF4444">' + fmtAmt(taxAmt) + '</b></div>';
+  h3 += '<div style="color:#94a3b8">\u041d\u0430 \u0440\u0443\u043a\u0438: <b style="color:#22C55E">' + fmtAmt(netPayout) + '</b></div>';
+  h3 += '</div>';
+  if (payDate || recipient) {
+    h3 += '<div style="margin-top:6px;font-size:0.75rem;color:#64748b">';
+    if (recipient) h3 += '<i class="fas fa-user" style="margin-right:4px"></i>' + escHtml(recipient) + ' ';
+    if (payDate) h3 += '<i class="fas fa-calendar" style="margin-right:4px"></i>' + payDate;
+    h3 += '</div>';
+  }
+  el.innerHTML = h3;
+}
+function updateDivSchedulePreview(amt) {
+  var el = document.getElementById('div_schedule_preview');
+  if (!el) return;
+  var schedEl = document.getElementById('pnl_dividend_schedule');
+  var sched = schedEl ? schedEl.value : 'monthly';
+  var schedNames = {monthly:'\u0415\u0436\u0435\u043c\u0435\u0441\u044f\u0447\u043d\u043e',quarterly:'\u0415\u0436\u0435\u043a\u0432\u0430\u0440\u0442\u0430\u043b\u044c\u043d\u043e',yearly:'\u0415\u0436\u0435\u0433\u043e\u0434\u043d\u043e'};
+  if (amt > 0) {
+    var h2 = '<div style="font-size:0.78rem;color:#8B5CF6;font-weight:600;margin-bottom:6px"><i class="fas fa-calendar-check" style="margin-right:6px"></i>\u0413\u0440\u0430\u0444\u0438\u043a \u0432\u044b\u043f\u043b\u0430\u0442 (' + schedNames[sched] + ')</div>';
+    if (sched === 'monthly') h2 += '<div style="font-size:0.82rem;color:#e2e8f0">\u041a\u0430\u0436\u0434\u044b\u0439 \u043c\u0435\u0441\u044f\u0446: <b style="color:#8B5CF6">' + fmtAmt(amt) + '</b> &nbsp;|&nbsp; \u0417\u0430 \u0433\u043e\u0434: <b>' + fmtAmt(amt * 12) + '</b></div>';
+    else if (sched === 'quarterly') h2 += '<div style="font-size:0.82rem;color:#e2e8f0">\u041a\u0430\u0436\u0434\u044b\u0439 \u043a\u0432\u0430\u0440\u0442\u0430\u043b: <b style="color:#8B5CF6">' + fmtAmt(amt) + '</b> &nbsp;|&nbsp; \u0412 \u043c\u0435\u0441\u044f\u0446: ~<b>' + fmtAmt(Math.round(amt/3)) + '</b> &nbsp;|&nbsp; \u0417\u0430 \u0433\u043e\u0434: <b>' + fmtAmt(amt * 4) + '</b></div>';
+    else h2 += '<div style="font-size:0.82rem;color:#e2e8f0">\u0420\u0430\u0437 \u0432 \u0433\u043e\u0434: <b style="color:#8B5CF6">' + fmtAmt(amt) + '</b> &nbsp;|&nbsp; \u0412 \u043c\u0435\u0441\u044f\u0446: ~<b>' + fmtAmt(Math.round(amt/12)) + '</b></div>';
+    el.innerHTML = h2;
+  } else {
+    el.innerHTML = '<div style="font-size:0.78rem;color:#EF4444"><i class="fas fa-times-circle" style="margin-right:6px"></i>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434: <b>0</b> \u2014 \u043d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u043f\u0440\u0438\u0431\u044b\u043b\u0438 \u0438\u043b\u0438 % \u043d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d</div>';
+  }
 }
 
 function renderPnlDividends(p) {
@@ -4220,7 +4322,7 @@ function renderPnlDividends(p) {
   h += '<div class="card" style="padding:0;overflow:hidden">';
   var total = 0;
   for (var i = 0; i < items.length; i++) {
-    var d = items[i]; total += (d.amount || 0) + (d.tax_amount || 0);
+    var d = items[i]; var dAmt = d.amount || 0; total += dAmt + (dAmt > 0 ? (d.tax_amount || 0) : 0);
     var sch = d.schedule || 'monthly';
     h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1e293b">';
     h += '<div><span style="font-weight:600;color:#e2e8f0">' + escHtml(d.recipient || '\u0412\u043b\u0430\u0434\u0435\u043b\u0435\u0446') + '</span>';
@@ -8357,6 +8459,10 @@ function render() {
   var mainEl = document.getElementById('mainArea');
   if (mainEl) {
     mainEl.innerHTML = getPageHtml();
+    // Post-render: auto-trigger dividend form calculations if form is open
+    if (showPnlAddForm && pnlEditType === 'dividend') {
+      setTimeout(function() { if (typeof calcDividendFromPct === 'function') calcDividendFromPct(); updateDivPayoutSummary(); }, 20);
+    }
     // Update sidebar active states
     document.querySelectorAll('.nav-item').forEach(function(el) {
       var pg = el.getAttribute('data-page');
@@ -8367,6 +8473,10 @@ function render() {
   
   // Full render (first time only)
   app.innerHTML = '<div style="display:flex">' + renderSidebar() + '<div id="mainArea" class="main">' + getPageHtml() + '</div></div>';
+  // Post-render for full render too
+  if (showPnlAddForm && pnlEditType === 'dividend') {
+    setTimeout(function() { if (typeof calcDividendFromPct === 'function') calcDividendFromPct(); updateDivPayoutSummary(); }, 20);
+  }
 }
 
 // ===== INIT =====
