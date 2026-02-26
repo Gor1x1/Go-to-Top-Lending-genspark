@@ -3108,7 +3108,8 @@ function renderPnlTaxes(p) {
     h += renderPnlCrudForm('tax', editItem);
   }
   var items = (data.taxPayments || []).filter(function(t) { return t.period_key === pnlPeriod; });
-  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px"><i class="fas fa-info-circle" style="margin-right:8px;color:#8B5CF6"></i>\u041d\u0435\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0445 \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439 \u0437\u0430 \u044d\u0442\u043e\u0442 \u043f\u0435\u0440\u0438\u043e\u0434.<br><span style="font-size:0.78rem;color:#475569">\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043d\u0430\u043b\u043e\u0433 \u0441 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442\u043e\u043c \u2014 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u0441\u0442\u0430\u0432\u043a\u0443 % \u0438 \u0431\u0430\u0437\u0443, \u0441\u0443\u043c\u043c\u0430 \u0440\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438.</span></div>'; return h; }
+  if (!items.length) { h += '<div class="card" style="text-align:center;color:#64748b;padding:32px"><i class="fas fa-info-circle" style="margin-right:8px;color:#8B5CF6"></i>\u041d\u0435\u0442 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0445 \u043f\u043b\u0430\u0442\u0435\u0436\u0435\u0439 \u0437\u0430 \u044d\u0442\u043e\u0442 \u043f\u0435\u0440\u0438\u043e\u0434.<br><span style="font-size:0.78rem;color:#475569">\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u043d\u0430\u043b\u043e\u0433 \u0441 \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442\u043e\u043c \u0438\u043b\u0438 \u0441\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043d\u0430\u043b\u043e\u0433\u043e\u0432\u043e\u0435 \u043f\u0440\u0430\u0432\u0438\u043b\u043e \u0432\u043d\u0438\u0437\u0443.</span></div>'; }
+  if (items.length) {
   var total = 0;
   h += '<div class="card" style="padding:0;overflow:hidden">';
   for (var i = 0; i < items.length; i++) {
@@ -3148,6 +3149,7 @@ function renderPnlTaxes(p) {
   }
   h += '<div style="padding:14px 16px;background:rgba(245,158,11,0.08);display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:#94a3b8"><i class="fas fa-sigma" style="margin-right:6px"></i>\u0418\u0442\u043e\u0433\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432:</span><span style="font-weight:800;color:#F59E0B;font-size:1.1rem">' + fmtAmt(total) + '</span></div>';
   h += '</div>';
+  } // end if (items.length)
   // All taxes (history)
   var allTaxes = data.taxPayments || [];
   if (allTaxes.length > items.length) {
