@@ -3896,11 +3896,16 @@ function renderPnlLoans(p) {
       h += '</div>';
       // Overdraft current month breakdown
       if (odMonthlyInt > 0) {
+        var odTotal = odMonthlyInt + (l.monthly_payment || 0) + extraAmt;
         h += '<div style="padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);margin-bottom:8px;font-size:0.82rem">';
         h += '<div style="font-weight:600;color:#3B82F6;margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>' + loanPeriodLabel + ' — \u043e\u0432\u0435\u0440\u0434\u0440\u0430\u0444\u0442</div>';
         h += '<div style="display:flex;gap:16px">';
         h += '<span style="color:#94a3b8">Проценты: <b style="color:#EF4444">' + fmtAmt(odMonthlyInt) + '</b></span>';
         if (extraAmt > 0) h += '<span style="color:#F59E0B">Доп. нагрузка: <b>+' + fmtAmt(extraAmt) + '</b></span>';
+        h += '</div>';
+        h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(59,130,246,0.15);display:flex;justify-content:space-between;align-items:center">';
+        h += '<span style="font-weight:700;font-size:0.92rem;color:#e2e8f0"><i class="fas fa-wallet" style="margin-right:6px;color:#3B82F6"></i>\u0418\u0422\u041e\u0413\u041e \u043a \u043e\u043f\u043b\u0430\u0442\u0435:</span>';
+        h += '<span style="font-weight:800;font-size:1.05rem;color:#3B82F6">' + fmtAmt(odTotal) + '</span>';
         h += '</div></div>';
       }
       if (l.start_date || l.end_date) {
@@ -3965,7 +3970,42 @@ function renderPnlLoans(p) {
       } else if (!isAggr && extraAmt > 0) {
         h += '<span style="color:#F59E0B;font-weight:700">\u0414\u043e\u043f. \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430: <b>+' + fmtAmt(extraAmt) + '</b></span>';
       }
-      h += '</div></div>';
+      // === ИТОГО К ОПЛАТЕ — total monthly obligation ===
+      var totalMonthlyDue = 0;
+      if (isAggr && aggrTargetPmt > 0) {
+        totalMonthlyDue = aggrTargetPmt;
+      } else {
+        totalMonthlyDue = (l.monthly_payment || 0) + extraAmt;
+      }
+      h += '</div>';
+      h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid ' + breakdownBorder + ';display:flex;justify-content:space-between;align-items:center">';
+      h += '<span style="font-weight:700;font-size:0.92rem;color:#e2e8f0"><i class="fas fa-wallet" style="margin-right:6px;color:' + breakdownColor + '"></i>\u0418\u0422\u041e\u0413\u041e \u043a \u043e\u043f\u043b\u0430\u0442\u0435:</span>';
+      h += '<span style="font-weight:800;font-size:1.05rem;color:' + breakdownColor + '">' + fmtAmt(totalMonthlyDue) + '</span>';
+      h += '</div>';
+      // === Desired term: monthly payment needed ===
+      if (l.desired_term_months && l.desired_term_months > 0 && l.remaining_balance > 0) {
+        var desiredPmt = 0;
+        if (l.interest_rate > 0) {
+          var dMonthRate = l.interest_rate / 100 / 12;
+          var dN = l.desired_term_months;
+          var dBal = l.remaining_balance;
+          desiredPmt = Math.ceil(dBal * dMonthRate * Math.pow(1 + dMonthRate, dN) / (Math.pow(1 + dMonthRate, dN) - 1));
+        } else {
+          desiredPmt = Math.ceil(l.remaining_balance / l.desired_term_months);
+        }
+        var desiredDiff = desiredPmt - totalMonthlyDue;
+        var desiredColor = desiredDiff > 0 ? '#EF4444' : '#22C55E';
+        h += '<div style="margin-top:6px;padding:6px 10px;background:rgba(168,85,247,0.08);border-radius:5px;border:1px solid rgba(168,85,247,0.2);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:4px">';
+        h += '<span style="font-size:0.78rem;color:#a78bfa"><i class="fas fa-crosshairs" style="margin-right:4px"></i>\u0414\u043e\u0441\u0440\u043e\u0447\u043d\u043e \u0437\u0430 ' + l.desired_term_months + ' \u043c\u0435\u0441.:</span>';
+        h += '<span style="font-weight:700;color:#a78bfa;font-size:0.92rem">' + fmtAmt(desiredPmt) + '/\u043c\u0435\u0441</span>';
+        if (desiredDiff > 0) {
+          h += '<span style="font-size:0.72rem;color:' + desiredColor + '">(\u043d\u0443\u0436\u043d\u043e \u0435\u0449\u0451 +' + fmtAmt(desiredDiff) + ' \u043a \u0442\u0435\u043a\u0443\u0449\u0435\u043c\u0443)</span>';
+        } else {
+          h += '<span style="font-size:0.72rem;color:' + desiredColor + '">(\u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u043b\u0430\u0442\u0451\u0436 \u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u0435\u043d \u2714)</span>';
+        }
+        h += '</div>';
+      }
+      h += '</div>';
     }
     if (l.start_date || l.end_date) {
       h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px"><i class="fas fa-calendar" style="margin-right:4px"></i>' + (l.start_date || '?') + ' \u2192 ' + (l.end_date || '?');
