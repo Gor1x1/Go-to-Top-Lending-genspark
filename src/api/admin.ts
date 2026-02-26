@@ -119,7 +119,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
     const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData] = await Promise.all([
       db.prepare('SELECT * FROM tax_payments WHERE (is_suppressed IS NULL OR is_suppressed = 0) ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM assets ORDER BY purchase_date DESC').all().catch(() => ({results:[]})),
-      db.prepare('SELECT * FROM loans ORDER BY start_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM loans ORDER BY priority ASC, start_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM dividends ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM other_income_expenses ORDER BY date DESC').all().catch(() => ({results:[]})),
@@ -2710,7 +2710,7 @@ api.delete('/assets/:id', authMiddleware, async (c) => {
 // ===== LOANS =====
 api.get('/loans', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const loans = await db.prepare('SELECT * FROM loans ORDER BY start_date DESC, id DESC').all();
+  const loans = await db.prepare('SELECT * FROM loans ORDER BY priority ASC, start_date DESC, id DESC').all();
   const payments = await db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all();
   return c.json({ loans: loans.results || [], payments: payments.results || [] });
 });
@@ -2718,8 +2718,40 @@ api.get('/loans', authMiddleware, async (c) => {
 api.post('/loans', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare('INSERT INTO loans (name, lender, principal, interest_rate, start_date, end_date, monthly_payment, remaining_balance, loan_type, is_active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-    .bind(d.name||'', d.lender||'', d.principal||0, d.interest_rate||0, d.start_date||'', d.end_date||'', d.monthly_payment||0, d.remaining_balance||d.principal||0, d.loan_type||'bank', d.is_active!==undefined?d.is_active:1, d.notes||'').run();
+  // Auto-calculate annuity PMT if type is annuity and we have principal, rate, term
+  let monthlyPayment = d.monthly_payment || 0;
+  let originalMonthly = 0;
+  const loanType = d.loan_type || 'annuity';
+  const principal = d.principal || 0;
+  const annualRate = d.interest_rate || 0;
+  const termMonths = d.term_months || 0;
+  const desiredTerm = d.desired_term_months || 0;
+
+  if (loanType === 'annuity' && principal > 0 && annualRate > 0 && termMonths > 0) {
+    const r = annualRate / 100 / 12;
+    const n = termMonths;
+    originalMonthly = Math.round(principal * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1) * 100) / 100;
+    monthlyPayment = originalMonthly;
+    // If desired_term is shorter, recalculate PMT for accelerated payoff
+    if (desiredTerm > 0 && desiredTerm < termMonths) {
+      monthlyPayment = Math.round(principal * r * Math.pow(1 + r, desiredTerm) / (Math.pow(1 + r, desiredTerm) - 1) * 100) / 100;
+    }
+  }
+
+  // Priority: collateral loans get priority 1-5, unsecured get 10
+  const collateralType = d.collateral_type || 'none';
+  const priority = collateralType !== 'none' ? (d.priority || 1) : (d.priority || 10);
+
+  // Calculate end_date from start_date + term_months if not provided
+  let endDate = d.end_date || '';
+  if (!endDate && d.start_date && termMonths > 0) {
+    const sd = new Date(d.start_date);
+    sd.setMonth(sd.getMonth() + termMonths);
+    endDate = sd.toISOString().slice(0, 10);
+  }
+
+  await db.prepare(`INSERT INTO loans (name, lender, principal, interest_rate, start_date, end_date, monthly_payment, remaining_balance, loan_type, is_active, notes, term_months, desired_term_months, original_monthly_payment, collateral_type, collateral_desc, priority, repayment_mode, aggressive_pct, overdraft_limit, overdraft_used, overdraft_rate) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(d.name||'', d.lender||'', principal, annualRate, d.start_date||'', endDate, monthlyPayment, d.remaining_balance||principal, loanType, d.is_active!==undefined?d.is_active:1, d.notes||'', termMonths, desiredTerm, originalMonthly, collateralType, d.collateral_desc||'', priority, d.repayment_mode||'standard', d.aggressive_pct||0, d.overdraft_limit||0, d.overdraft_used||0, d.overdraft_rate||0).run();
   return c.json({ success: true });
 });
 
@@ -2727,8 +2759,25 @@ api.put('/loans/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
   const d = await c.req.json();
+
+  // If changing terms, recalculate PMT
+  if (d.loan_type === 'annuity' && d.principal && d.interest_rate && d.term_months) {
+    const r = d.interest_rate / 100 / 12;
+    const n = d.term_months;
+    d.original_monthly_payment = Math.round(d.principal * r * Math.pow(1 + r, n) / (Math.pow(1 + r, n) - 1) * 100) / 100;
+    d.monthly_payment = d.original_monthly_payment;
+    if (d.desired_term_months && d.desired_term_months < d.term_months) {
+      d.monthly_payment = Math.round(d.principal * r * Math.pow(1 + r, d.desired_term_months) / (Math.pow(1 + r, d.desired_term_months) - 1) * 100) / 100;
+    }
+  }
+
+  // Auto-set priority from collateral
+  if (d.collateral_type && d.collateral_type !== 'none' && !d.priority) {
+    d.priority = 1;
+  }
+
   const fields: string[] = []; const vals: any[] = [];
-  for (const k of ['name','lender','principal','interest_rate','start_date','end_date','monthly_payment','remaining_balance','loan_type','is_active','notes']) {
+  for (const k of ['name','lender','principal','interest_rate','start_date','end_date','monthly_payment','remaining_balance','loan_type','is_active','notes','term_months','desired_term_months','original_monthly_payment','collateral_type','collateral_desc','priority','repayment_mode','aggressive_pct','overdraft_limit','overdraft_used','overdraft_rate']) {
     if (d[k] !== undefined) { fields.push(k+'=?'); vals.push(d[k]); }
   }
   if (fields.length) { vals.push(id); await db.prepare(`UPDATE loans SET ${fields.join(',')} WHERE id=?`).bind(...vals).run(); }
@@ -2746,11 +2795,11 @@ api.post('/loans/:id/payments', authMiddleware, async (c) => {
   const db = c.env.DB;
   const loanId = c.req.param('id');
   const d = await c.req.json();
-  await db.prepare('INSERT INTO loan_payments (loan_id, amount, principal_part, interest_part, payment_date, notes) VALUES (?,?,?,?,?,?)')
-    .bind(loanId, d.amount||0, d.principal_part||0, d.interest_part||0, d.payment_date||'', d.notes||'').run();
+  await db.prepare('INSERT INTO loan_payments (loan_id, amount, principal_part, interest_part, payment_date, notes, period_key, is_extra) VALUES (?,?,?,?,?,?,?,?)')
+    .bind(loanId, d.amount||0, d.principal_part||0, d.interest_part||0, d.payment_date||'', d.notes||'', d.period_key||'', d.is_extra||0).run();
   // Update remaining balance
   if (d.principal_part) {
-    await db.prepare('UPDATE loans SET remaining_balance = remaining_balance - ? WHERE id = ?').bind(d.principal_part, loanId).run();
+    await db.prepare('UPDATE loans SET remaining_balance = MAX(remaining_balance - ?, 0) WHERE id = ?').bind(d.principal_part, loanId).run();
   }
   return c.json({ success: true });
 });

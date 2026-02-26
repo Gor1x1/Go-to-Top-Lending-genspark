@@ -610,6 +610,21 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   // v19: Add hire_date/end_date to users for payroll tax period filtering
   try { await db.prepare("ALTER TABLE users ADD COLUMN hire_date TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN end_date TEXT DEFAULT ''").run(); } catch {}
+  // v20: Enhanced loan module — new fields for annuity, overdraft, collateral, aggressive repayment
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN term_months INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN desired_term_months INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN original_monthly_payment REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN collateral_type TEXT DEFAULT 'none'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN collateral_desc TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN priority INTEGER DEFAULT 10").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN repayment_mode TEXT DEFAULT 'standard'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN aggressive_pct REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN overdraft_limit REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN overdraft_used REAL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN overdraft_rate REAL DEFAULT 0").run(); } catch {}
+  // v20: Add period_key and extra_principal to loan_payments for tracking extra payments
+  try { await db.prepare("ALTER TABLE loan_payments ADD COLUMN period_key TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE loan_payments ADD COLUMN is_extra INTEGER DEFAULT 0").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
