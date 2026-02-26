@@ -3129,9 +3129,12 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const ytdTaxTotal = ((taxesYtd?.total as number) || 0) + autoTaxDelta;
 
   const netProfit = ebt - totalTaxes;
-  const totalLoanPaymentsPeriod = loanPayments?.total_payments as number || 0;
-  const netProfitAfterLoans = netProfit - totalLoanPaymentsPeriod;
-  const retainedEarnings = netProfit - totalDividends;
+  const totalLoanPaymentsPeriod = Number(loanPayments?.total_payments) || 0;
+  const totalLoanMonthlyPlan = Number(loanSummary?.total_monthly) || 0;
+  // Use the greater of actual payments or planned monthly — so if no payments recorded, plan is used
+  const effectiveLoanPayments = Math.max(totalLoanPaymentsPeriod, totalLoanMonthlyPlan);
+  const netProfitAfterLoans = netProfit - effectiveLoanPayments;
+  const retainedEarnings = netProfitAfterLoans - totalDividends;
 
   // Tax rules for reference (catch in case table doesn't exist yet on production)
   const taxRules = await db.prepare('SELECT * FROM tax_rules WHERE is_active = 1').all().catch(() => ({results:[]}));
@@ -3156,6 +3159,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     tax_burden: revenue > 0 ? Math.round(totalTaxes / revenue * 10000) / 100 : 0,
     net_profit: netProfit, net_margin: revenue > 0 ? Math.round(netProfit / revenue * 10000) / 100 : 0,
     net_profit_after_loans: netProfitAfterLoans,
+    effective_loan_payments: effectiveLoanPayments,
     dividends: divs.results || [], total_dividends: totalDividends,
     retained_earnings: retainedEarnings,
     ytd_taxes: ytdTaxTotal,
@@ -3166,16 +3170,16 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     assets: assets.results || [],
     loan_payments_list: loanPaymentsList.results || [],
     // Loan load data
-    loan_total_debt: (loanSummary?.total_debt as number || 0) + (loanSummary?.overdraft_debt as number || 0),
-    loan_total_monthly: loanSummary?.total_monthly as number || 0,
-    loan_total_payments_period: loanPayments?.total_payments as number || 0,
-    loan_total_principal_period: loanPayments?.total_principal as number || 0,
-    loan_count: loanSummary?.loan_count as number || 0,
+    loan_total_debt: Number(loanSummary?.total_debt || 0) + Number(loanSummary?.overdraft_debt || 0),
+    loan_total_monthly: Number(loanSummary?.total_monthly) || 0,
+    loan_total_payments_period: Number(loanPayments?.total_payments) || 0,
+    loan_total_principal_period: Number(loanPayments?.total_principal) || 0,
+    loan_count: Number(loanSummary?.loan_count) || 0,
     loan_repayment_mode: loanRepayMode,
     loan_aggressive_pct: loanAggrPct,
     loan_standard_extra_pct: loanStdExtraPct,
-    loan_load_on_revenue: revenue > 0 ? Math.round((loanPayments?.total_payments as number || 0) / revenue * 10000) / 100 : 0,
-    loan_load_on_profit: netProfit > 0 ? Math.round((loanSummary?.total_monthly as number || 0) / netProfit * 10000) / 100 : 0,
+    loan_load_on_revenue: revenue > 0 ? Math.round(totalLoanPaymentsPeriod / revenue * 10000) / 100 : 0,
+    loan_load_on_profit: netProfit > 0 ? Math.round(totalLoanMonthlyPlan / netProfit * 10000) / 100 : 0,
     tax_rules: taxRules.results || [],
     _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
