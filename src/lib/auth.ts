@@ -5,7 +5,7 @@
 
 const ADMIN_PASSWORD = 'gototop2026';
 const JWT_SECRET = 'gtt-admin-jwt-secret-2026';
-const TOKEN_EXPIRY = 24 * 60 * 60 * 1000; // 24 hours
+const TOKEN_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 export async function hashPassword(password: string): Promise<string> {
   const encoder = new TextEncoder();

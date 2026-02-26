@@ -629,6 +629,10 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE loans ADD COLUMN actual_end_date TEXT DEFAULT ''").run(); } catch {}
   // v21: Global loan settings stored in site_settings — repayment_mode + aggressive_pct apply system-wide
   // Settings are stored via the existing settings table mechanism
+  // v22: Dividend schedule support (monthly, quarterly, yearly)
+  try { await db.prepare("ALTER TABLE dividends ADD COLUMN schedule TEXT DEFAULT 'monthly'").run(); } catch {}
+  // v22: Overdraft term/payment fields for unified calculations
+  try { await db.prepare("ALTER TABLE loans ADD COLUMN bank_monthly_payment REAL DEFAULT 0").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

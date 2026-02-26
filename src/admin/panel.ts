@@ -71,7 +71,24 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [], loanSettings: { repayment_mode: 'standard', aggressive_pct: 10 } };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [], loanSettings: { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 } };
+
+// ===== TOKEN AUTO-REFRESH (every 6 hours) =====
+var _tokenRefreshInterval = null;
+function startTokenRefresh() {
+  if (_tokenRefreshInterval) clearInterval(_tokenRefreshInterval);
+  _tokenRefreshInterval = setInterval(async function() {
+    if (!token) return;
+    try {
+      var res = await fetch(API + '/refresh-token', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } });
+      if (res.ok) {
+        var d = await res.json();
+        if (d.token) { token = d.token; localStorage.setItem('gtt_token', token); }
+      }
+    } catch(e) { console.warn('Token refresh failed:', e); }
+  }, 6 * 60 * 60 * 1000); // every 6 hours
+}
+if (token) startTokenRefresh();
 
 // ===== API HELPERS =====
 const API = '/api/admin';
@@ -90,7 +107,17 @@ async function api(path, methodOrOpts, bodyData) {
   }
   try {
     const res = await fetch(API + path, { ...opts, headers });
-    if (res.status === 401 && !silent) { token = ''; localStorage.removeItem('gtt_token'); render(); return null; }
+    if (res.status === 401 && !silent) {
+      // Try to refresh token once before logging out
+      try {
+        var refreshRes = await fetch(API + '/refresh-token', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' } });
+        if (refreshRes.ok) {
+          var rd = await refreshRes.json();
+          if (rd.token) { token = rd.token; localStorage.setItem('gtt_token', token); return api(path, methodOrOpts, bodyData); }
+        }
+      } catch(re) {}
+      token = ''; localStorage.removeItem('gtt_token'); render(); return null;
+    }
     if (res.status === 401) return null;
     return await res.json();
   } catch(e) {
@@ -177,6 +204,7 @@ async function doLogin(e) {
       localStorage.setItem('gtt_token', token);
       localStorage.setItem('gtt_user', JSON.stringify(res.user));
       localStorage.setItem('gtt_roles', JSON.stringify(res.rolesConfig));
+      startTokenRefresh();
       toast('Добро пожаловать, ' + (res.user.display_name || res.user.username));
       try { await loadData(); } catch(err) { console.error('loadData error:', err); }
       render();
@@ -2749,6 +2777,15 @@ async function savePnlItem(type) {
     } else {
       // ===== NON-TAX ITEMS (asset, loan, dividend, other) =====
       d.period_key = pnlPeriod;
+      // Handle overdraft form fields (they have _od suffix)
+      if (type === 'loan' && d.loan_type === 'overdraft') {
+        if (d.start_date_od !== undefined) { d.start_date = d.start_date_od; delete d.start_date_od; }
+        if (d.end_date_od !== undefined) { d.end_date = d.end_date_od; delete d.end_date_od; }
+        if (d.term_months_od !== undefined) { d.term_months = d.term_months_od; delete d.term_months_od; }
+      } else if (type === 'loan') {
+        // Clean up overdraft-only fields for non-overdraft types
+        delete d.start_date_od; delete d.end_date_od; delete d.term_months_od;
+      }
       var endpoint = type === 'asset' ? '/assets' : type === 'loan' ? '/loans' : type === 'dividend' ? '/dividends' : '/other-income-expenses';
       var result;
       if (pnlEditId) { result = await api(endpoint + '/' + pnlEditId, { method: 'PUT', body: JSON.stringify(d), _silent: true }); }
@@ -3032,7 +3069,19 @@ function renderPnlCascade(p) {
       h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(245,158,11,0.08);gap:8px">';
       h += '<span style="color:#F59E0B;font-size:0.82rem"><i class="fas fa-bolt" style="margin-right:6px"></i>Агрессивное погашение (' + (p.loan_aggressive_pct||10) + '% от прибыли)</span>';
       h += '<span style="text-align:right;color:#F59E0B;font-weight:700;font-size:0.88rem">' + fmtAmt(aggrAmt) + '</span></div>';
+    } else if (p.loan_standard_extra_pct > 0) {
+      var extraTotal = Math.round(p.loan_total_monthly * p.loan_standard_extra_pct / 100);
+      h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(34,197,94,0.08);gap:8px">';
+      h += '<span style="color:#22C55E;font-size:0.82rem"><i class="fas fa-plus-circle" style="margin-right:6px"></i>Доп. нагрузка на кредиты (' + p.loan_standard_extra_pct + '% от PMT)' + tip('Дополнительная сумма, равномерно распределённая между кредитами для досрочного погашения') + '</span>';
+      h += '<span style="text-align:right;color:#22C55E;font-weight:700;font-size:0.88rem">+' + fmtAmt(extraTotal) + '</span></div>';
     }
+    // Total credit load line
+    var totalCreditLoad = p.loan_total_monthly;
+    if (p.loan_repayment_mode === 'aggressive') { totalCreditLoad = Math.round((p.net_profit||0) * (p.loan_aggressive_pct||10) / 100); }
+    else if (p.loan_standard_extra_pct > 0) { totalCreditLoad += Math.round(p.loan_total_monthly * p.loan_standard_extra_pct / 100); }
+    h += '<div style="display:grid;grid-template-columns:minmax(180px,2fr) minmax(100px,1fr);align-items:center;padding:8px 52px;border-bottom:1px solid #1e293b;background:rgba(239,68,68,0.1);gap:8px">';
+    h += '<span style="color:#EF4444;font-size:0.82rem;font-weight:700"><i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>ИТОГО нагрузка на кредиты' + tip('Полная сумма ежемесячных платежей включая доп. нагрузку') + '</span>';
+    h += '<span style="text-align:right;color:#EF4444;font-weight:800;font-size:0.92rem">' + fmtAmt(totalCreditLoad) + '</span></div>';
   }
   // Dividends
   h += pnlRow('\u2212 \u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b' + tip('\u0412\u044b\u043f\u043b\u0430\u0442\u044b \u0441\u043e\u0431\u0441\u0442\u0432\u0435\u043d\u043d\u0438\u043a\u0430\u043c \u0438\u0437 \u0447\u0438\u0441\u0442\u043e\u0439 \u043f\u0440\u0438\u0431\u044b\u043b\u0438'), p.total_dividends, {indent:1, color:'#8B5CF6', icon:'fa-money-check-alt', mom:mom.total_dividends, ytd:ytd.total_dividends});
@@ -3164,9 +3213,9 @@ function renderPnlCrudForm(type, item) {
     h += '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(239,68,68,0.08);border-radius:8px;border:1px solid rgba(239,68,68,0.2)">';
     h += '<label style="font-size:0.82rem;color:#EF4444;font-weight:600"><i class="fas fa-tag" style="margin-right:6px"></i>Тип кредита</label>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='annuity'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='annuity'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="annuity"' + (curLoanType==='annuity'?' checked':'') + ' onchange="document.getElementById(\\'pnl_loan_loan_type\\').value=\\'annuity\\';document.getElementById(\\'loanAnnuityFields\\').style.display=\\'grid\\';document.getElementById(\\'loanOverdraftFields\\').style.display=\\'none\\';document.getElementById(\\'loanManualPMT\\').style.display=\\'none\\'"><i class="fas fa-university"></i> Потребительский</label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='manual'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='manual'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="manual"' + (curLoanType==='manual'?' checked':'') + ' onchange="document.getElementById(\\'pnl_loan_loan_type\\').value=\\'manual\\';document.getElementById(\\'loanAnnuityFields\\').style.display=\\'grid\\';document.getElementById(\\'loanOverdraftFields\\').style.display=\\'none\\';document.getElementById(\\'loanManualPMT\\').style.display=\\'grid\\'"><i class="fas fa-handshake"></i> Займ с руки</label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='overdraft'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='overdraft'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="overdraft"' + (curLoanType==='overdraft'?' checked':'') + ' onchange="document.getElementById(\\'pnl_loan_loan_type\\').value=\\'overdraft\\';document.getElementById(\\'loanAnnuityFields\\').style.display=\\'none\\';document.getElementById(\\'loanOverdraftFields\\').style.display=\\'grid\\';document.getElementById(\\'loanManualPMT\\').style.display=\\'none\\'"><i class="fas fa-credit-card"></i> Овердрафт</label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='annuity'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='annuity'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="annuity"' + (curLoanType==='annuity'?' checked':'') + ' onchange="document.getElementById(\\'pnl_loan_loan_type\\').value=\\'annuity\\';document.getElementById(\\'loanAnnuityFields\\').style.display=\\'grid\\';document.getElementById(\\'loanOverdraftFields\\').style.display=\\'none\\';document.getElementById(\\'loanBankPMT\\').style.display=\\'grid\\';document.getElementById(\\'loanManualPMT\\').style.display=\\'none\\'"><i class="fas fa-university"></i> Потребительский</label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='manual'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='manual'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="manual"' + (curLoanType==='manual'?' checked':'') + ' onchange="document.getElementById(\\'pnl_loan_loan_type\\').value=\\'manual\\';document.getElementById(\\'loanAnnuityFields\\').style.display=\\'grid\\';document.getElementById(\\'loanOverdraftFields\\').style.display=\\'none\\';document.getElementById(\\'loanBankPMT\\').style.display=\\'none\\';document.getElementById(\\'loanManualPMT\\').style.display=\\'grid\\'"><i class="fas fa-handshake"></i> Займ с руки</label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='overdraft'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='overdraft'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="overdraft"' + (curLoanType==='overdraft'?' checked':'') + ' onchange="document.getElementById(\\'pnl_loan_loan_type\\').value=\\'overdraft\\';document.getElementById(\\'loanAnnuityFields\\').style.display=\\'none\\';document.getElementById(\\'loanOverdraftFields\\').style.display=\\'grid\\';document.getElementById(\\'loanBankPMT\\').style.display=\\'none\\';document.getElementById(\\'loanManualPMT\\').style.display=\\'none\\'"><i class="fas fa-credit-card"></i> Овердрафт</label>';
     h += '</div><input type="hidden" id="pnl_loan_loan_type" value="' + curLoanType + '">';
     h += '</div>';
     // Common fields: name, lender
@@ -3177,34 +3226,50 @@ function renderPnlCrudForm(type, item) {
     // Annuity + Manual shared fields
     h += '<div id="loanAnnuityFields" style="' + (curLoanType !== 'overdraft' ? 'display:grid;' : 'display:none;') + 'grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430 \u043a\u0440\u0435\u0434\u0438\u0442\u0430</label><input type="number" class="input" id="pnl_loan_principal" value="' + ((item && item.principal) || '') + '"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">Ставка % год. <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Годовая процентная ставка"></i></label><input type="number" class="input" id="pnl_loan_interest_rate" value="' + ((item && item.interest_rate) || '') + '" step="0.01"></div>';
-    // Start date and end date with auto-calculation
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Ставка % год.</label><input type="number" class="input" id="pnl_loan_interest_rate" value="' + ((item && item.interest_rate) || '') + '" step="0.01"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041d\u0430\u0447\u0430\u043b\u043e</label><input type="date" class="input" id="pnl_loan_start_date" value="' + ((item && item.start_date) || '') + '" onchange="calcLoanTermFromDates()"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u0435 (\u043f\u043e \u0434\u043e\u0433\u043e\u0432\u043e\u0440\u0443) <i class="fas fa-calculator" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Срок рассчитается автоматически из дат"></i></label><input type="date" class="input" id="pnl_loan_end_date" value="' + ((item && item.end_date) || '') + '" onchange="calcLoanTermFromDates()"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u043a\u043e\u043d\u0447\u0430\u043d\u0438\u0435 (\u043f\u043e \u0434\u043e\u0433\u043e\u0432\u043e\u0440\u0443)</label><input type="date" class="input" id="pnl_loan_end_date" value="' + ((item && item.end_date) || '') + '" onchange="calcLoanTermFromDates()"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Срок (мес.) <span style="font-size:0.65rem;color:#8B5CF6">авто из дат</span></label><input type="number" class="input" id="pnl_loan_term_months" value="' + ((item && item.term_months) || '') + '" placeholder="120" onchange="calcLoanEndFromTerm()"></div>';
-    h += '<div><label style="font-size:0.78rem;color:#F59E0B">Желаемый срок (мес.) <i class="fas fa-question-circle" style="color:#F59E0B;font-size:0.6rem;cursor:help" title="Если хотите погасить быстрее — укажите меньший срок. PMT пересчитается. Оригинальный PMT сохранится в карточке"></i></label><input type="number" class="input" id="pnl_loan_desired_term_months" value="' + ((item && item.desired_term_months) || '') + '" placeholder="Необязательно" style="border-color:rgba(245,158,11,0.3)"></div>';
-    // Actual end date (for when credit is paid off early)
-    h += '<div><label style="font-size:0.78rem;color:#22C55E"><i class="fas fa-check-circle" style="margin-right:4px"></i>Фактическое погашение <i class="fas fa-question-circle" style="color:#22C55E;font-size:0.6rem;cursor:help" title="Укажите дату, когда кредит был реально закрыт (если досрочно)"></i></label><input type="date" class="input" id="pnl_loan_actual_end_date" value="' + ((item && item.actual_end_date) || '') + '" style="border-color:rgba(34,197,94,0.3)"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#F59E0B">Желаемый срок (мес.)</label><input type="number" class="input" id="pnl_loan_desired_term_months" value="' + ((item && item.desired_term_months) || '') + '" placeholder="Необязательно" style="border-color:rgba(245,158,11,0.3)"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#22C55E"><i class="fas fa-check-circle" style="margin-right:4px"></i>Фактическое погашение</label><input type="date" class="input" id="pnl_loan_actual_end_date" value="' + ((item && item.actual_end_date) || '') + '" style="border-color:rgba(34,197,94,0.3)"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442\u043e\u043a \u0434\u043e\u043b\u0433\u0430</label><input type="number" class="input" id="pnl_loan_remaining_balance" value="' + ((item && item.remaining_balance) || '') + '" placeholder="= Сумма кредита"></div>';
     h += '</div>';
-    // Manual loan extra PMT row (only visible for manual type)
+    // Bank monthly payment (for annuity — PMT per bank contract)
+    h += '<div id="loanBankPMT" style="' + (curLoanType === 'annuity' ? 'display:grid;' : 'display:none;') + 'grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
+    h += '<div><label style="font-size:0.78rem;color:#3B82F6;font-weight:600"><i class="fas fa-file-contract" style="margin-right:4px"></i>Платёж по договору с банком <span style="color:#F59E0B">*</span></label><input type="number" class="input" id="pnl_loan_bank_monthly_payment" value="' + ((item && item.bank_monthly_payment) || '') + '" placeholder="Ежемес. сумма по договору" style="border-color:rgba(59,130,246,0.3)"></div>';
+    h += '<div style="display:flex;align-items:end;padding-bottom:4px"><div style="font-size:0.72rem;color:#64748b;padding:6px 10px;background:rgba(59,130,246,0.06);border-radius:6px"><i class="fas fa-info-circle" style="margin-right:4px;color:#3B82F6"></i>Система рассчитает PMT из суммы/ставки/срока. Если фактический платёж по договору отличается — укажите его здесь.</div></div>';
+    h += '</div>';
+    // Manual loan PMT row (for manual/займ с руки)
     h += '<div id="loanManualPMT" style="' + (curLoanType === 'manual' ? 'display:grid;' : 'display:none;') + 'grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
     h += '<div><label style="font-size:0.78rem;color:#EF4444;font-weight:600">Ежемес. платёж <span style="color:#F59E0B">*</span></label><input type="number" class="input" id="pnl_loan_monthly_payment" value="' + ((item && item.monthly_payment) || '') + '" placeholder="Обязательно" style="border-color:rgba(239,68,68,0.3)"></div>';
     h += '</div>';
-    // Overdraft fields
+    // Overdraft fields (extended with dates and term)
     h += '<div id="loanOverdraftFields" style="' + (curLoanType === 'overdraft' ? 'display:grid;' : 'display:none;') + 'grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Лимит</label><input type="number" class="input" id="pnl_loan_overdraft_limit" value="' + ((item && item.overdraft_limit) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Использовано</label><input type="number" class="input" id="pnl_loan_overdraft_used" value="' + ((item && item.overdraft_used) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Ставка % год.</label><input type="number" class="input" id="pnl_loan_overdraft_rate" value="' + ((item && item.overdraft_rate) || '') + '" step="0.01"></div>';
+    // Additional overdraft fields: dates, term
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Начало</label><input type="date" class="input" id="pnl_loan_start_date_od" value="' + ((item && item.start_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Окончание</label><input type="date" class="input" id="pnl_loan_end_date_od" value="' + ((item && item.end_date) || '') + '"></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b">Срок (мес.)</label><input type="number" class="input" id="pnl_loan_term_months_od" value="' + ((item && item.term_months) || '') + '"></div>';
     h += '</div>';
     // Collateral
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">';
-    h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-shield-alt" style="color:#F59E0B;margin-right:4px"></i>Залог <i class="fas fa-question-circle" style="color:#8B5CF6;font-size:0.6rem;cursor:help" title="Залоговые кредиты получают высший приоритет при агрессивном погашении"></i></label><select class="input" id="pnl_loan_collateral_type"><option value="none"' + (curCollateral==='none'?' selected':'') + '>Без залога</option><option value="real_estate"' + (curCollateral==='real_estate'?' selected':'') + '>Недвижимость</option><option value="car"' + (curCollateral==='car'?' selected':'') + '>Автомобиль</option><option value="equipment"' + (curCollateral==='equipment'?' selected':'') + '>Оборудование</option><option value="deposit"' + (curCollateral==='deposit'?' selected':'') + '>Депозит</option><option value="other"' + (curCollateral==='other'?' selected':'') + '>Другое</option></select></div>';
+    h += '<div><label style="font-size:0.78rem;color:#64748b"><i class="fas fa-shield-alt" style="color:#F59E0B;margin-right:4px"></i>Залог</label><select class="input" id="pnl_loan_collateral_type"><option value="none"' + (curCollateral==='none'?' selected':'') + '>Без залога</option><option value="real_estate"' + (curCollateral==='real_estate'?' selected':'') + '>Недвижимость</option><option value="car"' + (curCollateral==='car'?' selected':'') + '>Автомобиль</option><option value="equipment"' + (curCollateral==='equipment'?' selected':'') + '>Оборудование</option><option value="deposit"' + (curCollateral==='deposit'?' selected':'') + '>Депозит</option><option value="other"' + (curCollateral==='other'?' selected':'') + '>Другое</option></select></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">Описание залога</label><input class="input" id="pnl_loan_collateral_desc" value="' + escHtml((item && item.collateral_desc) || '') + '" placeholder="Адрес/марка/описание"></div>';
     h += '</div>';
     // Notes
     h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_loan_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
   } else if (type === 'dividend') {
+    var curSchedule = (item && item.schedule) || 'monthly';
+    h += '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(139,92,246,0.08);border-radius:8px;border:1px solid rgba(139,92,246,0.2)">';
+    h += '<label style="font-size:0.82rem;color:#8B5CF6;font-weight:600"><i class="fas fa-clock" style="margin-right:6px"></i>Режим выплат</label>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='monthly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='monthly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="monthly"' + (curSchedule==='monthly'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_schedule\\').value=\\'monthly\\'"> <span><b>Ежемесячно</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='quarterly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='quarterly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="quarterly"' + (curSchedule==='quarterly'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_schedule\\').value=\\'quarterly\\'"> <span><b>Ежеквартально</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='yearly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='yearly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="yearly"' + (curSchedule==='yearly'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_schedule\\').value=\\'yearly\\'"> <span><b>Ежегодно</b></span></label>';
+    h += '</div><input type="hidden" id="pnl_dividend_schedule" value="' + curSchedule + '">';
+    h += '</div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="pnl_dividend_amount" value="' + ((item && item.amount) || '') + '"></div>';
     h += '<div><label style="font-size:0.78rem;color:#64748b">\u041f\u043e\u043b\u0443\u0447\u0430\u0442\u0435\u043b\u044c</label><input class="input" id="pnl_dividend_recipient" value="' + escHtml((item && item.recipient) || '') + '"></div>';
@@ -3469,39 +3534,79 @@ function renderPnlLoans(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:8px"></i>\u041a\u0440\u0435\u0434\u0438\u0442\u044b \u0438 \u0437\u0430\u0439\u043c\u044b</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'loan\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u0440\u0435\u0434\u0438\u0442</button></div>';
-  // === SYSTEM-WIDE REPAYMENT MODE SELECTOR ===
-  var ls = data.loanSettings || { repayment_mode: 'standard', aggressive_pct: 10 };
+  // === SYSTEM-WIDE REPAYMENT MODE — STYLIZED CARD WITH DROPDOWN ===
+  var ls = data.loanSettings || { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 };
   var isAggr = ls.repayment_mode === 'aggressive';
-  h += '<div class="card" style="margin-bottom:16px;border-left:3px solid ' + (isAggr ? '#F59E0B' : '#22C55E') + '">';
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.88rem;color:' + (isAggr ? '#F59E0B' : '#22C55E') + ';font-weight:700"><i class="fas fa-tachometer-alt" style="margin-right:6px"></i>Режим погашения (системный)</label></div>';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
-  h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border-radius:6px;font-size:0.78rem;background:' + (!isAggr?'rgba(34,197,94,0.12)':'#0f172a') + ';border:1px solid ' + (!isAggr?'#22C55E':'#334155') + ';color:#e2e8f0"><input type="radio" name="loan_global_repay_radio" value="standard"' + (!isAggr?' checked':'') + ' onchange="document.getElementById(\\'aggressiveGlobalField\\').style.display=\\'none\\'"> <span><b>Стандартный</b><br><span style="font-size:0.7rem;color:#64748b">Платим ровно PMT каждый месяц</span></span></label>';
-  h += '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;padding:8px 12px;border-radius:6px;font-size:0.78rem;background:' + (isAggr?'rgba(245,158,11,0.12)':'#0f172a') + ';border:1px solid ' + (isAggr?'#F59E0B':'#334155') + ';color:#e2e8f0"><input type="radio" name="loan_global_repay_radio" value="aggressive"' + (isAggr?' checked':'') + ' onchange="document.getElementById(\\'aggressiveGlobalField\\').style.display=\\'block\\'"> <span><b>Агрессивный</b><br><span style="font-size:0.7rem;color:#64748b">% от чистой прибыли → по приоритету</span></span></label>';
+  var modeIcon = isAggr ? 'fa-bolt' : 'fa-shield-alt';
+  var modeColor = isAggr ? '#F59E0B' : '#22C55E';
+  var modeLabel = isAggr ? 'Агрессивный' : 'Стандартный';
+  h += '<div class="card" style="margin-bottom:16px;border-left:3px solid ' + modeColor + ';background:linear-gradient(135deg,rgba(' + (isAggr ? '245,158,11' : '34,197,94') + ',0.06),transparent)">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">';
+  h += '<div style="display:flex;align-items:center;gap:10px"><i class="fas ' + modeIcon + '" style="font-size:1.4rem;color:' + modeColor + '"></i><div><div style="font-weight:800;color:#e2e8f0;font-size:1rem">Режим погашения</div><div style="font-size:0.72rem;color:#64748b">Системная настройка для всех кредитов</div></div></div>';
+  h += '<select id="loan_global_mode_select" class="input" style="max-width:200px;padding:8px 12px;font-weight:700;background:' + (isAggr ? 'rgba(245,158,11,0.15)' : 'rgba(34,197,94,0.15)') + ';border-color:' + modeColor + ';color:' + modeColor + ';cursor:pointer" onchange="onLoanModeChange(this.value)">';
+  h += '<option value="standard"' + (!isAggr ? ' selected' : '') + '>\uD83D\uDEE1\uFE0F Стандартный</option>';
+  h += '<option value="aggressive"' + (isAggr ? ' selected' : '') + '>\u26A1 Агрессивный</option>';
+  h += '</select></div>';
+  // Standard mode fields
+  h += '<div id="standardModeFields" style="' + (isAggr ? 'display:none;' : '') + 'padding:12px;background:rgba(34,197,94,0.04);border-radius:8px;border:1px solid rgba(34,197,94,0.15);margin-bottom:8px">';
+  h += '<div style="font-size:0.82rem;color:#22C55E;font-weight:600;margin-bottom:8px"><i class="fas fa-info-circle" style="margin-right:4px"></i>Стандартный: платим PMT + доп. нагрузка</div>';
+  h += '<div style="display:flex;align-items:center;gap:10px">';
+  h += '<label style="font-size:0.78rem;color:#94a3b8;white-space:nowrap">Доп. нагрузка на налог (%)</label>';
+  h += '<input type="number" class="input" id="loan_global_std_extra_pct" value="' + (ls.standard_extra_pct || 0) + '" step="1" min="0" max="100" style="max-width:80px;border-color:rgba(34,197,94,0.3)">';
   h += '</div>';
-  h += '<div id="aggressiveGlobalField" style="' + (isAggr?'':'display:none;') + 'margin-top:10px;padding:10px;background:rgba(245,158,11,0.06);border-radius:6px;border:1px solid rgba(245,158,11,0.15)">';
+  // Show calculation preview for standard mode
+  var netProfit = (p && p.net_profit) || 0;
+  var stdExtraPct = ls.standard_extra_pct || 0;
+  var activeLoans = (data.loans || []).filter(function(l) { return l.is_active !== 0 && (l.remaining_balance || 0) > 0; });
+  var activeLoanCount = activeLoans.length;
+  if (stdExtraPct > 0 && activeLoanCount > 0) {
+    var totalPMT = activeLoans.reduce(function(s,l) { return s + (l.monthly_payment || 0); }, 0);
+    var extraTotal = Math.round(totalPMT * stdExtraPct / 100);
+    var extraPerLoan = activeLoanCount > 0 ? Math.round(extraTotal / activeLoanCount) : 0;
+    h += '<div style="margin-top:8px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-calculator" style="margin-right:4px;color:#22C55E"></i>';
+    h += 'Общий PMT: <b style="color:#3B82F6">' + fmtAmt(totalPMT) + '</b> × ' + stdExtraPct + '% = <b style="color:#22C55E">+' + fmtAmt(extraTotal) + '</b> → по <b style="color:#F59E0B">+' + fmtAmt(extraPerLoan) + '</b> на каждый кредит (' + activeLoanCount + ' шт.)</div>';
+  }
+  h += '<div style="margin-top:8px;font-size:0.72rem;color:#64748b"><i class="fas fa-lightbulb" style="margin-right:4px;color:#F59E0B"></i>Дополнительная сумма распределяется равномерно между всеми кредитами и идёт на досрочное погашение тела долга.</div>';
+  h += '</div>';
+  // Aggressive mode fields
+  h += '<div id="aggressiveModeFields" style="' + (isAggr ? '' : 'display:none;') + 'padding:12px;background:rgba(245,158,11,0.04);border-radius:8px;border:1px solid rgba(245,158,11,0.15);margin-bottom:8px">';
+  h += '<div style="font-size:0.82rem;color:#F59E0B;font-weight:600;margin-bottom:8px"><i class="fas fa-bolt" style="margin-right:4px"></i>Агрессивный: % от прибыли → 80% залог/старые, 20% остальные</div>';
   h += '<div style="display:flex;align-items:center;gap:10px">';
   h += '<label style="font-size:0.78rem;color:#F59E0B;white-space:nowrap">Доля от чистой прибыли (%)</label>';
   h += '<input type="number" class="input" id="loan_global_aggr_pct" value="' + (ls.aggressive_pct || 10) + '" step="1" min="1" max="100" style="max-width:80px;border-color:rgba(245,158,11,0.3)">';
   h += '</div>';
-  // Show calculation preview
-  var netProfit = (p && p.net_profit) || 0;
   if (netProfit > 0 && isAggr) {
     var aggrAmount = Math.round(netProfit * (ls.aggressive_pct || 10) / 100);
-    h += '<div style="margin-top:6px;font-size:0.75rem;color:#94a3b8"><i class="fas fa-calculator" style="margin-right:4px;color:#F59E0B"></i>Чистая прибыль: <b style="color:#22C55E">' + fmtAmt(netProfit) + '</b> × ' + (ls.aggressive_pct||10) + '% = <b style="color:#F59E0B">' + fmtAmt(aggrAmount) + '</b> на кредиты';
-    // Show distribution by priority
     var sortedLoans = (data.loans || []).slice().sort(function(a,b) { return (a.priority||10) - (b.priority||10); }).filter(function(l) { return l.is_active !== 0 && l.loan_type !== 'overdraft' && (l.remaining_balance || 0) > 0; });
-    if (sortedLoans.length > 0) {
-      var totalMinPMT = sortedLoans.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
-      var extraBudget = Math.max(aggrAmount - totalMinPMT, 0);
-      h += '<div style="margin-top:4px">Минимальные PMT: <b>' + fmtAmt(totalMinPMT) + '</b> → Свободно для досрочного: <b style="color:#F59E0B">' + fmtAmt(extraBudget) + '</b></div>';
-      if (extraBudget > 0 && sortedLoans.length > 0) {
-        h += '<div style="margin-top:2px">→ Первый приоритет: <b style="color:#a78bfa">' + escHtml(sortedLoans[0].name) + '</b>' + (sortedLoans[0].collateral_type && sortedLoans[0].collateral_type !== 'none' ? ' <span style="color:#F59E0B">🛡️ залог</span>' : '') + '</div>';
+    var totalMinPMT = sortedLoans.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
+    var extraBudget = Math.max(aggrAmount - totalMinPMT, 0);
+    h += '<div style="margin-top:8px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-calculator" style="margin-right:4px;color:#F59E0B"></i>';
+    h += 'Прибыль: <b style="color:#22C55E">' + fmtAmt(netProfit) + '</b> × ' + (ls.aggressive_pct||10) + '% = <b style="color:#F59E0B">' + fmtAmt(aggrAmount) + '</b> на кредиты';
+    h += '<br>Минимальный PMT: <b>' + fmtAmt(totalMinPMT) + '</b> → Свободно: <b style="color:#F59E0B">' + fmtAmt(extraBudget) + '</b></div>';
+    if (extraBudget > 0 && sortedLoans.length > 0) {
+      // Calculate 80/20 distribution
+      var priorityLoans = sortedLoans.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
+      var otherLoans = sortedLoans.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
+      var priorityShare = Math.round(extraBudget * 0.8);
+      var otherShare = extraBudget - priorityShare;
+      h += '<div style="margin-top:6px;padding:8px;background:rgba(245,158,11,0.06);border-radius:6px;font-size:0.75rem">';
+      h += '<div style="color:#F59E0B;font-weight:600;margin-bottom:4px">Распределение 80/20:</div>';
+      if (priorityLoans.length > 0) {
+        var perPriority = Math.round(priorityShare / priorityLoans.length);
+        h += '<div style="color:#EF4444">🛡️ 80% → Залог/старые (' + priorityLoans.length + '): <b>+' + fmtAmt(perPriority) + '</b> на каждый</div>';
+        for (var pi = 0; pi < priorityLoans.length; pi++) {
+          h += '<div style="color:#94a3b8;padding-left:16px">→ ' + escHtml(priorityLoans[pi].name) + (priorityLoans[pi].collateral_type && priorityLoans[pi].collateral_type !== 'none' ? ' 🛡️' : '') + '</div>';
+        }
+      } else { h += '<div style="color:#94a3b8">Нет залоговых кредитов → 80% к первому по приоритету</div>'; }
+      if (otherLoans.length > 0) {
+        var perOther = Math.round(otherShare / otherLoans.length);
+        h += '<div style="color:#3B82F6;margin-top:4px">📋 20% → Остальные (' + otherLoans.length + '): <b>+' + fmtAmt(perOther) + '</b> на каждый</div>';
       }
+      h += '</div>';
     }
-    h += '</div>';
   }
   h += '</div>';
-  h += '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem;margin-top:8px" onclick="saveLoanSettings()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить режим</button>';
+  h += '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem;margin-top:4px" onclick="saveLoanSettings()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить режим</button>';
   h += '</div>';
   // Show add form if open
   if (showPnlAddForm && pnlEditType === 'loan') {
@@ -3515,7 +3620,7 @@ function renderPnlLoans(p) {
   var totalDebt = 0; var totalMonthly = 0; var totalPrincipalAll = 0;
   for (var si = 0; si < loans.length; si++) {
     var sl = loans[si];
-    if (sl.loan_type === 'overdraft') { totalDebt += (sl.overdraft_used || 0); }
+    if (sl.loan_type === 'overdraft') { totalDebt += (sl.overdraft_used || 0); totalMonthly += (sl.monthly_payment || 0); }
     else { totalDebt += (sl.remaining_balance || 0); totalMonthly += (sl.monthly_payment || 0); }
     totalPrincipalAll += (sl.principal || 0);
   }
@@ -3529,6 +3634,29 @@ function renderPnlLoans(p) {
   h += '<div class="card" style="padding:10px 14px;text-align:center"><div style="font-size:0.68rem;color:#64748b">На выручку</div><div style="font-weight:800;color:' + (revenueLoad > 20 ? '#EF4444' : revenueLoad > 10 ? '#F59E0B' : '#22C55E') + ';font-size:1rem">' + revenueLoad + '%</div></div>';
   h += '<div class="card" style="padding:10px 14px;text-align:center"><div style="font-size:0.68rem;color:#64748b">Кредитов</div><div style="font-weight:800;color:#a78bfa;font-size:1rem">' + loans.length + '</div></div>';
   h += '</div>';
+  // Pre-calculate extra load distribution
+  var loanExtraMap = {};
+  if (!isAggr && stdExtraPct > 0) {
+    var activeLns = loans.filter(function(l) { return l.is_active !== 0 && (l.remaining_balance || 0) > 0; });
+    var totalPmtAll = activeLns.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
+    var extraTotalCalc = Math.round(totalPmtAll * stdExtraPct / 100);
+    var perLn = activeLns.length > 0 ? Math.round(extraTotalCalc / activeLns.length) : 0;
+    for (var ei = 0; ei < activeLns.length; ei++) loanExtraMap[activeLns[ei].id] = perLn;
+  } else if (isAggr) {
+    var aggrAmt2 = Math.round((netProfitV) * (ls.aggressive_pct||10) / 100);
+    var sortedLns = loans.filter(function(l) { return l.is_active !== 0 && l.loan_type !== 'overdraft' && (l.remaining_balance||0) > 0; }).sort(function(a,b) { return (a.priority||10)-(b.priority||10); });
+    var minPmts = sortedLns.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
+    var eBudget = Math.max(aggrAmt2 - minPmts, 0);
+    if (eBudget > 0) {
+      var priLns = sortedLns.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
+      var othLns = sortedLns.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
+      var priSh = priLns.length > 0 ? Math.round(eBudget * 0.8) : 0;
+      var othSh = eBudget - priSh;
+      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); for (var xi=0;xi<priLns.length;xi++) loanExtraMap[priLns[xi].id]=pp; }
+      else if (sortedLns.length > 0) { loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.8); }
+      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); for (var yi=0;yi<othLns.length;yi++) loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; }
+    }
+  }
   // Type labels
   var loanTypeLabels = {annuity:'Потребительский (аннуитет)',manual:'Займ с руки',overdraft:'Овердрафт',bank:'Банковский'};
   var collateralLabels = {none:'—',real_estate:'Недвижимость',car:'Автомобиль',equipment:'Оборудование',deposit:'Депозит',other:'Другое'};
@@ -3540,8 +3668,8 @@ function renderPnlLoans(p) {
     var totalPrincipalPaid = loanPayments.reduce(function(s, lp) { return s + (lp.principal_part || 0); }, 0);
     var isOD = l.loan_type === 'overdraft';
     var paidPct = isOD ? (l.overdraft_limit > 0 ? Math.round((l.overdraft_used||0) / l.overdraft_limit * 100) : 0) : (l.principal > 0 ? Math.round(totalPrincipalPaid / l.principal * 100) : 0);
-    // Card border color by priority
     var borderColor = (l.collateral_type && l.collateral_type !== 'none') ? '#F59E0B' : '#334155';
+    var extraAmt = loanExtraMap[l.id] || 0;
     h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + borderColor + '">';
     // Header
     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
@@ -3550,8 +3678,8 @@ function renderPnlLoans(p) {
     h += '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">';
     h += '<span style="padding:2px 6px;background:#1e293b;border-radius:4px;font-size:0.65rem;color:#a78bfa">' + (loanTypeLabels[l.loan_type] || l.loan_type) + '</span>';
     if (l.collateral_type && l.collateral_type !== 'none') h += '<span style="padding:2px 6px;background:rgba(245,158,11,0.15);border-radius:4px;font-size:0.65rem;color:#F59E0B"><i class="fas fa-shield-alt" style="margin-right:2px"></i>' + (collateralLabels[l.collateral_type]||l.collateral_type) + '</span>';
-    if (l.repayment_mode === 'aggressive') h += '<span style="padding:2px 6px;background:rgba(239,68,68,0.15);border-radius:4px;font-size:0.65rem;color:#EF4444"><i class="fas fa-bolt" style="margin-right:2px"></i>Агрессивный ' + (l.aggressive_pct||0) + '%</span>';
     if ((l.priority||10) < 10) h += '<span style="padding:2px 6px;background:rgba(34,197,94,0.15);border-radius:4px;font-size:0.65rem;color:#22C55E">Приоритет ' + l.priority + '</span>';
+    if (extraAmt > 0) h += '<span style="padding:2px 6px;background:rgba(245,158,11,0.2);border-radius:4px;font-size:0.65rem;color:#F59E0B;font-weight:700"><i class="fas fa-plus" style="margin-right:2px"></i>+' + fmtAmt(extraAmt) + '</span>';
     h += '</div></div>';
     h += '<div style="display:flex;gap:6px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-edit"></i></button><button class="tier-del-btn" onclick="deletePnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
     if (l.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-bottom:8px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(l.notes) + '</div>';
@@ -3560,27 +3688,57 @@ function renderPnlLoans(p) {
       var odUsed = l.overdraft_used || 0;
       var odLimit = l.overdraft_limit || 0;
       var odAvail = odLimit - odUsed;
-      var odMonthlyInt = Math.round(odUsed * (l.overdraft_rate || 0) / 100 / 12);
+      var odRate = l.overdraft_rate || 0;
+      var odMonthlyInt = Math.round(odUsed * odRate / 100 / 12);
       h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:10px">';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Лимит</div><div style="font-weight:700;color:#e2e8f0">' + fmtAmt(odLimit) + '</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Использовано</div><div style="font-weight:700;color:#EF4444">' + fmtAmt(odUsed) + '</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">Доступно</div><div style="font-weight:700;color:#22C55E">' + fmtAmt(odAvail) + '</div></div>';
+      h += '<div><div style="font-size:0.7rem;color:#64748b">Ставка</div><div style="font-weight:700;color:#F59E0B">' + odRate + '%</div></div>';
       h += '<div><div style="font-size:0.7rem;color:#64748b">% в мес.</div><div style="font-weight:700;color:#F59E0B">' + fmtAmt(odMonthlyInt) + '</div></div>';
+      if (l.monthly_payment) h += '<div><div style="font-size:0.7rem;color:#64748b">Платёж/мес</div><div style="font-weight:700;color:#3B82F6">' + fmtAmt(l.monthly_payment) + '</div></div>';
       h += '</div>';
+      // Overdraft current month breakdown
+      if (odMonthlyInt > 0) {
+        h += '<div style="padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);margin-bottom:8px;font-size:0.82rem">';
+        h += '<div style="font-weight:600;color:#3B82F6;margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>Текущий месяц — овердрафт</div>';
+        h += '<div style="display:flex;gap:16px">';
+        h += '<span style="color:#94a3b8">Проценты: <b style="color:#EF4444">' + fmtAmt(odMonthlyInt) + '</b></span>';
+        if (extraAmt > 0) h += '<span style="color:#F59E0B">Доп. нагрузка: <b>+' + fmtAmt(extraAmt) + '</b></span>';
+        h += '</div></div>';
+      }
+      if (l.start_date || l.end_date) {
+        h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px"><i class="fas fa-calendar" style="margin-right:4px"></i>' + (l.start_date || '?') + ' \u2192 ' + (l.end_date || '?');
+        if (l.term_months) h += ' (' + l.term_months + ' мес.)';
+        h += '</div>';
+      }
       var odPct = odLimit > 0 ? Math.round(odUsed / odLimit * 100) : 0;
-      h += '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + Math.min(odPct, 100) + '%;height:100%;background:' + (odPct > 80 ? '#EF4444' : odPct > 50 ? '#F59E0B' : '#22C55E') + ';border-radius:3px"></div></div>';
+      h += '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:' + Math.min(odPct, 100) + '%;height:100%;background:' + (odPct > 80 ? '#EF4444' : odPct > 50 ? '#F59E0B' : '#22C55E') + ';border-radius:3px"></div></div>';
+      // Overdraft payments (expandable)
+      h += '<details style="margin-top:4px"><summary style="cursor:pointer;color:#8B5CF6;font-size:0.82rem;font-weight:600"><i class="fas fa-list" style="margin-right:4px"></i>\u041f\u043b\u0430\u0442\u0435\u0436\u0438 (' + loanPayments.length + ')' + (totalPaid > 0 ? ' \u2014 ' + fmtAmt(totalPaid) + ' \u0432\u0441\u0435\u0433\u043e' : '') + '</summary>';
+      h += renderLoanPaymentsBlock(l, loanPayments, totalPrincipalPaid, totalInterestPaid, totalPaid);
+      h += '</details>';
       h += '</div>';
       continue;
     }
     // === ANNUITY / MANUAL CARD ===
-    // Current month calculation for annuity
     var monthlyInterest = Math.round((l.remaining_balance || 0) * ((l.interest_rate || 0) / 100 / 12));
     var monthlyPrincipal = Math.max((l.monthly_payment || 0) - monthlyInterest, 0);
     if (monthlyInterest >= (l.monthly_payment || 0)) { monthlyPrincipal = 0; monthlyInterest = l.monthly_payment || 0; }
-    // Months remaining
+    // Correct months remaining calculation
     var monthsRemaining = 0;
-    if (l.monthly_payment > 0 && monthlyPrincipal > 0) {
-      monthsRemaining = Math.ceil((l.remaining_balance || 0) / monthlyPrincipal);
+    if (l.monthly_payment > 0 && l.remaining_balance > 0 && l.interest_rate > 0) {
+      // Use logarithmic formula for accurate remaining months
+      var mr = l.interest_rate / 100 / 12;
+      var pmt = l.monthly_payment;
+      var bal = l.remaining_balance;
+      if (pmt > bal * mr) {
+        monthsRemaining = Math.ceil(-Math.log(1 - bal * mr / pmt) / Math.log(1 + mr));
+      } else {
+        monthsRemaining = 999; // Interest exceeds payment
+      }
+    } else if (l.monthly_payment > 0 && l.remaining_balance > 0) {
+      monthsRemaining = Math.ceil(l.remaining_balance / l.monthly_payment);
     }
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px;margin-bottom:10px">';
     h += '<div><div style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</div><div style="font-weight:700;color:#e2e8f0">' + fmtAmt(l.principal) + '</div></div>';
@@ -3588,17 +3746,19 @@ function renderPnlLoans(p) {
     h += '<div><div style="font-size:0.7rem;color:#64748b">\u041e\u0441\u0442\u0430\u0442\u043e\u043a</div><div style="font-weight:700;color:#EF4444">' + fmtAmt(l.remaining_balance) + '</div></div>';
     h += '<div><div style="font-size:0.7rem;color:#64748b">\u041f\u043e\u0433\u0430\u0448\u0435\u043d\u043e</div><div style="font-weight:700;color:#22C55E">' + paidPct + '%</div></div>';
     if (l.monthly_payment) h += '<div><div style="font-size:0.7rem;color:#64748b">\u0415\u0436\u0435\u043c\u0435\u0441.</div><div style="font-weight:700;color:#3B82F6">' + fmtAmt(l.monthly_payment) + '</div></div>';
+    if (l.bank_monthly_payment && l.bank_monthly_payment !== l.monthly_payment) h += '<div><div style="font-size:0.7rem;color:#64748b">По договору</div><div style="font-weight:700;color:#64748b">' + fmtAmt(l.bank_monthly_payment) + '</div></div>';
     if (l.original_monthly_payment && l.original_monthly_payment !== l.monthly_payment) h += '<div><div style="font-size:0.7rem;color:#64748b">Оригин. PMT</div><div style="font-weight:700;color:#64748b">' + fmtAmt(l.original_monthly_payment) + '</div></div>';
-    if (monthsRemaining > 0) h += '<div><div style="font-size:0.7rem;color:#64748b">Ост. мес.</div><div style="font-weight:700;color:#a78bfa">' + monthsRemaining + '</div></div>';
+    if (monthsRemaining > 0 && monthsRemaining < 999) h += '<div><div style="font-size:0.7rem;color:#64748b">Ост. мес.</div><div style="font-weight:700;color:#a78bfa">' + monthsRemaining + '</div></div>';
     h += '</div>';
     // Current month breakdown (highlighted)
     if (l.monthly_payment) {
       h += '<div style="padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);margin-bottom:8px;font-size:0.82rem">';
       h += '<div style="font-weight:600;color:#3B82F6;margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>Текущий месяц — разбивка платежа</div>';
-      h += '<div style="display:flex;gap:16px">';
+      h += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
       h += '<span style="color:#94a3b8">Платёж: <b style="color:#e2e8f0">' + fmtAmt(l.monthly_payment) + '</b></span>';
       h += '<span style="color:#94a3b8">Тело: <b style="color:#22C55E">' + fmtAmt(monthlyPrincipal) + '</b></span>';
       h += '<span style="color:#94a3b8">Процент: <b style="color:#EF4444">' + fmtAmt(monthlyInterest) + '</b></span>';
+      if (extraAmt > 0) h += '<span style="color:#F59E0B;font-weight:700">Доп. нагрузка: <b>+' + fmtAmt(extraAmt) + '</b></span>';
       h += '</div></div>';
     }
     if (l.start_date || l.end_date) {
@@ -3613,57 +3773,70 @@ function renderPnlLoans(p) {
     h += '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden;margin-bottom:10px"><div style="width:' + Math.min(paidPct, 100) + '%;height:100%;background:linear-gradient(90deg,#22C55E,#10B981);border-radius:3px"></div></div>';
     // Payments linked to this loan (expandable)
     h += '<details style="margin-top:4px"><summary style="cursor:pointer;color:#8B5CF6;font-size:0.82rem;font-weight:600"><i class="fas fa-list" style="margin-right:4px"></i>\u041f\u043b\u0430\u0442\u0435\u0436\u0438 (' + loanPayments.length + ')' + (totalPaid > 0 ? ' \u2014 ' + fmtAmt(totalPaid) + ' \u0432\u0441\u0435\u0433\u043e' : '') + '</summary>';
-    if (loanPayments.length > 0) {
-      h += '<div style="margin-top:8px;padding:8px;background:#0f172a;border-radius:8px;border:1px solid #334155">';
-      for (var lpi = 0; lpi < loanPayments.length; lpi++) {
-        var lp = loanPayments[lpi];
-        h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid #1e293b22;font-size:0.82rem">';
-        h += '<div><span style="color:#e2e8f0">' + (lp.payment_date || '\u0431\u0435\u0437 \u0434\u0430\u0442\u044b') + '</span>';
-        h += ' <span style="color:#64748b;font-size:0.72rem">(\u043e\u0441\u043d: ' + fmtAmt(lp.principal_part) + ', %: ' + fmtAmt(lp.interest_part) + ')</span>';
-        if (lp.is_extra) h += ' <span style="padding:1px 4px;background:rgba(245,158,11,0.15);border-radius:3px;font-size:0.6rem;color:#F59E0B">Досрочный</span>';
-        if (lp.notes) h += ' <span style="color:#8B5CF6;font-size:0.68rem">' + escHtml(lp.notes) + '</span>';
-        h += '</div>';
-        h += '<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#F59E0B">' + fmtAmt(lp.amount) + '</span>';
-        h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.68rem" onclick="editLoanPayment(' + l.id + ',' + lp.id + ')" title="\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c"><i class="fas fa-edit" style="font-size:0.55rem"></i></button>';
-        h += '<button class="tier-del-btn" onclick="deleteLoanPayment(' + lp.id + ')" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-trash" style="font-size:0.55rem"></i></button>';
-        h += '</div></div>';
-      }
-      h += '<div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:0.78rem;font-weight:600"><span style="color:#94a3b8">\u0418\u0442\u043e\u0433\u043e: \u043e\u0441\u043d. ' + fmtAmt(totalPrincipalPaid) + ' + %: ' + fmtAmt(totalInterestPaid) + '</span><span style="color:#22C55E">' + fmtAmt(totalPaid) + '</span></div>';
-      h += '</div>';
-    }
-    // Inline payment form
-    h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid ' + (editingLoanPaymentId > 0 ? '#F59E0B' : '#334155') + '">';
-    if (editingLoanPaymentId > 0) h += '<div style="font-size:0.78rem;color:#F59E0B;font-weight:600;margin-bottom:6px"><i class="fas fa-edit" style="margin-right:4px"></i>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0430</div>';
-    h += '<div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 1fr;gap:8px;align-items:end">';
-    h += '<div><label style="font-size:0.7rem;color:#64748b">\u0422\u0438\u043f \u043f\u043b\u0430\u0442\u0435\u0436\u0430</label><select class="input" id="lp_paytype_' + l.id + '" style="font-size:0.78rem" onchange="toggleLoanPayFields(' + l.id + ',this.value)"><option value="both">\u041e\u0441\u043d.+%</option><option value="interest_only">\u0422\u043e\u043b\u044c\u043a\u043e %</option><option value="principal_only">\u0422\u043e\u043b\u044c\u043a\u043e \u043e\u0441\u043d.</option><option value="extra">Досрочный</option></select></div>';
-    h += '<div><label style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="lp_amount_' + l.id + '" placeholder="0"></div>';
-    h += '<div id="lp_princ_wrap_' + l.id + '"><label style="font-size:0.7rem;color:#64748b">\u041e\u0441\u043d. \u0434\u043e\u043b\u0433</label><input type="number" class="input" id="lp_principal_' + l.id + '" placeholder="0"></div>';
-    h += '<div id="lp_int_wrap_' + l.id + '"><label style="font-size:0.7rem;color:#64748b">\u041f\u0440\u043e\u0446\u0435\u043d\u0442\u044b</label><input type="number" class="input" id="lp_interest_' + l.id + '" placeholder="0"></div>';
-    h += '<div><label style="font-size:0.7rem;color:#64748b">\u0414\u0430\u0442\u0430</label><input type="date" class="input" id="lp_date_' + l.id + '" value="' + new Date().toISOString().slice(0,10) + '"></div>';
-    h += '</div>';
-    h += '<div style="margin-top:6px"><label style="font-size:0.7rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="lp_notes_' + l.id + '" placeholder="\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439 \u043a \u043f\u043b\u0430\u0442\u0435\u0436\u0443" style="font-size:0.82rem"></div>';
-    h += '<div style="margin-top:6px;display:flex;gap:6px">';
-    h += '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem" onclick="saveLoanPaymentInline(' + l.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>' + (editingLoanPaymentId > 0 ? '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' : '\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436') + '</button>';
-    if (editingLoanPaymentId > 0) {
-      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="cancelEditLoanPayment()"><i class="fas fa-times" style="margin-right:4px"></i>\u041e\u0442\u043c\u0435\u043d\u0430</button>';
-    }
-    if (l.monthly_payment) {
-      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="prefillLoanPayment(' + l.id + ',' + l.monthly_payment + ',' + (l.interest_rate||0) + ',' + (l.remaining_balance||0) + ')"><i class="fas fa-magic" style="margin-right:4px"></i>\u0410\u0432\u0442\u043e\u0437\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u044c</button>';
-    }
-    h += '</div></div></details>';
+    h += renderLoanPaymentsBlock(l, loanPayments, totalPrincipalPaid, totalInterestPaid, totalPaid);
+    h += '</details>';
     h += '</div>';
   }
-  // Explanation block
-  h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-question-circle" style="margin-right:6px;color:#EF4444"></i>Как работают кредиты</summary>';
+  // Payment recording guide
+  h += '<details style="margin-top:16px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-question-circle" style="margin-right:6px;color:#EF4444"></i>Как записывать платежи</summary>';
   h += '<div class="card" style="margin-top:8px;font-size:0.8rem;color:#94a3b8;line-height:1.8">';
   h += '<div style="margin-bottom:12px"><b style="color:#e2e8f0">3 типа кредитов:</b></div>';
-  h += '<div style="padding:6px 12px;background:rgba(139,92,246,0.06);border-radius:6px;margin-bottom:6px"><b style="color:#a78bfa">Потребительский (аннуитет)</b> — фиксированный ежемесячный платёж. Система автоматически рассчитывает PMT из суммы, ставки и срока. В начале больше идёт на проценты, к концу — на тело.</div>';
-  h += '<div style="padding:6px 12px;background:rgba(245,158,11,0.06);border-radius:6px;margin-bottom:6px"><b style="color:#F59E0B">Займ с руки</b> — вы сами указываете платежи. Подходит для частных займов, где нет фиксированного графика.</div>';
-  h += '<div style="padding:6px 12px;background:rgba(59,130,246,0.06);border-radius:6px;margin-bottom:6px"><b style="color:#3B82F6">Овердрафт</b> — кредитная линия. Лимит, текущее использование, проценты только на использованную часть.</div>';
-  h += '<div style="margin-top:12px"><b style="color:#e2e8f0">Досрочное погашение:</b> при оплате сверх PMT, лишняя сумма идёт на тело долга → остаток уменьшается → процент в следующем месяце меньше → срок кредита сокращается. Используйте тип «Досрочный» при добавлении платежа.</div>';
-  h += '<div style="margin-top:8px"><b style="color:#e2e8f0">Агрессивный режим:</b> вы выделяете X% от чистой прибыли на кредиты. Всё сверх суммы минимальных платежей → идёт на погашение тела первого приоритетного кредита (залоговые сверху).</div>';
-  h += '<div style="margin-top:8px"><b style="color:#e2e8f0">Желаемый срок:</b> если хотите погасить быстрее — укажите меньший срок. Система пересчитает PMT. Оригинальный PMT по договору сохранится в карточке.</div>';
+  h += '<div style="padding:6px 12px;background:rgba(139,92,246,0.06);border-radius:6px;margin-bottom:6px"><b style="color:#a78bfa">Потребительский (аннуитет)</b> — фиксированный ежемесячный платёж. Система рассчитывает PMT из суммы, ставки и срока.</div>';
+  h += '<div style="padding:6px 12px;background:rgba(245,158,11,0.06);border-radius:6px;margin-bottom:6px"><b style="color:#F59E0B">Займ с руки</b> — вы сами указываете сумму, ставку, срок и ежемесячный платёж.</div>';
+  h += '<div style="padding:6px 12px;background:rgba(59,130,246,0.06);border-radius:6px;margin-bottom:6px"><b style="color:#3B82F6">Овердрафт</b> — кредитная линия с лимитом, используемой суммой и ставкой.</div>';
+  h += '<div style="margin-top:12px;padding:12px;background:rgba(34,197,94,0.06);border-radius:8px;border:1px solid rgba(34,197,94,0.15)">';
+  h += '<b style="color:#22C55E;font-size:0.9rem">Пример записи платежа:</b><br>';
+  h += 'Допустим, ваш ежемесячный платёж 50 000 ֏, из них тело 35 000, проценты 15 000.<br>';
+  h += 'Если режим «Стандартный» с доп. нагрузкой 10%, то система добавляет +5 000 на тело.<br>';
+  h += '<b>Записываете так:</b> Сумма = <b>55 000</b>, Осн. долг = <b>40 000</b>, Проценты = <b>15 000</b><br>';
+  h += 'Где 40 000 = 35 000 (обычное тело) + 5 000 (доп. нагрузка).<br>';
+  h += 'Кнопка «Автозаполнить» рассчитает базовый платёж, а доп. нагрузку добавьте вручную к телу.';
+  h += '</div>';
+  h += '<div style="margin-top:8px"><b style="color:#e2e8f0">Досрочное погашение:</b> при оплате сверх PMT, лишняя сумма идёт на тело долга → остаток уменьшается → срок кредита сокращается.</div>';
   h += '</div></details>';
+  return h;
+}
+// Helper: render loan payments list + inline form (reused for overdraft + regular)
+function renderLoanPaymentsBlock(l, loanPayments, totalPrincipalPaid, totalInterestPaid, totalPaid) {
+  var h = '';
+  if (loanPayments.length > 0) {
+    h += '<div style="margin-top:8px;padding:8px;background:#0f172a;border-radius:8px;border:1px solid #334155">';
+    for (var lpi = 0; lpi < loanPayments.length; lpi++) {
+      var lp = loanPayments[lpi];
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 8px;border-bottom:1px solid #1e293b22;font-size:0.82rem">';
+      h += '<div><span style="color:#e2e8f0">' + (lp.payment_date || '\u0431\u0435\u0437 \u0434\u0430\u0442\u044b') + '</span>';
+      h += ' <span style="color:#64748b;font-size:0.72rem">(\u043e\u0441\u043d: ' + fmtAmt(lp.principal_part) + ', %: ' + fmtAmt(lp.interest_part) + ')</span>';
+      if (lp.is_extra) h += ' <span style="padding:1px 4px;background:rgba(245,158,11,0.15);border-radius:3px;font-size:0.6rem;color:#F59E0B">Досрочный</span>';
+      if (lp.notes) h += ' <span style="color:#8B5CF6;font-size:0.68rem">' + escHtml(lp.notes) + '</span>';
+      h += '</div>';
+      h += '<div style="display:flex;align-items:center;gap:6px"><span style="font-weight:600;color:#F59E0B">' + fmtAmt(lp.amount) + '</span>';
+      h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.68rem" onclick="editLoanPayment(' + l.id + ',' + lp.id + ')"><i class="fas fa-edit" style="font-size:0.55rem"></i></button>';
+      h += '<button class="tier-del-btn" onclick="deleteLoanPayment(' + lp.id + ')"><i class="fas fa-trash" style="font-size:0.55rem"></i></button>';
+      h += '</div></div>';
+    }
+    h += '<div style="display:flex;justify-content:space-between;padding:6px 8px;font-size:0.78rem;font-weight:600"><span style="color:#94a3b8">\u0418\u0442\u043e\u0433\u043e: \u043e\u0441\u043d. ' + fmtAmt(totalPrincipalPaid) + ' + %: ' + fmtAmt(totalInterestPaid) + '</span><span style="color:#22C55E">' + fmtAmt(totalPaid) + '</span></div>';
+    h += '</div>';
+  }
+  // Inline payment form
+  h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid ' + (editingLoanPaymentId > 0 ? '#F59E0B' : '#334155') + '">';
+  if (editingLoanPaymentId > 0) h += '<div style="font-size:0.78rem;color:#F59E0B;font-weight:600;margin-bottom:6px"><i class="fas fa-edit" style="margin-right:4px"></i>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0430</div>';
+  h += '<div style="display:grid;grid-template-columns:120px 1fr 1fr 1fr 1fr;gap:8px;align-items:end">';
+  h += '<div><label style="font-size:0.7rem;color:#64748b">\u0422\u0438\u043f \u043f\u043b\u0430\u0442\u0435\u0436\u0430</label><select class="input" id="lp_paytype_' + l.id + '" style="font-size:0.78rem" onchange="toggleLoanPayFields(' + l.id + ',this.value)"><option value="both">\u041e\u0441\u043d.+%</option><option value="interest_only">\u0422\u043e\u043b\u044c\u043a\u043e %</option><option value="principal_only">\u0422\u043e\u043b\u044c\u043a\u043e \u043e\u0441\u043d.</option><option value="extra">Досрочный</option></select></div>';
+  h += '<div><label style="font-size:0.7rem;color:#64748b">\u0421\u0443\u043c\u043c\u0430</label><input type="number" class="input" id="lp_amount_' + l.id + '" placeholder="0"></div>';
+  h += '<div id="lp_princ_wrap_' + l.id + '"><label style="font-size:0.7rem;color:#64748b">\u041e\u0441\u043d. \u0434\u043e\u043b\u0433</label><input type="number" class="input" id="lp_principal_' + l.id + '" placeholder="0"></div>';
+  h += '<div id="lp_int_wrap_' + l.id + '"><label style="font-size:0.7rem;color:#64748b">\u041f\u0440\u043e\u0446\u0435\u043d\u0442\u044b</label><input type="number" class="input" id="lp_interest_' + l.id + '" placeholder="0"></div>';
+  h += '<div><label style="font-size:0.7rem;color:#64748b">\u0414\u0430\u0442\u0430</label><input type="date" class="input" id="lp_date_' + l.id + '" value="' + new Date().toISOString().slice(0,10) + '"></div>';
+  h += '</div>';
+  h += '<div style="margin-top:6px"><label style="font-size:0.7rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="lp_notes_' + l.id + '" placeholder="\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439 \u043a \u043f\u043b\u0430\u0442\u0435\u0436\u0443" style="font-size:0.82rem"></div>';
+  h += '<div style="margin-top:6px;display:flex;gap:6px">';
+  h += '<button class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem" onclick="saveLoanPaymentInline(' + l.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>' + (editingLoanPaymentId > 0 ? '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' : '\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043f\u043b\u0430\u0442\u0451\u0436') + '</button>';
+  if (editingLoanPaymentId > 0) {
+    h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="cancelEditLoanPayment()"><i class="fas fa-times" style="margin-right:4px"></i>\u041e\u0442\u043c\u0435\u043d\u0430</button>';
+  }
+  if (l.monthly_payment) {
+    h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="prefillLoanPayment(' + l.id + ',' + l.monthly_payment + ',' + (l.interest_rate||0) + ',' + (l.remaining_balance||0) + ')"><i class="fas fa-magic" style="margin-right:4px"></i>\u0410\u0432\u0442\u043e\u0437\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u044c</button>';
+  }
+  h += '</div></div>';
   return h;
 }
 function prefillLoanPayment(loanId, monthlyPayment, interestRate, remainingBalance) {
@@ -3751,11 +3924,18 @@ function calcLoanEndFromTerm() {
 }
 // Save loan settings (system-wide repayment mode)
 async function saveLoanSettings() {
-  var mode = document.querySelector('input[name="loan_global_repay_radio"]:checked')?.value || 'standard';
+  var mode = document.getElementById('loan_global_mode_select')?.value || 'standard';
   var pct = parseFloat(document.getElementById('loan_global_aggr_pct')?.value) || 10;
-  await api('/loan-settings', { method: 'PUT', body: JSON.stringify({ repayment_mode: mode, aggressive_pct: pct }), _silent: true });
-  data.loanSettings = { repayment_mode: mode, aggressive_pct: pct };
+  var stdExtraPct = parseFloat(document.getElementById('loan_global_std_extra_pct')?.value) || 0;
+  await api('/loan-settings', { method: 'PUT', body: JSON.stringify({ repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct }), _silent: true });
+  data.loanSettings = { repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct };
   toast('Режим погашения сохранён'); render();
+}
+function onLoanModeChange(mode) {
+  var stdEl = document.getElementById('standardModeFields');
+  var aggrEl = document.getElementById('aggressiveModeFields');
+  if (stdEl) stdEl.style.display = mode === 'standard' ? '' : 'none';
+  if (aggrEl) aggrEl.style.display = mode === 'aggressive' ? '' : 'none';
 }
 function toggleLoanPayFields(loanId, payType) {
   var pw = document.getElementById('lp_princ_wrap_' + loanId);
@@ -3765,6 +3945,8 @@ function toggleLoanPayFields(loanId, payType) {
 }
 
 function renderPnlDividends(p) {
+  var scheduleLabels = {monthly:'Ежемесячно',quarterly:'Ежеквартально',yearly:'Ежегодно'};
+  var scheduleColors = {monthly:'#22C55E',quarterly:'#3B82F6',yearly:'#F59E0B'};
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-money-check-alt" style="color:#8B5CF6;margin-right:8px"></i>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b</h3>';
   h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'dividend\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
@@ -3778,8 +3960,10 @@ function renderPnlDividends(p) {
   var total = 0;
   for (var i = 0; i < items.length; i++) {
     var d = items[i]; total += (d.amount || 0) + (d.tax_amount || 0);
+    var sch = d.schedule || 'monthly';
     h += '<div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid #1e293b">';
     h += '<div><span style="font-weight:600;color:#e2e8f0">' + escHtml(d.recipient || '\u0412\u043b\u0430\u0434\u0435\u043b\u0435\u0446') + '</span>';
+    h += ' <span style="padding:2px 6px;background:rgba(' + (sch==='monthly'?'34,197,94':sch==='quarterly'?'59,130,246':'245,158,11') + ',0.15);border-radius:4px;font-size:0.65rem;color:' + (scheduleColors[sch]||'#64748b') + '">' + (scheduleLabels[sch]||sch) + '</span>';
     h += '<div style="font-size:0.75rem;color:#64748b">' + (d.payment_date || '') + (d.tax_amount ? ' | \u043d\u0430\u043b\u043e\u0433: ' + fmtAmt(d.tax_amount) : '') + '</div>';
     if (d.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-top:2px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(d.notes) + '</div>';
     h += '</div>';
