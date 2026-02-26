@@ -3289,7 +3289,7 @@ function renderPnlCrudForm(type, item) {
     // Net profit hint + auto-calc from %
     var divNetProfit = (pnlData && pnlData.net_profit) || 0;
     var divLoanPayments = (pnlData && pnlData.loan_total_payments_period) || 0;
-    var divProfitAfterLoans = Math.max(divNetProfit - divLoanPayments, 0);
+    var divProfitAfterLoans = (pnlData && pnlData.net_profit_after_loans !== undefined) ? pnlData.net_profit_after_loans : (divNetProfit - divLoanPayments);
     var curDivPct = (item && item.dividend_pct) || 0;
     var curCalcBase = (item && item.calc_base) || 'after_loans';
     h += '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(34,197,94,0.06);border-radius:8px;border:1px solid rgba(34,197,94,0.15)">';
@@ -3301,10 +3301,10 @@ function renderPnlCrudForm(type, item) {
     h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='before_loans'?'rgba(245,158,11,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='before_loans'?'#F59E0B':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="before_loans"' + (curCalcBase==='before_loans'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_calc_base\\').value=\\'before_loans\\';calcDividendFromPct()"> <span><b>\u0414\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
     h += '</div><input type="hidden" id="pnl_dividend_calc_base" value="' + curCalcBase + '"></div>';
     // Show cascaded info
-    h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c: <b style="color:' + (divNetProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(divNetProfit) + '</b></div>';
-    if (divLoanPayments > 0) {
-      h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u2212 \u041a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438: <b style="color:#EF4444">' + fmtAmt(divLoanPayments) + '</b></div>';
-      h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:6px">\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432: <b style="color:' + (divProfitAfterLoans > 0 ? '#10B981' : '#EF4444') + '">' + fmtAmt(divProfitAfterLoans) + '</b></div>';
+    h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c (\u043f\u043e\u0441\u043b\u0435 \u043d\u0430\u043b\u043e\u0433\u043e\u0432): <b style="color:' + (divNetProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(divNetProfit) + '</b></div>';
+    if (divLoanPayments > 0 || divProfitAfterLoans !== divNetProfit) {
+      h += '<div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">\u2212 \u041a\u0440\u0435\u0434\u0438\u0442\u043d\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438 \u0437\u0430 \u043f\u0435\u0440\u0438\u043e\u0434: <b style="color:#EF4444">' + fmtAmt(divLoanPayments) + '</b></div>';
+      h += '<div style="font-size:0.78rem;color:' + (divProfitAfterLoans >= 0 ? '#10B981' : '#EF4444') + ';font-weight:600;margin-bottom:6px">=\u00a0\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432: <b>' + fmtAmt(divProfitAfterLoans) + '</b>' + (divProfitAfterLoans < 0 ? ' <span style="color:#EF4444;font-size:0.7rem"><i class="fas fa-exclamation-triangle"></i> \u0432 \u043c\u0438\u043d\u0443\u0441\u0435!</span>' : '') + '</div>';
     }
     h += '<div style="display:flex;align-items:center;gap:10px">';
     h += '<label style="font-size:0.78rem;color:#94a3b8;white-space:nowrap">% \u043e\u0442 \u043f\u0440\u0438\u0431\u044b\u043b\u0438</label>';
@@ -3312,9 +3312,11 @@ function renderPnlCrudForm(type, item) {
     h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem;flex-shrink:0" onclick="calcDividendFromPct()"><i class="fas fa-magic" style="margin-right:4px"></i>\u0420\u0430\u0441\u0441\u0447\u0438\u0442\u0430\u0442\u044c</button>';
     h += '</div>';
     var divActiveBase = curCalcBase === 'after_loans' ? divProfitAfterLoans : divNetProfit;
-    h += '<div id="div_calc_preview" style="margin-top:6px;font-size:0.75rem;color:#22C55E;' + (divActiveBase > 0 && curDivPct > 0 ? '' : 'display:none') + '">';
-    if (divActiveBase > 0 && curDivPct > 0) {
+    h += '<div id="div_calc_preview" style="margin-top:6px;font-size:0.75rem;' + (curDivPct > 0 ? '' : 'display:none;') + 'color:' + (divActiveBase >= 0 ? '#22C55E' : '#EF4444') + '">';
+    if (curDivPct > 0 && divActiveBase > 0) {
       h += '<i class="fas fa-check" style="margin-right:4px"></i>' + (curCalcBase === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c') + ': <b>' + fmtAmt(divActiveBase) + '</b> \u00d7 ' + curDivPct + '% = <b>' + fmtAmt(Math.round(divActiveBase * curDivPct / 100)) + '</b>';
+    } else if (curDivPct > 0 && divActiveBase <= 0) {
+      h += '<i class="fas fa-exclamation-triangle" style="margin-right:4px"></i><b>\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u0441\u0440\u0435\u0434\u0441\u0442\u0432!</b> ' + (curCalcBase === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c') + ': <b>' + fmtAmt(divActiveBase) + '</b> \u2014 \u0432\u044b \u0432 \u043c\u0438\u043d\u0443\u0441\u0435, \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434 \u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u0435\u043d';
     }
     h += '</div>';
     h += '</div>';
@@ -4143,17 +4145,27 @@ function calcDividendFromPct() {
   var pct = parseFloat(pctEl.value) || 0;
   var base = baseEl ? baseEl.value : 'after_loans';
   var netProfit = (pnlData && pnlData.net_profit) || 0;
-  var totalLoanPay = (pnlData && pnlData.loan_total_payments_period) || 0;
-  var profitBase = base === 'after_loans' ? Math.max(netProfit - totalLoanPay, 0) : netProfit;
-  if (pct > 0 && profitBase > 0) {
-    amtEl.value = Math.round(profitBase * pct / 100);
-  }
+  var profitAfterLoans = (pnlData && pnlData.net_profit_after_loans !== undefined) ? pnlData.net_profit_after_loans : (netProfit - ((pnlData && pnlData.loan_total_payments_period) || 0));
+  var profitBase = base === 'after_loans' ? profitAfterLoans : netProfit;
   // Update preview text
   var prevEl = document.getElementById('div_calc_preview');
-  if (prevEl && pct > 0) {
-    var baseLabel = base === 'after_loans' ? 'Прибыль после кредитов' : 'Чистая прибыль';
-    prevEl.innerHTML = '<i class="fas fa-check" style="margin-right:4px"></i>' + baseLabel + ': <b>' + fmtAmt(profitBase) + '</b> × ' + pct + '% = <b>' + fmtAmt(Math.round(profitBase * pct / 100)) + '</b>';
-    prevEl.style.display = '';
+  if (pct > 0 && profitBase > 0) {
+    var calcAmt = Math.round(profitBase * pct / 100);
+    amtEl.value = calcAmt;
+    if (prevEl) {
+      var baseLabel = base === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c';
+      prevEl.innerHTML = '<i class="fas fa-check" style="margin-right:4px"></i>' + baseLabel + ': <b>' + fmtAmt(profitBase) + '</b> \u00d7 ' + pct + '% = <b>' + fmtAmt(calcAmt) + '</b>';
+      prevEl.style.color = '#22C55E';
+      prevEl.style.display = '';
+    }
+  } else if (pct > 0 && profitBase <= 0) {
+    amtEl.value = '';
+    if (prevEl) {
+      var baseLabel2 = base === 'after_loans' ? '\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u043f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432' : '\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c';
+      prevEl.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:4px"></i><b>\u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u0441\u0440\u0435\u0434\u0441\u0442\u0432!</b> ' + baseLabel2 + ': <b>' + fmtAmt(profitBase) + '</b> \u2014 \u0432\u044b \u0432 \u043c\u0438\u043d\u0443\u0441\u0435, \u0434\u0438\u0432\u0438\u0434\u0435\u043d\u0434 \u043d\u0435\u0432\u043e\u0437\u043c\u043e\u0436\u0435\u043d';
+      prevEl.style.color = '#EF4444';
+      prevEl.style.display = '';
+    }
   } else if (prevEl) { prevEl.style.display = 'none'; }
 }
 
