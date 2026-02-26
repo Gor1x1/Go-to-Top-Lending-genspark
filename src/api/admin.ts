@@ -117,7 +117,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
     ]);
     // P&L related data (parallel, with fallback for new tables)
     const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData] = await Promise.all([
-      db.prepare('SELECT * FROM tax_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM tax_payments WHERE (is_suppressed IS NULL OR is_suppressed = 0) ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM assets ORDER BY purchase_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loans ORDER BY start_date DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all().catch(() => ({results:[]})),
@@ -2525,7 +2525,7 @@ api.get('/users/:id/earnings/:month', authMiddleware, async (c) => {
 // ===== TAX PAYMENTS =====
 api.get('/tax-payments', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const res = await db.prepare('SELECT * FROM tax_payments ORDER BY payment_date DESC, id DESC').all();
+  const res = await db.prepare('SELECT * FROM tax_payments WHERE (is_suppressed IS NULL OR is_suppressed = 0) ORDER BY payment_date DESC, id DESC').all();
   return c.json({ payments: res.results || [] });
 });
 
@@ -2559,7 +2559,16 @@ api.put('/tax-payments/:id', authMiddleware, async (c) => {
 
 api.delete('/tax-payments/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
-  await db.prepare('DELETE FROM tax_payments WHERE id = ?').bind(c.req.param('id')).run();
+  const id = c.req.param('id');
+  // Check if this payment was auto-generated from a rule
+  const payment = await db.prepare('SELECT rule_id FROM tax_payments WHERE id = ?').bind(id).first();
+  if (payment && payment.rule_id) {
+    // Soft-delete: mark as suppressed so auto-generation won't recreate it
+    await db.prepare('UPDATE tax_payments SET is_suppressed = 1, amount = 0, status = ? WHERE id = ?').bind('deleted', id).run();
+  } else {
+    // Hard delete for manually-created payments
+    await db.prepare('DELETE FROM tax_payments WHERE id = ?').bind(id).run();
+  }
   return c.json({ success: true });
 });
 
@@ -2645,11 +2654,11 @@ api.post('/tax-rules/generate/:periodKey', authMiddleware, async (c) => {
       // Check frequency (quarterly = only q-end months: 03,06,09,12)
       const month = parseInt(periodKey.split('-')[1]);
       if (rule.frequency === 'quarterly' && ![3,6,9,12].includes(month)) continue;
-      // Check if already exists for this rule+period
-      const existing = await db.prepare('SELECT id FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
-      if (existing) continue;
+      // Check if already exists for this rule+period (including suppressed)
+      const existing = await db.prepare('SELECT id, is_suppressed FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
+      if (existing) continue; // exists (active or suppressed) — skip
       // Insert payment from rule
-      await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,0,?,?,?,?,1,?)')
+      await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id, is_suppressed) VALUES (?,?,0,?,?,?,?,1,?,0)')
         .bind(rule.tax_type, rule.rule_name, periodKey, 'pending', rule.tax_rate, rule.tax_base, rule.id).run();
       generated++;
     }
@@ -2860,16 +2869,17 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
       if (rule.apply_from && periodKey < rule.apply_from) continue;
       if (rule.apply_to && periodKey > rule.apply_to) continue;
       if (rule.frequency === 'quarterly' && ![3,6,9,12].includes(month)) continue;
-      const existing = await db.prepare('SELECT id FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
+      const existing = await db.prepare('SELECT id, is_suppressed FROM tax_payments WHERE rule_id = ? AND period_key = ?').bind(rule.id, periodKey).first();
       if (!existing) {
-        await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id) VALUES (?,?,0,?,?,?,?,1,?)')
+        await db.prepare('INSERT INTO tax_payments (tax_type, tax_name, amount, period_key, status, tax_rate, tax_base, is_auto, rule_id, is_suppressed) VALUES (?,?,0,?,?,?,?,1,?,0)')
           .bind(rule.tax_type, rule.rule_name, periodKey, 'pending', rule.tax_rate, rule.tax_base, rule.id).run();
       }
+      // If existing but suppressed — do NOT recreate. User intentionally deleted it.
     }
   } catch {}
 
-  // Re-read taxes after auto-generation
-  const taxesRaw = await db.prepare('SELECT * FROM tax_payments WHERE period_key = ?').bind(periodKey).all();
+  // Re-read taxes after auto-generation (exclude suppressed entries)
+  const taxesRaw = await db.prepare('SELECT * FROM tax_payments WHERE period_key = ? AND (is_suppressed IS NULL OR is_suppressed = 0)').bind(periodKey).all();
   // Assets depreciation for this month
   const assets = await db.prepare('SELECT * FROM assets WHERE is_active = 1').all();
   let monthlyDepreciation = 0;
@@ -2948,7 +2958,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
         case 'total_turnover': base = totalTurnover; break;
         case 'turnover_excl_transit': base = turnoverExclTransit; break;
         case 'ebt': base = Math.max(ebt, 0); break;
-        case 'income_minus_expenses': base = Math.max(revenue - totalExpensesAll, 0); break;
+        case 'income_minus_expenses': base = Math.max(ebt, 0); break; // mapped to ebt (merged)
         case 'payroll': base = salariesBase + bonusesVal; break;
         case 'vat_inclusive': base = revenue;
           return { ...t, amount: Math.round(revenue * t.tax_rate / (100 + t.tax_rate) * 100) / 100, calculated_base: base, calculated_base_name: 'vat_inclusive' };
@@ -2970,8 +2980,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     }
   }
 
-  // Taxes YTD
-  const taxesYtd = await db.prepare("SELECT SUM(amount) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?").bind(yearStart, periodKey).first();
+  // Taxes YTD (exclude suppressed)
+  const taxesYtd = await db.prepare("SELECT SUM(amount) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ? AND (is_suppressed IS NULL OR is_suppressed = 0)").bind(yearStart, periodKey).first();
   const autoTaxDelta = totalTaxes - (taxesRaw.results || []).reduce((s: number, t: any) => s + (t.amount || 0), 0);
   const ytdTaxTotal = ((taxesYtd?.total as number) || 0) + autoTaxDelta;
 
@@ -3010,7 +3020,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     assets: assets.results || [],
     loan_payments_list: loanPaymentsList.results || [],
     tax_rules: taxRules.results || [],
-    _bases: { revenue, ebt, income_minus_expenses: Math.max(revenue - totalExpensesAll, 0), payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
+    _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
 }
 

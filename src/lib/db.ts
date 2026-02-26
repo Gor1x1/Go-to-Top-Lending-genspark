@@ -605,6 +605,8 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_tax_rules_active ON tax_rules(is_active)').run(); } catch {}
   // v18: Add rule_id to tax_payments to link auto-generated payments to their rule
   try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN rule_id INTEGER DEFAULT NULL").run(); } catch {}
+  // v18b: Add is_suppressed to tax_payments (soft-delete for rule-based taxes so they don't auto-regenerate)
+  try { await db.prepare("ALTER TABLE tax_payments ADD COLUMN is_suppressed INTEGER DEFAULT 0").run(); } catch {}
   // v19: Add hire_date/end_date to users for payroll tax period filtering
   try { await db.prepare("ALTER TABLE users ADD COLUMN hire_date TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN end_date TEXT DEFAULT ''").run(); } catch {}
