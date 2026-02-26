@@ -2727,11 +2727,15 @@ api.delete('/assets/:id', authMiddleware, async (c) => {
 });
 
 // ===== LOANS =====
-api.get('/loans', authMiddleware, async (c) => {
-  const db = c.env.DB;
-  // Ensure new columns exist (safe migration)
+// Helper: ensure new loan columns exist (safe idempotent migration)
+async function ensureLoanColumns(db: any) {
   try { await db.prepare('ALTER TABLE loans ADD COLUMN payment_day INTEGER DEFAULT 0').run(); } catch {}
   try { await db.prepare('ALTER TABLE loans ADD COLUMN min_payment REAL DEFAULT 0').run(); } catch {}
+}
+
+api.get('/loans', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await ensureLoanColumns(db);
   const loans = await db.prepare('SELECT * FROM loans ORDER BY priority ASC, start_date DESC, id DESC').all();
   const payments = await db.prepare('SELECT * FROM loan_payments ORDER BY payment_date DESC').all();
   return c.json({ loans: loans.results || [], payments: payments.results || [] });
@@ -2739,6 +2743,7 @@ api.get('/loans', authMiddleware, async (c) => {
 
 api.post('/loans', authMiddleware, async (c) => {
   const db = c.env.DB;
+  await ensureLoanColumns(db);
   const d = await c.req.json();
   // Auto-calculate annuity PMT if type is annuity and we have principal, rate, term
   let monthlyPayment = d.monthly_payment || 0;
@@ -2794,6 +2799,7 @@ api.post('/loans', authMiddleware, async (c) => {
 
 api.put('/loans/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
+  await ensureLoanColumns(db);
   const id = c.req.param('id');
   const d = await c.req.json();
 
