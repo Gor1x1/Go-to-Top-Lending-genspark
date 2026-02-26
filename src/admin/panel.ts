@@ -3626,40 +3626,81 @@ function renderPnlLoans(p) {
   h += '<label style="font-size:0.78rem;color:#F59E0B;white-space:nowrap">Доля от чистой прибыли (%)</label>';
   h += '<input type="number" class="input" id="loan_global_aggr_pct" value="' + (ls.aggressive_pct || 10) + '" step="1" min="1" max="100" style="max-width:80px;border-color:rgba(245,158,11,0.3)">';
   h += '</div>';
-  if (netProfit > 0 && isAggr) {
-    var aggrAmount = Math.round(netProfit * (ls.aggressive_pct || 10) / 100);
+  if (isAggr) {
+    var aggrPctVal = ls.aggressive_pct || 10;
+    var aggrAmount = Math.round(netProfit * aggrPctVal / 100);
     var sortedLoans = (data.loans || []).slice().sort(function(a,b) { return (a.priority||10) - (b.priority||10); }).filter(function(l) { return l.is_active !== 0 && l.loan_type !== 'overdraft' && (l.remaining_balance || 0) > 0; });
     var totalMinPMT = sortedLoans.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
     var extraBudget = Math.max(aggrAmount - totalMinPMT, 0);
+    var budgetInsufficient = aggrAmount > 0 && aggrAmount < totalMinPMT;
     h += '<div style="margin-top:8px;font-size:0.78rem;color:#94a3b8"><i class="fas fa-calculator" style="margin-right:4px;color:#F59E0B"></i>';
-    h += 'Прибыль: <b style="color:#22C55E">' + fmtAmt(netProfit) + '</b> × ' + (ls.aggressive_pct||10) + '% = <b style="color:#F59E0B">' + fmtAmt(aggrAmount) + '</b> на кредиты';
-    h += '<br>Минимальный PMT: <b>' + fmtAmt(totalMinPMT) + '</b> → Свободно: <b style="color:#F59E0B">' + fmtAmt(extraBudget) + '</b></div>';
-    if (extraBudget > 0 && sortedLoans.length > 0) {
-      // Calculate 80/20 distribution
-      var priorityLoans = sortedLoans.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
-      var otherLoans = sortedLoans.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
-      var priorityShare = Math.round(extraBudget * 0.8);
-      var otherShare = extraBudget - priorityShare;
+    h += 'Прибыль: <b style="color:#22C55E">' + fmtAmt(netProfit) + '</b> × ' + aggrPctVal + '% = <b style="color:#F59E0B">' + fmtAmt(aggrAmount) + '</b> на кредиты';
+    h += '<br>Минимальный PMT всех кредитов: <b>' + fmtAmt(totalMinPMT) + '</b>';
+    if (budgetInsufficient) {
+      h += '<br><span style="color:#EF4444;font-weight:700"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Бюджет (' + fmtAmt(aggrAmount) + ') < минимальных платежей (' + fmtAmt(totalMinPMT) + ') → пропорциональное распределение</span>';
+    } else if (extraBudget > 0) {
+      h += ' → Сверх PMT: <b style="color:#F59E0B">+' + fmtAmt(extraBudget) + '</b> на досрочное';
+    } else if (netProfit <= 0) {
+      h += '<br><span style="color:#EF4444"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Нет прибыли — бюджет равен 0</span>';
+    }
+    h += '</div>';
+    // Always show distribution table in aggressive mode
+    if (sortedLoans.length > 0) {
       h += '<div style="margin-top:6px;padding:8px;background:rgba(245,158,11,0.06);border-radius:6px;font-size:0.75rem">';
-      h += '<div style="color:#F59E0B;font-weight:600;margin-bottom:4px">Распределение 80/20:</div>';
-      if (priorityLoans.length > 0) {
-        var perPriority = Math.round(priorityShare / priorityLoans.length);
-        var priPct = netProfit > 0 ? Math.round(priorityShare / priorityLoans.length / netProfit * 10000) / 100 : 0;
-        h += '<div style="color:#EF4444">🛡️ 80% → Залог/старые (' + priorityLoans.length + '): <b>+' + fmtAmt(perPriority) + '</b> (' + priPct + '% от прибыли) на каждый</div>';
-        for (var pi = 0; pi < priorityLoans.length; pi++) {
-          h += '<div style="color:#94a3b8;padding-left:16px">→ ' + escHtml(priorityLoans[pi].name) + (priorityLoans[pi].collateral_type && priorityLoans[pi].collateral_type !== 'none' ? ' 🛡️' : '') + '</div>';
+      if (extraBudget > 0) {
+        // Case 1: Budget > PMT — extra money for 80/20 distribution
+        var priorityLoans = sortedLoans.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
+        var otherLoans = sortedLoans.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
+        var priorityShare = Math.round(extraBudget * 0.8);
+        var otherShare = extraBudget - priorityShare;
+        h += '<div style="color:#F59E0B;font-weight:600;margin-bottom:4px">Распределение сверх-бюджета 80/20:</div>';
+        if (priorityLoans.length > 0) {
+          var perPriority = Math.round(priorityShare / priorityLoans.length);
+          h += '<div style="color:#EF4444">🛡️ 80% → Залог/приоритет (' + priorityLoans.length + '): <b>PMT + ' + fmtAmt(perPriority) + '</b> на каждый</div>';
+          for (var pi = 0; pi < priorityLoans.length; pi++) {
+            var plPmt = priorityLoans[pi].monthly_payment || 0;
+            h += '<div style="color:#94a3b8;padding-left:16px">→ ' + escHtml(priorityLoans[pi].name) + ': ' + fmtAmt(plPmt) + ' + ' + fmtAmt(perPriority) + ' = <b style="color:#F59E0B">' + fmtAmt(plPmt + perPriority) + '</b>' + (priorityLoans[pi].collateral_type && priorityLoans[pi].collateral_type !== 'none' ? ' 🛡️' : '') + '</div>';
+          }
+        } else { h += '<div style="color:#94a3b8">Нет залоговых кредитов → 80% к первому по приоритету</div>'; }
+        if (otherLoans.length > 0) {
+          var perOther = Math.round(otherShare / otherLoans.length);
+          h += '<div style="color:#3B82F6;margin-top:4px">📋 20% → Остальные (' + otherLoans.length + '): <b>PMT + ' + fmtAmt(perOther) + '</b> на каждый</div>';
+          for (var oi = 0; oi < otherLoans.length; oi++) {
+            var olPmt = otherLoans[oi].monthly_payment || 0;
+            h += '<div style="color:#94a3b8;padding-left:16px">→ ' + escHtml(otherLoans[oi].name) + ': ' + fmtAmt(olPmt) + ' + ' + fmtAmt(perOther) + ' = <b style="color:#3B82F6">' + fmtAmt(olPmt + perOther) + '</b></div>';
+          }
         }
-      } else { h += '<div style="color:#94a3b8">Нет залоговых кредитов → 80% к первому по приоритету</div>'; }
-      if (otherLoans.length > 0) {
-        var perOther = Math.round(otherShare / otherLoans.length);
-        var othPct = netProfit > 0 ? Math.round(otherShare / otherLoans.length / netProfit * 10000) / 100 : 0;
-        h += '<div style="color:#3B82F6;margin-top:4px">📋 20% → Остальные (' + otherLoans.length + '): <b>+' + fmtAmt(perOther) + '</b> (' + othPct + '% от прибыли) на каждый</div>';
+      } else if (budgetInsufficient) {
+        // Case 2: Budget < PMT — proportional distribution
+        h += '<div style="color:#EF4444;font-weight:600;margin-bottom:4px"><i class="fas fa-chart-pie" style="margin-right:4px"></i>Пропорциональное распределение бюджета ' + fmtAmt(aggrAmount) + ':</div>';
+        for (var di = 0; di < sortedLoans.length; di++) {
+          var sl = sortedLoans[di];
+          var proportion = totalMinPMT > 0 ? (sl.monthly_payment||0) / totalMinPMT : 0;
+          var allocated = Math.round(aggrAmount * proportion);
+          var pctOfBudget = Math.round(proportion * 100);
+          h += '<div style="color:#94a3b8;display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(255,255,255,0.03)">';
+          h += '<span>→ ' + escHtml(sl.name) + (sl.collateral_type && sl.collateral_type !== 'none' ? ' 🛡️' : '') + '</span>';
+          h += '<span><b style="color:#F59E0B">' + fmtAmt(allocated) + '</b> <span style="font-size:0.65rem;color:#64748b">(PMT ' + fmtAmt(sl.monthly_payment||0) + ' → ' + pctOfBudget + '% бюджета)</span></span>';
+          h += '</div>';
+        }
+        h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(245,158,11,0.2);color:#F59E0B;font-weight:600">Итого: ' + fmtAmt(aggrAmount) + ' из ' + fmtAmt(totalMinPMT) + ' необходимых (' + Math.round(aggrAmount / totalMinPMT * 100) + '%)</div>';
+      } else {
+        // Case 3: No budget (0 profit)
+        h += '<div style="color:#EF4444;font-weight:600;margin-bottom:4px">Нет бюджета для агрессивного погашения</div>';
+        h += '<div style="color:#64748b">Минимальные платежи (' + fmtAmt(totalMinPMT) + ') распределяются по графику:</div>';
+        for (var ni = 0; ni < sortedLoans.length; ni++) {
+          h += '<div style="color:#94a3b8;padding:2px 0">→ ' + escHtml(sortedLoans[ni].name) + ': <b>' + fmtAmt(sortedLoans[ni].monthly_payment||0) + '</b></div>';
+        }
       }
       h += '</div>';
     }
   }
   h += '</div>';
-  h += '<button id="loanSettingsSaveBtn" class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem;margin-top:4px" onclick="saveLoanSettings()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить режим</button>';
+  // Save button + saved indicator
+  h += '<div style="display:flex;align-items:center;gap:10px;margin-top:8px">';
+  h += '<button id="loanSettingsSaveBtn" class="btn btn-primary" style="padding:6px 14px;font-size:0.82rem" onclick="saveLoanSettings()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить режим</button>';
+  h += '<span id="loanSettingsSavedMsg" style="display:none;font-size:0.78rem;color:#22C55E;font-weight:600"><i class="fas fa-check-circle" style="margin-right:4px"></i>Сохранено</span>';
+  h += '</div>';
   h += '</div>';
   // Show add form if open
   if (showPnlAddForm && pnlEditType === 'loan') {
@@ -3690,6 +3731,7 @@ function renderPnlLoans(p) {
   // Pre-calculate extra load distribution — Standard: base = NET PROFIT
   var loanExtraMap = {};
   var loanExtraPctMap = {};
+  var loanAggrPmtMap = {}; // aggressive mode: total target PMT per loan
   if (!isAggr && stdExtraPct > 0) {
     var activeLns = loans.filter(function(l) { return l.is_active !== 0 && (l.remaining_balance || 0) > 0; });
     var extraTotalCalc = Math.round(netProfitV * stdExtraPct / 100);
@@ -3701,14 +3743,29 @@ function renderPnlLoans(p) {
     var sortedLns = loans.filter(function(l) { return l.is_active !== 0 && l.loan_type !== 'overdraft' && (l.remaining_balance||0) > 0; }).sort(function(a,b) { return (a.priority||10)-(b.priority||10); });
     var minPmts = sortedLns.reduce(function(s,l) { return s + (l.monthly_payment||0); }, 0);
     var eBudget = Math.max(aggrAmt2 - minPmts, 0);
+    // Even if eBudget=0, in aggressive mode we still show PMT allocation
+    // Case 1: budget >= total PMT => distribute extra on top of PMT
     if (eBudget > 0) {
       var priLns = sortedLns.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
       var othLns = sortedLns.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
       var priSh = priLns.length > 0 ? Math.round(eBudget * 0.8) : 0;
       var othSh = eBudget - priSh;
-      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; } }
-      else if (sortedLns.length > 0) { loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.8); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.8 / netProfitV * 10000)/100 : 0; }
-      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; } }
+      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=(priLns[xi].monthly_payment||0)+pp; } }
+      else if (sortedLns.length > 0) { loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.8); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.8 / netProfitV * 10000)/100 : 0; loanAggrPmtMap[sortedLns[0].id]=(sortedLns[0].monthly_payment||0)+Math.round(eBudget * 0.8); }
+      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=(othLns[yi].monthly_payment||0)+(loanExtraMap[othLns[yi].id]||0); } }
+      // Fill PMT map for loans without extra
+      for (var fi=0;fi<sortedLns.length;fi++) { if (!loanAggrPmtMap[sortedLns[fi].id]) loanAggrPmtMap[sortedLns[fi].id] = sortedLns[fi].monthly_payment || 0; }
+    }
+    // Case 2: budget < total PMT => proportional distribution
+    else if (aggrAmt2 > 0 && minPmts > 0) {
+      for (var qi=0;qi<sortedLns.length;qi++) {
+        var proportion = (sortedLns[qi].monthly_payment||0) / minPmts;
+        loanAggrPmtMap[sortedLns[qi].id] = Math.round(aggrAmt2 * proportion);
+      }
+    }
+    // Case 3: aggrAmt2 = 0 (no profit) => just show PMT as is
+    else {
+      for (var ri=0;ri<sortedLns.length;ri++) { loanAggrPmtMap[sortedLns[ri].id] = sortedLns[ri].monthly_payment || 0; }
     }
   }
   // Type labels
@@ -3729,6 +3786,7 @@ function renderPnlLoans(p) {
     var paidPct = isOD ? (l.overdraft_limit > 0 ? Math.round((l.overdraft_used||0) / l.overdraft_limit * 100) : 0) : (l.principal > 0 ? Math.round(totalPrincipalPaid / l.principal * 100) : 0);
     var borderColor = (l.collateral_type && l.collateral_type !== 'none') ? '#F59E0B' : '#334155';
     var extraAmt = loanExtraMap[l.id] || 0;
+    var aggrTargetPmt = loanAggrPmtMap[l.id] || 0;
     h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + borderColor + '">';
     // Header
     h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
@@ -3737,9 +3795,15 @@ function renderPnlLoans(p) {
     h += '<div style="display:flex;gap:4px;margin-top:3px;flex-wrap:wrap">';
     h += '<span style="padding:2px 6px;background:#1e293b;border-radius:4px;font-size:0.65rem;color:#a78bfa">' + (loanTypeLabels[l.loan_type] || l.loan_type) + '</span>';
     if (l.collateral_type && l.collateral_type !== 'none') h += '<span style="padding:2px 6px;background:rgba(245,158,11,0.15);border-radius:4px;font-size:0.65rem;color:#F59E0B"><i class="fas fa-shield-alt" style="margin-right:2px"></i>' + (collateralLabels[l.collateral_type]||l.collateral_type) + '</span>';
-    if ((l.priority||10) < 10) h += '<span style="padding:2px 6px;background:rgba(34,197,94,0.15);border-radius:4px;font-size:0.65rem;color:#22C55E">Приоритет ' + l.priority + '</span>';
+    if ((l.priority||10) < 10) h += '<span style="padding:2px 6px;background:rgba(34,197,94,0.15);border-radius:4px;font-size:0.65rem;color:#22C55E">\u041f\u0440\u0438\u043e\u0440\u0438\u0442\u0435\u0442 ' + l.priority + '</span>';
     var extraPctVal = loanExtraPctMap[l.id] || 0;
-    if (extraAmt > 0) h += '<span style="padding:2px 6px;background:rgba(245,158,11,0.2);border-radius:4px;font-size:0.65rem;color:#F59E0B;font-weight:700"><i class="fas fa-plus" style="margin-right:2px"></i>+' + fmtAmt(extraAmt) + ' (' + extraPctVal + '% прибыли)</span>';
+    if (!isAggr && extraAmt > 0) {
+      h += '<span style="padding:2px 6px;background:rgba(245,158,11,0.2);border-radius:4px;font-size:0.65rem;color:#F59E0B;font-weight:700"><i class="fas fa-plus" style="margin-right:2px"></i>+' + fmtAmt(extraAmt) + ' (' + extraPctVal + '% \u043f\u0440\u0438\u0431\u044b\u043b\u0438)</span>';
+    }
+    if (isAggr && aggrTargetPmt > 0) {
+      var aggrColor = extraAmt > 0 ? '#F59E0B' : '#3B82F6';
+      h += '<span style="padding:2px 6px;background:rgba(' + (extraAmt > 0 ? '245,158,11' : '59,130,246') + ',0.2);border-radius:4px;font-size:0.65rem;color:' + aggrColor + ';font-weight:700"><i class="fas fa-bolt" style="margin-right:2px"></i>\u2261 ' + fmtAmt(aggrTargetPmt) + (extraAmt > 0 ? ' (+' + fmtAmt(extraAmt) + ' \u0434\u043e\u043f.)' : '') + '</span>';
+    }
     h += '</div></div>';
     h += '<div style="display:flex;gap:6px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-edit"></i></button><button class="tier-del-btn" onclick="deletePnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
     if (l.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-bottom:8px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(l.notes) + '</div>';
@@ -3811,14 +3875,24 @@ function renderPnlLoans(p) {
     if (monthsRemaining > 0 && monthsRemaining < 999) h += '<div><div style="font-size:0.7rem;color:#64748b">Ост. мес.</div><div style="font-weight:700;color:#a78bfa">' + monthsRemaining + '</div></div>';
     h += '</div>';
     // Current month breakdown (highlighted)
-    if (l.monthly_payment) {
-      h += '<div style="padding:8px 12px;background:rgba(59,130,246,0.06);border-radius:6px;border:1px solid rgba(59,130,246,0.15);margin-bottom:8px;font-size:0.82rem">';
-      h += '<div style="font-weight:600;color:#3B82F6;margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>' + loanPeriodLabel + ' — \u0440\u0430\u0437\u0431\u0438\u0432\u043a\u0430 \u043f\u043b\u0430\u0442\u0435\u0436\u0430</div>';
+    if (l.monthly_payment || aggrTargetPmt > 0) {
+      var breakdownBorder = isAggr ? 'rgba(245,158,11,0.15)' : 'rgba(59,130,246,0.15)';
+      var breakdownBg = isAggr ? 'rgba(245,158,11,0.06)' : 'rgba(59,130,246,0.06)';
+      var breakdownColor = isAggr ? '#F59E0B' : '#3B82F6';
+      h += '<div style="padding:8px 12px;background:' + breakdownBg + ';border-radius:6px;border:1px solid ' + breakdownBorder + ';margin-bottom:8px;font-size:0.82rem">';
+      h += '<div style="font-weight:600;color:' + breakdownColor + ';margin-bottom:4px"><i class="fas fa-calendar-day" style="margin-right:4px"></i>' + loanPeriodLabel + ' — ' + (isAggr ? '\u0430\u0433\u0440\u0435\u0441\u0441\u0438\u0432\u043d\u044b\u0439 \u043f\u043b\u0430\u043d' : '\u0440\u0430\u0437\u0431\u0438\u0432\u043a\u0430 \u043f\u043b\u0430\u0442\u0435\u0436\u0430') + '</div>';
       h += '<div style="display:flex;gap:16px;flex-wrap:wrap">';
-      h += '<span style="color:#94a3b8">Платёж: <b style="color:#e2e8f0">' + fmtAmt(l.monthly_payment) + '</b></span>';
-      h += '<span style="color:#94a3b8">Тело: <b style="color:#22C55E">' + fmtAmt(monthlyPrincipal) + '</b></span>';
-      h += '<span style="color:#94a3b8">Процент: <b style="color:#EF4444">' + fmtAmt(monthlyInterest) + '</b></span>';
-      if (extraAmt > 0) h += '<span style="color:#F59E0B;font-weight:700">Доп. нагрузка: <b>+' + fmtAmt(extraAmt) + '</b></span>';
+      h += '<span style="color:#94a3b8">PMT: <b style="color:#e2e8f0">' + fmtAmt(l.monthly_payment) + '</b></span>';
+      h += '<span style="color:#94a3b8">\u0422\u0435\u043b\u043e: <b style="color:#22C55E">' + fmtAmt(monthlyPrincipal) + '</b></span>';
+      h += '<span style="color:#94a3b8">\u041f\u0440\u043e\u0446\u0435\u043d\u0442: <b style="color:#EF4444">' + fmtAmt(monthlyInterest) + '</b></span>';
+      if (isAggr && aggrTargetPmt > 0) {
+        h += '</div><div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(245,158,11,0.2);display:flex;gap:16px;flex-wrap:wrap;align-items:center">';
+        h += '<span style="color:#F59E0B;font-weight:700"><i class="fas fa-bolt" style="margin-right:4px"></i>\u0426\u0435\u043b\u0435\u0432\u043e\u0439: <b style="font-size:1rem">' + fmtAmt(aggrTargetPmt) + '</b></span>';
+        if (extraAmt > 0) h += '<span style="color:#94a3b8">(PMT ' + fmtAmt(l.monthly_payment) + ' + \u0434\u043e\u043f. <b style="color:#F59E0B">' + fmtAmt(extraAmt) + '</b>)</span>';
+        else if (aggrTargetPmt < (l.monthly_payment||0)) h += '<span style="color:#EF4444;font-size:0.72rem">(\u0431\u044e\u0434\u0436\u0435\u0442 < PMT, \u043f\u0440\u043e\u043f\u043e\u0440\u0446. ' + fmtAmt(aggrTargetPmt) + ')</span>';
+      } else if (!isAggr && extraAmt > 0) {
+        h += '<span style="color:#F59E0B;font-weight:700">\u0414\u043e\u043f. \u043d\u0430\u0433\u0440\u0443\u0437\u043a\u0430: <b>+' + fmtAmt(extraAmt) + '</b></span>';
+      }
       h += '</div></div>';
     }
     if (l.start_date || l.end_date) {
@@ -3984,8 +4058,7 @@ function calcLoanEndFromTerm() {
 }
 // Save loan settings (system-wide repayment mode)
 async function saveLoanSettings() {
-  var btn = null;
-  try { btn = document.getElementById('loanSettingsSaveBtn'); } catch(e) {}
+  var btn = document.getElementById('loanSettingsSaveBtn');
   var restore = btnLoading(btn, 'Сохранение...');
   try {
     var modeEl = document.getElementById('loan_global_mode_select');
@@ -4002,16 +4075,24 @@ async function saveLoanSettings() {
       toast('Ошибка сохранения: ' + (res && res.error ? res.error : 'нет ответа'), 'error');
       return;
     }
+    // Immediately update local settings so UI re-renders correctly
     data.loanSettings = { repayment_mode: mode, aggressive_pct: pct, standard_extra_pct: stdExtraPct };
-    toast('✅ Режим погашения сохранён');
-    // Refresh bulk data to sync loanSettings
+    // Refresh bulk data to sync loanSettings + loans list
     var bulk = await api('/bulk-data', { _silent: true });
     if (bulk && !bulk.error) {
       data.loans = bulk.loans || data.loans;
       data.loanPayments = bulk.loanPayments || data.loanPayments;
       if (bulk.loanSettings) data.loanSettings = bulk.loanSettings;
     }
-    pnlData = null; loadPnlData();
+    // Await loadPnlData so render happens with fresh data
+    pnlData = null;
+    await loadPnlData();
+    // After render, show saved indicator (element re-created by render)
+    toast('✅ Режим погашения сохранён');
+    setTimeout(function() {
+      var savedMsg = document.getElementById('loanSettingsSavedMsg');
+      if (savedMsg) { savedMsg.style.display = 'inline'; setTimeout(function() { savedMsg.style.display = 'none'; }, 3000); }
+    }, 100);
   } catch(e) {
     console.error('[saveLoanSettings] exception:', e);
     if (restore) restore();
