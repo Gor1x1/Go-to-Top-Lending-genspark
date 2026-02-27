@@ -1273,6 +1273,130 @@ async function deleteCalcTab(id) {
 }
 
 // ===== TELEGRAM MESSAGES =====
+// ===== TG MESSAGES INLINE (inside block constructor, grouped by block) =====
+function renderTelegramInline() {
+  var msgs = data.telegram || [];
+  var allBlocks = data.siteBlocks || [];
+  var h = '';
+  
+  h += '<div style="margin-bottom:20px;padding:14px 18px;background:rgba(38,165,228,0.08);border:1px solid rgba(38,165,228,0.2);border-radius:10px;display:flex;align-items:center;gap:12px">' +
+    '<i class="fab fa-telegram" style="color:#26A5E4;font-size:1.3rem"></i>' +
+    '<div style="flex:1"><span style="font-size:0.88rem;color:#e2e8f0;font-weight:600">Шаблоны Telegram-сообщений</span>' +
+    '<p style="font-size:0.78rem;color:#94a3b8;margin:4px 0 0">Каждая кнопка на сайте отправляет заявку + шаблон в Telegram. Редактируйте тексты, URL и шаблоны ниже.</p></div>' +
+    '<button class="btn btn-primary" style="white-space:nowrap;font-size:0.82rem" onclick="addTelegramMsg()"><i class="fas fa-plus" style="margin-right:5px"></i>Новая кнопка</button>' +
+  '</div>';
+  
+  if (msgs.length === 0) {
+    h += '<div class="card" style="text-align:center;padding:48px"><i class="fab fa-telegram" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
+      '<p style="color:#94a3b8">Telegram-сообщения ещё не настроены.</p>' +
+      '<p style="color:#64748b;font-size:0.82rem">Загрузите блоки с сайта или добавьте кнопки вручную.</p></div>';
+    return h;
+  }
+  
+  // Group TG messages by matching block buttons
+  var blockMsgMap = {}; // block_key -> messages
+  var unmatchedMsgs = [];
+  
+  for (var mi = 0; mi < msgs.length; mi++) {
+    var msg = msgs[mi];
+    var matched = false;
+    // Try to match by button_key to a block
+    for (var bi = 0; bi < allBlocks.length; bi++) {
+      var blk = allBlocks[bi];
+      var btns = blk.buttons || [];
+      if (typeof btns === 'string') { try { btns = JSON.parse(btns); } catch(e) { btns = []; } }
+      for (var bti = 0; bti < btns.length; bti++) {
+        if (btns[bti].text_ru && msg.button_label_ru && btns[bti].text_ru.trim() === msg.button_label_ru.trim()) {
+          if (!blockMsgMap[blk.block_key]) blockMsgMap[blk.block_key] = { block: blk, messages: [] };
+          blockMsgMap[blk.block_key].messages.push(msg);
+          matched = true;
+          break;
+        }
+      }
+      if (matched) break;
+    }
+    if (!matched) unmatchedMsgs.push(msg);
+  }
+  
+  // Render grouped by blocks
+  var blockKeys = Object.keys(blockMsgMap);
+  for (var ki = 0; ki < blockKeys.length; ki++) {
+    var key = blockKeys[ki];
+    var group = blockMsgMap[key];
+    h += '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;border-left:4px solid #26A5E4">';
+    h += '<div style="padding:14px 18px;background:#141c2e;display:flex;align-items:center;gap:10px">' +
+      '<i class="fas fa-cubes" style="color:#8B5CF6;font-size:0.9rem"></i>' +
+      '<span style="font-weight:700;color:#e2e8f0;font-size:0.9rem">' + escHtml(group.block.title_ru || group.block.block_key) + '</span>' +
+      '<span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(key) + '</span>' +
+      '<span class="badge" style="background:rgba(38,165,228,0.12);color:#26A5E4;font-size:0.68rem">' + group.messages.length + ' кноп.</span>' +
+    '</div>';
+    for (var gmi = 0; gmi < group.messages.length; gmi++) {
+      h += renderTgMsgCard(group.messages[gmi]);
+    }
+    h += '</div>';
+  }
+  
+  // Render unmatched messages
+  if (unmatchedMsgs.length > 0) {
+    h += '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;border-left:4px solid #F59E0B">';
+    h += '<div style="padding:14px 18px;background:#141c2e;display:flex;align-items:center;gap:10px">' +
+      '<i class="fas fa-unlink" style="color:#F59E0B;font-size:0.9rem"></i>' +
+      '<span style="font-weight:700;color:#e2e8f0;font-size:0.9rem">Общие кнопки</span>' +
+      '<span style="color:#64748b;font-size:0.78rem">(не привязаны к блоку)</span>' +
+      '<span class="badge badge-amber" style="font-size:0.68rem">' + unmatchedMsgs.length + ' кноп.</span>' +
+    '</div>';
+    for (var umi = 0; umi < unmatchedMsgs.length; umi++) {
+      h += renderTgMsgCard(unmatchedMsgs[umi]);
+    }
+    h += '</div>';
+  }
+  
+  // Variables hint
+  h += '<div style="padding:14px 18px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:10px;margin-top:8px">' +
+    '<div style="font-size:0.78rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-code" style="margin-right:5px"></i>Доступные переменные для шаблонов:</div>' +
+    '<div style="font-size:0.75rem;color:#64748b;line-height:1.6">' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin-right:6px">{items}</code> количество |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{total}</code> сумма |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{buyouts}</code> выкупы |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{reviews}</code> отзывы |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{contact}</code> контакт |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{name}</code> имя |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{product}</code> товар |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{service}</code> услуга |' +
+      '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{message}</code> сообщение' +
+    '</div></div>';
+  
+  return h;
+}
+
+function renderTgMsgCard(msg) {
+  var h = '<div style="padding:14px 18px;border-top:1px solid #1e293b">';
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+    '<div style="display:flex;align-items:center;gap:8px">' +
+      '<span class="badge badge-green" style="font-size:0.72rem">' + escHtml(msg.button_key || '') + '</span>' +
+      '<span style="color:#64748b;font-size:0.78rem">' + escHtml(msg.description || '') + '</span>' +
+    '</div>' +
+    '<div style="display:flex;gap:6px">' +
+      '<button class="btn btn-success" style="padding:5px 12px;font-size:0.78rem" onclick="saveTgMsg(' + msg.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить</button>' +
+      '<button class="btn btn-danger" style="padding:5px 8px;font-size:0.78rem" onclick="deleteTgMsg(' + msg.id + ')"><i class="fas fa-trash"></i></button>' +
+    '</div>' +
+  '</div>';
+  // Row 1: Button labels RU/AM
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+    '<div><label style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-tag" style="margin-right:3px"></i>Текст кнопки (RU)</label><input class="input" value="' + escHtml(msg.button_label_ru) + '" id="tg_lru_' + msg.id + '" style="font-size:0.82rem"></div>' +
+    '<div><label style="font-size:0.72rem;color:#F59E0B;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-tag" style="margin-right:3px"></i>Текст кнопки (AM)</label><input class="input" value="' + escHtml(msg.button_label_am) + '" id="tg_lam_' + msg.id + '" style="font-size:0.82rem"></div>' +
+  '</div>';
+  // Row 2: URL
+  h += '<div style="margin-bottom:10px"><label style="font-size:0.72rem;color:#60a5fa;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-link" style="margin-right:3px"></i>Telegram URL</label><input class="input" value="' + escHtml(msg.telegram_url) + '" id="tg_url_' + msg.id + '" style="font-size:0.82rem;color:#60a5fa"></div>';
+  // Row 3: Message templates
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+    '<div><label style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-envelope" style="margin-right:3px"></i>Шаблон (RU)</label><textarea class="input" id="tg_mru_' + msg.id + '" rows="3" style="font-size:0.78rem;line-height:1.5">' + escHtml(msg.message_template_ru) + '</textarea></div>' +
+    '<div><label style="font-size:0.72rem;color:#F59E0B;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-envelope" style="margin-right:3px"></i>Шаблон (AM)</label><textarea class="input" id="tg_mam_' + msg.id + '" rows="3" style="font-size:0.78rem;line-height:1.5">' + escHtml(msg.message_template_am) + '</textarea></div>' +
+  '</div>';
+  h += '</div>';
+  return h;
+}
+
 function renderTelegram() {
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Telegram сообщения</h1>' +
     '<p style="color:#94a3b8;margin-bottom:24px">Настройка текстов сообщений для каждой кнопки на сайте (на 2 языках)</p>' +
@@ -8413,7 +8537,7 @@ var sbSearchQuery = ''; // search/filter blocks
 var sbSortableInstance = null; // SortableJS instance
 var sbSaveTimers = {}; // per-block debounce timers
 var sbSaveStatus = 'hidden'; // 'hidden', 'saving', 'saved'
-var sbActiveTab = 'blocks'; // 'blocks', 'calculator'
+var sbActiveTab = 'blocks'; // 'blocks', 'calculator', 'telegram'
 
 function renderSiteBlocks() {
   var allBlocks = data.siteBlocks || [];
@@ -8446,12 +8570,28 @@ function renderSiteBlocks() {
       '</div>' +
     '</div>';
 
-  // ── Tabs: Blocks / Calculator ──
-  h += '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px">' +
-    '<div class="sb-tabs">' +
-      '<button class="sb-tab' + (sbActiveTab==='blocks'?' active':'') + '" onclick="sbActiveTab=&apos;blocks&apos;;render()"><i class="fas fa-cubes" style="margin-right:6px"></i>Блоки сайта <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + contentBlocks.length + ')</span></button>' +
-      '<button class="sb-tab' + (sbActiveTab==='calculator'?' active':'') + '" onclick="sbActiveTab=&apos;calculator&apos;;render()"><i class="fas fa-calculator" style="margin-right:6px"></i>Калькулятор <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + calcBlocks.length + ')</span></button>' +
-    '</div>' +
+  // ── Tabs: Blocks / Calculator / TG Messages (analytics-style) ──
+  var sbTabs = [
+    { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
+    { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор', count: calcBlocks.length },
+    { id: 'telegram', icon: 'fa-paper-plane', label: 'TG сообщения', count: (data.telegram || []).length }
+  ];
+  h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
+  for (var sti = 0; sti < sbTabs.length; sti++) {
+    var st = sbTabs[sti];
+    h += '<button class="tab-btn' + (sbActiveTab === st.id ? ' active' : '') + '" onclick="sbActiveTab=&apos;' + st.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + st.icon + '" style="margin-right:6px"></i>' + st.label + ' <span style="opacity:0.6;font-size:0.75rem;margin-left:4px">(' + st.count + ')</span></button>';
+  }
+  h += '</div>';
+
+  // ── If TG tab selected, render TG messages inline ──
+  if (sbActiveTab === 'telegram') {
+    h += '</div>'; // close header
+    h += renderTelegramInline();
+    return h;
+  }
+
+  // ── Search + Toolbar (only for blocks/calculator tabs) ──
+  h += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">' +
     '<div style="flex:1;min-width:200px;max-width:320px" class="sb-search-box"><i class="fas fa-search"></i><input class="input" placeholder="Поиск по блокам..." value="' + escHtml(sbSearchQuery) + '" oninput="sbSearchQuery=this.value;render()" style="font-size:0.85rem"></div>' +
   '</div>';
 
@@ -9142,7 +9282,7 @@ function getPageHtml() {
     case 'slots': return renderSlotCounter();
     case 'footer': return renderFooter();
     case 'photos': return renderPhotos();
-    case 'telegram': return renderTelegram();
+    case 'telegram': sbActiveTab = 'telegram'; return renderSiteBlocks();
     case 'tgbot': return renderTelegramBot();
     case 'scripts': return renderScripts();
     case 'settings': return renderSettings();
