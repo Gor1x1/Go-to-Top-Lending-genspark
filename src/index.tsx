@@ -293,6 +293,10 @@ app.post('/api/generate-pdf', async (c) => {
     const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(nextNum, 'calculator_pdf', clientName, clientContact, JSON.stringify({ items, total, referralCode }), lang, referralCode, ua.substring(0,200), total).run();
     const leadId = leadResult.meta?.last_row_id || 0;
+    // Increment referral code usage
+    if (referralCode) {
+      try { await db.prepare("UPDATE referral_codes SET uses_count = uses_count + 1 WHERE code = ? AND is_active = 1").bind(referralCode).run(); } catch {}
+    }
 
     // Notify via Telegram with detailed info
     const tgLines = [
@@ -2819,19 +2823,14 @@ switchLang = function(l) {
           if (existing) existing.remove();
           
           var ss = bf.social_settings || {};
-          var defaultSize = ss.icon_size || 44;
           var socGap = ss.gap || 12;
           var socAlign = ss.align || 'center';
           var socPosition = ss.position || 'bottom';
-          var offTop = ss.offset_top || 0;
-          var offRight = ss.offset_right || 0;
-          var offBottom = ss.offset_bottom || 0;
-          var offLeft = ss.offset_left || 0;
           var justifyMap = { center: 'center', left: 'flex-start', right: 'flex-end' };
           
           var socDiv = document.createElement('div');
           socDiv.className = 'block-socials';
-          socDiv.style.cssText = 'display:flex;flex-direction:column;align-items:' + (socAlign === 'center' ? 'center' : socAlign === 'right' ? 'flex-end' : 'flex-start') + ';padding:' + offTop + 'px ' + offRight + 'px ' + offBottom + 'px ' + offLeft + 'px;margin-top:12px';
+          socDiv.style.cssText = 'display:flex;flex-direction:column;align-items:' + (socAlign === 'center' ? 'center' : socAlign === 'right' ? 'flex-end' : 'flex-start') + ';padding:16px 0;margin-top:12px';
           
           var socH = '';
           // Title
@@ -2841,17 +2840,18 @@ switchLang = function(l) {
           if (socSubtitle) socH += '<div style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">' + socSubtitle + '</div>';
           
           // Icons row
-          socH += '<div style="display:flex;gap:' + socGap + 'px;justify-content:' + (justifyMap[socAlign] || 'center') + ';align-items:center;flex-wrap:wrap">';
+          socH += '<div style="display:flex;gap:' + socGap + 'px;justify-content:' + (justifyMap[socAlign] || 'center') + ';align-items:flex-start;flex-wrap:wrap">';
           bf.social_links.forEach(function(s) {
             if (!s.url) return;
             var icon = socialIcons[s.type] || 'fas fa-link';
             var color = s.bg_color || socialColors[s.type] || '#8B5CF6';
-            var sz = s.icon_size || defaultSize;
+            var sz = s.icon_size || 44;
             var fontSize = Math.round(sz * 0.45);
+            var textSz = s.text_size || 14;
             socH += '<a href="' + s.url + '" target="_blank" rel="noopener" style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none" onmouseover="this.querySelector(&apos;.soc-icon&apos;).style.transform=&apos;scale(1.15)&apos;;this.querySelector(&apos;.soc-icon&apos;).style.boxShadow=&apos;0 4px 15px ' + color + '66&apos;" onmouseout="this.querySelector(&apos;.soc-icon&apos;).style.transform=&apos;scale(1)&apos;;this.querySelector(&apos;.soc-icon&apos;).style.boxShadow=&apos;none&apos;">' +
               '<div class="soc-icon" style="display:inline-flex;align-items:center;justify-content:center;width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + color + ';color:white;font-size:' + fontSize + 'px;transition:transform 0.2s,box-shadow 0.2s">' +
               '<i class="' + icon + '"></i></div>' +
-              (s.label ? '<span style="font-size:0.72rem;color:var(--text-secondary,#999);max-width:' + (sz + 20) + 'px;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + s.label + '</span>' : '') +
+              (s.label ? '<span style="font-size:' + textSz + 'px;color:var(--text-secondary,#999);max-width:' + (sz + 40) + 'px;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + s.label + '</span>' : '') +
             '</a>';
           });
           socH += '</div>';

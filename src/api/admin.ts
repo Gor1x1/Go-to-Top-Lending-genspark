@@ -337,6 +337,21 @@ api.delete('/calc-services/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== REORDER CALC SERVICES (drag-and-drop) =====
+api.put('/calc-services-reorder', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { orders } = await c.req.json(); // [{id, sort_order, tab_id?}]
+  if (!Array.isArray(orders)) return c.json({ error: 'orders must be array' }, 400);
+  for (const o of orders) {
+    if (o.tab_id !== undefined) {
+      await db.prepare('UPDATE calculator_services SET sort_order = ?, tab_id = ? WHERE id = ?').bind(o.sort_order, o.tab_id, o.id).run();
+    } else {
+      await db.prepare('UPDATE calculator_services SET sort_order = ? WHERE id = ?').bind(o.sort_order, o.id).run();
+    }
+  }
+  return c.json({ success: true });
+});
+
 // ===== TELEGRAM MESSAGES =====
 api.get('/telegram', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -661,6 +676,10 @@ api.post('/leads', authMiddleware, async (c) => {
   const nextNum = ((lastLead?.max_num as number) || 0) + 1;
   await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, total_amount, calc_data, referral_code, custom_fields, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(nextNum, d.source || 'manual', d.name || '', d.contact || '', d.product || '', d.service || '', '', d.lang || 'ru', d.total_amount || 0, d.calc_data || '', d.referral_code || '', d.custom_fields || '', d.message || '').run();
+  // Increment referral code usage counter if code was used
+  if (d.referral_code) {
+    try { await db.prepare("UPDATE referral_codes SET uses_count = uses_count + 1 WHERE code = ? AND is_active = 1").bind(d.referral_code).run(); } catch {}
+  }
   return c.json({ success: true });
 });
 

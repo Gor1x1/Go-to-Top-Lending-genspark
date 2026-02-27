@@ -664,6 +664,15 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE loans ADD COLUMN bank_monthly_payment REAL DEFAULT 0").run(); } catch {}
   // v23: site_blocks — add social_links column for per-block social media links
   try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN social_links TEXT DEFAULT '[]'").run(); } catch {}
+  // v24: Ensure uploads table exists (may be missing on older DBs initialized before uploads was added)
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS uploads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT DEFAULT '',
+    mime_type TEXT DEFAULT '',
+    data_base64 TEXT NOT NULL,
+    block_id INTEGER,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

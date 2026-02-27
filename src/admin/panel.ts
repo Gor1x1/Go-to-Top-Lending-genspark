@@ -1044,15 +1044,17 @@ function renderCalculator() {
       '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="deleteCalcTab(' + tab.id + ')" title="Удалить раздел"><i class="fas fa-trash"></i></button>' +
     '</div>';
     
-    // Services inside this folder
+    // Services inside this folder (sortable container)
+    h += '<div id="calc_svc_list_' + tab.id + '" class="calc-sortable-list">';
     for (var si2 = 0; si2 < svcs.length; si2++) {
       var svc2 = svcs[si2];
       var isTiered = svc2.price_type === 'tiered' && svc2.price_tiers_json;
       var tiers = [];
       if (isTiered) { try { tiers = JSON.parse(svc2.price_tiers_json); } catch(e) { tiers = []; } }
       
-      h += '<div class="section-edit-row" style="margin-bottom:8px">' +
-        '<div style="display:grid;grid-template-columns:1fr 1fr 100px auto auto;gap:8px;align-items:center">' +
+      h += '<div class="section-edit-row" style="margin-bottom:8px" data-svc-id="' + svc2.id + '">' +
+        '<div style="display:grid;grid-template-columns:28px 1fr 1fr 100px auto auto;gap:8px;align-items:center">' +
+          '<i class="fas fa-grip-vertical calc-drag-handle" style="color:#475569;cursor:grab;font-size:0.9rem"></i>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название RU</div><input class="input" value="' + escHtml(svc2.name_ru) + '" id="svc_ru_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название AM</div><input class="input" value="' + escHtml(svc2.name_am || '') + '" id="svc_am_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">\u0426\u0435\u043d\u0430 \u058f</div><input class="input" type="number" value="' + svc2.price + '" id="svc_price_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
@@ -1082,6 +1084,7 @@ function renderCalculator() {
       }
       h += '</div>';
     }
+    h += '</div>'; // close calc-sortable-list
     
     // Add service button inside folder
     h += '<button class="btn btn-outline" style="width:100%;margin-top:8px;padding:10px;font-size:0.85rem;border-style:dashed" onclick="addServiceToTab(' + tab.id + ')" data-tab-name="' + escHtml(tab.name_ru) + '">' +
@@ -1098,6 +1101,35 @@ function renderCalculator() {
   
   h += '</div>';
   return h;
+}
+
+// ===== SORTABLE: drag-and-drop reorder services inside each calculator tab =====
+function initCalcSortables() {
+  document.querySelectorAll('.calc-sortable-list').forEach(function(el) {
+    if (el._sortableCalc) return;
+    el._sortableCalc = new Sortable(el, {
+      handle: '.calc-drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function(evt) {
+        var listEl = evt.to;
+        var tabId = listEl.id.replace('calc_svc_list_', '');
+        var items = listEl.querySelectorAll('[data-svc-id]');
+        var orders = [];
+        for (var i = 0; i < items.length; i++) {
+          orders.push({ id: parseInt(items[i].getAttribute('data-svc-id')), sort_order: i, tab_id: parseInt(tabId) });
+        }
+        for (var oi = 0; oi < orders.length; oi++) {
+          var svc = data.calcServices.find(function(s) { return s.id === orders[oi].id; });
+          if (svc) svc.sort_order = orders[oi].sort_order;
+        }
+        api('/calc-services-reorder', { method: 'PUT', body: JSON.stringify({ orders: orders }) })
+          .then(function() { toast('Порядок услуг сохранён'); })
+          .catch(function() { toast('Ошибка сохранения порядка', 'error'); });
+      }
+    });
+  });
 }
 
 // ===== CREATE NEW SECTION (tab + folder in one action) =====
@@ -9208,19 +9240,10 @@ function renderSiteBlocks() {
         h += '</div>';
         
         h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-sliders-h" style="margin-right:4px"></i>Визуальные настройки</div>';
-        h += '<div style="display:grid;grid-template-columns:80px 80px 100px 100px;gap:6px;margin-bottom:6px">';
-        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Размер иконки</div><input class="input" id="sb_socsize_' + b.id + '" type="number" value="' + (socOpts.icon_size || 36) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '<div style="display:grid;grid-template-columns:80px 100px 100px;gap:6px;margin-bottom:6px">';
         h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Зазор (px)</div><input class="input" id="sb_socgap_' + b.id + '" type="number" value="' + (socOpts.gap || 8) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Выравнивание</div><select class="input" id="sb_socalign_' + b.id + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"><option value="center"' + (socOpts.align==='center'?' selected':'') + '>Центр</option><option value="left"' + (socOpts.align==='left'?' selected':'') + '>Лево</option><option value="right"' + (socOpts.align==='right'?' selected':'') + '>Право</option></select></div>';
         h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Позиция</div><select class="input" id="sb_socpos_' + b.id + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"><option value="bottom"' + (socOpts.position==='bottom'||!socOpts.position?' selected':'') + '>Внизу блока</option><option value="top"' + (socOpts.position==='top'?' selected':'') + '>Вверху</option><option value="inline"' + (socOpts.position==='inline'?' selected':'') + '>В строку</option></select></div>';
-        h += '</div>';
-        // Position offsets (left/right/top/bottom in px)
-        h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-arrows-alt" style="margin-right:4px"></i>Позиция иконок (отступ, px)</div>';
-        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">';
-        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Сверху</div><input class="input" id="sb_socoff_top_' + b.id + '" type="number" value="' + (socOpts.offset_top || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Справа</div><input class="input" id="sb_socoff_right_' + b.id + '" type="number" value="' + (socOpts.offset_right || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Снизу</div><input class="input" id="sb_socoff_bottom_' + b.id + '" type="number" value="' + (socOpts.offset_bottom || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Слева</div><input class="input" id="sb_socoff_left_' + b.id + '" type="number" value="' + (socOpts.offset_left || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div></div>';
 
         // ── Social links list (each icon with URL + per-icon settings) ──
@@ -9241,10 +9264,11 @@ function renderSiteBlocks() {
           h += '<input class="input" id="sb_socurl_' + b.id + '_' + si + '" value="' + escHtml(soc.url || '') + '" placeholder="https://..." style="font-size:0.75rem;color:#60a5fa;padding:4px 8px" onchange="sbAutoSave(' + b.id + ')">';
           h += '<button class="tier-del-btn" style="width:22px;height:22px;font-size:0.65rem" onclick="sbRemoveSocial(' + b.id + ',' + si + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
-          // Row 2: per-icon label + individual size
-          h += '<div style="display:grid;grid-template-columns:1fr 70px 70px;gap:6px;margin-top:5px;align-items:center">';
-          h += '<input class="input" id="sb_soclabel_' + b.id + '_' + si + '" value="' + escHtml(soc.label || '') + '" placeholder="\u041f\u043e\u0434\u043f\u0438\u0441\u044c \u0438\u043a\u043e\u043d\u043a\u0438" style="font-size:0.72rem;padding:4px 6px;color:#94a3b8" onchange="sbAutoSave(' + b.id + ')">';
-          h += '<div><div style="font-size:0.58rem;color:#64748b;margin-bottom:1px">\u0420\u0430\u0437\u043c\u0435\u0440 (px)</div><input class="input" id="sb_socicon_size_' + b.id + '_' + si + '" type="number" value="' + (soc.icon_size || '') + '" placeholder="' + (socOpts.icon_size || 36) + '" style="font-size:0.72rem;padding:3px 5px" onchange="sbAutoSave(' + b.id + ')"></div>';
+          // Row 2: per-icon label (larger) + text size + individual icon size + bg color
+          h += '<div style="display:grid;grid-template-columns:1fr 70px 70px 70px;gap:6px;margin-top:5px;align-items:center">';
+          h += '<input class="input" id="sb_soclabel_' + b.id + '_' + si + '" value="' + escHtml(soc.label || '') + '" placeholder="\u041f\u043e\u0434\u043f\u0438\u0441\u044c \u0438\u043a\u043e\u043d\u043a\u0438" style="font-size:0.82rem;padding:6px 8px;color:#e2e8f0;font-weight:500" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<div><div style="font-size:0.58rem;color:#64748b;margin-bottom:1px">\u0422\u0435\u043a\u0441\u0442 (px)</div><input class="input" id="sb_soctext_size_' + b.id + '_' + si + '" type="number" value="' + (soc.text_size || '') + '" placeholder="14" style="font-size:0.72rem;padding:3px 5px" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '<div><div style="font-size:0.58rem;color:#64748b;margin-bottom:1px">\u0420\u0430\u0437\u043c\u0435\u0440 (px)</div><input class="input" id="sb_socicon_size_' + b.id + '_' + si + '" type="number" value="' + (soc.icon_size || '') + '" placeholder="36" style="font-size:0.72rem;padding:3px 5px" onchange="sbAutoSave(' + b.id + ')"></div>';
           h += '<div><div style="font-size:0.58rem;color:#64748b;margin-bottom:1px">\u0426\u0432\u0435\u0442 BG</div><input class="input" id="sb_socicon_color_' + b.id + '_' + si + '" type="color" value="' + escHtml(soc.bg_color || socNet.c) + '" style="height:26px;padding:1px 3px;cursor:pointer" onchange="sbAutoSave(' + b.id + ')"></div>';
           h += '</div>';
           h += '</div>';
@@ -9945,12 +9969,14 @@ async function sbSaveBlock(id) {
     var socLabel = document.getElementById('sb_soclabel_' + id + '_' + si);
     var socIconSize = document.getElementById('sb_socicon_size_' + id + '_' + si);
     var socIconColor = document.getElementById('sb_socicon_color_' + id + '_' + si);
+    var socTextSize = document.getElementById('sb_soctext_size_' + id + '_' + si);
     newSocials.push({
       type: socType ? socType.value : (socials[si].type || 'instagram'),
       url: socUrl ? socUrl.value : (socials[si].url || ''),
       label: socLabel ? socLabel.value : (socials[si].label || ''),
       icon_size: socIconSize && socIconSize.value ? parseInt(socIconSize.value) : (socials[si].icon_size || 0),
-      bg_color: socIconColor ? socIconColor.value : (socials[si].bg_color || '')
+      bg_color: socIconColor ? socIconColor.value : (socials[si].bg_color || ''),
+      text_size: socTextSize && socTextSize.value ? parseInt(socTextSize.value) : (socials[si].text_size || 0)
     });
   }
   b.social_links = newSocials;
@@ -9963,30 +9989,20 @@ async function sbSaveBlock(id) {
   // Collect social section settings
   var socTitleRu = document.getElementById('sb_soctitle_ru_' + id);
   var socTitleAm = document.getElementById('sb_soctitle_am_' + id);
-  var socSize = document.getElementById('sb_socsize_' + id);
   var socGap = document.getElementById('sb_socgap_' + id);
   var socAlign = document.getElementById('sb_socalign_' + id);
   var socPos = document.getElementById('sb_socpos_' + id);
   var socSubRu = document.getElementById('sb_socsubtitle_ru_' + id);
   var socSubAm = document.getElementById('sb_socsubtitle_am_' + id);
-  var socOffTop = document.getElementById('sb_socoff_top_' + id);
-  var socOffRight = document.getElementById('sb_socoff_right_' + id);
-  var socOffBottom = document.getElementById('sb_socoff_bottom_' + id);
-  var socOffLeft = document.getElementById('sb_socoff_left_' + id);
-  if (socTitleRu || socTitleAm || socSize) {
+  if (socTitleRu || socTitleAm || socGap) {
     if (!blockOpts.social_settings) blockOpts.social_settings = {};
     if (socTitleRu) blockOpts.social_settings.title_ru = socTitleRu.value;
     if (socTitleAm) blockOpts.social_settings.title_am = socTitleAm.value;
     if (socSubRu) blockOpts.social_settings.subtitle_ru = socSubRu.value;
     if (socSubAm) blockOpts.social_settings.subtitle_am = socSubAm.value;
-    if (socSize) blockOpts.social_settings.icon_size = parseInt(socSize.value) || 36;
     if (socGap) blockOpts.social_settings.gap = parseInt(socGap.value) || 8;
     if (socAlign) blockOpts.social_settings.align = socAlign.value || 'center';
     if (socPos) blockOpts.social_settings.position = socPos.value || 'bottom';
-    if (socOffTop) blockOpts.social_settings.offset_top = parseInt(socOffTop.value) || 0;
-    if (socOffRight) blockOpts.social_settings.offset_right = parseInt(socOffRight.value) || 0;
-    if (socOffBottom) blockOpts.social_settings.offset_bottom = parseInt(socOffBottom.value) || 0;
-    if (socOffLeft) blockOpts.social_settings.offset_left = parseInt(socOffLeft.value) || 0;
   }
   // Social visibility based on links presence
   blockOpts.show_socials = newSocials.length > 0;
@@ -10151,6 +10167,8 @@ function render() {
   var mainEl = document.getElementById('mainArea');
   if (mainEl) {
     mainEl.innerHTML = getPageHtml();
+    // Post-render: init SortableJS for calculator service lists
+    initCalcSortables();
     // Post-render: auto-trigger dividend form calculations if form is open
     if (showPnlAddForm && pnlEditType === 'dividend') {
       setTimeout(function() { if (typeof calcDividendFromPct === 'function') calcDividendFromPct(); updateDivPayoutSummary(); }, 20);
