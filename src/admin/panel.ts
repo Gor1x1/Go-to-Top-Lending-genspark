@@ -3733,7 +3733,7 @@ function renderPnlLoans(p) {
           if (isPri && priLoans.length > 0) splExtra = Math.round(priShare / priLoans.length);
           else if (!isPri && othLoans.length > 0) splExtra = Math.round(othShare / othLoans.length);
           var splTotal = getActPmt(spl) + splExtra;
-          var groupTag = isPri ? '<span style="color:#EF4444;font-size:0.6rem"> 80%</span>' : '<span style="color:#3B82F6;font-size:0.6rem"> 20%</span>';
+          var groupTag = isPri ? '<span style="color:#EF4444;font-size:0.6rem"> 70%</span>' : '<span style="color:#3B82F6;font-size:0.6rem"> 30%</span>';
           h += '<tr style="border-bottom:1px solid rgba(255,255,255,0.03)">';
           h += '<td style="padding:3px 0;color:#e2e8f0">' + escHtml(spl.name) + (spl.collateral_type && spl.collateral_type !== 'none' ? ' \ud83d\udee1\ufe0f' : '') + groupTag + '</td>';
           h += '<td style="text-align:right;color:#94a3b8">' + fmtAmt(getActPmt(spl)) + '</td>';
@@ -3831,45 +3831,42 @@ function renderPnlLoans(p) {
     for (var ei = 0; ei < activeLns.length; ei++) { loanExtraMap[activeLns[ei].id] = perLn; loanExtraPctMap[activeLns[ei].id] = perLnPct; }
   } else if (isAggr) {
     var aggrAmt2 = Math.round((netProfitV) * (ls.aggressive_pct||10) / 100);
+    // ALL active loans including overdraft
     var allActiveLns = loans.filter(function(l) { return l.is_active !== 0 && ((l.remaining_balance||0) > 0 || (l.loan_type === 'overdraft' && (l.overdraft_used||0) > 0)); }).sort(function(a,b) { return (a.priority||10)-(b.priority||10); });
-    var sortedLns = allActiveLns.filter(function(l) { return l.loan_type !== 'overdraft'; });
-    var odLns = allActiveLns.filter(function(l) { return l.loan_type === 'overdraft'; });
-    var minPmts = sortedLns.reduce(function(s,l) { return s + getActPmt(l); }, 0);
-    // Include overdraft payments in total minimum payments
-    var odMinPmts = odLns.reduce(function(s,l) { return s + getActPmt(l); }, 0);
-    var totalMinPmts = minPmts + odMinPmts;
-    // Fill AggrPmtMap for overdrafts (they always pay their base amount)
-    for (var odi=0;odi<odLns.length;odi++) { loanAggrPmtMap[odLns[odi].id] = getActPmt(odLns[odi]); }
+    // Compute total minimum payments for ALL loans (including overdraft)
+    var totalMinPmts = allActiveLns.reduce(function(s,l) { return s + getActPmt(l); }, 0);
     var eBudget = Math.max(aggrAmt2 - totalMinPmts, 0);
-    // Even if eBudget=0, in aggressive mode we still show PMT allocation
-    // Case 1: budget >= total PMT => distribute extra on top of PMT
+
+    // First, set base PMT for ALL loans (including overdraft)
+    for (var bi=0;bi<allActiveLns.length;bi++) { loanAggrPmtMap[allActiveLns[bi].id] = getActPmt(allActiveLns[bi]); }
+
+    // Case 1: budget > total PMT => distribute extra on top of base PMT for ALL loans
     if (eBudget > 0) {
-      var priLns = sortedLns.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
-      var othLns = sortedLns.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
+      var priLns = allActiveLns.filter(function(l) { return (l.collateral_type && l.collateral_type !== 'none') || (l.priority||10) <= 5; });
+      var othLns = allActiveLns.filter(function(l) { return !(l.collateral_type && l.collateral_type !== 'none') && (l.priority||10) > 5; });
       var priSh = priLns.length > 0 ? Math.round(eBudget * 0.7) : 0;
       var othSh = eBudget - priSh;
-      if (priLns.length > 0) { var pp = Math.round(priSh / priLns.length); var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0; for (var xi=0;xi<priLns.length;xi++) { var xAP = getActPmt(priLns[xi]); loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=xAP+pp; } }
-      else if (sortedLns.length > 0) { var s0AP = getActPmt(sortedLns[0]); loanExtraMap[sortedLns[0].id] = Math.round(eBudget * 0.7); loanExtraPctMap[sortedLns[0].id] = netProfitV > 0 ? Math.round(eBudget * 0.7 / netProfitV * 10000)/100 : 0; loanAggrPmtMap[sortedLns[0].id]=s0AP+Math.round(eBudget * 0.7); }
-      if (othLns.length > 0) { var op = Math.round(othSh / othLns.length); var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0; for (var yi=0;yi<othLns.length;yi++) { var yAP = getActPmt(othLns[yi]); loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=yAP+(loanExtraMap[othLns[yi].id]||0); } }
-      // Fill PMT map for loans without extra
-      for (var fi=0;fi<sortedLns.length;fi++) { if (!loanAggrPmtMap[sortedLns[fi].id]) { loanAggrPmtMap[sortedLns[fi].id] = getActPmt(sortedLns[fi]); } }
-    }
-    // Case 2: budget < total PMT => each loan gets at least its PMT, budget used proportionally for what it can cover
-    else if (aggrAmt2 > 0 && totalMinPmts > 0) {
-      for (var qi=0;qi<sortedLns.length;qi++) {
-        var proportion = getActPmt(sortedLns[qi]) / totalMinPmts;
-        loanAggrPmtMap[sortedLns[qi].id] = Math.round(aggrAmt2 * proportion);
+      if (priLns.length > 0) {
+        var pp = Math.round(priSh / priLns.length);
+        var ppPct = netProfitV > 0 ? Math.round(pp / netProfitV * 10000)/100 : 0;
+        for (var xi=0;xi<priLns.length;xi++) { loanExtraMap[priLns[xi].id]=pp; loanExtraPctMap[priLns[xi].id]=ppPct; loanAggrPmtMap[priLns[xi].id]=getActPmt(priLns[xi])+pp; }
+      } else if (allActiveLns.length > 0) {
+        // No priority loans — give 70% to first loan
+        var firstExtra = Math.round(eBudget * 0.7);
+        loanExtraMap[allActiveLns[0].id] = firstExtra;
+        loanExtraPctMap[allActiveLns[0].id] = netProfitV > 0 ? Math.round(firstExtra / netProfitV * 10000)/100 : 0;
+        loanAggrPmtMap[allActiveLns[0].id] = getActPmt(allActiveLns[0]) + firstExtra;
       }
-      for (var qoi=0;qoi<odLns.length;qoi++) {
-        var oProportion = getActPmt(odLns[qoi]) / totalMinPmts;
-        loanAggrPmtMap[odLns[qoi].id] = Math.round(aggrAmt2 * oProportion);
+      if (othLns.length > 0) {
+        var op = Math.round(othSh / othLns.length);
+        var opPct = netProfitV > 0 ? Math.round(op / netProfitV * 10000)/100 : 0;
+        for (var yi=0;yi<othLns.length;yi++) { loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=getActPmt(othLns[yi])+(loanExtraMap[othLns[yi].id]||0); }
       }
     }
-    // Case 3: aggrAmt2 = 0 (no profit) => just show PMT as is
-    else {
-      for (var ri=0;ri<sortedLns.length;ri++) { loanAggrPmtMap[sortedLns[ri].id] = getActPmt(sortedLns[ri]); }
-      for (var roi=0;roi<odLns.length;roi++) { loanAggrPmtMap[odLns[roi].id] = getActPmt(odLns[roi]); }
-    }
+    // Case 2: budget < total PMT => no extra, but distribute budget proportionally as extra info
+    // Each loan STILL pays its base PMT. The aggrAmt2 shows what % of total PMT is covered.
+    // loanAggrPmtMap already set to base PMT above — no change needed.
+    // Case 3: no profit => same, base PMT only.
   }
   // Type labels
   var loanTypeLabels = {annuity:'Потребительский (аннуитет)',manual:'Займ с руки',overdraft:'Овердрафт',bank:'Банковский'};
@@ -3944,6 +3941,11 @@ function renderPnlLoans(p) {
           h += '<span style="color:#94a3b8">Проценты: <b style="color:#EF4444">' + fmtAmt(odMonthlyInt) + '</b></span>';
         }
         if (extraAmt > 0) h += '<span style="color:#F59E0B">Доп. нагрузка: <b>+' + fmtAmt(extraAmt) + '</b></span>';
+        if (isAggr && aggrTargetPmt > 0) {
+          h += '</div><div style="margin-top:6px;padding-top:6px;border-top:1px dashed rgba(245,158,11,0.2);display:flex;gap:16px;flex-wrap:wrap;align-items:center">';
+          h += '<span style="color:#F59E0B;font-weight:700"><i class="fas fa-bolt" style="margin-right:4px"></i>\u0426\u0435\u043b\u0435\u0432\u043e\u0439: <b style="font-size:1rem">' + fmtAmt(aggrTargetPmt) + '</b></span>';
+          if (extraAmt > 0) h += '<span style="color:#94a3b8">(\u041f\u043e \u0434\u043e\u0433\u043e\u0432\u043e\u0440\u0443 ' + fmtAmt(odActualPmt) + ' + \u0434\u043e\u043f. <b style="color:#F59E0B">' + fmtAmt(extraAmt) + '</b>)</span>';
+        }
         h += '</div>';
         if (odPayDay) h += '<div style="margin-top:4px;font-size:0.75rem;color:#8B5CF6"><i class="fas fa-bell" style="margin-right:4px"></i>Оплатить до: ' + odPayDay + '</div>';
         h += '<div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(59,130,246,0.15);display:flex;justify-content:space-between;align-items:center">';
