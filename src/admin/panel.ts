@@ -7052,7 +7052,7 @@ function renderPdfTemplate() {
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
   h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041b\u043e\u0433\u043e\u0442\u0438\u043f</label>';
   h += '<div style="display:flex;gap:8px;align-items:center">';
-  if (t.company_logo_url) h += '<img src="' + escHtml(t.company_logo_url) + '" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #334155" onerror="this.style.display=\'none\'">';
+  if (t.company_logo_url) h += '<img src="' + escHtml(t.company_logo_url) + '" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
   h += '<input class="input" id="pdf_logo" value="' + escHtml(t.company_logo_url || '') + '" placeholder="https://...logo.png" style="flex:1">';
   h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:4px"></i>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c<input type="file" accept="image/*" style="display:none" onchange="pdfUploadLogo(this)"></label>';
   h += '</div></div>';
@@ -7476,7 +7476,7 @@ function renderPhotos() {
         // Preview
         if (hasPreview) {
           h += '<div style="height:140px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden">' +
-            '<img src="' + escHtml(photoUrl) + '" style="max-width:100%;max-height:140px;object-fit:contain" onerror="this.parentElement.innerHTML=&apos;<i class=\\'fas fa-image\\' style=\\'font-size:2rem;color:#334155\\'></i>&apos;">' +
+            '<img src="' + escHtml(photoUrl) + '" style="max-width:100%;max-height:140px;object-fit:contain" onerror="this.style.display=&apos;none&apos;">' +
           '</div>';
         }
         h += '<div style="padding:10px">' +

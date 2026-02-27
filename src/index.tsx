@@ -488,7 +488,7 @@ app.get('/pdf/:id', async (c) => {
       + '<div class="hdr"><div>'
       + '<div class="inv-num">' + invoiceNum + '</div>'
       + '<div class="logo-wrap">'
-      + (companyLogo ? '<img class="logo-img" src="' + companyLogo + '" onerror="this.style.display=\'none\'">' : '')
+      + (companyLogo ? '<img class="logo-img" src="' + companyLogo + '" onerror="this.style.display=&apos;none&apos;">' : '')
       + '<span class="logo">' + companyName + '</span></div>'
       + '</div><div class="ci">'
       + (companyPhone ? '<div><i class="fas fa-phone" style="margin-right:4px"></i>' + companyPhone + '</div>' : '')
