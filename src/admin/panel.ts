@@ -4592,30 +4592,42 @@ function renderPnlSummary(p) {
   h += '</div>';
 
   // === LOAN BREAKDOWN (if loans exist) ===
-  var activeLoans = (data.loans || []).filter(function(l) { return l.is_active !== 0 && (l.remaining_balance || 0) > 0 && l.loan_type !== 'overdraft'; });
+  // Include ALL loans: standard + overdraft (if overdraft has used amount)
+  var activeLoans = (data.loans || []).filter(function(l) {
+    if (!l.is_active || l.is_active === 0) return false;
+    if (l.loan_type === 'overdraft') return (l.overdraft_used || 0) > 0;
+    return (l.remaining_balance || 0) > 0;
+  });
   if (activeLoans.length > 0) {
     h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(239,68,68,0.04);border-radius:8px;border:1px solid rgba(239,68,68,0.1)">';
     h += '<div style="font-size:0.82rem;color:#EF4444;font-weight:700;margin-bottom:8px"><i class="fas fa-hand-holding-usd" style="margin-right:6px"></i>\\u0414\\u0435\\u0442\\u0430\\u043b\\u0438\\u0437\\u0430\\u0446\\u0438\\u044f \\u043a\\u0440\\u0435\\u0434\\u0438\\u0442\\u043e\\u0432 (' + activeLoans.length + ')</div>';
     for (var li = 0; li < activeLoans.length; li++) {
       var loan = activeLoans[li];
-      var pmt = loan.monthly_payment || 0;
-      var remaining = loan.remaining_balance || 0;
+      // Use bank_monthly_payment when available (consistent with getActPmt in loans tab)
+      var pmt = (loan.bank_monthly_payment && loan.bank_monthly_payment > 0) ? loan.bank_monthly_payment : (loan.monthly_payment || 0);
+      var remaining = loan.loan_type === 'overdraft' ? (loan.overdraft_used || 0) : (loan.remaining_balance || 0);
+      var loanTypeTag = loan.loan_type === 'overdraft' ? ' <span style="color:#F59E0B;font-size:0.68rem;font-weight:600">[\\u041e\\u0414]</span>' : '';
       h += '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.82rem;border-bottom:1px solid #0f172a">';
-      h += '<span style="color:#e2e8f0">' + escHtml(loan.name) + ' <span style="color:#475569;font-size:0.7rem">(' + fmtAmt(remaining) + ' \\u043e\\u0441\\u0442.)</span></span>';
+      h += '<span style="color:#e2e8f0">' + escHtml(loan.name) + loanTypeTag + ' <span style="color:#475569;font-size:0.7rem">(' + fmtAmt(remaining) + ' \\u043e\\u0441\\u0442.)</span></span>';
       h += '<span style="color:#EF4444;font-weight:600">' + fmtAmt(pmt) + '/\\u043c\\u0435\\u0441</span></div>';
     }
     h += '</div>';
   }
 
   // === TAX BREAKDOWN (if taxes exist) ===
+  // Use human-readable tax type labels (consistent with P&L cascade)
+  var summaryTaxLabels = {income_tax:'\\u041d\\u0430\\u043b\\u043e\\u0433 \\u043d\\u0430 \\u043f\\u0440\\u0438\\u0431\\u044b\\u043b\\u044c',vat:'\\u041d\\u0414\\u0421',usn_income:'\\u0423\\u0421\\u041d \\u0414\\u043e\\u0445\\u043e\\u0434\\u044b',usn_income_expense:'\\u0423\\u0421\\u041d \\u0414\\u043e\\u0445.\\u2212\\u0420\\u0430\\u0441\\u0445.',turnover_tax:'\\u041d\\u0430\\u043b\\u043e\\u0433 \\u043d\\u0430 \\u043e\\u0431\\u043e\\u0440\\u043e\\u0442',payroll_tax:'\\u041d\\u0430\\u043b\\u043e\\u0433\\u0438 \\u043d\\u0430 \\u0417\\u041f',patent:'\\u041f\\u0430\\u0442\\u0435\\u043d\\u0442',property:'\\u041d\\u0430\\u043b\\u043e\\u0433 \\u043d\\u0430 \\u0438\\u043c\\u0443\\u0449\\u0435\\u0441\\u0442\\u0432\\u043e',other:'\\u041f\\u0440\\u043e\\u0447\\u0435\\u0435'};
   var taxItems = (p.taxes || []).filter(function(t) { return (t.amount || 0) > 0; });
   if (taxItems.length > 0) {
     h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(245,158,11,0.04);border-radius:8px;border:1px solid rgba(245,158,11,0.1)">';
     h += '<div style="font-size:0.82rem;color:#F59E0B;font-weight:700;margin-bottom:8px"><i class="fas fa-landmark" style="margin-right:6px"></i>\\u0414\\u0435\\u0442\\u0430\\u043b\\u0438\\u0437\\u0430\\u0446\\u0438\\u044f \\u043d\\u0430\\u043b\\u043e\\u0433\\u043e\\u0432 (' + taxItems.length + ')</div>';
     for (var ti = 0; ti < taxItems.length; ti++) {
       var tx = taxItems[ti];
+      // Show human-readable name: prefer tax_name from DB, then mapped label, then raw type
+      var txDisplayName = tx.tax_name || tx.name || summaryTaxLabels[tx.tax_type] || tx.tax_type || '\\u041d\\u0430\\u043b\\u043e\\u0433';
+      if (tx.is_auto && tx.tax_rate) txDisplayName += ' [' + tx.tax_rate + '%]';
       h += '<div style="display:flex;justify-content:space-between;padding:5px 0;font-size:0.82rem;border-bottom:1px solid #0f172a">';
-      h += '<span style="color:#e2e8f0">' + escHtml(tx.name || tx.tax_type || '\\u041d\\u0430\\u043b\\u043e\\u0433') + '</span>';
+      h += '<span style="color:#e2e8f0">' + escHtml(txDisplayName) + '</span>';
       h += '<span style="color:#F59E0B;font-weight:600">' + fmtAmt(tx.amount) + '</span></div>';
     }
     h += '</div>';
