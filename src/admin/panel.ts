@@ -267,7 +267,18 @@ async function loadData() {
     data.footer = bulk.footer || {};
     data.photoBlocks = bulk.photoBlocks || [];
     data.users = ensureArray(bulk.users);
-    data.siteBlocks = bulk.siteBlocks || [];
+    data.siteBlocks = (bulk.siteBlocks || []).map(function(b) {
+      // Ensure texts_ru/texts_am are always arrays (defensive parse)
+      if (typeof b.texts_ru === 'string') { try { b.texts_ru = JSON.parse(b.texts_ru); } catch(e) { b.texts_ru = []; } }
+      if (typeof b.texts_am === 'string') { try { b.texts_am = JSON.parse(b.texts_am); } catch(e) { b.texts_am = []; } }
+      if (typeof b.images === 'string') { try { b.images = JSON.parse(b.images); } catch(e) { b.images = []; } }
+      if (typeof b.buttons === 'string') { try { b.buttons = JSON.parse(b.buttons); } catch(e) { b.buttons = []; } }
+      if (!Array.isArray(b.texts_ru)) b.texts_ru = [];
+      if (!Array.isArray(b.texts_am)) b.texts_am = [];
+      if (!Array.isArray(b.images)) b.images = [];
+      if (!Array.isArray(b.buttons)) b.buttons = [];
+      return b;
+    });
     data.companyRoles = bulk.companyRoles || [];
     data.expenseCategories = bulk.expenseCategories || [];
     data.expenseFreqTypes = bulk.expenseFreqTypes || [];
@@ -7294,8 +7305,8 @@ function renderPhotos() {
     ];
   }
 
-  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Фото блоки</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Создавайте фото-блоки с описаниями и размещайте их на сайте</p>' +
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-images" style="color:#8B5CF6;margin-right:10px"></i>Фото блоки</h1>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Создавайте фото-блоки с описаниями и размещайте их на сайте. Загружайте фото с устройства или вставляйте URL.</p>' +
     '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addPhotoBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить фото-блок</button>';
 
   for (var bi = 0; bi < blocks.length; bi++) {
@@ -7304,7 +7315,7 @@ function renderPhotos() {
     try { photos = JSON.parse(b.photos_json || '[]'); } catch { photos = []; }
     h += '<div class="card" style="margin-bottom:20px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
-      '<h3 style="font-weight:700"><i class="fas fa-images" style="color:#8B5CF6;margin-right:8px"></i>' + escHtml(b.block_name || 'Блок #'+(bi+1)) + '</h3>' +
+      '<h3 style="font-weight:700"><i class="fas fa-images" style="color:#8B5CF6;margin-right:8px"></i>' + escHtml(b.block_name || 'Блок #'+(bi+1)) + ' <span style="font-size:0.75rem;color:#64748b;font-weight:400">(' + photos.length + ' фото)</span></h3>' +
       '<div style="display:flex;gap:8px"><label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#94a3b8"><input type="checkbox" id="pb_vis_'+b.id+'"'+(b.is_visible?' checked':'')+'>Видимый</label>' +
       '<button class="btn btn-danger" style="font-size:0.8rem;padding:6px 14px" onclick="deletePhotoBlock('+b.id+')"><i class="fas fa-trash"></i></button></div>' +
       '</div>' +
@@ -7320,18 +7331,48 @@ function renderPhotos() {
       '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Описание (AM)</label><textarea class="input" id="pb_desc_am_'+b.id+'" rows="2">'+escHtml(b.description_am)+'</textarea></div>' +
       '</div>';
 
-    // Photo URLs list
-    h += '<div style="margin-bottom:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:8px;display:block">Фотографии (URL)</label>';
-    for (var phi = 0; phi < photos.length; phi++) {
-      h += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">' +
-        '<input class="input" id="pb_photo_'+b.id+'_'+phi+'" value="'+escHtml(photos[phi].url)+'" placeholder="URL фотографии">' +
-        '<input class="input" style="width:200px" id="pb_pcap_'+b.id+'_'+phi+'" value="'+escHtml(photos[phi].caption||'')+'" placeholder="Подпись">' +
-        '<button class="tier-del-btn" onclick="removePhotoFromBlock('+b.id+','+phi+')"><i class="fas fa-times"></i></button>' +
+    // ── Photo gallery with previews ──
+    h += '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+      '<label style="font-size:0.8rem;color:#a78bfa;font-weight:700"><i class="fas fa-camera" style="margin-right:6px"></i>Фотографии (' + photos.length + ')</label>' +
+      '<div style="display:flex;gap:6px">' +
+      '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.78rem;cursor:pointer"><i class="fas fa-upload" style="margin-right:5px"></i>Загрузить с устройства<input type="file" accept="image/*" multiple style="display:none" onchange="pbUploadPhotos(this,'+b.id+')"></label>' +
+      '<button class="btn btn-outline" style="font-size:0.78rem;padding:6px 14px" onclick="addPhotoToBlock('+b.id+')"><i class="fas fa-link" style="margin-right:4px"></i>URL</button>' +
+      '</div></div>';
+
+    // Photo grid with previews
+    if (photos.length > 0) {
+      h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px">';
+      for (var phi = 0; phi < photos.length; phi++) {
+        var photoUrl = photos[phi].url || '';
+        var hasPreview = photoUrl && (photoUrl.startsWith('http') || photoUrl.startsWith('/'));
+        h += '<div style="background:#1a2236;border:1px solid #293548;border-radius:10px;overflow:hidden">';
+        // Preview
+        if (hasPreview) {
+          h += '<div style="height:140px;background:#0f172a;display:flex;align-items:center;justify-content:center;overflow:hidden">' +
+            '<img src="' + escHtml(photoUrl) + '" style="max-width:100%;max-height:140px;object-fit:contain" onerror="this.parentElement.innerHTML=&apos;<i class=\\'fas fa-image\\' style=\\'font-size:2rem;color:#334155\\'></i>&apos;">' +
+          '</div>';
+        }
+        h += '<div style="padding:10px">' +
+          '<input class="input" id="pb_photo_'+b.id+'_'+phi+'" value="'+escHtml(photoUrl)+'" placeholder="URL фотографии" style="font-size:0.82rem;margin-bottom:6px">' +
+          '<input class="input" id="pb_pcap_'+b.id+'_'+phi+'" value="'+escHtml(photos[phi].caption||'')+'" placeholder="Подпись к фото" style="font-size:0.82rem;margin-bottom:8px">' +
+          '<div style="display:flex;gap:6px">' +
+          '<label class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;cursor:pointer;flex:1;text-align:center"><i class="fas fa-upload" style="margin-right:3px"></i>Заменить<input type="file" accept="image/*" style="display:none" onchange="pbReplacePhoto(this,'+b.id+','+phi+')"></label>' +
+          '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;color:#f87171;border-color:rgba(248,113,113,0.3);flex:1" onclick="removePhotoFromBlock('+b.id+','+phi+')"><i class="fas fa-trash" style="margin-right:3px"></i>Удалить</button>' +
+          '</div></div></div>';
+      }
+      h += '</div>';
+    } else {
+      h += '<div style="padding:24px;text-align:center;background:#1a2236;border:2px dashed #293548;border-radius:10px;color:#475569">' +
+        '<i class="fas fa-cloud-upload-alt" style="font-size:1.5rem;margin-bottom:8px;display:block"></i>' +
+        '<div style="font-size:0.85rem">Нет фотографий. Загрузите с устройства или добавьте URL</div>' +
+        '<div style="font-size:0.72rem;margin-top:4px;color:#334155">Рекомендуемый размер: 800×600 px, JPG/PNG/WebP, макс. 5 МБ</div>' +
       '</div>';
     }
-    h += '<button class="btn btn-outline" style="font-size:0.8rem;padding:6px 14px" onclick="addPhotoToBlock('+b.id+')"><i class="fas fa-plus" style="margin-right:4px"></i>Фото</button></div>';
+    h += '</div>';
 
-    h += '<button class="btn btn-success" onclick="savePhotoBlock('+b.id+')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button></div>';
+    h += '<button class="btn btn-success" onclick="savePhotoBlock('+b.id+')" style="margin-right:8px"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>' +
+      '<button class="btn btn-outline" onclick="dupPhotoBlock('+b.id+')" style="font-size:0.82rem"><i class="fas fa-copy" style="margin-right:4px"></i>Дублировать</button>' +
+      '</div>';
   }
 
   if (blocks.length === 0) {
@@ -7340,6 +7381,87 @@ function renderPhotos() {
 
   h += '</div>';
   return h;
+}
+
+// ── Upload photos to photo block from device ──
+async function pbUploadPhotos(input, blockId) {
+  var files = input.files;
+  if (!files || files.length === 0) return;
+  toast('Загрузка ' + files.length + ' фото...');
+  var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
+  if (!block) return;
+  var photos = [];
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+  var uploaded = 0;
+
+  for (var fi = 0; fi < files.length; fi++) {
+    var file = files[fi];
+    if (file.size > 5 * 1024 * 1024) { toast('Пропущен: ' + file.name + ' (> 5 МБ)', 'error'); continue; }
+    var formData = new FormData();
+    formData.append('file', file);
+    formData.append('block_id', 'photoblock_' + blockId);
+    try {
+      var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+      var result = await resp.json();
+      if (result.success) {
+        photos.push({ url: result.url || result.data_url, caption: '' });
+        uploaded++;
+      }
+    } catch(e) {}
+  }
+  block.photos_json = JSON.stringify(photos);
+  render();
+  if (uploaded > 0) {
+    toast(uploaded + ' фото загружено!');
+    savePhotoBlock(blockId);
+  }
+}
+
+// ── Replace single photo in photo block ──
+async function pbReplacePhoto(input, blockId, photoIdx) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Файл слишком большой (макс. 5 МБ)', 'error'); return; }
+  toast('Загрузка фото...');
+  var formData = new FormData();
+  formData.append('file', file);
+  formData.append('block_id', 'photoblock_' + blockId);
+  try {
+    var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+    var result = await resp.json();
+    if (result.success) {
+      var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
+      if (!block) return;
+      var photos = [];
+      try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+      if (photoIdx < photos.length) {
+        photos[photoIdx].url = result.url || result.data_url;
+        block.photos_json = JSON.stringify(photos);
+        render();
+        savePhotoBlock(blockId);
+        toast('Фото заменено!');
+      }
+    }
+  } catch(e) {
+    toast('Ошибка загрузки: ' + (e.message || 'network error'), 'error');
+  }
+}
+
+// ── Duplicate photo block ──
+async function dupPhotoBlock(id) {
+  var block = (data.photoBlocks||[]).find(function(b){return b.id===id});
+  if (!block) return;
+  await api('/photo-blocks', { method: 'POST', body: JSON.stringify({
+    block_name: (block.block_name || 'Блок') + ' (копия)',
+    position: block.position,
+    is_visible: block.is_visible,
+    photos_json: block.photos_json || '[]',
+    description_ru: block.description_ru || '',
+    description_am: block.description_am || '',
+    sort_order: (block.sort_order || 0) + 1
+  }) });
+  toast('Блок дублирован');
+  await loadData(); render();
 }
 
 async function addPhotoBlock() {
@@ -8597,7 +8719,7 @@ function renderSiteBlocks() {
   var allBlocks = data.siteBlocks || [];
   var contentBlocks = allBlocks; // ALL blocks shown together (calculator included as card)
   var calcBlocks = allBlocks.filter(function(b) { return b.block_type === 'calculator'; });
-  var blocks = sbActiveTab === 'blocks' ? contentBlocks : (sbActiveTab === 'calculator' ? calcBlocks : contentBlocks);
+  var blocks = sbActiveTab === 'blocks' ? contentBlocks : contentBlocks;
   
   // Define which block_keys have photos by design
   var photoBlocks = { hero: true, about: true, warehouse: true, wb_official: true, services: true, wb_banner: true };
@@ -8638,7 +8760,6 @@ function renderSiteBlocks() {
   }
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
-    { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор', count: calcBlocks.length },
     { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns },
     { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length },
     { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер', count: 1 },
@@ -8799,8 +8920,8 @@ function renderSiteBlocks() {
             h += '</div></div>';
           }
           
-          // Link to calculator settings tab
-          h += '<div style="margin-top:12px;padding:12px;background:#1a2236;border:1px solid #293548;border-radius:8px;display:flex;align-items:center;justify-content:between;gap:12px;cursor:pointer" onclick="sbActiveTab=&apos;calculator&apos;;render()">';
+          // Link to calculator settings page
+          h += '<div style="margin-top:12px;padding:12px;background:#1a2236;border:1px solid #293548;border-radius:8px;display:flex;align-items:center;justify-content:between;gap:12px;cursor:pointer" onclick="navigate(&apos;calculator&apos;)">';
           h += '<div style="flex:1"><div style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-cog" style="margin-right:6px"></i>Настройки калькулятора</div>';
           h += '<div style="font-size:0.72rem;color:#64748b;margin-top:2px">Вкладки, услуги, цены — редактируются в разделе «Калькулятор»</div></div>';
           h += '<i class="fas fa-arrow-right" style="color:#8B5CF6;font-size:1rem"></i>';
@@ -9036,7 +9157,7 @@ function renderSiteBlocks() {
           h += '</details></div>';
         }
         h += '<div style="margin-bottom:16px">';
-        h += '<details><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-sliders-h" style="color:#f59e0b;margin-right:6px"></i>Опции блока</summary>';
+        h += '<details' + (opts.show_slots ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-sliders-h" style="color:#f59e0b;margin-right:6px"></i>Опции блока</summary>';
         h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
         // Show social links toggle (only for social-capable blocks)
         if (socialBlocks[b.block_key]) {
@@ -9055,8 +9176,9 @@ function renderSiteBlocks() {
           '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbToggleSlotCounter(' + b.id + ',this.checked)" style="accent-color:#8B5CF6;width:16px;height:16px">' +
           '<span><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:4px"></i>Счётчик слотов</span></label>';
         h += '</div>';
+        h += '</details>';
         
-        // ── Inline Slot Counter Settings (shown when show_slots is on) ──
+        // ── Inline Slot Counter Settings (OUTSIDE details so always visible when enabled) ──
         if (opts.show_slots) {
           var blockCounter = null;
           var counters = data.slotCounters || [];
@@ -9123,7 +9245,7 @@ function renderSiteBlocks() {
           h += '</div>';
         }
         
-        h += '</details></div>';
+        h += '</div>';
 
         } // end if (!isCalcBlock) — skip detail sections for calculator
 
@@ -9772,11 +9894,8 @@ async function importSiteBlocks() {
   } else {
     toast('Ошибка загрузки: ' + (result?.error || 'unknown'), 'error');
   }
-  // Reload both blocks and telegram messages
-  var res = await api('/site-blocks');
-  data.siteBlocks = (res && res.blocks) || [];
-  var tgRes = await api('/telegram');
-  data.telegram = (tgRes && Array.isArray(tgRes)) ? tgRes : (tgRes && tgRes.messages) || [];
+  // Full reload to get all updated data (blocks, photos, slot counters etc.)
+  await loadData();
   render();
 }
 
