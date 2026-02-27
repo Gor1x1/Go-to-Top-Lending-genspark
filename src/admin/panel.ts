@@ -7066,7 +7066,7 @@ function renderPdfTemplate() {
   // ── 5. Quick stats & Preview ──
   h += '<div class="card" style="margin-bottom:20px;background:rgba(139,92,246,0.04);border-color:rgba(139,92,246,0.2)">';
   h += '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-chart-bar" style="margin-right:8px"></i>\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u043b\u0438\u0434\u043e\u0432 PDF</h3>';
-  var leads = data.leads || [];
+  var leads = (data.leads && data.leads.leads) ? data.leads.leads : (Array.isArray(data.leads) ? data.leads : []);
   var pdfLeads = leads.filter(function(l) { return l.source === 'calculator_pdf'; });
   var totalRevenue = pdfLeads.reduce(function(s, l) { return s + (parseFloat(l.total_amount) || 0); }, 0);
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
@@ -9140,6 +9140,10 @@ function renderSiteBlocks() {
         }
         h += '</div>';
 
+        // ── Optional features / opts (parsed early, needed by social + photo sections) ──
+        var opts = {};
+        try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+
         // ── Social Links section (integrated in block as single unit) ──
         var socials = [];
         try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
@@ -9216,10 +9220,6 @@ function renderSiteBlocks() {
         h += '<button class="btn btn-outline" style="padding:3px 10px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
         h += '</details></div>';
         } // end hasSocials
-
-        // ── Optional features / opts (MUST be before photo section which uses it) ──
-        var opts = {};
-        try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
 
         // ── Block Photos section (only for blocks that have photos by design) ──
         var isTickerBlock = (b.block_key === 'ticker' || b.block_type === 'ticker');
