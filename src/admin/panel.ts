@@ -8376,228 +8376,414 @@ async function cloneCompanyRole(id) {
   render();
 }
 
-// ===== SITE BLOCKS CONSTRUCTOR (emergent-style) =====
+// ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace =====
 var sbLangView = 'both'; // 'both', 'ru', 'am'
+var sbExpandedBlocks = {}; // track which blocks are expanded
+
 function renderSiteBlocks() {
-  const blocks = data.siteBlocks || [];
-  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px"><div><h1 style="font-size:1.5rem;font-weight:800"><i class="fas fa-cubes" style="color:#8B5CF6;margin-right:10px"></i>\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 \u0431\u043b\u043e\u043a\u043e\u0432</h1><p style="color:#94a3b8;font-size:0.85rem">\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0435 \u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0441\u0435\u043a\u0446\u0438\u0439 \u0441\u0430\u0439\u0442\u0430 \u043d\u0430 2 \u044f\u0437\u044b\u043a\u0430\u0445. \u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u0441\u0440\u0430\u0437\u0443 \u043e\u0442\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u043d\u0430 \u0441\u0430\u0439\u0442\u0435.</p></div>' +
+  var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
+  var h = '<div style="padding:28px 32px">';
+
+  // ── Header bar ──
+  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
+    '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:4px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков</h1>' +
+    '<p style="color:#94a3b8;font-size:0.85rem">Редактируйте тексты каждого блока на 2 языках. Перемещайте блоки вверх/вниз. Изменения сразу отражаются на сайте.</p></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0431\u043b\u043e\u043a\u0438 \u0441 \u0441\u0430\u0439\u0442\u0430</button>' +
-      '<button class="btn btn-primary" onclick="createSiteBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a</button>' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить блоки с сайта</button>' +
+      '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap"><i class="fas fa-plus" style="margin-right:6px"></i>Новый блок</button>' +
     '</div></div>';
-  // Language toggle
-  h += '<div style="display:flex;gap:6px;margin-bottom:16px;align-items:center"><span style="font-size:0.82rem;color:#94a3b8;margin-right:8px"><i class="fas fa-language" style="margin-right:4px"></i>\u042f\u0437\u044b\u043a:</span>' +
-    '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'both\\';render()">RU + AM</button>' +
-    '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'ru\\';render()">\ud83c\uddf7\ud83c\uddfa RU</button>' +
-    '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'am\\';render()">\ud83c\udde6\ud83c\uddf2 AM</button>' +
+
+  // ── Language toggle + stats ──
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">' +
+    '<div style="display:flex;gap:6px;align-items:center">' +
+      '<span style="font-size:0.82rem;color:#94a3b8;margin-right:6px"><i class="fas fa-language" style="margin-right:4px"></i>Язык:</span>' +
+      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:6px 16px;font-size:0.8rem" onclick="sbLangView=\\'both\\';render()">RU + AM</button>' +
+      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:6px 16px;font-size:0.8rem" onclick="sbLangView=\\'ru\\';render()">🇷🇺 RU</button>' +
+      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:6px 16px;font-size:0.8rem" onclick="sbLangView=\\'am\\';render()">🇦🇲 AM</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:12px;align-items:center;font-size:0.82rem;color:#64748b">' +
+      '<span><i class="fas fa-cubes" style="margin-right:4px;color:#8B5CF6"></i>' + blocks.length + ' блоков</span>' +
+      '<span><i class="fas fa-eye" style="margin-right:4px;color:#10B981"></i>' + blocks.filter(function(b){return b.is_visible}).length + ' видимых</span>' +
+      '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbExpandAll()"><i class="fas fa-expand-alt" style="margin-right:4px"></i>Раскрыть всё</button>' +
+      '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbCollapseAll()"><i class="fas fa-compress-alt" style="margin-right:4px"></i>Свернуть</button>' +
+    '</div>' +
   '</div>';
+
   if (blocks.length === 0) {
-    h += '<div class="card" style="text-align:center;padding:48px;color:#64748b"><i class="fas fa-cubes" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>\u0411\u043b\u043e\u043a\u0438 \u0435\u0449\u0451 \u043d\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b. \u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0431\u043b\u043e\u043a\u0438 \u0441 \u0441\u0430\u0439\u0442\u0430\u00bb \u0447\u0442\u043e\u0431\u044b \u0438\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0432\u0441\u0435 \u0442\u0435\u043a\u0441\u0442\u044b \u0438 \u043a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 \u043d\u0430 2 \u044f\u0437\u044b\u043a\u0430\u0445.</p></div>';
+    h += '<div class="card" style="text-align:center;padding:60px;color:#64748b">' +
+      '<i class="fas fa-layer-group" style="font-size:3rem;margin-bottom:16px;display:block;opacity:0.3"></i>' +
+      '<p style="font-size:1.1rem;margin-bottom:8px">Блоки ещё не добавлены</p>' +
+      '<p style="font-size:0.85rem;margin-bottom:20px">Нажмите «Загрузить блоки с сайта» чтобы импортировать все тексты и секции на 2 языках.</p>' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить блоки с сайта</button></div>';
   } else {
-    h += '<div style="display:grid;gap:8px">';
-    blocks.forEach((b, idx) => {
-      const textsCount = (b.texts_ru?.length||0) + (b.texts_am?.length||0);
-      const imgsCount = b.images?.length||0;
-      const btnsCount = b.buttons?.length||0;
-      h += '<div class="card" draggable="true" ondragstart="sbDragStart(' + idx + ')" ondragover="sbDragOver(event,' + idx + ')" ondragend="sbDragEnd()" style="padding:0;overflow:hidden;opacity:' + (b.is_visible?'1':'0.5') + ';border-left:3px solid ' + (b.is_visible?'#8B5CF6':'#EF4444') + '">';
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;background:#1e293b" onclick="toggleSbExpand(' + b.id + ')">';
-      h += '<i class="fas fa-grip-vertical" style="color:#64748b;cursor:grab" onclick="event.stopPropagation()"></i>';
-      h += '<span style="color:#64748b;font-size:0.8rem;font-weight:700;min-width:28px">#' + (idx+1) + '</span>';
-      h += '<div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-      h += '<span style="font-weight:700;color:' + (b.is_visible?'#e2e8f0':'#f87171') + '">' + escHtml(b.title_ru||b.block_key) + '</span>';
-      h += '<span class="badge badge-purple" style="font-size:0.7rem">' + escHtml(b.block_key) + '</span>';
-      if (textsCount > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.68rem">' + textsCount + ' \u0442\u0435\u043a\u0441\u0442</span>';
-      if (imgsCount > 0) h += '<span class="badge badge-green" style="font-size:0.68rem">' + imgsCount + ' \u0444\u043e\u0442\u043e</span>';
-      if (btnsCount > 0) h += '<span class="badge badge-amber" style="font-size:0.68rem">' + btnsCount + ' \u043a\u043d\u043e\u043f\u043e\u043a</span>';
+    // ── Block list ──
+    for (var bi = 0; bi < blocks.length; bi++) {
+      var b = blocks[bi];
+      var isExpanded = !!sbExpandedBlocks[b.id];
+      var textsRu = b.texts_ru || [];
+      var textsAm = b.texts_am || [];
+      var maxTexts = Math.max(textsRu.length, textsAm.length);
+      var showRu = sbLangView === 'both' || sbLangView === 'ru';
+      var showAm = sbLangView === 'both' || sbLangView === 'am';
+
+      h += '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;opacity:' + (b.is_visible ? '1' : '0.55') + ';border-left:4px solid ' + (b.is_visible ? '#8B5CF6' : '#EF4444') + '">';
+
+      // ── Block header ──
+      h += '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:' + (isExpanded ? '#1a2236' : '#1e293b') + ';cursor:pointer;user-select:none" onclick="toggleSbExpand(' + b.id + ')">';
+      // Reorder arrows
+      h += '<div style="display:flex;flex-direction:column;gap:2px" onclick="event.stopPropagation()">';
+      h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.65rem;line-height:1;border-color:#475569" onclick="sbMoveBlock(' + b.id + ',-1)" title="Вверх"' + (bi === 0 ? ' disabled style="padding:2px 6px;font-size:0.65rem;line-height:1;opacity:0.3;cursor:default;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:8px;font-weight:600"' : '') + '><i class="fas fa-chevron-up"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.65rem;line-height:1;border-color:#475569" onclick="sbMoveBlock(' + b.id + ',1)" title="Вниз"' + (bi === blocks.length - 1 ? ' disabled style="padding:2px 6px;font-size:0.65rem;line-height:1;opacity:0.3;cursor:default;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:8px;font-weight:600"' : '') + '><i class="fas fa-chevron-down"></i></button>';
       h += '</div>';
+      // Number
+      h += '<span style="color:#64748b;font-size:0.8rem;font-weight:800;min-width:32px;text-align:center;background:#0f172a;padding:4px 8px;border-radius:6px">' + (bi + 1) + '</span>';
+      // Title + badge
+      h += '<div style="flex:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
+      h += '<span style="font-weight:700;font-size:1.05rem;color:' + (b.is_visible ? '#e2e8f0' : '#f87171') + '">' + escHtml(b.title_ru || b.block_key) + '</span>';
+      h += '<span class="badge badge-purple" style="font-size:0.72rem">' + escHtml(b.block_key) + '</span>';
+      if (maxTexts > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.72rem">' + maxTexts + ' текстов</span>';
+      if ((b.buttons||[]).length > 0) h += '<span class="badge badge-amber" style="font-size:0.72rem">' + (b.buttons||[]).length + ' кнопок</span>';
+      h += '</div>';
+      // Action buttons
       h += '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">';
-      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editSiteBlock(' + b.id + ')" title="\u0420\u0435\u0434."><i class="fas fa-edit"></i></button>';
-      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="dupSiteBlock(' + b.id + ')" title="\u041a\u043e\u043f\u0438\u044f"><i class="fas fa-copy"></i></button>';
-      h += '<button class="btn ' + (b.is_visible?'btn-success':'btn-danger') + '" style="padding:4px 8px;font-size:0.75rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')">' + (b.is_visible?'<i class="fas fa-eye"></i>':'<i class="fas fa-eye-slash"></i>') + '</button>';
-      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="delSiteBlock(' + b.id + ')"><i class="fas fa-trash"></i></button>';
+      h += '<button class="btn ' + (b.is_visible ? 'btn-success' : 'btn-danger') + '" style="padding:5px 10px;font-size:0.78rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')" title="' + (b.is_visible ? 'Скрыть' : 'Показать') + '">' + (b.is_visible ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>';
+      h += '<button class="btn btn-outline" style="padding:5px 10px;font-size:0.78rem" onclick="dupSiteBlock(' + b.id + ')" title="Копия"><i class="fas fa-copy"></i></button>';
+      h += '<button class="btn btn-danger" style="padding:5px 10px;font-size:0.78rem" onclick="delSiteBlock(' + b.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
       h += '</div>';
-      h += '<i class="fas fa-chevron-down" style="color:#64748b"></i></div>';
-      // Expanded preview with language toggle
-      h += '<div id="sb-expand-' + b.id + '" style="display:none;padding:16px;border-top:1px solid #334155;background:#0f172a">';
-      const showRu = sbLangView === 'both' || sbLangView === 'ru';
-      const showAm = sbLangView === 'both' || sbLangView === 'am';
-      const gridCols = (showRu && showAm) ? '1fr 1fr' : '1fr';
-      h += '<div style="display:grid;grid-template-columns:' + gridCols + ';gap:16px;margin-bottom:12px">';
-      if (showRu) {
-        h += '<div><div style="font-size:0.75rem;font-weight:700;color:#8B5CF6;margin-bottom:6px">\ud83c\uddf7\ud83c\uddfa \u0422\u0435\u043a\u0441\u0442\u044b (RU)</div>';
-        (b.texts_ru||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
-        h += '</div>';
-      }
-      if (showAm) {
-        h += '<div><div style="font-size:0.75rem;font-weight:700;color:#fbbf24;margin-bottom:6px">\ud83c\udde6\ud83c\uddf2 \u0422\u0435\u043a\u0441\u0442\u044b (AM)</div>';
-        (b.texts_am||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
-        h += '</div>';
-      }
+      h += '<i class="fas fa-chevron-' + (isExpanded ? 'up' : 'down') + '" style="color:#64748b;font-size:0.9rem"></i>';
       h += '</div>';
-      if ((b.buttons||[]).length > 0) {
-        h += '<div style="font-size:0.75rem;font-weight:700;color:#a78bfa;margin-bottom:6px">\u041a\u043d\u043e\u043f\u043a\u0438</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
-        (b.buttons||[]).forEach(btn => { h += '<span style="padding:6px 12px;background:#8B5CF6;color:white;border-radius:6px;font-size:0.82rem">' + escHtml(btn.text_ru) + '</span>'; });
+
+      // ── Expanded edit area (footer-style) ──
+      if (isExpanded) {
+        h += '<div style="padding:20px;background:#0f172a;border-top:1px solid #334155">';
+
+        // Block title editing
+        h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:12px;margin-bottom:16px">';
+        if (showRu) {
+          h += '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600;display:block;margin-bottom:4px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок блока (RU)</label>' +
+            '<input class="input" id="sb_title_ru_' + b.id + '" value="' + escHtml(b.title_ru) + '" style="font-weight:700;font-size:1rem"></div>';
+        }
+        if (showAm) {
+          h += '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600;display:block;margin-bottom:4px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок блока (AM)</label>' +
+            '<input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:1rem"></div>';
+        }
         h += '</div>';
+
+        // ── Texts editing — paired RU/AM side by side (like footer) ──
+        h += '<div style="margin-bottom:16px">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+          '<h4 style="font-size:0.88rem;font-weight:700;color:#cbd5e1"><i class="fas fa-align-left" style="color:#8B5CF6;margin-right:6px"></i>Тексты секции</h4>' +
+          '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbAddTextPair(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
+        '</div>';
+
+        for (var ti = 0; ti < maxTexts; ti++) {
+          var ruText = ti < textsRu.length ? textsRu[ti] : '';
+          var amText = ti < textsAm.length ? textsAm[ti] : '';
+          var isLong = ruText.length > 80 || amText.length > 80;
+
+          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 32px;gap:8px;margin-bottom:8px;padding:10px 12px;background:#1e293b;border-radius:8px;border:1px solid #334155;align-items:start">';
+          if (showRu) {
+            h += '<div><label style="font-size:0.68rem;color:#8B5CF6;font-weight:600;margin-bottom:3px;display:block">🇷🇺 RU #' + (ti + 1) + '</label>';
+            if (isLong) {
+              h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.85rem">' + escHtml(ruText) + '</textarea>';
+            } else {
+              h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.85rem">';
+            }
+            h += '</div>';
+          }
+          if (showAm) {
+            h += '<div><label style="font-size:0.68rem;color:#F59E0B;font-weight:600;margin-bottom:3px;display:block">🇦🇲 AM #' + (ti + 1) + '</label>';
+            if (isLong) {
+              h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.85rem">' + escHtml(amText) + '</textarea>';
+            } else {
+              h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.85rem">';
+            }
+            h += '</div>';
+          }
+          h += '<button class="tier-del-btn" style="margin-top:18px" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>';
+          h += '</div>';
+        }
+        h += '</div>';
+
+        // ── Buttons ──
+        if ((b.buttons || []).length > 0 || true) {
+          h += '<div style="margin-bottom:16px">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+            '<h4 style="font-size:0.88rem;font-weight:700;color:#cbd5e1"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки</h4>' +
+            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
+          '</div>';
+          for (var bti = 0; bti < (b.buttons || []).length; bti++) {
+            var btn = b.buttons[bti];
+            h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 1fr 32px;gap:8px;margin-bottom:6px;padding:8px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;align-items:center">';
+            if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem">';
+            if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="Текст кнопки (AM)" style="font-size:0.82rem">';
+            h += '<input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url) + '" placeholder="URL" style="font-size:0.82rem;color:#60a5fa">';
+            h += '<button class="tier-del-btn" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+          }
+          h += '</div>';
+        }
+
+        // ── Save button ──
+        h += '<div style="display:flex;gap:10px;justify-content:flex-end;padding-top:12px;border-top:1px solid #334155">' +
+          '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')">Свернуть</button>' +
+          '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:180px"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить блок</button>' +
+        '</div>';
+
+        h += '</div>'; // end expanded area
       }
-      h += '</div></div>';
-    });
-    h += '</div>';
+
+      h += '</div>'; // end card
+    }
   }
-  h += '<div id="siteBlockModalArea"></div>';
-  return h + '</div>';
+
+  h += '</div>'; // end wrapper
+  return h;
 }
 
+// ── Toggle expand ──
 function toggleSbExpand(id) {
-  const el = document.getElementById('sb-expand-' + id);
-  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
+  if (sbExpandedBlocks[id]) { delete sbExpandedBlocks[id]; } else { sbExpandedBlocks[id] = true; }
+  render();
+}
+function sbExpandAll() {
+  var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
+  blocks.forEach(function(b) { sbExpandedBlocks[b.id] = true; });
+  render();
+}
+function sbCollapseAll() {
+  sbExpandedBlocks = {};
+  render();
 }
 
-let sbDragIdx = null;
-function sbDragStart(idx) { sbDragIdx = idx; }
-function sbDragOver(e, idx) { e.preventDefault(); }
-async function sbDragEnd() {
-  // Save current order (simplified — full reorder happens on server)
-  const orders = (data.siteBlocks||[]).map((b, i) => ({ id: b.id, sort_order: i }));
-  await api('/site-blocks/reorder', { method:'POST', body: JSON.stringify({ orders }) });
-  sbDragIdx = null;
+// ── Move block up/down ──
+async function sbMoveBlock(id, direction) {
+  var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
+  var idx = blocks.findIndex(function(b) { return b.id === id; });
+  if (idx < 0) return;
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= blocks.length) return;
+  // Swap in local data
+  var temp = blocks[idx];
+  blocks[idx] = blocks[newIdx];
+  blocks[newIdx] = temp;
+  // Build new order for ALL blocks (including calculator ones)
+  var calcBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type === 'calculator'; });
+  var allBlocks = blocks.concat(calcBlocks);
+  var orders = allBlocks.map(function(b, i) { return { id: b.id, sort_order: i }; });
+  data.siteBlocks = allBlocks;
+  render();
+  await api('/site-blocks/reorder', { method: 'POST', body: JSON.stringify({ orders: orders }) });
+  // Also sync section_order for live site
+  var sectionOrders = blocks.map(function(b, i) { return { section_id: b.block_key, sort_order: i }; });
+  await api('/section-order', { method: 'PUT', body: JSON.stringify({ orders: sectionOrders }) });
+  toast('Порядок блоков обновлён');
 }
 
+// ── Visibility toggle ──
 async function toggleSbVisible(id, val) {
-  await api('/site-blocks/' + id, { method:'PUT', body: JSON.stringify({is_visible: val}) });
-  const res = await api('/site-blocks');
+  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify({ is_visible: val }) });
+  var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
   render();
 }
 
+// ── Delete block ──
 async function delSiteBlock(id) {
-  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0431\u043b\u043e\u043a?')) return;
-  await api('/site-blocks/' + id, { method:'DELETE' });
-  const res = await api('/site-blocks');
+  if (!confirm('Удалить блок?')) return;
+  await api('/site-blocks/' + id, { method: 'DELETE' });
+  delete sbExpandedBlocks[id];
+  var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
-  toast('\u0411\u043b\u043e\u043a \u0443\u0434\u0430\u043b\u0451\u043d');
+  toast('Блок удалён');
   render();
 }
 
+// ── Duplicate block ──
 async function dupSiteBlock(id) {
-  await api('/site-blocks/duplicate/' + id, { method:'POST' });
-  const res = await api('/site-blocks');
+  await api('/site-blocks/duplicate/' + id, { method: 'POST' });
+  var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
-  toast('\u0411\u043b\u043e\u043a \u0434\u0443\u0431\u043b\u0438\u0440\u043e\u0432\u0430\u043d');
+  toast('Блок дублирован');
   render();
 }
 
-let editingBlock = null;
-function createSiteBlock() {
-  editingBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: '\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], is_visible: true, custom_css: '', custom_html: '' };
-  showBlockEditor();
-}
-
-function editSiteBlock(id) {
-  const b = (data.siteBlocks||[]).find(x => x.id === id);
+// ── Add text pair ──
+function sbAddTextPair(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
   if (!b) return;
-  editingBlock = JSON.parse(JSON.stringify(b));
+  if (!b.texts_ru) b.texts_ru = [];
+  if (!b.texts_am) b.texts_am = [];
+  b.texts_ru.push('');
+  b.texts_am.push('');
+  render();
+}
+
+// ── Remove text pair ──
+function sbRemoveTextPair(blockId, idx) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  if (b.texts_ru && idx < b.texts_ru.length) b.texts_ru.splice(idx, 1);
+  if (b.texts_am && idx < b.texts_am.length) b.texts_am.splice(idx, 1);
+  render();
+}
+
+// ── Add button ──
+function sbAddButton(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  if (!b.buttons) b.buttons = [];
+  b.buttons.push({ text_ru: '', text_am: '', url: '' });
+  render();
+}
+
+// ── Remove button ──
+function sbRemoveButton(blockId, idx) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b || !b.buttons) return;
+  b.buttons.splice(idx, 1);
+  render();
+}
+
+// ── Create new block ──
+function createSiteBlock() {
+  var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], is_visible: 1, custom_css: '', custom_html: '' };
+  // Show as a new unsaved block at the top by calling the modal editor
+  editingBlock = newBlock;
   showBlockEditor();
 }
 
+// ── Save block inline (collect from inputs) ──
+async function sbSaveBlock(id) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === id; });
+  if (!b) return;
+  
+  // Collect title
+  var titleRuEl = document.getElementById('sb_title_ru_' + id);
+  var titleAmEl = document.getElementById('sb_title_am_' + id);
+  if (titleRuEl) b.title_ru = titleRuEl.value;
+  if (titleAmEl) b.title_am = titleAmEl.value;
+
+  // Collect texts
+  var newRu = [], newAm = [];
+  var maxTexts = Math.max((b.texts_ru || []).length, (b.texts_am || []).length);
+  for (var ti = 0; ti < maxTexts; ti++) {
+    var ruEl = document.getElementById('sb_tru_' + id + '_' + ti);
+    var amEl = document.getElementById('sb_tam_' + id + '_' + ti);
+    newRu.push(ruEl ? ruEl.value : (b.texts_ru && b.texts_ru[ti] || ''));
+    newAm.push(amEl ? amEl.value : (b.texts_am && b.texts_am[ti] || ''));
+  }
+  b.texts_ru = newRu;
+  b.texts_am = newAm;
+
+  // Collect buttons
+  var newBtns = [];
+  for (var bti = 0; bti < (b.buttons || []).length; bti++) {
+    var btnRu = document.getElementById('sb_btnru_' + id + '_' + bti);
+    var btnAm = document.getElementById('sb_btnam_' + id + '_' + bti);
+    var btnUrl = document.getElementById('sb_btnurl_' + id + '_' + bti);
+    newBtns.push({
+      text_ru: btnRu ? btnRu.value : (b.buttons[bti].text_ru || ''),
+      text_am: btnAm ? btnAm.value : (b.buttons[bti].text_am || ''),
+      url: btnUrl ? btnUrl.value : (b.buttons[bti].url || '')
+    });
+  }
+  b.buttons = newBtns;
+
+  // Save to server
+  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(b) });
+  // Sync to site_content for instant site update
+  await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' });
+  
+  toast('Блок «' + (b.title_ru || b.block_key) + '» сохранён и обновлён на сайте');
+  var res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
+  render();
+}
+
+// ── Modal editor for NEW blocks ──
+var editingBlock = null;
 function showBlockEditor() {
   if (!editingBlock) return;
-  const b = editingBlock;
-  let h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="closeBlockEditor()">' +
+  var b = editingBlock;
+  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="closeBlockEditor()">' +
     '<div class="card" style="width:800px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1.1rem;font-weight:700">' + (b.id ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0431\u043b\u043e\u043a' : '\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a') + '</h3><button class="btn btn-outline" style="padding:6px 10px" onclick="closeBlockEditor()"><i class="fas fa-times"></i></button></div>';
-  // Basic fields
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">\u041a\u043b\u044e\u0447 \u0431\u043b\u043e\u043a\u0430</label><input class="input" id="sbKey" value="' + escHtml(b.block_key) + '"></div><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">\u0422\u0438\u043f</label><select class="input" id="sbType"><option value="section" ' + (b.block_type==='section'?'selected':'') + '>\u0421\u0435\u043a\u0446\u0438\u044f</option><option value="hero" ' + (b.block_type==='hero'?'selected':'') + '>Hero</option><option value="features" ' + (b.block_type==='features'?'selected':'') + '>Features</option><option value="cta" ' + (b.block_type==='cta'?'selected':'') + '>CTA</option><option value="custom" ' + (b.block_type==='custom'?'selected':'') + '>\u041a\u0430\u0441\u0442\u043e\u043c</option></select></div></div>';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#8B5CF6;display:block;margin-bottom:4px">\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (RU)</label><input class="input" id="sbTitleRu" value="' + escHtml(b.title_ru) + '"></div><div><label style="font-size:0.78rem;color:#fbbf24;display:block;margin-bottom:4px">\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '"></div></div>';
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1.1rem;font-weight:700">' + (b.id ? 'Редактировать блок' : 'Новый блок') + '</h3><button class="btn btn-outline" style="padding:6px 10px" onclick="closeBlockEditor()"><i class="fas fa-times"></i></button></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Ключ блока</label><input class="input" id="sbKey" value="' + escHtml(b.block_key) + '"></div><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Тип</label><select class="input" id="sbType"><option value="section"' + (b.block_type==='section'?' selected':'') + '>Секция</option><option value="hero"' + (b.block_type==='hero'?' selected':'') + '>Hero</option><option value="features"' + (b.block_type==='features'?' selected':'') + '>Features</option><option value="cta"' + (b.block_type==='cta'?' selected':'') + '>CTA</option></select></div></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#8B5CF6;display:block;margin-bottom:4px">Заголовок (RU)</label><input class="input" id="sbTitleRu" value="' + escHtml(b.title_ru) + '"></div><div><label style="font-size:0.78rem;color:#fbbf24;display:block;margin-bottom:4px">Заголовок (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '"></div></div>';
   // Texts
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#8B5CF6;font-weight:700">\u0422\u0435\u043a\u0441\u0442\u044b (RU)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(&apos;ru&apos;)"><i class="fas fa-plus"></i></button></div><div id="sbTextsRu">';
-  (b.texts_ru||[]).forEach((t, i) => { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_ru[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(&apos;ru&apos;,' + i + ')"><i class="fas fa-times"></i></button></div>'; });
-  h += '</div></div><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#fbbf24;font-weight:700">\u0422\u0435\u043a\u0441\u0442\u044b (AM)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(&apos;am&apos;)"><i class="fas fa-plus"></i></button></div><div id="sbTextsAm">';
-  (b.texts_am||[]).forEach((t, i) => { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_am[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(&apos;am&apos;,' + i + ')"><i class="fas fa-times"></i></button></div>'; });
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#8B5CF6;font-weight:700">Тексты (RU)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(&apos;ru&apos;)"><i class="fas fa-plus"></i></button></div><div id="sbTextsRu">';
+  (b.texts_ru||[]).forEach(function(t, i) { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_ru[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(&apos;ru&apos;,' + i + ')"><i class="fas fa-times"></i></button></div>'; });
+  h += '</div></div><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#fbbf24;font-weight:700">Тексты (AM)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(&apos;am&apos;)"><i class="fas fa-plus"></i></button></div><div id="sbTextsAm">';
+  (b.texts_am||[]).forEach(function(t, i) { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_am[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(&apos;am&apos;,' + i + ')"><i class="fas fa-times"></i></button></div>'; });
   h += '</div></div></div>';
-  // Buttons
-  h += '<div style="margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;font-weight:700;color:#a78bfa">\u041a\u043d\u043e\u043f\u043a\u0438</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbBtn()"><i class="fas fa-plus"></i> \u041a\u043d\u043e\u043f\u043a\u0430</button></div><div id="sbButtons">';
-  (b.buttons||[]).forEach((btn, i) => {
-    h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 32px;gap:8px;margin-bottom:8px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid #334155"><div><label style="font-size:0.7rem;color:#8B5CF6">\u0422\u0435\u043a\u0441\u0442 (RU)</label><input class="input" style="font-size:0.82rem" value="' + escHtml(btn.text_ru) + '" onchange="editingBlock.buttons[' + i + '].text_ru=this.value"></div>' +
-      '<div><label style="font-size:0.7rem;color:#fbbf24">\u0422\u0435\u043a\u0441\u0442 (AM)</label><input class="input" style="font-size:0.82rem" value="' + escHtml(btn.text_am) + '" onchange="editingBlock.buttons[' + i + '].text_am=this.value"></div>' +
-      '<div><label style="font-size:0.7rem;color:#64748b">URL</label><input class="input" style="font-size:0.82rem" value="' + escHtml(btn.url) + '" onchange="editingBlock.buttons[' + i + '].url=this.value" placeholder="https://..."></div>' +
-      '<button class="tier-del-btn" style="align-self:end;margin-bottom:4px" onclick="rmSbBtn(' + i + ')"><i class="fas fa-times"></i></button></div>';
-  });
-  h += '</div></div>';
-  // Custom CSS/HTML
-  h += '<details style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;font-size:0.85rem;color:#64748b;margin-bottom:8px">\u0414\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u043e (HTML/CSS)</summary><div style="margin-bottom:8px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Custom CSS</label><textarea class="input" id="sbCss" style="font-family:monospace;font-size:0.82rem;min-height:60px">' + escHtml(b.custom_css) + '</textarea></div><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Custom HTML</label><textarea class="input" id="sbHtml" style="font-family:monospace;font-size:0.82rem;min-height:60px">' + escHtml(b.custom_html) + '</textarea></div></details>';
   // Actions
-  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline" onclick="closeBlockEditor()">\u041e\u0442\u043c\u0435\u043d\u0430</button><button class="btn btn-primary" onclick="saveSiteBlock()"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button></div>';
+  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline" onclick="closeBlockEditor()">Отмена</button><button class="btn btn-primary" onclick="saveSiteBlockModal()"><i class="fas fa-save" style="margin-right:6px"></i>Создать</button></div>';
   h += '</div></div>';
-  const area = document.getElementById('siteBlockModalArea');
-  if (area) area.innerHTML = h;
+  // Inject modal
+  var modal = document.createElement('div');
+  modal.id = 'siteBlockModal';
+  modal.innerHTML = h;
+  document.body.appendChild(modal);
 }
 
-function closeBlockEditor() { editingBlock = null; const area = document.getElementById('siteBlockModalArea'); if (area) area.innerHTML = ''; }
+function closeBlockEditor() {
+  editingBlock = null;
+  var modal = document.getElementById('siteBlockModal');
+  if (modal) modal.remove();
+}
 
 function addSbText(lang) {
   if (!editingBlock) return;
+  if (!editingBlock['texts_' + lang]) editingBlock['texts_' + lang] = [];
   editingBlock['texts_' + lang].push('');
+  closeBlockEditor();
   showBlockEditor();
 }
 function rmSbText(lang, idx) {
   if (!editingBlock) return;
   editingBlock['texts_' + lang].splice(idx, 1);
-  showBlockEditor();
-}
-function addSbBtn() {
-  if (!editingBlock) return;
-  editingBlock.buttons.push({ text_ru: '', text_am: '', url: '' });
-  showBlockEditor();
-}
-function rmSbBtn(idx) {
-  if (!editingBlock) return;
-  editingBlock.buttons.splice(idx, 1);
+  closeBlockEditor();
   showBlockEditor();
 }
 
-async function saveSiteBlock() {
+async function saveSiteBlockModal() {
   if (!editingBlock) return;
-  // Read current values from inputs
   editingBlock.block_key = document.getElementById('sbKey')?.value || editingBlock.block_key;
   editingBlock.block_type = document.getElementById('sbType')?.value || editingBlock.block_type;
   editingBlock.title_ru = document.getElementById('sbTitleRu')?.value || '';
   editingBlock.title_am = document.getElementById('sbTitleAm')?.value || '';
-  editingBlock.custom_css = document.getElementById('sbCss')?.value || '';
-  editingBlock.custom_html = document.getElementById('sbHtml')?.value || '';
-  
+
   if (editingBlock.id) {
-    await api('/site-blocks/' + editingBlock.id, { method:'PUT', body: JSON.stringify(editingBlock) });
-    // Sync changes to site_content for instant site update
-    await api('/site-blocks/' + editingBlock.id + '/sync-to-site', { method:'POST' });
+    await api('/site-blocks/' + editingBlock.id, { method: 'PUT', body: JSON.stringify(editingBlock) });
+    await api('/site-blocks/' + editingBlock.id + '/sync-to-site', { method: 'POST' });
   } else {
-    var createRes = await api('/site-blocks', { method:'POST', body: JSON.stringify(editingBlock) });
-    // For new blocks, reload to get ID, then sync
+    await api('/site-blocks', { method: 'POST', body: JSON.stringify(editingBlock) });
     var freshRes = await api('/site-blocks');
     data.siteBlocks = (freshRes && freshRes.blocks) || [];
-    // Find the newly created block and sync
     var newBlock = data.siteBlocks.find(function(b) { return b.block_key === editingBlock.block_key; });
     if (newBlock) {
-      await api('/site-blocks/' + newBlock.id + '/sync-to-site', { method:'POST' });
+      await api('/site-blocks/' + newBlock.id + '/sync-to-site', { method: 'POST' });
     }
   }
   closeBlockEditor();
-  const res = await api('/site-blocks');
+  var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
-  toast('\u0411\u043b\u043e\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d \u0438 \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u043d \u0441 \u0441\u0430\u0439\u0442\u043e\u043c');
+  toast('Блок сохранён и синхронизирован с сайтом');
   render();
 }
 
-// Import all blocks from site
+// ── Import all blocks from site ──
 async function importSiteBlocks() {
   if (data.siteBlocks && data.siteBlocks.length > 0) {
-    if (!confirm('\u0412\u043d\u0438\u043c\u0430\u043d\u0438\u0435! \u0412\u0441\u0435 \u0442\u0435\u043a\u0443\u0449\u0438\u0435 \u0431\u043b\u043e\u043a\u0438 \u0431\u0443\u0434\u0443\u0442 \u0437\u0430\u043c\u0435\u043d\u0435\u043d\u044b \u0434\u0430\u043d\u043d\u044b\u043c\u0438 \u0441 \u0441\u0430\u0439\u0442\u0430. \u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c?')) return;
+    if (!confirm('Внимание! Все текущие блоки будут заменены данными с сайта. Продолжить?')) return;
   }
-  toast('\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0431\u043b\u043e\u043a\u043e\u0432 \u0441 \u0441\u0430\u0439\u0442\u0430...');
+  toast('Загрузка блоков с сайта...');
   var result = await api('/site-blocks/import-from-site', { method: 'POST' });
   if (result && result.success) {
-    toast('\u0423\u0441\u043f\u0435\u0448\u043d\u043e \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u043e ' + (result.imported || 0) + ' \u0431\u043b\u043e\u043a\u043e\u0432 \u043d\u0430 2 \u044f\u0437\u044b\u043a\u0430\u0445!');
+    toast('Успешно загружено ' + (result.imported || 0) + ' блоков на 2 языках!');
   } else {
-    toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438');
+    toast('Ошибка загрузки', 'error');
   }
   var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];

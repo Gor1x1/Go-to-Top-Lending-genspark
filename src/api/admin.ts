@@ -527,6 +527,18 @@ api.post('/section-order', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+api.put('/section-order', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { orders } = await c.req.json();
+  // orders = [{section_id, sort_order}]
+  if (orders && Array.isArray(orders)) {
+    for (const o of orders) {
+      await db.prepare('UPDATE section_order SET sort_order = ? WHERE section_id = ?').bind(o.sort_order, o.section_id).run();
+    }
+  }
+  return c.json({ success: true });
+});
+
 api.put('/section-order/seed', authMiddleware, async (c) => {
   const db = c.env.DB;
   // Seed default section order
