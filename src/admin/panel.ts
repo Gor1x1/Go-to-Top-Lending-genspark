@@ -11,6 +11,7 @@ export function getAdminHTML(): string {
 <title>Go to Top — Админ-панель</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.6/Sortable.min.js"><\/script>
 <style>
   body { font-family: 'Inter', system-ui, sans-serif; background: #0f172a; color: #e2e8f0; }
   .sidebar { width: 260px; min-height: 100vh; background: #1e293b; border-right: 1px solid #334155; }
@@ -54,6 +55,34 @@ export function getAdminHTML(): string {
   .tier-del-btn { width:24px;height:24px;min-width:24px;border-radius:50%;background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;font-size:0.65rem;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;transition:all 0.2s;padding:0; }
   .tier-del-btn:hover { background:#EF4444;color:white; }
   .btn-loading { opacity: 0.7; pointer-events: none; }
+  /* ===== BLOCK CONSTRUCTOR PRO ===== */
+  .sb-block-item { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .sb-block-item.sortable-ghost { opacity: 0.4; background: #1a2236 !important; }
+  .sb-block-item.sortable-chosen { box-shadow: 0 8px 40px rgba(139,92,246,0.35); transform: scale(1.01); z-index: 10; }
+  .sb-drag-handle { cursor: grab; padding: 6px 8px; color: #475569; transition: color 0.2s; display: flex; flex-direction: column; gap: 1px; align-items: center; }
+  .sb-drag-handle:hover { color: #8B5CF6; }
+  .sb-drag-handle:active { cursor: grabbing; }
+  .sb-drag-dots { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: block; }
+  .sb-field-group { margin-bottom: 14px; }
+  .sb-field-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+  .sb-field-label.ru { color: #8B5CF6; }
+  .sb-field-label.am { color: #F59E0B; }
+  .sb-field-label .field-hint { font-weight: 400; text-transform: none; letter-spacing: 0; color: #64748b; font-size: 0.7rem; }
+  .sb-save-indicator { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); padding: 10px 24px; border-radius: 10px; font-weight: 600; font-size: 0.85rem; z-index: 9998; transition: all 0.3s ease; pointer-events: none; }
+  .sb-save-indicator.saving { background: #1e40af; color: #93c5fd; opacity: 1; }
+  .sb-save-indicator.saved { background: #065f46; color: #6ee7b7; opacity: 1; }
+  .sb-save-indicator.hidden { opacity: 0; transform: translateX(-50%) translateY(10px); }
+  .sb-text-pair { background: #1a2236; border: 1px solid #293548; border-radius: 10px; padding: 14px; margin-bottom: 10px; transition: border-color 0.2s; position: relative; }
+  .sb-text-pair:hover { border-color: #475569; }
+  .sb-text-pair:focus-within { border-color: #8B5CF6; box-shadow: 0 0 0 2px rgba(139,92,246,0.1); }
+  .sb-text-pair-num { position: absolute; top: -8px; left: 12px; background: #1e293b; padding: 0 6px; font-size: 0.65rem; font-weight: 700; color: #64748b; border-radius: 4px; }
+  .sb-search-box { position: relative; }
+  .sb-search-box input { padding-left: 36px !important; }
+  .sb-search-box i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 0.85rem; }
+  .sb-tabs { display: flex; gap: 4px; background: #0f172a; padding: 4px; border-radius: 10px; border: 1px solid #1e293b; }
+  .sb-tab { padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s; color: #94a3b8; background: transparent; border: none; }
+  .sb-tab.active { background: #8B5CF6; color: white; }
+  .sb-tab:hover:not(.active) { background: #1e293b; color: #e2e8f0; }
 </style>
 </head>
 <body>
@@ -8376,169 +8405,320 @@ async function cloneCompanyRole(id) {
   render();
 }
 
-// ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace =====
+// ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace V2 =====
 var sbLangView = 'both'; // 'both', 'ru', 'am'
 var sbExpandedBlocks = {}; // track which blocks are expanded
+var sbSearchQuery = ''; // search/filter blocks
+var sbSortableInstance = null; // SortableJS instance
+var sbSaveTimers = {}; // per-block debounce timers
+var sbSaveStatus = 'hidden'; // 'hidden', 'saving', 'saved'
+var sbActiveTab = 'blocks'; // 'blocks', 'calculator'
 
 function renderSiteBlocks() {
-  var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
-  var h = '<div style="padding:28px 32px">';
+  var allBlocks = data.siteBlocks || [];
+  var contentBlocks = allBlocks.filter(function(b) { return b.block_type !== 'calculator'; });
+  var calcBlocks = allBlocks.filter(function(b) { return b.block_type === 'calculator'; });
+  var blocks = sbActiveTab === 'calculator' ? calcBlocks : contentBlocks;
+  
+  // Filter by search
+  if (sbSearchQuery) {
+    var q = sbSearchQuery.toLowerCase();
+    blocks = blocks.filter(function(b) {
+      return (b.title_ru || '').toLowerCase().includes(q) || (b.title_am || '').toLowerCase().includes(q) || (b.block_key || '').toLowerCase().includes(q) ||
+        (b.texts_ru || []).some(function(t) { return (t || '').toLowerCase().includes(q); }) ||
+        (b.texts_am || []).some(function(t) { return (t || '').toLowerCase().includes(q); });
+    });
+  }
+  
+  var showRu = sbLangView === 'both' || sbLangView === 'ru';
+  var showAm = sbLangView === 'both' || sbLangView === 'am';
+  var h = '<div style="padding:24px 28px;max-width:1400px;margin:0 auto">';
 
-  // ── Header bar ──
-  h += '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px;flex-wrap:wrap;gap:12px">' +
-    '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:4px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков</h1>' +
-    '<p style="color:#94a3b8;font-size:0.85rem">Редактируйте тексты каждого блока на 2 языках. Перемещайте блоки вверх/вниз. Изменения сразу отражаются на сайте.</p></div>' +
-    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
-      '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить блоки с сайта</button>' +
-      '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap"><i class="fas fa-plus" style="margin-right:6px"></i>Новый блок</button>' +
-    '</div></div>';
+  // ── Header ──
+  h += '<div style="margin-bottom:24px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">' +
+      '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков</h1>' +
+      '<p style="color:#64748b;font-size:0.82rem;margin:0">Перетаскивайте блоки мышкой для изменения порядка. Тексты сохраняются автоматически.</p></div>' +
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+        '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
+        '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
+      '</div>' +
+    '</div>';
 
-  // ── Language toggle + stats ──
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:10px">' +
-    '<div style="display:flex;gap:6px;align-items:center">' +
-      '<span style="font-size:0.82rem;color:#94a3b8;margin-right:6px"><i class="fas fa-language" style="margin-right:4px"></i>Язык:</span>' +
-      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:6px 16px;font-size:0.8rem" onclick="sbLangView=\\'both\\';render()">RU + AM</button>' +
-      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:6px 16px;font-size:0.8rem" onclick="sbLangView=\\'ru\\';render()">🇷🇺 RU</button>' +
-      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:6px 16px;font-size:0.8rem" onclick="sbLangView=\\'am\\';render()">🇦🇲 AM</button>' +
+  // ── Tabs: Blocks / Calculator ──
+  h += '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px">' +
+    '<div class="sb-tabs">' +
+      '<button class="sb-tab' + (sbActiveTab==='blocks'?' active':'') + '" onclick="sbActiveTab=\\'blocks\\';render()"><i class="fas fa-cubes" style="margin-right:6px"></i>Блоки сайта <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + contentBlocks.length + ')</span></button>' +
+      '<button class="sb-tab' + (sbActiveTab==='calculator'?' active':'') + '" onclick="sbActiveTab=\\'calculator\\';render()"><i class="fas fa-calculator" style="margin-right:6px"></i>Калькулятор <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + calcBlocks.length + ')</span></button>' +
     '</div>' +
-    '<div style="display:flex;gap:12px;align-items:center;font-size:0.82rem;color:#64748b">' +
-      '<span><i class="fas fa-cubes" style="margin-right:4px;color:#8B5CF6"></i>' + blocks.length + ' блоков</span>' +
-      '<span><i class="fas fa-eye" style="margin-right:4px;color:#10B981"></i>' + blocks.filter(function(b){return b.is_visible}).length + ' видимых</span>' +
-      '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbExpandAll()"><i class="fas fa-expand-alt" style="margin-right:4px"></i>Раскрыть всё</button>' +
-      '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbCollapseAll()"><i class="fas fa-compress-alt" style="margin-right:4px"></i>Свернуть</button>' +
-    '</div>' +
+    '<div style="flex:1;min-width:200px;max-width:320px" class="sb-search-box"><i class="fas fa-search"></i><input class="input" placeholder="Поиск по блокам..." value="' + escHtml(sbSearchQuery) + '" oninput="sbSearchQuery=this.value;render()" style="font-size:0.85rem"></div>' +
   '</div>';
 
-  if (blocks.length === 0) {
+  // ── Toolbar: Language + Stats + Expand ──
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">' +
+    '<div style="display:flex;gap:4px;align-items:center">' +
+      '<span style="font-size:0.78rem;color:#64748b;margin-right:4px"><i class="fas fa-language" style="margin-right:3px"></i>Язык:</span>' +
+      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'both\\';render()">RU + AM</button>' +
+      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'ru\\';render()">RU</button>' +
+      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'am\\';render()">AM</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;align-items:center;font-size:0.78rem;color:#475569">' +
+      '<span><i class="fas fa-eye" style="color:#10B981;margin-right:3px"></i>' + blocks.filter(function(b){return b.is_visible}).length + ' видимых</span>' +
+      '<span>|</span>' +
+      '<span style="cursor:pointer;color:#8B5CF6" onclick="sbExpandAll()"><i class="fas fa-expand-alt" style="margin-right:3px"></i>Раскрыть</span>' +
+      '<span style="cursor:pointer;color:#94a3b8" onclick="sbCollapseAll()"><i class="fas fa-compress-alt" style="margin-right:3px"></i>Свернуть</span>' +
+    '</div>' +
+  '</div>';
+  h += '</div>'; // end header
+
+  // ── Calculator link for blocks tab ──
+  if (sbActiveTab === 'blocks' && calcBlocks.length > 0) {
+    h += '<div style="margin-bottom:16px;padding:14px 18px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;display:flex;align-items:center;gap:12px">' +
+      '<i class="fas fa-calculator" style="color:#10B981;font-size:1.1rem"></i>' +
+      '<span style="font-size:0.85rem;color:#94a3b8">Настройки калькулятора (цены, услуги) доступны в разделе:</span>' +
+      '<button class="btn btn-outline" style="padding:5px 14px;font-size:0.78rem;border-color:rgba(16,185,129,0.3);color:#10B981" onclick="navigate(\\'calculator\\')"><i class="fas fa-external-link-alt" style="margin-right:5px"></i>Калькулятор</button>' +
+    '</div>';
+  }
+
+  if (blocks.length === 0 && !sbSearchQuery) {
     h += '<div class="card" style="text-align:center;padding:60px;color:#64748b">' +
       '<i class="fas fa-layer-group" style="font-size:3rem;margin-bottom:16px;display:block;opacity:0.3"></i>' +
-      '<p style="font-size:1.1rem;margin-bottom:8px">Блоки ещё не добавлены</p>' +
-      '<p style="font-size:0.85rem;margin-bottom:20px">Нажмите «Загрузить блоки с сайта» чтобы импортировать все тексты и секции на 2 языках.</p>' +
-      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить блоки с сайта</button></div>';
+      '<p style="font-size:1.1rem;margin-bottom:8px">Блоки ещё не загружены</p>' +
+      '<p style="font-size:0.85rem;margin-bottom:20px">Нажмите «Загрузить с сайта» чтобы импортировать все секции.</p>' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить с сайта</button></div>';
+  } else if (blocks.length === 0 && sbSearchQuery) {
+    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-search" style="font-size:2rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>Ничего не найдено по запросу «' + escHtml(sbSearchQuery) + '»</p></div>';
   } else {
-    // ── Block list ──
+    // ── Block list (sortable) ──
+    h += '<div id="sbBlockList">';
     for (var bi = 0; bi < blocks.length; bi++) {
       var b = blocks[bi];
       var isExpanded = !!sbExpandedBlocks[b.id];
       var textsRu = b.texts_ru || [];
       var textsAm = b.texts_am || [];
       var maxTexts = Math.max(textsRu.length, textsAm.length);
-      var showRu = sbLangView === 'both' || sbLangView === 'ru';
-      var showAm = sbLangView === 'both' || sbLangView === 'am';
+      var btnsCount = (b.buttons||[]).length;
 
-      h += '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;opacity:' + (b.is_visible ? '1' : '0.55') + ';border-left:4px solid ' + (b.is_visible ? '#8B5CF6' : '#EF4444') + '">';
+      h += '<div class="card sb-block-item" data-block-id="' + b.id + '" style="margin-bottom:12px;padding:0;overflow:hidden;opacity:' + (b.is_visible ? '1' : '0.5') + ';border-left:4px solid ' + (b.is_visible ? '#8B5CF6' : '#475569') + '">';
 
-      // ── Block header ──
-      h += '<div style="display:flex;align-items:center;gap:10px;padding:14px 18px;background:' + (isExpanded ? '#1a2236' : '#1e293b') + ';cursor:pointer;user-select:none" onclick="toggleSbExpand(' + b.id + ')">';
-      // Reorder arrows
-      h += '<div style="display:flex;flex-direction:column;gap:2px" onclick="event.stopPropagation()">';
-      h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.65rem;line-height:1;border-color:#475569" onclick="sbMoveBlock(' + b.id + ',-1)" title="Вверх"' + (bi === 0 ? ' disabled style="padding:2px 6px;font-size:0.65rem;line-height:1;opacity:0.3;cursor:default;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:8px;font-weight:600"' : '') + '><i class="fas fa-chevron-up"></i></button>';
-      h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.65rem;line-height:1;border-color:#475569" onclick="sbMoveBlock(' + b.id + ',1)" title="Вниз"' + (bi === blocks.length - 1 ? ' disabled style="padding:2px 6px;font-size:0.65rem;line-height:1;opacity:0.3;cursor:default;background:transparent;border:1px solid #475569;color:#94a3b8;border-radius:8px;font-weight:600"' : '') + '><i class="fas fa-chevron-down"></i></button>';
-      h += '</div>';
-      // Number
-      h += '<span style="color:#64748b;font-size:0.8rem;font-weight:800;min-width:32px;text-align:center;background:#0f172a;padding:4px 8px;border-radius:6px">' + (bi + 1) + '</span>';
-      // Title + badge
-      h += '<div style="flex:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap">';
-      h += '<span style="font-weight:700;font-size:1.05rem;color:' + (b.is_visible ? '#e2e8f0' : '#f87171') + '">' + escHtml(b.title_ru || b.block_key) + '</span>';
-      h += '<span class="badge badge-purple" style="font-size:0.72rem">' + escHtml(b.block_key) + '</span>';
-      if (maxTexts > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.72rem">' + maxTexts + ' текстов</span>';
-      if ((b.buttons||[]).length > 0) h += '<span class="badge badge-amber" style="font-size:0.72rem">' + (b.buttons||[]).length + ' кнопок</span>';
-      h += '</div>';
-      // Action buttons
-      h += '<div style="display:flex;gap:4px" onclick="event.stopPropagation()">';
-      h += '<button class="btn ' + (b.is_visible ? 'btn-success' : 'btn-danger') + '" style="padding:5px 10px;font-size:0.78rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')" title="' + (b.is_visible ? 'Скрыть' : 'Показать') + '">' + (b.is_visible ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>';
-      h += '<button class="btn btn-outline" style="padding:5px 10px;font-size:0.78rem" onclick="dupSiteBlock(' + b.id + ')" title="Копия"><i class="fas fa-copy"></i></button>';
-      h += '<button class="btn btn-danger" style="padding:5px 10px;font-size:0.78rem" onclick="delSiteBlock(' + b.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
-      h += '</div>';
-      h += '<i class="fas fa-chevron-' + (isExpanded ? 'up' : 'down') + '" style="color:#64748b;font-size:0.9rem"></i>';
+      // ── Block header (always visible) ──
+      h += '<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:' + (isExpanded ? '#141c2e' : '#1e293b') + ';cursor:pointer;user-select:none" onclick="toggleSbExpand(' + b.id + ')">';
+
+      // Drag handle
+      h += '<div class="sb-drag-handle" onclick="event.stopPropagation()" title="Перетащите для изменения порядка">' +
+        '<span class="sb-drag-dots"></span><span class="sb-drag-dots"></span><span class="sb-drag-dots"></span>' +
+        '<span class="sb-drag-dots"></span><span class="sb-drag-dots"></span><span class="sb-drag-dots"></span>' +
+      '</div>';
+
+      // Number badge
+      h += '<span style="color:#475569;font-size:0.75rem;font-weight:800;min-width:28px;text-align:center;background:#0f172a;padding:3px 7px;border-radius:6px">' + (bi + 1) + '</span>';
+
+      // Title + badges
+      h += '<div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow:hidden">';
+      h += '<span style="font-weight:700;font-size:0.95rem;color:' + (b.is_visible ? '#e2e8f0' : '#94a3b8') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px">' + escHtml(b.title_ru || b.block_key) + '</span>';
+      h += '<span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(b.block_key) + '</span>';
+      if (maxTexts > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.12);color:#60a5fa;font-size:0.68rem">' + maxTexts + ' текст.</span>';
+      if (btnsCount > 0) h += '<span class="badge badge-amber" style="font-size:0.68rem">' + btnsCount + ' кноп.</span>';
       h += '</div>';
 
-      // ── Expanded edit area (footer-style) ──
+      // Quick actions
+      h += '<div style="display:flex;gap:3px" onclick="event.stopPropagation()">';
+      h += '<button class="btn ' + (b.is_visible ? 'btn-outline' : 'btn-danger') + '" style="padding:4px 8px;font-size:0.72rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')" title="' + (b.is_visible ? 'Скрыть блок' : 'Показать блок') + '">' + (b.is_visible ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>';
+      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem" onclick="dupSiteBlock(' + b.id + ')" title="Создать копию"><i class="fas fa-copy"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem;color:#f87171;border-color:rgba(248,113,113,0.3)" onclick="delSiteBlock(' + b.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
+      h += '</div>';
+
+      // Expand arrow
+      h += '<i class="fas fa-chevron-' + (isExpanded ? 'up' : 'down') + '" style="color:#475569;font-size:0.8rem;min-width:16px;text-align:center"></i>';
+      h += '</div>'; // end header
+
+      // ── Expanded editor ──
       if (isExpanded) {
-        h += '<div style="padding:20px;background:#0f172a;border-top:1px solid #334155">';
+        h += '<div style="padding:20px;background:#0f172a;border-top:1px solid #1e293b">';
 
-        // Block title editing
-        h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:12px;margin-bottom:16px">';
-        if (showRu) {
-          h += '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600;display:block;margin-bottom:4px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок блока (RU)</label>' +
-            '<input class="input" id="sb_title_ru_' + b.id + '" value="' + escHtml(b.title_ru) + '" style="font-weight:700;font-size:1rem"></div>';
-        }
-        if (showAm) {
-          h += '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600;display:block;margin-bottom:4px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок блока (AM)</label>' +
-            '<input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:1rem"></div>';
-        }
+        // ── Block ID + Title row ──
+        h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '200px 1fr 1fr' : '200px 1fr') + ';gap:12px;margin-bottom:18px">';
+        h += '<div class="sb-field-group"><div class="sb-field-label" style="color:#64748b"><i class="fas fa-key"></i> ID блока</div><input class="input" value="' + escHtml(b.block_key) + '" disabled style="font-size:0.82rem;opacity:0.6;cursor:not-allowed"></div>';
+        if (showRu) h += '<div class="sb-field-group"><div class="sb-field-label ru"><i class="fas fa-heading"></i> Название блока (RU)</div><input class="input" id="sb_title_ru_' + b.id + '" value="' + escHtml(b.title_ru) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        if (showAm) h += '<div class="sb-field-group"><div class="sb-field-label am"><i class="fas fa-heading"></i> Անվանումը (AM)</div><input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div>';
 
-        // ── Texts editing — paired RU/AM side by side (like footer) ──
+        // ── Semantic text pairs ──
         h += '<div style="margin-bottom:16px">';
         h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-          '<h4 style="font-size:0.88rem;font-weight:700;color:#cbd5e1"><i class="fas fa-align-left" style="color:#8B5CF6;margin-right:6px"></i>Тексты секции</h4>' +
-          '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbAddTextPair(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
+          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-align-left" style="color:#8B5CF6;margin-right:6px"></i>Тексты блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + maxTexts + ' элементов)</span></h4>' +
+          '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTextPair(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
         '</div>';
 
         for (var ti = 0; ti < maxTexts; ti++) {
           var ruText = ti < textsRu.length ? textsRu[ti] : '';
           var amText = ti < textsAm.length ? textsAm[ti] : '';
-          var isLong = ruText.length > 80 || amText.length > 80;
+          var isLong = ruText.length > 100 || amText.length > 100;
+          var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
 
-          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 32px;gap:8px;margin-bottom:8px;padding:10px 12px;background:#1e293b;border-radius:8px;border:1px solid #334155;align-items:start">';
+          h += '<div class="sb-text-pair">';
+          h += '<div class="sb-text-pair-num">' + fieldLabel + '</div>';
+          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
           if (showRu) {
-            h += '<div><label style="font-size:0.68rem;color:#8B5CF6;font-weight:600;margin-bottom:3px;display:block">🇷🇺 RU #' + (ti + 1) + '</label>';
+            h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
             if (isLong) {
-              h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.85rem">' + escHtml(ruText) + '</textarea>';
+              h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(ruText) + '</textarea>';
             } else {
-              h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.85rem">';
+              h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
             }
             h += '</div>';
           }
           if (showAm) {
-            h += '<div><label style="font-size:0.68rem;color:#F59E0B;font-weight:600;margin-bottom:3px;display:block">🇦🇲 AM #' + (ti + 1) + '</label>';
+            h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label am" style="margin-bottom:3px">AM</div>';
             if (isLong) {
-              h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.85rem">' + escHtml(amText) + '</textarea>';
+              h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>';
             } else {
-              h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.85rem">';
+              h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
             }
             h += '</div>';
           }
-          h += '<button class="tier-del-btn" style="margin-top:18px" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>';
           h += '</div>';
+          h += '<button class="tier-del-btn" style="position:absolute;top:6px;right:6px" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>';
+          h += '</div>'; // end sb-text-pair
         }
         h += '</div>';
 
-        // ── Buttons ──
-        if ((b.buttons || []).length > 0 || true) {
-          h += '<div style="margin-bottom:16px">';
-          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-            '<h4 style="font-size:0.88rem;font-weight:700;color:#cbd5e1"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки</h4>' +
-            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.75rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
-          '</div>';
-          for (var bti = 0; bti < (b.buttons || []).length; bti++) {
-            var btn = b.buttons[bti];
-            h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 1fr 32px;gap:8px;margin-bottom:6px;padding:8px 10px;background:#1e293b;border-radius:8px;border:1px solid #334155;align-items:center">';
-            if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem">';
-            if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="Текст кнопки (AM)" style="font-size:0.82rem">';
-            h += '<input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url) + '" placeholder="URL" style="font-size:0.82rem;color:#60a5fa">';
-            h += '<button class="tier-del-btn" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
-            h += '</div>';
-          }
+        // ── Buttons section ──
+        h += '<div style="margin-bottom:16px">';
+        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки / Ссылки</h4>' +
+          '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
+        '</div>';
+        for (var bti = 0; bti < (b.buttons || []).length; bti++) {
+          var btn = b.buttons[bti];
+          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 1.2fr 28px;gap:8px;margin-bottom:6px;padding:8px 10px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
+          if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст (RU)" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')">';
+          if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="Տeքստ (AM)" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url) + '" placeholder="https://..." style="font-size:0.82rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<button class="tier-del-btn" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
         }
+        if ((b.buttons || []).length === 0) {
+          h += '<div style="font-size:0.78rem;color:#475569;padding:8px;text-align:center;border:1px dashed #293548;border-radius:8px">Нет кнопок. Нажмите + чтобы добавить.</div>';
+        }
+        h += '</div>';
 
-        // ── Save button ──
-        h += '<div style="display:flex;gap:10px;justify-content:flex-end;padding-top:12px;border-top:1px solid #334155">' +
-          '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')">Свернуть</button>' +
-          '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:180px"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить блок</button>' +
+        // ── Footer: Save ──
+        h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #1e293b">' +
+          '<div style="font-size:0.72rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:4px"></i>Изменения сохраняются при выходе из поля. Ctrl+S — принудительное сохранение.</div>' +
+          '<div style="display:flex;gap:8px">' +
+            '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')" style="font-size:0.82rem">Свернуть</button>' +
+            '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:160px;font-size:0.82rem"><i class="fas fa-save" style="margin-right:5px"></i>Сохранить</button>' +
+          '</div>' +
         '</div>';
 
         h += '</div>'; // end expanded area
       }
-
       h += '</div>'; // end card
     }
+    h += '</div>'; // end #sbBlockList
   }
 
+  // ── Save status indicator ──
+  h += '<div id="sbSaveIndicator" class="sb-save-indicator ' + sbSaveStatus + '">' +
+    (sbSaveStatus === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение...' : '') +
+    (sbSaveStatus === 'saved' ? '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено' : '') +
+  '</div>';
+
   h += '</div>'; // end wrapper
+
+  // ── Post-render: init SortableJS ──
+  setTimeout(function() { sbInitSortable(); }, 50);
+
   return h;
+}
+
+// ── Semantic field labels based on block key and position ──
+function sbGetFieldLabel(blockKey, idx, total) {
+  // Default numbering
+  var num = '#' + (idx + 1);
+  if (total <= 1) return 'Текст';
+  if (idx === 0 && total >= 2) return 'Заголовок';
+  if (idx === 1 && total >= 3) return 'Подзаголовок';
+  if (idx === total - 1 && total >= 4) return 'Итог / Примечание';
+  return num;
+}
+
+// ── Init SortableJS on block list ──
+function sbInitSortable() {
+  var el = document.getElementById('sbBlockList');
+  if (!el) return;
+  if (sbSortableInstance) { try { sbSortableInstance.destroy(); } catch(e) {} }
+  sbSortableInstance = new Sortable(el, {
+    handle: '.sb-drag-handle',
+    animation: 200,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    onEnd: function(evt) {
+      if (evt.oldIndex === evt.newIndex) return;
+      sbReorderAfterDrag();
+    }
+  });
+}
+
+// ── Reorder after drag-and-drop ──
+async function sbReorderAfterDrag() {
+  var el = document.getElementById('sbBlockList');
+  if (!el) return;
+  var items = el.querySelectorAll('.sb-block-item');
+  var newIds = [];
+  items.forEach(function(item) { newIds.push(parseInt(item.getAttribute('data-block-id'))); });
+
+  // Build order for API
+  var orders = newIds.map(function(id, i) { return { id: id, sort_order: i }; });
+
+  // Update local data order
+  var blockMap = {};
+  (data.siteBlocks || []).forEach(function(b) { blockMap[b.id] = b; });
+  var reordered = newIds.map(function(id) { return blockMap[id]; }).filter(Boolean);
+  // Keep calculator blocks appended
+  var calcBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type === 'calculator'; });
+  var contentBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
+  
+  if (sbActiveTab === 'calculator') {
+    data.siteBlocks = contentBlocks.concat(reordered);
+  } else {
+    data.siteBlocks = reordered.concat(calcBlocks);
+  }
+
+  toast('Порядок обновлён');
+  
+  // Save to server
+  await api('/site-blocks/reorder', { method: 'POST', body: JSON.stringify({ orders: orders }) });
+  // Sync section_order for live site
+  var sectionOrders = reordered.map(function(b, i) { return { section_id: b.block_key, sort_order: i }; });
+  await api('/section-order', { method: 'PUT', body: JSON.stringify({ orders: sectionOrders }) });
+}
+
+// ── Auto-save with debounce ──
+function sbAutoSave(blockId) {
+  if (sbSaveTimers[blockId]) clearTimeout(sbSaveTimers[blockId]);
+  sbSaveTimers[blockId] = setTimeout(function() {
+    sbSaveBlock(blockId);
+  }, 1200);
+}
+
+// ── Show save status ──
+function sbShowSaveStatus(status) {
+  sbSaveStatus = status;
+  var ind = document.getElementById('sbSaveIndicator');
+  if (ind) {
+    ind.className = 'sb-save-indicator ' + status;
+    ind.innerHTML = status === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение...' : '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено';
+  }
+  if (status === 'saved') {
+    setTimeout(function() {
+      sbSaveStatus = 'hidden';
+      var ind2 = document.getElementById('sbSaveIndicator');
+      if (ind2) ind2.className = 'sb-save-indicator hidden';
+    }, 2000);
+  }
 }
 
 // ── Toggle expand ──
@@ -8547,7 +8727,7 @@ function toggleSbExpand(id) {
   render();
 }
 function sbExpandAll() {
-  var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
+  var blocks = (data.siteBlocks || []).filter(function(b) { return sbActiveTab === 'calculator' ? b.block_type === 'calculator' : b.block_type !== 'calculator'; });
   blocks.forEach(function(b) { sbExpandedBlocks[b.id] = true; });
   render();
 }
@@ -8556,45 +8736,45 @@ function sbCollapseAll() {
   render();
 }
 
-// ── Move block up/down ──
+// ── Move block (fallback for non-drag) ──
 async function sbMoveBlock(id, direction) {
   var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
   var idx = blocks.findIndex(function(b) { return b.id === id; });
   if (idx < 0) return;
   var newIdx = idx + direction;
   if (newIdx < 0 || newIdx >= blocks.length) return;
-  // Swap in local data
   var temp = blocks[idx];
   blocks[idx] = blocks[newIdx];
   blocks[newIdx] = temp;
-  // Build new order for ALL blocks (including calculator ones)
   var calcBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type === 'calculator'; });
   var allBlocks = blocks.concat(calcBlocks);
   var orders = allBlocks.map(function(b, i) { return { id: b.id, sort_order: i }; });
   data.siteBlocks = allBlocks;
   render();
   await api('/site-blocks/reorder', { method: 'POST', body: JSON.stringify({ orders: orders }) });
-  // Also sync section_order for live site
   var sectionOrders = blocks.map(function(b, i) { return { section_id: b.block_key, sort_order: i }; });
   await api('/section-order', { method: 'PUT', body: JSON.stringify({ orders: sectionOrders }) });
-  toast('Порядок блоков обновлён');
+  toast('Порядок обновлён');
 }
 
 // ── Visibility toggle ──
 async function toggleSbVisible(id, val) {
   await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify({ is_visible: val }) });
-  var res = await api('/site-blocks');
-  data.siteBlocks = (res && res.blocks) || [];
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === id; });
+  if (b) b.is_visible = val;
   render();
+  // Sync visibility to section_order
+  if (b) await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' });
+  toast(val ? 'Блок показан на сайте' : 'Блок скрыт с сайта');
 }
 
 // ── Delete block ──
 async function delSiteBlock(id) {
-  if (!confirm('Удалить блок?')) return;
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === id; });
+  if (!confirm('Удалить блок «' + (b ? b.title_ru || b.block_key : '') + '»? Это действие необратимо.')) return;
   await api('/site-blocks/' + id, { method: 'DELETE' });
   delete sbExpandedBlocks[id];
-  var res = await api('/site-blocks');
-  data.siteBlocks = (res && res.blocks) || [];
+  data.siteBlocks = (data.siteBlocks || []).filter(function(x) { return x.id !== id; });
   toast('Блок удалён');
   render();
 }
@@ -8626,6 +8806,7 @@ function sbRemoveTextPair(blockId, idx) {
   if (b.texts_ru && idx < b.texts_ru.length) b.texts_ru.splice(idx, 1);
   if (b.texts_am && idx < b.texts_am.length) b.texts_am.splice(idx, 1);
   render();
+  sbAutoSave(blockId);
 }
 
 // ── Add button ──
@@ -8643,21 +8824,23 @@ function sbRemoveButton(blockId, idx) {
   if (!b || !b.buttons) return;
   b.buttons.splice(idx, 1);
   render();
+  sbAutoSave(blockId);
 }
 
-// ── Create new block ──
+// ── Create new block (modal) ──
 function createSiteBlock() {
   var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], is_visible: 1, custom_css: '', custom_html: '' };
-  // Show as a new unsaved block at the top by calling the modal editor
   editingBlock = newBlock;
   showBlockEditor();
 }
 
-// ── Save block inline (collect from inputs) ──
+// ── Save block (collect from DOM + send to API) ──
 async function sbSaveBlock(id) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === id; });
   if (!b) return;
   
+  sbShowSaveStatus('saving');
+
   // Collect title
   var titleRuEl = document.getElementById('sb_title_ru_' + id);
   var titleAmEl = document.getElementById('sb_title_am_' + id);
@@ -8691,40 +8874,46 @@ async function sbSaveBlock(id) {
   b.buttons = newBtns;
 
   // Save to server
-  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(b) });
+  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(b) }, true);
   // Sync to site_content for instant site update
-  await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' });
+  await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' }, true);
   
-  toast('Блок «' + (b.title_ru || b.block_key) + '» сохранён и обновлён на сайте');
-  var res = await api('/site-blocks');
-  data.siteBlocks = (res && res.blocks) || [];
-  render();
+  sbShowSaveStatus('saved');
 }
+
+// ── Keyboard shortcut: Ctrl+S ──
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's' && currentPage === 'blocks') {
+    e.preventDefault();
+    // Save all expanded blocks
+    var expandedIds = Object.keys(sbExpandedBlocks);
+    expandedIds.forEach(function(id) { sbSaveBlock(parseInt(id)); });
+    if (expandedIds.length === 0) toast('Раскройте блок для сохранения');
+  }
+});
 
 // ── Modal editor for NEW blocks ──
 var editingBlock = null;
 function showBlockEditor() {
   if (!editingBlock) return;
   var b = editingBlock;
-  var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="closeBlockEditor()">' +
-    '<div class="card" style="width:800px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1.1rem;font-weight:700">' + (b.id ? 'Редактировать блок' : 'Новый блок') + '</h3><button class="btn btn-outline" style="padding:6px 10px" onclick="closeBlockEditor()"><i class="fas fa-times"></i></button></div>';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Ключ блока</label><input class="input" id="sbKey" value="' + escHtml(b.block_key) + '"></div><div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Тип</label><select class="input" id="sbType"><option value="section"' + (b.block_type==='section'?' selected':'') + '>Секция</option><option value="hero"' + (b.block_type==='hero'?' selected':'') + '>Hero</option><option value="features"' + (b.block_type==='features'?' selected':'') + '>Features</option><option value="cta"' + (b.block_type==='cta'?' selected':'') + '>CTA</option></select></div></div>';
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px"><div><label style="font-size:0.78rem;color:#8B5CF6;display:block;margin-bottom:4px">Заголовок (RU)</label><input class="input" id="sbTitleRu" value="' + escHtml(b.title_ru) + '"></div><div><label style="font-size:0.78rem;color:#fbbf24;display:block;margin-bottom:4px">Заголовок (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '"></div></div>';
-  // Texts
-  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px"><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#8B5CF6;font-weight:700">Тексты (RU)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(&apos;ru&apos;)"><i class="fas fa-plus"></i></button></div><div id="sbTextsRu">';
-  (b.texts_ru||[]).forEach(function(t, i) { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_ru[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(&apos;ru&apos;,' + i + ')"><i class="fas fa-times"></i></button></div>'; });
-  h += '</div></div><div><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><label style="font-size:0.78rem;color:#fbbf24;font-weight:700">Тексты (AM)</label><button class="btn btn-outline" style="padding:2px 8px;font-size:0.72rem" onclick="addSbText(&apos;am&apos;)"><i class="fas fa-plus"></i></button></div><div id="sbTextsAm">';
-  (b.texts_am||[]).forEach(function(t, i) { h += '<div style="display:flex;gap:6px;margin-bottom:6px"><textarea class="input" style="min-height:50px;font-size:0.82rem" onchange="editingBlock.texts_am[' + i + ']=this.value">' + escHtml(t) + '</textarea><button class="tier-del-btn" onclick="rmSbText(&apos;am&apos;,' + i + ')"><i class="fas fa-times"></i></button></div>'; });
-  h += '</div></div></div>';
-  // Actions
-  h += '<div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn btn-outline" onclick="closeBlockEditor()">Отмена</button><button class="btn btn-primary" onclick="saveSiteBlockModal()"><i class="fas fa-save" style="margin-right:6px"></i>Создать</button></div>';
+  var h = '<div id="siteBlockModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px" onclick="closeBlockEditor()">' +
+    '<div class="card" style="width:700px;max-width:95vw;max-height:90vh;overflow:auto" onclick="event.stopPropagation()">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1.1rem;font-weight:700"><i class="fas fa-plus-circle" style="color:#8B5CF6;margin-right:8px"></i>Новый блок</h3><button class="btn btn-outline" style="padding:6px 10px" onclick="closeBlockEditor()"><i class="fas fa-times"></i></button></div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+  h += '<div><label class="sb-field-label" style="color:#94a3b8"><i class="fas fa-key"></i> Ключ блока</label><input class="input" id="sbKey" value="' + escHtml(b.block_key) + '" placeholder="my_block"></div>';
+  h += '<div><label class="sb-field-label" style="color:#94a3b8"><i class="fas fa-tag"></i> Тип</label><select class="input" id="sbType"><option value="section">Секция</option><option value="hero">Hero</option><option value="cta">CTA</option></select></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
+  h += '<div><label class="sb-field-label ru"><i class="fas fa-heading"></i> Название (RU)</label><input class="input" id="sbTitleRu" value="' + escHtml(b.title_ru) + '" placeholder="Название блока"></div>';
+  h += '<div><label class="sb-field-label am"><i class="fas fa-heading"></i> Անվdelays (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '" placeholder="Բdelays անdelays"></div>';
+  h += '</div>';
+  h += '<div style="text-align:right;margin-top:16px"><button class="btn btn-success" onclick="saveSiteBlockModal()" style="min-width:180px"><i class="fas fa-save" style="margin-right:6px"></i>Создать блок</button></div>';
   h += '</div></div>';
-  // Inject modal
-  var modal = document.createElement('div');
-  modal.id = 'siteBlockModal';
-  modal.innerHTML = h;
-  document.body.appendChild(modal);
+  
+  var existing = document.getElementById('siteBlockModal');
+  if (existing) existing.remove();
+  document.body.insertAdjacentHTML('beforeend', h);
 }
 
 function closeBlockEditor() {
@@ -8742,7 +8931,7 @@ function addSbText(lang) {
 }
 function rmSbText(lang, idx) {
   if (!editingBlock) return;
-  editingBlock['texts_' + lang].splice(idx, 1);
+  if (editingBlock['texts_' + lang] && idx < editingBlock['texts_' + lang].length) editingBlock['texts_' + lang].splice(idx, 1);
   closeBlockEditor();
   showBlockEditor();
 }
@@ -8769,19 +8958,19 @@ async function saveSiteBlockModal() {
   closeBlockEditor();
   var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
-  toast('Блок сохранён и синхронизирован с сайтом');
+  toast('Блок создан и синхронизирован с сайтом');
   render();
 }
 
 // ── Import all blocks from site ──
 async function importSiteBlocks() {
   if (data.siteBlocks && data.siteBlocks.length > 0) {
-    if (!confirm('Внимание! Все текущие блоки будут заменены данными с сайта. Продолжить?')) return;
+    if (!confirm('Все текущие блоки будут заменены данными с сайта. Продолжить?')) return;
   }
   toast('Загрузка блоков с сайта...');
   var result = await api('/site-blocks/import-from-site', { method: 'POST' });
   if (result && result.success) {
-    toast('Успешно загружено ' + (result.imported || 0) + ' блоков на 2 языках!');
+    toast('Загружено ' + (result.imported || 0) + ' блоков на 2 языках!');
   } else {
     toast('Ошибка загрузки', 'error');
   }
