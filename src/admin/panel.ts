@@ -8377,12 +8377,22 @@ async function cloneCompanyRole(id) {
 }
 
 // ===== SITE BLOCKS CONSTRUCTOR (emergent-style) =====
+var sbLangView = 'both'; // 'both', 'ru', 'am'
 function renderSiteBlocks() {
   const blocks = data.siteBlocks || [];
-  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px"><div><h1 style="font-size:1.5rem;font-weight:800">\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 \u0431\u043b\u043e\u043a\u043e\u0432 v2</h1><p style="color:#94a3b8;font-size:0.85rem">\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0435 \u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0441\u0435\u043a\u0446\u0438\u0439 \u0441\u0430\u0439\u0442\u0430 (RU/AM)</p></div>' +
-    '<button class="btn btn-primary" onclick="createSiteBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a</button></div>';
+  let h = '<div style="padding:32px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px"><div><h1 style="font-size:1.5rem;font-weight:800"><i class="fas fa-cubes" style="color:#8B5CF6;margin-right:10px"></i>\u041a\u043e\u043d\u0441\u0442\u0440\u0443\u043a\u0442\u043e\u0440 \u0431\u043b\u043e\u043a\u043e\u0432</h1><p style="color:#94a3b8;font-size:0.85rem">\u0412\u0438\u0437\u0443\u0430\u043b\u044c\u043d\u043e\u0435 \u0440\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u0435 \u0441\u0435\u043a\u0446\u0438\u0439 \u0441\u0430\u0439\u0442\u0430 \u043d\u0430 2 \u044f\u0437\u044b\u043a\u0430\u0445. \u0418\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u0441\u0440\u0430\u0437\u0443 \u043e\u0442\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u043d\u0430 \u0441\u0430\u0439\u0442\u0435.</p></div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0431\u043b\u043e\u043a\u0438 \u0441 \u0441\u0430\u0439\u0442\u0430</button>' +
+      '<button class="btn btn-primary" onclick="createSiteBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>\u041d\u043e\u0432\u044b\u0439 \u0431\u043b\u043e\u043a</button>' +
+    '</div></div>';
+  // Language toggle
+  h += '<div style="display:flex;gap:6px;margin-bottom:16px;align-items:center"><span style="font-size:0.82rem;color:#94a3b8;margin-right:8px"><i class="fas fa-language" style="margin-right:4px"></i>\u042f\u0437\u044b\u043a:</span>' +
+    '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'both\\';render()">RU + AM</button>' +
+    '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'ru\\';render()">\ud83c\uddf7\ud83c\uddfa RU</button>' +
+    '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'am\\';render()">\ud83c\udde6\ud83c\uddf2 AM</button>' +
+  '</div>';
   if (blocks.length === 0) {
-    h += '<div class="card" style="text-align:center;padding:48px;color:#64748b"><i class="fas fa-cubes" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>\u0411\u043b\u043e\u043a\u0438 \u0435\u0449\u0451 \u043d\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b</p></div>';
+    h += '<div class="card" style="text-align:center;padding:48px;color:#64748b"><i class="fas fa-cubes" style="font-size:2.5rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>\u0411\u043b\u043e\u043a\u0438 \u0435\u0449\u0451 \u043d\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u044b. \u041d\u0430\u0436\u043c\u0438\u0442\u0435 \u00ab\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c \u0431\u043b\u043e\u043a\u0438 \u0441 \u0441\u0430\u0439\u0442\u0430\u00bb \u0447\u0442\u043e\u0431\u044b \u0438\u043c\u043f\u043e\u0440\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u0432\u0441\u0435 \u0442\u0435\u043a\u0441\u0442\u044b \u0438 \u043a\u0430\u043b\u044c\u043a\u0443\u043b\u044f\u0442\u043e\u0440 \u043d\u0430 2 \u044f\u0437\u044b\u043a\u0430\u0445.</p></div>';
   } else {
     h += '<div style="display:grid;gap:8px">';
     blocks.forEach((b, idx) => {
@@ -8407,13 +8417,23 @@ function renderSiteBlocks() {
       h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="delSiteBlock(' + b.id + ')"><i class="fas fa-trash"></i></button>';
       h += '</div>';
       h += '<i class="fas fa-chevron-down" style="color:#64748b"></i></div>';
-      // Expanded preview
+      // Expanded preview with language toggle
       h += '<div id="sb-expand-' + b.id + '" style="display:none;padding:16px;border-top:1px solid #334155;background:#0f172a">';
-      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:12px"><div><div style="font-size:0.75rem;font-weight:700;color:#8B5CF6;margin-bottom:6px">\u0422\u0435\u043a\u0441\u0442\u044b (RU)</div>';
-      (b.texts_ru||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
-      h += '</div><div><div style="font-size:0.75rem;font-weight:700;color:#fbbf24;margin-bottom:6px">\u0422\u0435\u043a\u0441\u0442\u044b (AM)</div>';
-      (b.texts_am||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
-      h += '</div></div>';
+      const showRu = sbLangView === 'both' || sbLangView === 'ru';
+      const showAm = sbLangView === 'both' || sbLangView === 'am';
+      const gridCols = (showRu && showAm) ? '1fr 1fr' : '1fr';
+      h += '<div style="display:grid;grid-template-columns:' + gridCols + ';gap:16px;margin-bottom:12px">';
+      if (showRu) {
+        h += '<div><div style="font-size:0.75rem;font-weight:700;color:#8B5CF6;margin-bottom:6px">\ud83c\uddf7\ud83c\uddfa \u0422\u0435\u043a\u0441\u0442\u044b (RU)</div>';
+        (b.texts_ru||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
+        h += '</div>';
+      }
+      if (showAm) {
+        h += '<div><div style="font-size:0.75rem;font-weight:700;color:#fbbf24;margin-bottom:6px">\ud83c\udde6\ud83c\uddf2 \u0422\u0435\u043a\u0441\u0442\u044b (AM)</div>';
+        (b.texts_am||[]).forEach(t => { h += '<div style="font-size:0.85rem;margin-bottom:4px;padding:6px 10px;background:#1e293b;border-radius:6px;border:1px solid #334155">' + (escHtml(t)||'<span style="color:#64748b">\u043f\u0443\u0441\u0442\u043e</span>') + '</div>'; });
+        h += '</div>';
+      }
+      h += '</div>';
       if ((b.buttons||[]).length > 0) {
         h += '<div style="font-size:0.75rem;font-weight:700;color:#a78bfa;margin-bottom:6px">\u041a\u043d\u043e\u043f\u043a\u0438</div><div style="display:flex;gap:8px;flex-wrap:wrap">';
         (b.buttons||[]).forEach(btn => { h += '<span style="padding:6px 12px;background:#8B5CF6;color:white;border-radius:6px;font-size:0.82rem">' + escHtml(btn.text_ru) + '</span>'; });
@@ -8547,13 +8567,40 @@ async function saveSiteBlock() {
   
   if (editingBlock.id) {
     await api('/site-blocks/' + editingBlock.id, { method:'PUT', body: JSON.stringify(editingBlock) });
+    // Sync changes to site_content for instant site update
+    await api('/site-blocks/' + editingBlock.id + '/sync-to-site', { method:'POST' });
   } else {
-    await api('/site-blocks', { method:'POST', body: JSON.stringify(editingBlock) });
+    var createRes = await api('/site-blocks', { method:'POST', body: JSON.stringify(editingBlock) });
+    // For new blocks, reload to get ID, then sync
+    var freshRes = await api('/site-blocks');
+    data.siteBlocks = (freshRes && freshRes.blocks) || [];
+    // Find the newly created block and sync
+    var newBlock = data.siteBlocks.find(function(b) { return b.block_key === editingBlock.block_key; });
+    if (newBlock) {
+      await api('/site-blocks/' + newBlock.id + '/sync-to-site', { method:'POST' });
+    }
   }
   closeBlockEditor();
   const res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
-  toast('\u0411\u043b\u043e\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
+  toast('\u0411\u043b\u043e\u043a \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d \u0438 \u0441\u0438\u043d\u0445\u0440\u043e\u043d\u0438\u0437\u0438\u0440\u043e\u0432\u0430\u043d \u0441 \u0441\u0430\u0439\u0442\u043e\u043c');
+  render();
+}
+
+// Import all blocks from site
+async function importSiteBlocks() {
+  if (data.siteBlocks && data.siteBlocks.length > 0) {
+    if (!confirm('\u0412\u043d\u0438\u043c\u0430\u043d\u0438\u0435! \u0412\u0441\u0435 \u0442\u0435\u043a\u0443\u0449\u0438\u0435 \u0431\u043b\u043e\u043a\u0438 \u0431\u0443\u0434\u0443\u0442 \u0437\u0430\u043c\u0435\u043d\u0435\u043d\u044b \u0434\u0430\u043d\u043d\u044b\u043c\u0438 \u0441 \u0441\u0430\u0439\u0442\u0430. \u041f\u0440\u043e\u0434\u043e\u043b\u0436\u0438\u0442\u044c?')) return;
+  }
+  toast('\u0417\u0430\u0433\u0440\u0443\u0437\u043a\u0430 \u0431\u043b\u043e\u043a\u043e\u0432 \u0441 \u0441\u0430\u0439\u0442\u0430...');
+  var result = await api('/site-blocks/import-from-site', { method: 'POST' });
+  if (result && result.success) {
+    toast('\u0423\u0441\u043f\u0435\u0448\u043d\u043e \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d\u043e ' + (result.imported || 0) + ' \u0431\u043b\u043e\u043a\u043e\u0432 \u043d\u0430 2 \u044f\u0437\u044b\u043a\u0430\u0445!');
+  } else {
+    toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0437\u0430\u0433\u0440\u0443\u0437\u043a\u0438');
+  }
+  var res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
   render();
 }
 

@@ -1224,6 +1224,166 @@ api.post('/site-blocks/reorder', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== IMPORT BLOCKS FROM SITE (populate site_blocks from site_content + calculator) =====
+api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  
+  // 1. Load all content sections
+  const contentRes = await db.prepare('SELECT * FROM site_content ORDER BY sort_order').all();
+  const sections = contentRes.results || [];
+  
+  // 2. Load calculator tabs + services
+  const tabsRes = await db.prepare('SELECT * FROM calculator_tabs WHERE is_active = 1 ORDER BY sort_order').all();
+  const svcsRes = await db.prepare(`SELECT cs.*, ct.tab_key, ct.name_ru as tab_name_ru, ct.name_am as tab_name_am 
+    FROM calculator_services cs 
+    JOIN calculator_tabs ct ON cs.tab_id = ct.id 
+    WHERE cs.is_active = 1 
+    ORDER BY cs.tab_id, cs.sort_order`).all();
+  
+  // 3. Load section order for visibility/labels
+  const orderRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
+  const orderMap: Record<string, any> = {};
+  for (const o of (orderRes.results || [])) {
+    orderMap[o.section_id as string] = o;
+  }
+  
+  // 4. Clear existing site_blocks
+  await db.prepare('DELETE FROM site_blocks').run();
+  
+  // 5. Create blocks from site_content sections
+  let sortIdx = 0;
+  for (const sec of sections) {
+    const key = sec.section_key as string;
+    const name = sec.section_name as string;
+    let items: any[] = [];
+    try { items = JSON.parse(sec.content_json as string); } catch { items = []; }
+    
+    const textsRu = items.map((it: any) => it.ru || '');
+    const textsAm = items.map((it: any) => it.am || '');
+    const order = orderMap[key];
+    const isVisible = order ? (order.is_visible === 1 || order.is_visible === true) : true;
+    const labelAm = order?.label_am || '';
+    
+    await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(key, 'section', name, labelAm, JSON.stringify(textsRu), JSON.stringify(textsAm), '[]', '[]', '', '', isVisible ? 1 : 0, sortIdx).run();
+    sortIdx++;
+  }
+  
+  // 6. Create calculator block with tabs + services info
+  const calcTextsRu: string[] = [];
+  const calcTextsAm: string[] = [];
+  for (const tab of (tabsRes.results || [])) {
+    calcTextsRu.push(`[TAB] ${tab.name_ru}`);
+    calcTextsAm.push(`[TAB] ${tab.name_am}`);
+  }
+  for (const svc of (svcsRes.results || [])) {
+    const price = svc.price as number;
+    const priceType = svc.price_type as string;
+    let tiersStr = '';
+    if (priceType === 'tiered' && svc.price_tiers_json) {
+      try {
+        const tiers = JSON.parse(svc.price_tiers_json as string);
+        tiersStr = ' [TIERS: ' + tiers.map((t: any) => `${t.min}-${t.max}: ${t.price}֏`).join(', ') + ']';
+      } catch {}
+    }
+    calcTextsRu.push(`[SVC:${svc.tab_key}] ${svc.name_ru} — ${price}֏${tiersStr}`);
+    calcTextsAm.push(`[SVC:${svc.tab_key}] ${svc.name_am} — ${price}֏${tiersStr}`);
+  }
+  
+  await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind('calculator_data', 'calculator', 'Калькулятор (услуги и цены)', 'Հաdelays (ділaymentner ev gner)', JSON.stringify(calcTextsRu), JSON.stringify(calcTextsAm), '[]', '[]', '', '', 1, sortIdx).run();
+  
+  return c.json({ success: true, imported: sortIdx + 1 });
+});
+
+// ===== SYNC BLOCK BACK TO SITE CONTENT (for instant site update) =====
+api.post('/site-blocks/:id/sync-to-site', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  
+  const block = await db.prepare('SELECT * FROM site_blocks WHERE id = ?').bind(id).first();
+  if (!block) return c.json({ error: 'Block not found' }, 404);
+  
+  const blockKey = block.block_key as string;
+  const blockType = block.block_type as string;
+  
+  // For calculator type, sync to calculator_tabs/services
+  if (blockType === 'calculator') {
+    // Calculator sync is more complex — parse tagged texts
+    const textsRu = JSON.parse(block.texts_ru as string || '[]');
+    const textsAm = JSON.parse(block.texts_am as string || '[]');
+    
+    for (let i = 0; i < textsRu.length; i++) {
+      const ru = textsRu[i] || '';
+      const am = textsAm[i] || '';
+      
+      // Parse [SVC:tab_key] name — price format
+      const svcMatch = ru.match(/^\[SVC:(\w+)\]\s*(.+?)\s*—\s*(\d+)/);
+      if (svcMatch) {
+        const tabKey = svcMatch[1];
+        const nameRu = svcMatch[2];
+        const price = parseInt(svcMatch[3]);
+        const amSvcMatch = am.match(/^\[SVC:\w+\]\s*(.+?)\s*—/);
+        const nameAm = amSvcMatch ? amSvcMatch[1] : '';
+        
+        // Update service by tab_key + sort position
+        const tab = await db.prepare('SELECT id FROM calculator_tabs WHERE tab_key = ?').bind(tabKey).first();
+        if (tab) {
+          // Find service by name or create
+          const existing = await db.prepare('SELECT id FROM calculator_services WHERE tab_id = ? AND name_ru = ?').bind(tab.id, nameRu).first();
+          if (existing) {
+            await db.prepare('UPDATE calculator_services SET name_am = ?, price = ? WHERE id = ?').bind(nameAm, price, existing.id).run();
+          }
+        }
+      }
+      
+      // Parse [TAB] name format
+      const tabMatch = ru.match(/^\[TAB\]\s*(.+)/);
+      if (tabMatch) {
+        const tabNameRu = tabMatch[1];
+        const amTabMatch = am.match(/^\[TAB\]\s*(.+)/);
+        const tabNameAm = amTabMatch ? amTabMatch[1] : '';
+        
+        await db.prepare('UPDATE calculator_tabs SET name_ru = ?, name_am = ? WHERE name_ru = ?').bind(tabNameRu, tabNameAm, tabNameRu).run();
+      }
+    }
+    return c.json({ success: true, synced: 'calculator' });
+  }
+  
+  // For regular sections, sync to site_content
+  const textsRu = JSON.parse(block.texts_ru as string || '[]');
+  const textsAm = JSON.parse(block.texts_am as string || '[]');
+  
+  // Build content_json array of {ru, am} pairs
+  const maxLen = Math.max(textsRu.length, textsAm.length);
+  const contentItems: {ru: string, am: string}[] = [];
+  for (let i = 0; i < maxLen; i++) {
+    contentItems.push({
+      ru: textsRu[i] || '',
+      am: textsAm[i] || ''
+    });
+  }
+  
+  // Update or insert into site_content
+  const existing = await db.prepare('SELECT id FROM site_content WHERE section_key = ?').bind(blockKey).first();
+  if (existing) {
+    await db.prepare('UPDATE site_content SET content_json = ?, section_name = ? WHERE section_key = ?')
+      .bind(JSON.stringify(contentItems), block.title_ru, blockKey).run();
+  } else {
+    await db.prepare('INSERT INTO site_content (section_key, section_name, content_json, sort_order) VALUES (?,?,?,?)')
+      .bind(blockKey, block.title_ru, JSON.stringify(contentItems), 999).run();
+  }
+  
+  // Also update section_order visibility and labels
+  const orderExists = await db.prepare('SELECT id FROM section_order WHERE section_id = ?').bind(blockKey).first();
+  if (orderExists) {
+    await db.prepare('UPDATE section_order SET is_visible = ?, label_ru = ?, label_am = ? WHERE section_id = ?')
+      .bind(block.is_visible, block.title_ru, block.title_am, blockKey).run();
+  }
+  
+  return c.json({ success: true, synced: blockKey });
+});
+
 api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
