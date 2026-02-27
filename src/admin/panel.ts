@@ -8765,8 +8765,49 @@ function renderSiteBlocks() {
         if (showAm) h += '<div class="sb-field-group"><div class="sb-field-label am"><i class="fas fa-heading"></i> Վերնագիր (AM)</div><input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div>';
 
-        // ── TICKER EDITOR (special for ticker blocks) ──
-        if (isTicker) {
+        // ── CALCULATOR EDITOR (compact — only title texts + link) ──
+        var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
+        if (isCalcBlock) {
+          h += '<div style="margin-bottom:16px;padding:16px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:10px">';
+          h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
+            '<i class="fas fa-calculator" style="color:#8B5CF6;font-size:1.2rem"></i>' +
+            '<h4 style="font-size:0.95rem;font-weight:700;color:#a78bfa">Блок калькулятора</h4>' +
+          '</div>';
+          
+          // Show only first 2 texts (heading + subheading)
+          var calcTextsCount = Math.min(maxTexts, 2);
+          for (var ti = 0; ti < calcTextsCount; ti++) {
+            var ruText = ti < textsRu.length ? textsRu[ti] : '';
+            var amText = ti < textsAm.length ? textsAm[ti] : '';
+            var isLong = ruText.length > 100 || amText.length > 100;
+            var fieldLabel = ti === 0 ? 'Заголовок секции' : 'Подзаголовок';
+            h += '<div class="sb-text-pair" style="margin-bottom:10px">';
+            h += '<div class="sb-text-pair-num">' + fieldLabel + '</div>';
+            h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
+            if (showRu) {
+              h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
+              if (isLong) { h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:50px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(ruText) + '</textarea>'; }
+              else { h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">'; }
+              h += '</div>';
+            }
+            if (showAm) {
+              h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label am" style="margin-bottom:3px">AM</div>';
+              if (isLong) { h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:50px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>'; }
+              else { h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">'; }
+              h += '</div>';
+            }
+            h += '</div></div>';
+          }
+          
+          // Link to calculator settings tab
+          h += '<div style="margin-top:12px;padding:12px;background:#1a2236;border:1px solid #293548;border-radius:8px;display:flex;align-items:center;justify-content:between;gap:12px;cursor:pointer" onclick="sbActiveTab=&apos;calculator&apos;;render()">';
+          h += '<div style="flex:1"><div style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-cog" style="margin-right:6px"></i>Настройки калькулятора</div>';
+          h += '<div style="font-size:0.72rem;color:#64748b;margin-top:2px">Вкладки, услуги, цены — редактируются в разделе «Калькулятор»</div></div>';
+          h += '<i class="fas fa-arrow-right" style="color:#8B5CF6;font-size:1rem"></i>';
+          h += '</div>';
+          h += '</div>';
+          
+        } else if (isTicker) {
           h += '<div style="margin-bottom:16px;padding:14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:10px">';
           h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
             '<h4 style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-stream" style="margin-right:6px"></i>Элементы бегущей строки <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + maxTexts + ' элементов)</span></h4>' +
@@ -8828,6 +8869,9 @@ function renderSiteBlocks() {
           }
           h += '</div>';
         }
+
+        // ── Skip detail sections for calculator blocks (they have their own compact editor above) ──
+        if (!isCalcBlock) {
 
         // ── Buttons section: compact view with link to "Быстрые сообщения" tab ──
         h += '<div style="margin-bottom:16px">';
@@ -8945,8 +8989,19 @@ function renderSiteBlocks() {
           var blockPhotos = [];
           try { blockPhotos = opts.photos || []; } catch(e) { blockPhotos = []; }
           if (!Array.isArray(blockPhotos)) blockPhotos = [];
+          
+          // Recommended photo dimensions per block type
+          var photoDims = { hero: '600×800px (портрет) или 1200×675px (16:9)', about: '800×600px (горизонт) или 600×600px (квадрат)', warehouse: '800×500px (горизонт, 16:10)', wb_official: '1200×675px (16:9)', services: '600×400px (горизонт)', wb_banner: '1200×400px (баннер, 3:1)' };
+          var dimHint = photoDims[b.block_key] || '800×600px (рекомендуемый размер)';
+          
           h += '<div style="margin-bottom:16px">';
           h += '<details' + (blockPhotos.length > 0 || opts.photo_url ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>Фото блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
+          
+          // Photo size recommendation
+          h += '<div style="padding:6px 10px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:6px">' +
+            '<i class="fas fa-ruler-combined" style="color:#60a5fa;font-size:0.75rem"></i>' +
+            '<span style="font-size:0.72rem;color:#60a5fa">Рекомендуемый размер: <b>' + dimHint + '</b> • Макс: 5 МБ • JPG/PNG/WebP</span>' +
+          '</div>';
           
           // Main photo URL (replaces main section image, e.g. Hero photo)
           h += '<div style="margin-bottom:10px;padding:8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
@@ -8959,6 +9014,9 @@ function renderSiteBlocks() {
           h += '</div></div>';
 
           // Additional photos gallery
+          if (blockPhotos.length > 0) {
+            h += '<div style="font-size:0.72rem;color:#94a3b8;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-th" style="margin-right:4px"></i>Галерея (' + blockPhotos.length + ')</div>';
+          }
           h += '<div style="margin-bottom:6px">';
           for (var phi = 0; phi < blockPhotos.length; phi++) {
             var ph = blockPhotos[phi];
@@ -8994,7 +9052,7 @@ function renderSiteBlocks() {
         }
         // Slot counter toggle
         h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
-          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbToggleSlotCounter(' + b.id + ',this.checked);sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
+          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbToggleSlotCounter(' + b.id + ',this.checked)" style="accent-color:#8B5CF6;width:16px;height:16px">' +
           '<span><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:4px"></i>Счётчик слотов</span></label>';
         h += '</div>';
         
@@ -9002,19 +9060,22 @@ function renderSiteBlocks() {
         if (opts.show_slots) {
           var blockCounter = null;
           var counters = data.slotCounters || [];
+          var blockKeyHyphen = b.block_key.replace(/_/g,'-');
           // Find counter linked to this block key
           for (var sci = 0; sci < counters.length; sci++) {
-            if (counters[sci].position === 'in-' + b.block_key || counters[sci].position === 'after-' + b.block_key.replace(/_/g,'-') || counters[sci].position === 'in-' + b.block_key.replace(/_/g,'-')) {
+            var cpos = counters[sci].position || '';
+            if (cpos === 'in-' + b.block_key || cpos === 'after-' + b.block_key || cpos === 'in-' + blockKeyHyphen || cpos === 'after-' + blockKeyHyphen || cpos === 'before-' + blockKeyHyphen) {
               blockCounter = counters[sci]; break;
             }
           }
-          if (!blockCounter && counters.length > 0) {
-            // Find first visible counter
-            for (var sci = 0; sci < counters.length; sci++) { if (counters[sci].show_timer) { blockCounter = counters[sci]; break; } }
-          }
+          // If no directly linked counter, offer to link/create
           
-          h += '<div id="sb_slot_settings_' + b.id + '" style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid #293548;border-radius:8px">';
-          h += '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:10px"><i class="fas fa-cog" style="margin-right:4px"></i>Настройки счётчика слотов для этого блока</div>';
+          h += '<div id="sb_slot_settings_' + b.id + '" style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid rgba(251,191,36,0.2);border-radius:8px">';
+          h += '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between"><span><i class="fas fa-sliders-h" style="margin-right:4px"></i>Настройки счётчика для блока «' + escHtml(b.title_ru || b.block_key) + '»</span>';
+          if (blockCounter) {
+            h += '<span class="badge badge-green" style="font-size:0.65rem">ID #' + blockCounter.id + '</span>';
+          }
+          h += '</div>';
           
           if (blockCounter) {
             var scId = blockCounter.id;
@@ -9028,38 +9089,71 @@ function renderSiteBlocks() {
                 '<span style="font-size:0.78rem;color:#94a3b8">' + escHtml(blockCounter.label_ru || 'Свободных мест') + '</span>' +
                 '<span style="font-size:1.2rem;font-weight:800;color:' + scBarColor + '">' + scFree + '<span style="color:#64748b;font-weight:400;font-size:0.75rem"> / ' + blockCounter.total_slots + '</span></span>' +
               '</div>' +
-              '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + scPct + '%;background:' + scBarColor + ';border-radius:3px"></div></div>' +
+              '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + scPct + '%;background:' + scBarColor + ';border-radius:3px;transition:width 0.5s"></div></div>' +
             '</div>';
             
             h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
-            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Всего мест</div><input class="input" type="number" id="sb_sc_total_' + b.id + '" value="' + (blockCounter.total_slots || 10) + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
-            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Занято</div><input class="input" type="number" id="sb_sc_booked_' + b.id + '" value="' + (blockCounter.booked_slots || 0) + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Всего мест</div><input class="input" type="number" id="sb_sc_total_' + b.id + '" value="' + (blockCounter.total_slots || 10) + '" style="font-size:0.78rem" data-sc-id="' + scId + '"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Занято</div><input class="input" type="number" id="sb_sc_booked_' + b.id + '" value="' + (blockCounter.booked_slots || 0) + '" style="font-size:0.78rem" data-sc-id="' + scId + '"></div>';
             h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Свободно</div><div style="font-size:1.3rem;font-weight:800;color:#10B981;padding:6px 0">' + scFree + '</div></div>';
             h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
-            h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:3px">Надпись (RU)</div><input class="input" id="sb_sc_lru_' + b.id + '" value="' + escHtml(blockCounter.label_ru || '') + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
-            h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:3px">Надпись (AM)</div><input class="input" id="sb_sc_lam_' + b.id + '" value="' + escHtml(blockCounter.label_am || '') + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
+            h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+            h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:3px">Надпись (RU)</div><input class="input" id="sb_sc_lru_' + b.id + '" value="' + escHtml(blockCounter.label_ru || '') + '" style="font-size:0.78rem" data-sc-id="' + scId + '"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:3px">Надпись (AM)</div><input class="input" id="sb_sc_lam_' + b.id + '" value="' + escHtml(blockCounter.label_am || '') + '" style="font-size:0.78rem" data-sc-id="' + scId + '"></div>';
             h += '</div>';
-            h += '<div style="font-size:0.68rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:3px"></i>Счётчик #' + scId + ' • Для детальных настроек перейдите во вкладку «Счётчики слотов»</div>';
+            h += '<div style="display:flex;justify-content:space-between;align-items:center">';
+            h += '<button class="btn btn-success" style="font-size:0.78rem;padding:6px 14px" onclick="sbSaveInlineSlot(' + b.id + ',' + scId + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить счётчик</button>';
+            h += '<span style="font-size:0.68rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:3px"></i>Детали во вкладке «Счётчики слотов»</span>';
+            h += '</div>';
           } else {
-            h += '<div style="text-align:center;padding:10px;color:#64748b;font-size:0.82rem">' +
-              '<p style="margin-bottom:8px">Нет привязанного счётчика. Создайте новый.</p>' +
-              '<button class="btn btn-primary" style="font-size:0.78rem;padding:6px 14px" onclick="sbCreateSlotForBlock(&apos;' + b.block_key + '&apos;)"><i class="fas fa-plus" style="margin-right:4px"></i>Создать счётчик</button>' +
-            '</div>';
+            // No counter linked — show create form inline
+            h += '<div style="padding:10px;background:#1a2236;border-radius:8px;border:1px dashed #293548">';
+            h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:10px;text-align:center"><i class="fas fa-plus-circle" style="color:#fbbf24;margin-right:4px"></i>Создайте счётчик для этого блока</div>';
+            h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Всего мест</div><input class="input" type="number" id="sb_sc_newtotal_' + b.id + '" value="10" style="font-size:0.78rem"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Уже занято</div><input class="input" type="number" id="sb_sc_newbooked_' + b.id + '" value="0" style="font-size:0.78rem"></div>';
+            h += '</div>';
+            h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+            h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:3px">Надпись (RU)</div><input class="input" id="sb_sc_newlru_' + b.id + '" value="Свободных мест" style="font-size:0.78rem"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:3px">Надпись (AM)</div><input class="input" id="sb_sc_newlam_' + b.id + '" value="" placeholder="AM текст" style="font-size:0.78rem"></div>';
+            h += '</div>';
+            h += '<button class="btn btn-primary" style="width:100%;font-size:0.82rem" onclick="sbCreateSlotForBlockFull(&apos;' + b.block_key + '&apos;,' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Создать и привязать счётчик</button>';
+            h += '</div>';
           }
           h += '</div>';
         }
         
         h += '</details></div>';
 
-        // ── Footer: Save ──
-        h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #1e293b">' +
-          '<div style="font-size:0.72rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:4px"></i>Изменения сохраняются автоматически. Ctrl+S — принудительное сохранение всех блоков.</div>' +
+        } // end if (!isCalcBlock) — skip detail sections for calculator
+
+        // ── Footer: Save + Pro Tools ──
+        // Character count stats
+        var totalCharsRu = (b.texts_ru || []).reduce(function(sum, t) { return sum + (t||'').length; }, 0);
+        var totalCharsAm = (b.texts_am || []).reduce(function(sum, t) { return sum + (t||'').length; }, 0);
+        
+        h += '<div style="padding-top:14px;border-top:1px solid #1e293b">';
+        // Pro stats bar
+        h += '<div style="display:flex;gap:12px;margin-bottom:10px;flex-wrap:wrap;font-size:0.68rem;color:#475569">';
+        h += '<span title="Символов RU"><i class="fas fa-font" style="color:#8B5CF6;margin-right:2px"></i>RU: ' + totalCharsRu + ' симв.</span>';
+        h += '<span title="Символов AM"><i class="fas fa-font" style="color:#F59E0B;margin-right:2px"></i>AM: ' + totalCharsAm + ' симв.</span>';
+        h += '<span title="Кнопок"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:2px"></i>' + btnsCount + ' кноп.</span>';
+        if (socials.length > 0) h += '<span title="Соцсетей"><i class="fas fa-share-alt" style="color:#10B981;margin-right:2px"></i>' + socials.length + ' соц.</span>';
+        h += '<span title="Последнее обновление"><i class="fas fa-clock" style="margin-right:2px"></i>' + (b.updated_at ? new Date(b.updated_at).toLocaleString('ru') : 'не задано') + '</span>';
+        h += '</div>';
+        
+        h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center">' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbCopyBlockData(' + b.id + ')" title="Скопировать JSON блока"><i class="fas fa-clipboard"></i></button>' +
+            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbPreviewBlock(&apos;' + b.block_key + '&apos;)" title="Предпросмотр блока на сайте"><i class="fas fa-external-link-alt"></i></button>' +
+            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbResetBlock(' + b.id + ')" title="Сбросить до оригинала"><i class="fas fa-undo"></i></button>' +
+          '</div>' +
           '<div style="display:flex;gap:8px">' +
             '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')" style="font-size:0.82rem">Свернуть</button>' +
             '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:160px;font-size:0.82rem"><i class="fas fa-save" style="margin-right:5px"></i>Сохранить и синхр.</button>' +
           '</div>' +
         '</div>';
+        h += '</div>';
 
         h += '</div>'; // end expanded area
       }
@@ -9299,6 +9393,42 @@ function sbAddPhoto(blockId) {
   render();
 }
 
+// ── Pro Tools: Copy block data as JSON ──
+function sbCopyBlockData(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var exportData = {
+    block_key: b.block_key, block_type: b.block_type,
+    title_ru: b.title_ru, title_am: b.title_am,
+    texts_ru: b.texts_ru, texts_am: b.texts_am,
+    buttons: b.buttons, social_links: b.social_links,
+    options: JSON.parse(b.custom_html || '{}')
+  };
+  navigator.clipboard.writeText(JSON.stringify(exportData, null, 2)).then(function() {
+    toast('JSON скопирован в буфер обмена');
+  }).catch(function() { toast('Не удалось скопировать', 'error'); });
+}
+
+// ── Pro Tools: Preview block on live site ──
+function sbPreviewBlock(blockKey) {
+  var sectionId = blockKey.replace(/_/g, '-');
+  window.open('/#' + sectionId, '_blank');
+}
+
+// ── Pro Tools: Reset block to original (re-import from site) ──
+async function sbResetBlock(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  if (!confirm('Сбросить блок «' + (b.title_ru || b.block_key) + '» до оригинальных текстов с сайта? Текущие изменения будут потеряны.')) return;
+  toast('Сброс блока...');
+  // Re-import will overwrite, but for a single block we just sync from site_content
+  await api('/site-blocks/' + blockId + '/sync-to-site', { method: 'POST' });
+  var res = await api('/site-blocks');
+  data.siteBlocks = (res && res.blocks) || [];
+  toast('Блок сброшен и синхронизирован');
+  render();
+}
+
 // ── Remove photo from block ──
 function sbRemovePhoto(blockId, idx) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
@@ -9381,11 +9511,16 @@ async function sbUploadPhotoBatch(input, blockId) {
 }
 
 // ── Toggle slot counter for block ──
-function sbToggleSlotCounter(blockId, checked) {
-  if (checked) {
-    // Render will show inline settings on next render cycle
-  }
-  // Handled by sbAutoSave
+async function sbToggleSlotCounter(blockId, checked) {
+  // Save the opts first, then re-render to show/hide the form
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  opts.show_slots = checked;
+  b.custom_html = JSON.stringify(opts);
+  sbAutoSave(blockId);
+  render();
 }
 
 // ── Save inline slot counter settings ──
@@ -9401,10 +9536,25 @@ async function sbSaveInlineSlot(blockId, scId) {
   // Update local data
   var counter = (data.slotCounters || []).find(function(c) { return c.id === scId; });
   if (counter) { counter.total_slots = total; counter.booked_slots = booked; counter.label_ru = lru; counter.label_am = lam; }
-  toast('Счётчик обновлён');
+  toast('Счётчик сохранён!');
+  render();
 }
 
-// ── Create new slot counter for block ──
+// ── Create new slot counter for block with full form data ──
+async function sbCreateSlotForBlockFull(blockKey, blockId) {
+  var total = parseInt(document.getElementById('sb_sc_newtotal_' + blockId)?.value) || 10;
+  var booked = parseInt(document.getElementById('sb_sc_newbooked_' + blockId)?.value) || 0;
+  var lru = document.getElementById('sb_sc_newlru_' + blockId)?.value || 'Свободных мест';
+  var lam = document.getElementById('sb_sc_newlam_' + blockId)?.value || '';
+  var pos = 'in-' + blockKey;
+  await api('/slot-counter', { method: 'POST', body: JSON.stringify({
+    counter_name: 'Счётчик: ' + blockKey, total_slots: total, booked_slots: booked, show_timer: 1, position: pos, label_ru: lru, label_am: lam
+  }) });
+  toast('Счётчик создан и привязан к блоку!');
+  await loadData(); render();
+}
+
+// ── Create new slot counter for block (simple) ──
 async function sbCreateSlotForBlock(blockKey) {
   var pos = 'in-' + blockKey;
   await api('/slot-counter', { method: 'POST', body: JSON.stringify({

@@ -1381,8 +1381,22 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
       ];
     }
     
+    // Auto-detect photos for known blocks (from original HTML structure)
+    let customHtml: Record<string, any> = {};
+    const photoMap: Record<string, { photo_url: string, photos: any[] }> = {
+      'hero': { photo_url: '/static/img/founder.jpg', photos: [] },
+      'about': { photo_url: '/static/img/about-hero2.jpg', photos: [] },
+      'warehouse': { photo_url: '', photos: [
+        { url: '/static/img/warehouse1.jpg', caption: 'Склад Ереван' },
+        { url: '/static/img/warehouse2.jpg', caption: 'Рабочее пространство' }
+      ]},
+    };
+    if (photoMap[key]) {
+      customHtml = photoMap[key];
+    }
+    
     await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(key, blockType, name, titleAm, JSON.stringify(textsRu), JSON.stringify(textsAm), JSON.stringify(images), JSON.stringify(buttons), '', '', isVisible ? 1 : 0, sortIdx, JSON.stringify(socialLinks)).run();
+      .bind(key, blockType, name, titleAm, JSON.stringify(textsRu), JSON.stringify(textsAm), JSON.stringify(images), JSON.stringify(buttons), '', JSON.stringify(customHtml), isVisible ? 1 : 0, sortIdx, JSON.stringify(socialLinks)).run();
     sortIdx++;
   }
   
