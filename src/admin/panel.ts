@@ -7050,7 +7050,12 @@ function renderPdfTemplate() {
   h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0418\u041d\u041d / \u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440</label><input class="input" id="pdf_inn" value="' + escHtml(t.company_inn || '') + '" placeholder="00000000"></div>';
   h += '</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
-  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041b\u043e\u0433\u043e\u0442\u0438\u043f (URL)</label><input class="input" id="pdf_logo" value="' + escHtml(t.company_logo_url || '') + '" placeholder="https://...logo.png"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041b\u043e\u0433\u043e\u0442\u0438\u043f</label>';
+  h += '<div style="display:flex;gap:8px;align-items:center">';
+  if (t.company_logo_url) h += '<img src="' + escHtml(t.company_logo_url) + '" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #334155" onerror="this.style.display=\'none\'">';
+  h += '<input class="input" id="pdf_logo" value="' + escHtml(t.company_logo_url || '') + '" placeholder="https://...logo.png" style="flex:1">';
+  h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:4px"></i>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c<input type="file" accept="image/*" style="display:none" onchange="pdfUploadLogo(this)"></label>';
+  h += '</div></div>';
   h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Telegram URL \u043c\u0435\u043d\u0435\u0434\u0436\u0435\u0440\u0430</label><input class="input" id="pdf_order_tg" value="' + escHtml(t.order_telegram_url || 'https://t.me/goo_to_top') + '" placeholder="https://t.me/your_username"></div>';
   h += '</div></div>';
   
@@ -7141,6 +7146,31 @@ async function savePdfTemplate() {
   await api('/pdf-template', { method: 'PUT', body: JSON.stringify(payload) });
   data.pdfTemplate = Object.assign(data.pdfTemplate || {}, payload);
   toast('\u0428\u0430\u0431\u043b\u043e\u043d PDF \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
+}
+
+// ── Upload logo for PDF template ──
+async function pdfUploadLogo(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Файл слишком большой (макс. 5 МБ)', 'error'); return; }
+  toast('Загрузка логотипа...');
+  var formData = new FormData();
+  formData.append('file', file);
+  formData.append('block_id', 'logo');
+  try {
+    var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+    var result = await resp.json();
+    if (!result.success) { toast('Ошибка: ' + (result.error || 'unknown'), 'error'); return; }
+    var url = result.url || result.data_url;
+    var logoInput = document.getElementById('pdf_logo');
+    if (logoInput) logoInput.value = url;
+    if (!data.pdfTemplate) data.pdfTemplate = {};
+    data.pdfTemplate.company_logo_url = url;
+    toast('Логотип загружен!');
+    render();
+  } catch(e) {
+    toast('Ошибка загрузки: ' + (e.message || 'network error'), 'error');
+  }
 }
 
 // ===== SLOT COUNTER =====
@@ -9193,14 +9223,15 @@ function renderSiteBlocks() {
         h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Слева</div><input class="input" id="sb_socoff_left_' + b.id + '" type="number" value="' + (socOpts.offset_left || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div></div>';
 
-        // ── Social links list (each icon with URL + per-icon text) ──
+        // ── Social links list (each icon with URL + per-icon settings) ──
         h += '<div style="margin-bottom:6px">';
         for (var si = 0; si < socials.length; si++) {
           var soc = socials[si];
           var socNet = socialNetworks.find(function(n) { return n.v === soc.type; }) || {v:'website',l:'Сайт',i:'fas fa-globe',c:'#8B5CF6'};
-          h += '<div style="margin-bottom:5px;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+          h += '<div style="margin-bottom:8px;padding:8px 10px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+          // Row 1: icon + type + url + delete
           h += '<div style="display:grid;grid-template-columns:28px 110px 1fr 24px;gap:6px;align-items:center">';
-          h += '<i class="' + socNet.i + '" style="color:' + socNet.c + ';font-size:1rem;text-align:center"></i>';
+          h += '<i class="' + socNet.i + '" style="color:' + socNet.c + ';font-size:1.1rem;text-align:center"></i>';
           h += '<select class="input" id="sb_soctype_' + b.id + '_' + si + '" style="font-size:0.75rem;padding:4px 6px" onchange="sbAutoSave(' + b.id + ')">';
           for (var sni = 0; sni < socialNetworks.length; sni++) {
             var sn = socialNetworks[sni];
@@ -9210,11 +9241,13 @@ function renderSiteBlocks() {
           h += '<input class="input" id="sb_socurl_' + b.id + '_' + si + '" value="' + escHtml(soc.url || '') + '" placeholder="https://..." style="font-size:0.75rem;color:#60a5fa;padding:4px 8px" onchange="sbAutoSave(' + b.id + ')">';
           h += '<button class="tier-del-btn" style="width:22px;height:22px;font-size:0.65rem" onclick="sbRemoveSocial(' + b.id + ',' + si + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
-          // Per-icon text label
-          h += '<div style="display:grid;grid-template-columns:28px 1fr;gap:6px;margin-top:4px;align-items:center">';
-          h += '<span></span>';
-          h += '<input class="input" id="sb_soclabel_' + b.id + '_' + si + '" value="' + escHtml(soc.label || '') + '" placeholder="Подпись иконки (необязательно)" style="font-size:0.72rem;padding:4px 6px;color:#94a3b8" onchange="sbAutoSave(' + b.id + ')">';
-          h += '</div></div>';
+          // Row 2: per-icon label + individual size
+          h += '<div style="display:grid;grid-template-columns:1fr 70px 70px;gap:6px;margin-top:5px;align-items:center">';
+          h += '<input class="input" id="sb_soclabel_' + b.id + '_' + si + '" value="' + escHtml(soc.label || '') + '" placeholder="\u041f\u043e\u0434\u043f\u0438\u0441\u044c \u0438\u043a\u043e\u043d\u043a\u0438" style="font-size:0.72rem;padding:4px 6px;color:#94a3b8" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<div><div style="font-size:0.58rem;color:#64748b;margin-bottom:1px">\u0420\u0430\u0437\u043c\u0435\u0440 (px)</div><input class="input" id="sb_socicon_size_' + b.id + '_' + si + '" type="number" value="' + (soc.icon_size || '') + '" placeholder="' + (socOpts.icon_size || 36) + '" style="font-size:0.72rem;padding:3px 5px" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '<div><div style="font-size:0.58rem;color:#64748b;margin-bottom:1px">\u0426\u0432\u0435\u0442 BG</div><input class="input" id="sb_socicon_color_' + b.id + '_' + si + '" type="color" value="' + escHtml(soc.bg_color || socNet.c) + '" style="height:26px;padding:1px 3px;cursor:pointer" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '</div>';
+          h += '</div>';
         }
         h += '</div>';
         h += '<button class="btn btn-outline" style="padding:3px 10px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
@@ -9711,9 +9744,17 @@ async function sbUploadPhoto(input, blockId, target, idx) {
       }
     }
     b.custom_html = JSON.stringify(opts);
+    // Direct save to server (no debounce — immediate)
+    var saveData = Object.assign({}, b);
+    saveData.social_links = JSON.stringify(b.social_links || []);
+    saveData.images = JSON.stringify(b.images || []);
+    saveData.buttons = JSON.stringify(b.buttons || []);
+    saveData.texts_ru = JSON.stringify(b.texts_ru || []);
+    saveData.texts_am = JSON.stringify(b.texts_am || []);
+    await api('/site-blocks/' + blockId, { method: 'PUT', body: JSON.stringify(saveData) }, true);
+    await api('/site-blocks/' + blockId + '/sync-to-site', { method: 'POST' }, true);
+    toast('Фото загружено и сохранено!');
     render();
-    sbAutoSave(blockId);
-    toast('Фото загружено!');
   } catch(e) {
     toast('Ошибка загрузки: ' + (e.message || 'network error'), 'error');
   }
@@ -9745,9 +9786,17 @@ async function sbUploadPhotoBatch(input, blockId) {
     } catch(e) {}
   }
   b.custom_html = JSON.stringify(opts);
-  render();
-  sbAutoSave(blockId);
+  // Direct save to server (no debounce)
+  var saveData = Object.assign({}, b);
+  saveData.social_links = JSON.stringify(b.social_links || []);
+  saveData.images = JSON.stringify(b.images || []);
+  saveData.buttons = JSON.stringify(b.buttons || []);
+  saveData.texts_ru = JSON.stringify(b.texts_ru || []);
+  saveData.texts_am = JSON.stringify(b.texts_am || []);
+  await api('/site-blocks/' + blockId, { method: 'PUT', body: JSON.stringify(saveData) }, true);
+  await api('/site-blocks/' + blockId + '/sync-to-site', { method: 'POST' }, true);
   toast('Загружено ' + files.length + ' фото!');
+  render();
 }
 
 // ── Toggle slot counter for block ──
@@ -9894,10 +9943,14 @@ async function sbSaveBlock(id) {
     var socType = document.getElementById('sb_soctype_' + id + '_' + si);
     var socUrl = document.getElementById('sb_socurl_' + id + '_' + si);
     var socLabel = document.getElementById('sb_soclabel_' + id + '_' + si);
+    var socIconSize = document.getElementById('sb_socicon_size_' + id + '_' + si);
+    var socIconColor = document.getElementById('sb_socicon_color_' + id + '_' + si);
     newSocials.push({
       type: socType ? socType.value : (socials[si].type || 'instagram'),
       url: socUrl ? socUrl.value : (socials[si].url || ''),
-      label: socLabel ? socLabel.value : (socials[si].label || '')
+      label: socLabel ? socLabel.value : (socials[si].label || ''),
+      icon_size: socIconSize && socIconSize.value ? parseInt(socIconSize.value) : (socials[si].icon_size || 0),
+      bg_color: socIconColor ? socIconColor.value : (socials[si].bg_color || '')
     });
   }
   b.social_links = newSocials;

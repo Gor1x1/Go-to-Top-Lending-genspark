@@ -112,6 +112,7 @@ app.get('/api/site-data', async (c) => {
         siteBlockFeatures.push({
             key: blk.block_key,
             social_links: socials,
+            social_settings: blockOpts.social_settings || {},
             photos: blockPhotos,
             photo_url: blockOpts.photo_url || '',
             show_socials: socials.length > 0 || blockOpts.show_socials || false,
@@ -2817,22 +2818,53 @@ switchLang = function(l) {
           var existing = section.querySelector('.block-socials');
           if (existing) existing.remove();
           
+          var ss = bf.social_settings || {};
+          var defaultSize = ss.icon_size || 44;
+          var socGap = ss.gap || 12;
+          var socAlign = ss.align || 'center';
+          var socPosition = ss.position || 'bottom';
+          var offTop = ss.offset_top || 0;
+          var offRight = ss.offset_right || 0;
+          var offBottom = ss.offset_bottom || 0;
+          var offLeft = ss.offset_left || 0;
+          var justifyMap = { center: 'center', left: 'flex-start', right: 'flex-end' };
+          
           var socDiv = document.createElement('div');
           socDiv.className = 'block-socials';
-          socDiv.style.cssText = 'display:flex;gap:12px;justify-content:center;align-items:center;padding:16px 0;margin-top:12px;flex-wrap:wrap';
+          socDiv.style.cssText = 'display:flex;flex-direction:column;align-items:' + (socAlign === 'center' ? 'center' : socAlign === 'right' ? 'flex-end' : 'flex-start') + ';padding:' + offTop + 'px ' + offRight + 'px ' + offBottom + 'px ' + offLeft + 'px;margin-top:12px';
+          
           var socH = '';
+          // Title
+          var socTitle = lang === 'am' ? (ss.title_am || ss.title_ru || '') : (ss.title_ru || '');
+          var socSubtitle = lang === 'am' ? (ss.subtitle_am || ss.subtitle_ru || '') : (ss.subtitle_ru || '');
+          if (socTitle) socH += '<div style="font-size:1.1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:4px">' + socTitle + '</div>';
+          if (socSubtitle) socH += '<div style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">' + socSubtitle + '</div>';
+          
+          // Icons row
+          socH += '<div style="display:flex;gap:' + socGap + 'px;justify-content:' + (justifyMap[socAlign] || 'center') + ';align-items:center;flex-wrap:wrap">';
           bf.social_links.forEach(function(s) {
             if (!s.url) return;
             var icon = socialIcons[s.type] || 'fas fa-link';
-            var color = socialColors[s.type] || '#8B5CF6';
-            socH += '<a href="' + s.url + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:' + color + ';color:white;font-size:1.15rem;transition:transform 0.2s,box-shadow 0.2s;text-decoration:none" onmouseover="this.style.transform=&apos;scale(1.15)&apos;;this.style.boxShadow=&apos;0 4px 15px ' + color + '66&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;;this.style.boxShadow=&apos;none&apos;">' +
-              '<i class="' + icon + '"></i></a>';
+            var color = s.bg_color || socialColors[s.type] || '#8B5CF6';
+            var sz = s.icon_size || defaultSize;
+            var fontSize = Math.round(sz * 0.45);
+            socH += '<a href="' + s.url + '" target="_blank" rel="noopener" style="display:inline-flex;flex-direction:column;align-items:center;gap:4px;text-decoration:none" onmouseover="this.querySelector(&apos;.soc-icon&apos;).style.transform=&apos;scale(1.15)&apos;;this.querySelector(&apos;.soc-icon&apos;).style.boxShadow=&apos;0 4px 15px ' + color + '66&apos;" onmouseout="this.querySelector(&apos;.soc-icon&apos;).style.transform=&apos;scale(1)&apos;;this.querySelector(&apos;.soc-icon&apos;).style.boxShadow=&apos;none&apos;">' +
+              '<div class="soc-icon" style="display:inline-flex;align-items:center;justify-content:center;width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + color + ';color:white;font-size:' + fontSize + 'px;transition:transform 0.2s,box-shadow 0.2s">' +
+              '<i class="' + icon + '"></i></div>' +
+              (s.label ? '<span style="font-size:0.72rem;color:var(--text-secondary,#999);max-width:' + (sz + 20) + 'px;text-align:center;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + s.label + '</span>' : '') +
+            '</a>';
           });
+          socH += '</div>';
+          
           socDiv.innerHTML = socH;
-          // Insert social links at the end of the container (or after first child container)
           var container = section.querySelector('.container');
-          if (container) { container.appendChild(socDiv); }
-          else { section.appendChild(socDiv); }
+          if (socPosition === 'top') {
+            if (container) { container.insertBefore(socDiv, container.firstChild); }
+            else { section.insertBefore(socDiv, section.firstChild); }
+          } else {
+            if (container) { container.appendChild(socDiv); }
+            else { section.appendChild(socDiv); }
+          }
         }
         
         // Inject slot counters if show_slots is on
