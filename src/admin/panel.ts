@@ -3863,10 +3863,19 @@ function renderPnlLoans(p) {
         for (var yi=0;yi<othLns.length;yi++) { loanExtraMap[othLns[yi].id]=(loanExtraMap[othLns[yi].id]||0)+op; loanExtraPctMap[othLns[yi].id]=(loanExtraPctMap[othLns[yi].id]||0)+opPct; loanAggrPmtMap[othLns[yi].id]=getActPmt(othLns[yi])+(loanExtraMap[othLns[yi].id]||0); }
       }
     }
-    // Case 2: budget < total PMT => no extra, but distribute budget proportionally as extra info
-    // Each loan STILL pays its base PMT. The aggrAmt2 shows what % of total PMT is covered.
-    // loanAggrPmtMap already set to base PMT above — no change needed.
-    // Case 3: no profit => same, base PMT only.
+    // Case 2: budget < total PMT => distribute aggrAmt2 proportionally as extra ON TOP of base PMT
+    // Each loan pays base PMT + proportional share of aggressive budget
+    else if (aggrAmt2 > 0 && totalMinPmts > 0) {
+      for (var qi=0;qi<allActiveLns.length;qi++) {
+        var qBase = getActPmt(allActiveLns[qi]);
+        var qProportion = qBase / totalMinPmts;
+        var qExtra = Math.round(aggrAmt2 * qProportion);
+        loanExtraMap[allActiveLns[qi].id] = qExtra;
+        loanExtraPctMap[allActiveLns[qi].id] = netProfitV > 0 ? Math.round(qExtra / netProfitV * 10000)/100 : 0;
+        loanAggrPmtMap[allActiveLns[qi].id] = qBase + qExtra;
+      }
+    }
+    // Case 3: no profit => base PMT only, no extra.
   }
   // Type labels
   var loanTypeLabels = {annuity:'Потребительский (аннуитет)',manual:'Займ с руки',overdraft:'Овердрафт',bank:'Банковский'};
