@@ -1251,32 +1251,33 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
   }
   
   // Define which sections have which CTA buttons (mirrors the actual HTML structure)
+  // Armenian labels are resolved from tgMsgMap at runtime, these are fallbacks only
   const sectionButtons: Record<string, {text_ru: string, text_am: string, icon: string}[]> = {
     'hero': [
-      {text_ru: 'Написать в Telegram', text_am: 'Գրել Telegram- delays', icon: 'fab fa-telegram'},
-      {text_ru: 'Рассчитать стоимость', text_am: 'Հdelays', icon: 'fas fa-calculator'}
+      {text_ru: 'Написать в Telegram', text_am: 'Գրել Telegram-ով', icon: 'fab fa-telegram'},
+      {text_ru: 'Рассчитать стоимость', text_am: 'Հաशvel arjequn', icon: 'fas fa-calculator'}
     ],
-    'wb_banner': [{text_ru: 'Узнать', text_am: 'Իdelays', icon: 'fas fa-arrow-right'}],
-    'about': [{text_ru: 'Заказать сейчас', text_am: 'Պdelays', icon: 'fas fa-shopping-cart'}],
+    'wb_banner': [{text_ru: 'Узнать', text_am: 'Իմananal', icon: 'fas fa-arrow-right'}],
+    'about': [{text_ru: 'Заказать сейчас', text_am: 'Պatvirel hima', icon: 'fas fa-shopping-cart'}],
     'services': [
-      {text_ru: 'Начать продвижение', text_am: 'Սdelays', icon: 'fas fa-rocket'},
-      {text_ru: 'Заказать съёмку', text_am: 'Պdelays', icon: 'fas fa-camera'}
+      {text_ru: 'Начать продвижение', text_am: 'Սksel arachkhaghatsum', icon: 'fas fa-rocket'},
+      {text_ru: 'Заказать съёмку', text_am: 'Պatvirel lusankar', icon: 'fas fa-camera'}
     ],
     'buyout_detail': [
-      {text_ru: 'Начать выкupы сейчас', text_am: 'Սdelays', icon: 'fas fa-shopping-bag'},
-      {text_ru: 'Получить индividальный расчёт', text_am: 'Սdelays', icon: 'fas fa-calculator'}
+      {text_ru: 'Начать выкупы сейчас', text_am: 'Սksel gnumnere', icon: 'fas fa-shopping-bag'},
+      {text_ru: 'Получить индивидуальный расчёт', text_am: 'Ստandsanal hashvark', icon: 'fas fa-calculator'}
     ],
-    'why_buyouts': [{text_ru: 'Начать выкупы по ключевикам', text_am: 'Սdelays', icon: 'fas fa-fire'}],
-    'wb_official': [{text_ru: 'Занять ТОП прямо сейчас', text_am: 'Զбdelays', icon: 'fas fa-rocket'}],
-    'process': [{text_ru: 'Написать менеджеру', text_am: 'Գdelays', icon: 'fab fa-telegram'}],
-    'warehouse': [{text_ru: 'Заказать сейчас', text_am: 'Պdelays', icon: 'fas fa-shopping-cart'}],
-    'guarantee': [{text_ru: 'Начать продвижение', text_am: 'Սdelays', icon: 'fas fa-rocket'}],
-    'comparison': [{text_ru: 'Убedites сами — начните сейчас', text_am: 'Սdelays', icon: 'fas fa-rocket'}],
-    'important': [{text_ru: 'Уточнить условия', text_am: 'Գdelays', icon: 'fab fa-telegram'}],
-    'faq': [{text_ru: 'Остались вопросы? Напишите нам', text_am: 'Հdelays', icon: 'fas fa-shopping-cart'}],
-    'contact': [{text_ru: 'Отправить заявку', text_am: 'Ուdelays', icon: 'fas fa-paper-plane'}],
-    'floating_tg': [{text_ru: 'Написать нам', text_am: 'Գdelays', icon: 'fab fa-telegram'}],
-    'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Սdelays', icon: 'fab fa-telegram'}]
+    'why_buyouts': [{text_ru: 'Начать выкупы по ключевикам', text_am: 'Սksel gnumnere banali barerov', icon: 'fas fa-fire'}],
+    'wb_official': [{text_ru: 'Занять ТОП прямо сейчас', text_am: 'Զbaghetsnel TOP hima', icon: 'fas fa-rocket'}],
+    'process': [{text_ru: 'Написать менеджеру', text_am: 'Գrel menedzherin', icon: 'fab fa-telegram'}],
+    'warehouse': [{text_ru: 'Заказать сейчас', text_am: 'Պatvirel hima', icon: 'fas fa-shopping-cart'}],
+    'guarantee': [{text_ru: 'Начать продвижение', text_am: 'Սksel arachkhaghatsum', icon: 'fas fa-rocket'}],
+    'comparison': [{text_ru: 'Убедитесь сами — начните сейчас', text_am: 'Համozvek — sksel hima', icon: 'fas fa-rocket'}],
+    'important': [{text_ru: 'Уточнить условия', text_am: 'Shtkel paymannere', icon: 'fab fa-telegram'}],
+    'faq': [{text_ru: 'Остались вопросы? Напишите нам', text_am: 'Hartser uneq? Greq mez', icon: 'fas fa-comment-dots'}],
+    'contact': [{text_ru: 'Отправить заявку', text_am: 'Ughарkel hayty', icon: 'fas fa-paper-plane'}],
+    'floating_tg': [{text_ru: 'Написать нам', text_am: 'Гrel mez', icon: 'fab fa-telegram'}],
+    'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Ստandsanal hashvark Telegram-ov', icon: 'fab fa-telegram'}]
   };
   
   // Load section order for visibility
@@ -1316,12 +1317,23 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     const seedItems = seedSec.items;
     const useItems = dbItems.length >= seedItems.length ? dbItems : seedItems;
     
-    const textsRu = useItems.map((it: any) => it.ru || '');
-    const textsAm = useItems.map((it: any) => it.am || '');
-    
-    // Build buttons array with full data
+    // Build buttons array first (need to know button labels to exclude from texts)
     const buttons: any[] = [];
     const secBtns = sectionButtons[key] || [];
+    // Collect button text labels to exclude from texts
+    const btnTextLabels = new Set(secBtns.map((b: any) => b.text_ru.trim()));
+    
+    const textsRu: string[] = [];
+    const textsAm: string[] = [];
+    for (let ti = 0; ti < useItems.length; ti++) {
+      const ruText = (useItems[ti] as any).ru || '';
+      const amText = (useItems[ti] as any).am || '';
+      // Skip items that match button labels (they belong in buttons, not texts)
+      if (btnTextLabels.has(ruText.trim())) continue;
+      textsRu.push(ruText);
+      textsAm.push(amText);
+    }
+    
     for (const btnDef of secBtns) {
       const tgMsg = tgMsgMap[btnDef.text_ru] || {};
       const dbTg = dbTgMessages['label:' + btnDef.text_ru] || {};
@@ -1374,7 +1386,23 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     sortIdx++;
   }
   
-  return c.json({ success: true, imported: sortIdx });
+  // Sync telegram_messages from all block buttons so "Быстрые сообщения" tab has data
+  await db.prepare('DELETE FROM telegram_messages').run();
+  const allNewBlocks = await db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all();
+  let tgSortIdx = 0;
+  for (const blk of (allNewBlocks.results || [])) {
+    let btns: any[] = [];
+    try { btns = JSON.parse(blk.buttons as string || '[]'); } catch { btns = []; }
+    for (const btn of btns) {
+      if (!btn.text_ru) continue;
+      const btnKey = (blk.block_key as string) + '_' + btn.text_ru.replace(/[^a-zA-Zа-яА-Я0-9]/g, '_').substring(0, 30);
+      await db.prepare('INSERT INTO telegram_messages (button_key, button_label_ru, button_label_am, telegram_url, message_template_ru, message_template_am, description, sort_order) VALUES (?,?,?,?,?,?,?,?)')
+        .bind(btnKey, btn.text_ru || '', btn.text_am || '', btn.url || 'https://t.me/goo_to_top', btn.message_ru || '', btn.message_am || '', 'Блок: ' + (blk.title_ru || blk.block_key), tgSortIdx).run();
+      tgSortIdx++;
+    }
+  }
+  
+  return c.json({ success: true, imported: sortIdx, tg_messages: tgSortIdx });
 });
 
 // ===== SYNC BLOCK BACK TO SITE CONTENT (for instant site update) =====

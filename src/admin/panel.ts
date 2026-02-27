@@ -59,9 +59,9 @@ export function getAdminHTML(): string {
   .sb-block-item { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .sb-block-item.sortable-ghost { opacity: 0.4; background: #1a2236 !important; }
   .sb-block-item.sortable-chosen { box-shadow: 0 8px 40px rgba(139,92,246,0.35); transform: scale(1.01); z-index: 10; }
-  .sb-drag-handle { cursor: grab; padding: 6px 8px; color: #475569; transition: color 0.2s; display: flex; flex-direction: column; gap: 1px; align-items: center; }
-  .sb-drag-handle:hover { color: #8B5CF6; }
-  .sb-drag-handle:active { cursor: grabbing; }
+  .sb-drag-handle { cursor: grab; padding: 10px 12px; color: #64748b; transition: color 0.2s, background 0.2s; display: flex; align-items: center; justify-content: center; border-radius: 8px; min-width: 40px; min-height: 40px; }
+  .sb-drag-handle:hover { color: #8B5CF6; background: rgba(139,92,246,0.15); }
+  .sb-drag-handle:active { cursor: grabbing; color: #a78bfa; background: rgba(139,92,246,0.25); transform: scale(1.05); }
   .sb-drag-dots { width: 4px; height: 4px; border-radius: 50%; background: currentColor; display: block; }
   .sb-field-group { margin-bottom: 14px; }
   .sb-field-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
@@ -349,7 +349,7 @@ const pages = [
   { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
   { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов' },
   { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер сайта' },
-  { id: 'telegram', icon: 'fa-telegram', label: 'TG сообщения', fab: true },
+  { id: 'telegram', icon: 'fa-telegram', label: 'Быстрые сообщения', fab: true },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
@@ -1279,81 +1279,138 @@ function renderTelegramInline() {
   var allBlocks = data.siteBlocks || [];
   var h = '';
   
-  h += '<div style="margin-bottom:20px;padding:14px 18px;background:rgba(38,165,228,0.08);border:1px solid rgba(38,165,228,0.2);border-radius:10px;display:flex;align-items:center;gap:12px">' +
-    '<i class="fab fa-telegram" style="color:#26A5E4;font-size:1.3rem"></i>' +
-    '<div style="flex:1"><span style="font-size:0.88rem;color:#e2e8f0;font-weight:600">Шаблоны Telegram-сообщений</span>' +
-    '<p style="font-size:0.78rem;color:#94a3b8;margin:4px 0 0">Каждая кнопка на сайте отправляет заявку + шаблон в Telegram. Редактируйте тексты, URL и шаблоны ниже.</p></div>' +
-    '<button class="btn btn-primary" style="white-space:nowrap;font-size:0.82rem" onclick="addTelegramMsg()"><i class="fas fa-plus" style="margin-right:5px"></i>Новая кнопка</button>' +
-  '</div>';
+  // Count total buttons across blocks
+  var totalBtns = 0;
+  for (var bi2 = 0; bi2 < allBlocks.length; bi2++) {
+    var bBtns = allBlocks[bi2].buttons || [];
+    if (typeof bBtns === 'string') { try { bBtns = JSON.parse(bBtns); } catch(e) { bBtns = []; } }
+    totalBtns += bBtns.length;
+  }
   
-  if (msgs.length === 0) {
+  h += '<div style="margin-bottom:20px;padding:16px 20px;background:rgba(38,165,228,0.08);border:1px solid rgba(38,165,228,0.2);border-radius:12px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">' +
+    '<div style="display:flex;align-items:center;gap:12px">' +
+    '<i class="fab fa-telegram" style="color:#26A5E4;font-size:1.5rem"></i>' +
+    '<div><span style="font-size:0.95rem;color:#e2e8f0;font-weight:700">Быстрые сообщения</span>' +
+    '<p style="font-size:0.78rem;color:#94a3b8;margin:4px 0 0">Каждая кнопка на сайте отправляет шаблон в Telegram. Здесь видно какая кнопка к какому блоку привязана.</p></div></div>' +
+    '<div style="display:flex;gap:8px;align-items:center">' +
+    '<span class="badge" style="background:rgba(38,165,228,0.15);color:#26A5E4;font-size:0.78rem;padding:6px 12px">' + totalBtns + ' кнопок в блоках</span>' +
+    '<span class="badge" style="background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.78rem;padding:6px 12px">' + msgs.length + ' TG шаблонов</span>' +
+    '<button class="btn btn-primary" style="white-space:nowrap;font-size:0.82rem" onclick="addTelegramMsg()"><i class="fas fa-plus" style="margin-right:5px"></i>Новый шаблон</button>' +
+    '</div></div></div>';
+  
+  if (msgs.length === 0 && totalBtns === 0) {
     h += '<div class="card" style="text-align:center;padding:48px"><i class="fab fa-telegram" style="font-size:3rem;color:#475569;margin-bottom:16px"></i>' +
-      '<p style="color:#94a3b8">Telegram-сообщения ещё не настроены.</p>' +
-      '<p style="color:#64748b;font-size:0.82rem">Загрузите блоки с сайта или добавьте кнопки вручную.</p></div>';
+      '<p style="color:#94a3b8;font-size:0.95rem">Кнопки и шаблоны ещё не загружены.</p>' +
+      '<p style="color:#64748b;font-size:0.82rem;margin-bottom:16px">Нажмите «Загрузить с сайта» чтобы импортировать блоки с кнопками.</p>' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить с сайта</button></div>';
     return h;
   }
   
-  // Group TG messages by matching block buttons
-  var blockMsgMap = {}; // block_key -> messages
-  var unmatchedMsgs = [];
-  
-  for (var mi = 0; mi < msgs.length; mi++) {
-    var msg = msgs[mi];
-    var matched = false;
-    // Try to match by button_key to a block
-    for (var bi = 0; bi < allBlocks.length; bi++) {
-      var blk = allBlocks[bi];
-      var btns = blk.buttons || [];
-      if (typeof btns === 'string') { try { btns = JSON.parse(btns); } catch(e) { btns = []; } }
-      for (var bti = 0; bti < btns.length; bti++) {
-        if (btns[bti].text_ru && msg.button_label_ru && btns[bti].text_ru.trim() === msg.button_label_ru.trim()) {
-          if (!blockMsgMap[blk.block_key]) blockMsgMap[blk.block_key] = { block: blk, messages: [] };
-          blockMsgMap[blk.block_key].messages.push(msg);
-          matched = true;
+  // Build map: block_key -> block + its buttons + matched TG messages
+  for (var bbi = 0; bbi < allBlocks.length; bbi++) {
+    var blk = allBlocks[bbi];
+    var btns = blk.buttons || [];
+    if (typeof btns === 'string') { try { btns = JSON.parse(btns); } catch(e) { btns = []; } }
+    if (btns.length === 0) continue;
+    
+    h += '<div class="card" style="margin-bottom:14px;padding:0;overflow:hidden;border-left:4px solid #8B5CF6">';
+    // Block header
+    h += '<div style="padding:12px 18px;background:#141c2e;display:flex;align-items:center;gap:10px;cursor:pointer" onclick="sbActiveTab=&apos;blocks&apos;;sbExpandedBlocks[' + blk.id + ']=true;render()">';
+    h += '<i class="fas fa-cubes" style="color:#8B5CF6;font-size:0.9rem"></i>';
+    h += '<span style="font-weight:700;color:#e2e8f0;font-size:0.9rem">' + escHtml(blk.title_ru || blk.block_key) + '</span>';
+    h += '<span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(blk.block_key) + '</span>';
+    h += '<span class="badge" style="background:rgba(38,165,228,0.12);color:#26A5E4;font-size:0.68rem">' + btns.length + ' кноп.</span>';
+    h += '<i class="fas fa-external-link-alt" style="color:#475569;font-size:0.65rem;margin-left:auto" title="Перейти к блоку"></i>';
+    h += '</div>';
+    
+    // Buttons in this block
+    for (var bti2 = 0; bti2 < btns.length; bti2++) {
+      var btn = btns[bti2];
+      // Find matching TG message
+      var matchedMsg = null;
+      for (var mi2 = 0; mi2 < msgs.length; mi2++) {
+        if (msgs[mi2].button_label_ru && btn.text_ru && msgs[mi2].button_label_ru.trim() === btn.text_ru.trim()) {
+          matchedMsg = msgs[mi2];
           break;
         }
       }
-      if (matched) break;
-    }
-    if (!matched) unmatchedMsgs.push(msg);
-  }
-  
-  // Render grouped by blocks
-  var blockKeys = Object.keys(blockMsgMap);
-  for (var ki = 0; ki < blockKeys.length; ki++) {
-    var key = blockKeys[ki];
-    var group = blockMsgMap[key];
-    h += '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;border-left:4px solid #26A5E4">';
-    h += '<div style="padding:14px 18px;background:#141c2e;display:flex;align-items:center;gap:10px">' +
-      '<i class="fas fa-cubes" style="color:#8B5CF6;font-size:0.9rem"></i>' +
-      '<span style="font-weight:700;color:#e2e8f0;font-size:0.9rem">' + escHtml(group.block.title_ru || group.block.block_key) + '</span>' +
-      '<span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(key) + '</span>' +
-      '<span class="badge" style="background:rgba(38,165,228,0.12);color:#26A5E4;font-size:0.68rem">' + group.messages.length + ' кноп.</span>' +
-    '</div>';
-    for (var gmi = 0; gmi < group.messages.length; gmi++) {
-      h += renderTgMsgCard(group.messages[gmi]);
+      
+      h += '<div style="padding:14px 18px;border-top:1px solid #1e293b">';
+      // Button header row
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">';
+      h += '<div style="display:flex;align-items:center;gap:8px">';
+      h += '<i class="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" style="color:#a78bfa;font-size:0.85rem"></i>';
+      h += '<span style="font-weight:600;color:#e2e8f0;font-size:0.88rem">' + escHtml(btn.text_ru || '') + '</span>';
+      if (btn.text_am) h += '<span style="color:#fbbf24;font-size:0.78rem;opacity:0.7">/ ' + escHtml(btn.text_am) + '</span>';
+      h += '</div>';
+      h += '<div style="display:flex;gap:6px;align-items:center">';
+      if (matchedMsg) {
+        h += '<span class="badge badge-green" style="font-size:0.68rem"><i class="fab fa-telegram" style="margin-right:3px"></i>Шаблон настроен</span>';
+        h += '<button class="btn btn-success" style="padding:5px 12px;font-size:0.78rem" onclick="saveTgMsg(' + matchedMsg.id + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить</button>';
+        h += '<button class="btn btn-danger" style="padding:5px 8px;font-size:0.78rem" onclick="deleteTgMsg(' + matchedMsg.id + ')"><i class="fas fa-trash"></i></button>';
+      } else {
+        h += '<span class="badge badge-amber" style="font-size:0.68rem"><i class="fas fa-unlink" style="margin-right:3px"></i>Без TG-шаблона</span>';
+      }
+      h += '</div></div>';
+      
+      if (matchedMsg) {
+        // Editable fields
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">';
+        h += '<div><label style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-tag" style="margin-right:3px"></i>Кнопка RU</label><input class="input" value="' + escHtml(matchedMsg.button_label_ru) + '" id="tg_lru_' + matchedMsg.id + '" style="font-size:0.82rem"></div>';
+        h += '<div><label style="font-size:0.72rem;color:#F59E0B;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-tag" style="margin-right:3px"></i>Кнопка AM</label><input class="input" value="' + escHtml(matchedMsg.button_label_am) + '" id="tg_lam_' + matchedMsg.id + '" style="font-size:0.82rem"></div>';
+        h += '</div>';
+        h += '<div style="margin-bottom:10px"><label style="font-size:0.72rem;color:#60a5fa;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-link" style="margin-right:3px"></i>Telegram URL</label><input class="input" value="' + escHtml(matchedMsg.telegram_url) + '" id="tg_url_' + matchedMsg.id + '" style="font-size:0.82rem;color:#60a5fa"></div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+        h += '<div><label style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-envelope" style="margin-right:3px"></i>Шаблон RU</label><textarea class="input" id="tg_mru_' + matchedMsg.id + '" rows="3" style="font-size:0.78rem;line-height:1.5">' + escHtml(matchedMsg.message_template_ru) + '</textarea></div>';
+        h += '<div><label style="font-size:0.72rem;color:#F59E0B;font-weight:600;margin-bottom:3px;display:block"><i class="fas fa-envelope" style="margin-right:3px"></i>Шаблон AM</label><textarea class="input" id="tg_mam_' + matchedMsg.id + '" rows="3" style="font-size:0.78rem;line-height:1.5">' + escHtml(matchedMsg.message_template_am) + '</textarea></div>';
+        h += '</div>';
+      } else {
+        h += '<div style="font-size:0.78rem;color:#64748b;padding:8px 12px;background:#1a2236;border-radius:8px;border:1px dashed #293548">' +
+          '<i class="fas fa-info-circle" style="margin-right:6px;color:#475569"></i>URL: <span style="color:#60a5fa">' + escHtml(btn.url || 'не задан') + '</span>' +
+          (btn.message_ru ? ' | Шаблон: <span style="color:#94a3b8">' + escHtml(btn.message_ru.substring(0, 50)) + '...</span>' : '') +
+        '</div>';
+      }
+      h += '</div>';
     }
     h += '</div>';
   }
   
-  // Render unmatched messages
+  // Unmatched TG messages (not linked to any block button)
+  var unmatchedMsgs = [];
+  for (var umi = 0; umi < msgs.length; umi++) {
+    var tgm = msgs[umi];
+    var found = false;
+    for (var ubi = 0; ubi < allBlocks.length; ubi++) {
+      var uBtns = allBlocks[ubi].buttons || [];
+      if (typeof uBtns === 'string') { try { uBtns = JSON.parse(uBtns); } catch(e) { uBtns = []; } }
+      for (var ubti = 0; ubti < uBtns.length; ubti++) {
+        if (uBtns[ubti].text_ru && tgm.button_label_ru && uBtns[ubti].text_ru.trim() === tgm.button_label_ru.trim()) {
+          found = true; break;
+        }
+      }
+      if (found) break;
+    }
+    if (!found) unmatchedMsgs.push(tgm);
+  }
+  
   if (unmatchedMsgs.length > 0) {
-    h += '<div class="card" style="margin-bottom:16px;padding:0;overflow:hidden;border-left:4px solid #F59E0B">';
-    h += '<div style="padding:14px 18px;background:#141c2e;display:flex;align-items:center;gap:10px">' +
+    h += '<div class="card" style="margin-bottom:14px;padding:0;overflow:hidden;border-left:4px solid #F59E0B">';
+    h += '<div style="padding:12px 18px;background:#141c2e;display:flex;align-items:center;gap:10px">' +
       '<i class="fas fa-unlink" style="color:#F59E0B;font-size:0.9rem"></i>' +
-      '<span style="font-weight:700;color:#e2e8f0;font-size:0.9rem">Общие кнопки</span>' +
+      '<span style="font-weight:700;color:#e2e8f0;font-size:0.9rem">Общие шаблоны</span>' +
       '<span style="color:#64748b;font-size:0.78rem">(не привязаны к блоку)</span>' +
-      '<span class="badge badge-amber" style="font-size:0.68rem">' + unmatchedMsgs.length + ' кноп.</span>' +
+      '<span class="badge badge-amber" style="font-size:0.68rem">' + unmatchedMsgs.length + '</span>' +
     '</div>';
-    for (var umi = 0; umi < unmatchedMsgs.length; umi++) {
-      h += renderTgMsgCard(unmatchedMsgs[umi]);
+    for (var umj = 0; umj < unmatchedMsgs.length; umj++) {
+      h += renderTgMsgCard(unmatchedMsgs[umj]);
     }
     h += '</div>';
   }
   
   // Variables hint
   h += '<div style="padding:14px 18px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:10px;margin-top:8px">' +
-    '<div style="font-size:0.78rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-code" style="margin-right:5px"></i>Доступные переменные для шаблонов:</div>' +
+    '<div style="font-size:0.78rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-code" style="margin-right:5px"></i>Доступные переменные:</div>' +
     '<div style="font-size:0.75rem;color:#64748b;line-height:1.6">' +
       '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin-right:6px">{items}</code> количество |' +
       '<code style="color:#8B5CF6;background:#1e293b;padding:1px 5px;border-radius:3px;margin:0 6px">{total}</code> сумма |' +
@@ -8570,11 +8627,17 @@ function renderSiteBlocks() {
       '</div>' +
     '</div>';
 
-  // ── Tabs: Blocks / Calculator / TG Messages (analytics-style) ──
+  // ── Tabs: Blocks / Calculator / Quick Messages (analytics-style) ──
+  var totalBlockBtns = 0;
+  for (var tbi = 0; tbi < allBlocks.length; tbi++) {
+    var tbBtns = allBlocks[tbi].buttons || [];
+    if (typeof tbBtns === 'string') { try { tbBtns = JSON.parse(tbBtns); } catch(e) { tbBtns = []; } }
+    totalBlockBtns += tbBtns.length;
+  }
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
     { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор', count: calcBlocks.length },
-    { id: 'telegram', icon: 'fa-paper-plane', label: 'TG сообщения', count: (data.telegram || []).length }
+    { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns }
   ];
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
@@ -8646,10 +8709,9 @@ function renderSiteBlocks() {
       // ── Block header (always visible) ──
       h += '<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:' + (isExpanded ? '#141c2e' : '#1e293b') + ';cursor:pointer;user-select:none" onclick="toggleSbExpand(' + b.id + ')">';
 
-      // Drag handle
-      h += '<div class="sb-drag-handle" onclick="event.stopPropagation()" title="Перетащите для изменения порядка">' +
-        '<span class="sb-drag-dots"></span><span class="sb-drag-dots"></span><span class="sb-drag-dots"></span>' +
-        '<span class="sb-drag-dots"></span><span class="sb-drag-dots"></span><span class="sb-drag-dots"></span>' +
+      // Drag handle (grab with mouse to reorder)
+      h += '<div class="sb-drag-handle" onclick="event.stopPropagation()" title="Зажмите и перетащите для изменения порядка">' +
+        '<i class="fas fa-grip-vertical" style="font-size:1.4rem"></i>' +
       '</div>';
 
       // Number badge
@@ -8750,25 +8812,48 @@ function renderSiteBlocks() {
           h += '</div>';
         }
 
-        // ── Buttons section with FULL info: URL, icon, action_type, message template ──
+        // ── Buttons section: compact view with link to "Быстрые сообщения" tab ──
         h += '<div style="margin-bottom:16px">';
         h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки / Ссылки <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + btnsCount + ')</span></h4>' +
-          '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
+          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + btnsCount + ')</span></h4>' +
+          '<div style="display:flex;gap:6px">' +
+            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
+          '</div>' +
         '</div>';
         for (var bti = 0; bti < (b.buttons || []).length; bti++) {
           var btn = b.buttons[bti];
-          h += '<div style="margin-bottom:10px;padding:12px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
-          // Row 1: Button text (RU/AM) + icon
-          h += '<div style="display:grid;grid-template-columns:80px ' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:8px;margin-bottom:8px;align-items:end">';
-          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="fas fa-icons" style="margin-right:3px"></i>Иконка</div><input class="input" id="sb_btnicon_' + b.id + '_' + bti + '" value="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" placeholder="fas fa-..." style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-          if (showRu) h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:3px">Текст кнопки (RU)</div><input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-          if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px">Текст кнопки (AM)</div><input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="AM տեքստ" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          // Find matching TG message for this button
+          var matchedTgMsg = null;
+          for (var tmi = 0; tmi < (data.telegram || []).length; tmi++) {
+            if (data.telegram[tmi].button_label_ru && btn.text_ru && data.telegram[tmi].button_label_ru.trim() === btn.text_ru.trim()) {
+              matchedTgMsg = data.telegram[tmi];
+              break;
+            }
+          }
+          var tgBadge = matchedTgMsg 
+            ? '<span class="badge badge-green" style="font-size:0.65rem;cursor:pointer" onclick="event.stopPropagation();sbActiveTab=&apos;telegram&apos;;render()" title="Связан с TG-шаблоном. Нажмите для редактирования"><i class="fab fa-telegram" style="margin-right:3px"></i>Шаблон</span>'
+            : '<span class="badge" style="font-size:0.65rem;background:rgba(245,158,11,0.12);color:#fbbf24" title="Нет TG-шаблона"><i class="fas fa-unlink" style="margin-right:3px"></i>Без шаблона</span>';
+          
+          h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
+          // Compact row: icon + text RU + text AM + action + TG badge + link
+          h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+          // Icon
+          h += '<div style="min-width:36px;text-align:center"><i class="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" style="color:#8B5CF6;font-size:0.9rem"></i></div>';
+          // Button text RU
+          if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbAutoSave(' + b.id + ')">';
+          // Button text AM
+          if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="AM" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbAutoSave(' + b.id + ')">';
+          // TG badge
+          h += tgBadge;
+          // Delete
+          h += '<button class="tier-del-btn" style="position:static;flex-shrink:0" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
-          // Row 2: URL + action type
-          h += '<div style="display:grid;grid-template-columns:1fr 160px;gap:8px;margin-bottom:8px;align-items:end">';
-          h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>Ссылка (URL)</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/goo_to_top" style="font-size:0.82rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')"></div>';
-          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="fas fa-bolt" style="margin-right:3px"></i>Действие</div><select class="input" id="sb_btnact_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
+          // Collapsible: full settings
+          h += '<details style="margin-top:6px"><summary style="font-size:0.70rem;color:#64748b;cursor:pointer;user-select:none"><i class="fas fa-cog" style="margin-right:4px"></i>Настройки кнопки (URL, иконка, действие, шаблон)</summary>';
+          h += '<div style="margin-top:8px;display:grid;grid-template-columns:80px 1fr 140px;gap:8px;align-items:end">';
+          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Иконка</div><input class="input" id="sb_btnicon_' + b.id + '_' + bti + '" value="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" placeholder="fas fa-..." style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>URL</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/..." style="font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Действие</div><select class="input" id="sb_btnact_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
             '<option value="telegram"' + (btn.action_type === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
             '<option value="whatsapp"' + (btn.action_type === 'whatsapp' ? ' selected' : '') + '>WhatsApp</option>' +
             '<option value="link"' + (btn.action_type === 'link' ? ' selected' : '') + '>Ссылка</option>' +
@@ -8776,16 +8861,15 @@ function renderSiteBlocks() {
             '<option value="lead_form"' + (btn.action_type === 'lead_form' ? ' selected' : '') + '>Создать лид</option>' +
           '</select></div>';
           h += '</div>';
-          // Row 3: Message template (collapsible)
-          h += '<details style="margin-top:4px"><summary style="font-size:0.72rem;color:#8B5CF6;cursor:pointer;user-select:none"><i class="fas fa-envelope" style="margin-right:4px"></i>Шаблон сообщения при клике (авто-лид)</summary>';
+          // Message templates
           h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:8px;margin-top:8px">';
-          if (showRu) h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:3px">Сообщение RU</div><textarea class="input" id="sb_btnmsg_ru_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_ru || '') + '</textarea></div>';
-          if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px">Сообщение AM</div><textarea class="input" id="sb_btnmsg_am_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_am || '') + '</textarea></div>';
+          if (showRu) h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:3px">Шаблон сообщения RU</div><textarea class="input" id="sb_btnmsg_ru_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_ru || '') + '</textarea></div>';
+          if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px">Шаблон сообщения AM</div><textarea class="input" id="sb_btnmsg_am_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_am || '') + '</textarea></div>';
           h += '</div>';
-          h += '<div style="font-size:0.68rem;color:#475569;margin-top:6px"><i class="fas fa-info-circle" style="margin-right:3px"></i>Когда пользователь нажмёт кнопку, автоматически создастся лид + отправится сообщение в Telegram/WhatsApp</div>';
+          if (matchedTgMsg) {
+            h += '<div style="font-size:0.70rem;color:#26A5E4;margin-top:8px;padding:6px 10px;background:rgba(38,165,228,0.06);border-radius:6px;cursor:pointer" onclick="sbActiveTab=&apos;telegram&apos;;render()"><i class="fab fa-telegram" style="margin-right:5px"></i>Открыть полный шаблон в «Быстрые сообщения» <i class="fas fa-external-link-alt" style="margin-left:4px;font-size:0.6rem"></i></div>';
+          }
           h += '</details>';
-          // Delete button
-          h += '<button class="tier-del-btn" style="position:absolute;top:8px;right:8px" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
         }
         if ((b.buttons || []).length === 0) {
@@ -9257,12 +9341,15 @@ async function importSiteBlocks() {
   toast('Загрузка блоков с сайта...');
   var result = await api('/site-blocks/import-from-site', { method: 'POST' });
   if (result && result.success) {
-    toast('Загружено ' + (result.imported || 0) + ' блоков с кнопками, ссылками и текстами!');
+    toast('Загружено ' + (result.imported || 0) + ' блоков и ' + (result.tg_messages || 0) + ' кнопок-сообщений!');
   } else {
     toast('Ошибка загрузки: ' + (result?.error || 'unknown'), 'error');
   }
+  // Reload both blocks and telegram messages
   var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];
+  var tgRes = await api('/telegram');
+  data.telegram = (tgRes && Array.isArray(tgRes)) ? tgRes : (tgRes && tgRes.messages) || [];
   render();
 }
 
