@@ -371,7 +371,7 @@ function renderSidebar() {
   for (const p of pages) {
     // Check permissions: main_admin sees all, others see only allowed sections
     if (!isAdmin && !userPerms.includes(p.id) && p.id !== 'dashboard') continue;
-    h += '<div class="nav-item' + (currentPage === p.id ? ' active' : '') + '" data-page="' + p.id + '" onclick="navigate(\\'' + p.id + '\\')">' +
+    h += '<div class="nav-item' + (currentPage === p.id ? ' active' : '') + '" data-page="' + p.id + '" onclick="navigate(&apos;' + p.id + '&apos;)">' +
       '<i class="' + (p.fab ? 'fab' : 'fas') + ' ' + p.icon + '"></i><span>' + p.label + '</span></div>';
   }
   h += '</div><div style="padding:16px;border-top:1px solid #334155">' +
@@ -1584,7 +1584,7 @@ function renderLeads() {
     '<p style="color:#94a3b8;margin-top:4px">Всего: <strong>' + total + '</strong> | Показано: <strong>' + filtered.length + '</strong></p></div>' +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
       '<button class="btn btn-success" onclick="showCreateLeadModal()"><i class="fas fa-plus" style="margin-right:4px"></i>Новый лид</button>' +
-      '<button class="btn btn-primary" onclick="navigate(\\'analytics\\')"><i class="fas fa-chart-bar" style="margin-right:4px"></i>Аналитика</button>' +
+      '<button class="btn btn-primary" onclick="navigate(&apos;analytics&apos;)"><i class="fas fa-chart-bar" style="margin-right:4px"></i>Аналитика</button>' +
       '<button class="btn btn-outline" onclick="loadLeadsData()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Обновить</button>' +
       '<a href="/api/admin/leads/export" target="_blank" class="btn btn-outline" style="text-decoration:none"><i class="fas fa-download" style="margin-right:6px"></i>CSV</a>' +
     '</div></div>';
@@ -1592,33 +1592,33 @@ function renderLeads() {
   // KPI cards — 6 statuses + Total
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:10px;margin-bottom:20px">';
   // 1. Новые
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.04));border-color:rgba(16,185,129,0.25)" onclick="setLeadsFilter(\\'status\\',\\'new\\')">' +
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.04));border-color:rgba(16,185,129,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;new&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.new.c + '</span><span style="font-size:1.4rem">🟢</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Новые лиды</div>' +
     '<div style="color:#34d399;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.new.a) + '</div></div>';
   // 2. На связи
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(59,130,246,0.04));border-color:rgba(59,130,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'contacted\\')">' +
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(59,130,246,0.12),rgba(59,130,246,0.04));border-color:rgba(59,130,246,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;contacted&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#3B82F6">' + stats.contacted.c + '</span><span style="font-size:1.4rem">💬</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">На связи</div>' +
     '<div style="color:#60a5fa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.contacted.a) + '</div></div>';
   // 3. В работе — total at top, services and articles below
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border-color:rgba(245,158,11,0.25)" onclick="setLeadsFilter(\\'status\\',\\'in_progress\\')">' +
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04));border-color:rgba(245,158,11,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;in_progress&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
     '<div style="color:#fbbf24;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div>' +
     '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span></div></div>';
   // 4. Отклонен
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(\\'status\\',\\'rejected\\')">' +
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;rejected&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Отклонён</div>' +
     '<div style="color:#f87171;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.rejected.a) + '</div></div>';
   // 5. Проверка
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="setLeadsFilter(\\'status\\',\\'checking\\')">' +
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border-color:rgba(139,92,246,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;checking&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#8B5CF6">' + stats.checking.c + '</span><span style="font-size:1.4rem">🔍</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Проверка</div>' +
     '<div style="color:#a78bfa;font-size:0.82rem;font-weight:700;margin-top:2px">' + fmtA(stats.checking.a) + '</div></div>';
   // 6. Завершён — total (turnover) at top, services and articles below
-  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="setLeadsFilter(\\'status\\',\\'done\\')">' +
+  h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08));border-color:rgba(16,185,129,0.4)" onclick="setLeadsFilter(&apos;status&apos;,&apos;done&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
     '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
@@ -1628,7 +1628,7 @@ function renderLeads() {
   // Filters row — 6 statuses only
   h += '<div class="card" style="padding:14px;margin-bottom:20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">' +
     '<i class="fas fa-filter" style="color:#64748b"></i>' +
-    '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'status\\',this.value)">' +
+    '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(&apos;status&apos;,this.value)">' +
       '<option value="all"' + (leadsFilter.status==='all'?' selected':'') + '>Все статусы</option>' +
       '<option value="new"' + (leadsFilter.status==='new'?' selected':'') + '>🟢 Новые лиды</option>' +
       '<option value="contacted"' + (leadsFilter.status==='contacted'?' selected':'') + '>💬 На связи</option>' +
@@ -1636,14 +1636,14 @@ function renderLeads() {
       '<option value="rejected"' + (leadsFilter.status==='rejected'?' selected':'') + '>❌ Отклонён</option>' +
       '<option value="checking"' + (leadsFilter.status==='checking'?' selected':'') + '>🔍 Проверка</option>' +
       '<option value="done"' + (leadsFilter.status==='done'?' selected':'') + '>✅ Завершён</option></select>' +
-    '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'source\\',this.value)">' +
+    '<select class="input" style="width:150px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(&apos;source&apos;,this.value)">' +
       '<option value="all"' + (leadsFilter.source==='all'?' selected':'') + '>Все источники</option>' +
       '<option value="form"' + (leadsFilter.source==='form'?' selected':'') + '>Форма</option>' +
       '<option value="popup"' + (leadsFilter.source==='popup'?' selected':'') + '>Попап</option>' +
       '<option value="calculator_pdf"' + (leadsFilter.source==='calculator_pdf'?' selected':'') + '>Калькулятор</option>' +
       '<option value="manual"' + (leadsFilter.source==='manual'?' selected':'') + '>Ручной</option>' +
       '<option value="admin_panel"' + (leadsFilter.source==='admin_panel'?' selected':'') + '>Админ-панель</option></select>' +
-    '<select class="input" style="width:170px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(\\'assignee\\',this.value)">' +
+    '<select class="input" style="width:170px;padding:6px 10px;font-size:0.82rem" onchange="setLeadsFilter(&apos;assignee&apos;,this.value)">' +
       '<option value="all"' + (leadsFilter.assignee==='all'?' selected':'') + '>Все ответственные</option>' +
       '<option value=""' + (leadsFilter.assignee===''?' selected':'') + '>Не назначен</option>';
   for (var ui = 0; ui < ensureArray(data.users).length; ui++) {
@@ -1651,7 +1651,7 @@ function renderLeads() {
     h += '<option value="' + usr.id + '"' + (leadsFilter.assignee===String(usr.id)?' selected':'') + '>' + escHtml(usr.display_name) + '</option>';
   }
   h += '</select>' +
-    '<input class="input" style="flex:1;min-width:180px;padding:6px 10px;font-size:0.82rem" placeholder="Поиск по имени, контакту, #id..." value="' + escHtml(leadsFilter.search) + '" oninput="setLeadsFilter(\\'search\\',this.value)">' +
+    '<input class="input" style="flex:1;min-width:180px;padding:6px 10px;font-size:0.82rem" placeholder="Поиск по имени, контакту, #id..." value="' + escHtml(leadsFilter.search) + '" oninput="setLeadsFilter(&apos;search&apos;,this.value)">' +
     (leadsFilter.status!=='all'||leadsFilter.source!=='all'||leadsFilter.search||leadsFilter.assignee!=='all' ? '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem" onclick="resetLeadsFilter()"><i class="fas fa-times" style="margin-right:4px"></i>Сбросить</button>' : '') +
   '</div>';
 
@@ -1768,7 +1768,7 @@ function renderLeads() {
       var svcTotal = 0;
       for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(\\'svc-body-' + l.id + '\\',\\'svc-arrow-' + l.id + '\\')">' +
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">' +
         '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ') — <span style="color:#8B5CF6">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</span></span>' +
         '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
         '<i id="svc-arrow-' + l.id + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
@@ -1826,7 +1826,7 @@ function showCreateLeadModal() {
     '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Язык (для PDF)</label>' +
     '<select class="input" id="nl_lang" style="width:100%"><option value="ru">🇷🇺 Русский</option><option value="am">🇦🇲 Армянский</option></select></div>' +
     '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Заметка</label><textarea class="input" id="nl_message" rows="3" placeholder="Дополнительная информация..."></textarea></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>Создать</button></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>Создать</button></div>' +
     '</form></div></div>';
   var area = document.getElementById('createLeadModalArea');
   if (area) area.innerHTML = h;
@@ -1935,7 +1935,7 @@ function renderCommentSection(leadId) {
       '<div style="font-size:0.85rem;color:#e2e8f0;white-space:pre-wrap">' + escHtml(cm.comment) + '</div></div>';
   }
   h += '<div style="display:flex;gap:8px;margin-top:8px">' +
-    '<input class="input" style="flex:1;padding:8px 12px;font-size:0.82rem" id="newComment-' + leadId + '" placeholder="Написать комментарий..." onkeydown="if(event.key===\\'Enter\\')addComment(' + leadId + ')">' +
+    '<input class="input" style="flex:1;padding:8px 12px;font-size:0.82rem" id="newComment-' + leadId + '" placeholder="Написать комментарий..." onkeydown="if(event.key===&apos;Enter&apos;)addComment(' + leadId + ')">' +
     '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.82rem;white-space:nowrap" onclick="addComment(' + leadId + ')"><i class="fas fa-paper-plane"></i></button>' +
   '</div></div>';
   el.innerHTML = h;
@@ -2040,7 +2040,7 @@ function renderArticlesSection(leadId) {
   var totalSum = 0;
   for (var ti = 0; ti < articles.length; ti++) { totalSum += Number(articles[ti].total_price || 0); }
   var h = '<div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px">' +
-    '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(\\'art-body-' + leadId + '\\',\\'art-arrow-' + leadId + '\\')">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;art-body-' + leadId + '&apos;,&apos;art-arrow-' + leadId + '&apos;)">' +
     '<span style="font-size:0.85rem;font-weight:700;color:#fb923c"><i class="fas fa-box" style="margin-right:6px"></i>Артикулы WB (' + articles.length + ') — <span style="color:#F59E0B">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</span></span>' +
     '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showArticleModal(' + leadId + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
     '<i id="art-arrow-' + leadId + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
@@ -2126,7 +2126,7 @@ function showArticleModal(leadId, articleId) {
   }
   h += '</select></div></div>' +
     '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Примечание</label><textarea class="input" id="art_notes" rows="2" placeholder="Особые пожелания клиента...">' + escHtml((art && art.notes) || '') + '</textarea></div>' +
-    '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (isEdit ? 'Сохранить' : 'Добавить') + '</button></div>' +
+    '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (isEdit ? 'Сохранить' : 'Добавить') + '</button></div>' +
     '</form></div></div>';
   document.body.insertAdjacentHTML('beforeend', h);
   document.getElementById('art_wb_article').focus();
@@ -2270,7 +2270,7 @@ function showLeadCalcModal(leadId) {
   h += '<div style="margin-top:16px;padding-top:16px;border-top:1px solid #334155">' +
     '<div id="lc_selected_summary" style="font-size:0.85rem;color:#94a3b8;margin-bottom:12px">Выберите услуги галочкой ☑ и нажмите «Добавить выбранные»</div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end">' +
-    '<button class="btn btn-outline" onclick="this.closest(\\'[style*=fixed]\\').remove()">Закрыть</button>' +
+    '<button class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Закрыть</button>' +
     '<button class="btn btn-success" style="padding:10px 24px;font-size:0.9rem" onclick="addSelectedServicesToLead(' + leadId + ')"><i class="fas fa-check" style="margin-right:6px"></i>Добавить выбранные (<span id="lc_sel_count">0</span>)</button>' +
     '</div></div>';
   h += '</div></div>';
@@ -2613,7 +2613,7 @@ function renderLeadsAnalytics() {
     var mNum = parseInt(expandedMonth.split('-')[1]);
     h += '<div class="card" style="padding:12px 20px;margin-bottom:16px;background:rgba(139,92,246,0.1);border-color:#8B5CF6;display:flex;align-items:center;justify-content:space-between">';
     h += '<div><i class="fas fa-calendar-day" style="color:#8B5CF6;margin-right:8px"></i><strong style="color:#a78bfa">' + mNames2[mNum] + ' ' + expandedMonth.split('-')[0] + '</strong> — детализация по месяцу</div>';
-    h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="expandedMonth=\\'\\';analyticsData=null;loadAnalyticsData()"><i class="fas fa-times" style="margin-right:4px"></i>Закрыть</button>';
+    h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.8rem" onclick="expandedMonth=&apos;&apos;;analyticsData=null;loadAnalyticsData()"><i class="fas fa-times" style="margin-right:4px"></i>Закрыть</button>';
     h += '</div>';
   }
   // Date filter (hidden when month is expanded)
@@ -2625,7 +2625,7 @@ function renderLeadsAnalytics() {
     h += '<input type="date" class="input" style="width:150px;padding:6px 10px" value="' + analyticsDateTo + '" onchange="analyticsDateTo=this.value;analyticsData=null;loadAnalyticsData()">';
     var periods = [{l:'Сегодня',v:'today'},{l:'7 дн',v:'week'},{l:'14 дн',v:'14d'},{l:'30 дн',v:'month'},{l:'90 дн',v:'90d'},{l:'Все',v:'all'}];
     for (var pi = 0; pi < periods.length; pi++) {
-      h += '<button class="tab-btn" style="padding:6px 14px;font-size:0.8rem" onclick="setAnalyticsPeriod(\\'' + periods[pi].v + '\\')">' + periods[pi].l + '</button>';
+      h += '<button class="tab-btn" style="padding:6px 14px;font-size:0.8rem" onclick="setAnalyticsPeriod(&apos;' + periods[pi].v + '&apos;)">' + periods[pi].l + '</button>';
     }
     h += '</div>';
   }
@@ -2652,7 +2652,7 @@ function renderLeadsAnalytics() {
   h += '<div style="display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap">';
   for (var ti = 0; ti < tabs.length; ti++) {
     var t = tabs[ti];
-    h += '<button class="tab-btn' + (bizAnalyticsTab === t.id ? ' active' : '') + '" onclick="bizAnalyticsTab=\\'' + t.id + '\\';render()" style="padding:10px 20px"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
+    h += '<button class="tab-btn' + (bizAnalyticsTab === t.id ? ' active' : '') + '" onclick="bizAnalyticsTab=&apos;' + t.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + t.icon + '" style="margin-right:6px"></i>' + t.label + '</button>';
   }
   h += '</div>';
   // Tab content
@@ -2978,9 +2978,9 @@ function renderPnLTab() {
   }
   // Period selector
   h += '<div class="card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">';
-  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:1rem" onclick="setPnlPeriod(\\'prev\\')"><i class="fas fa-chevron-left"></i></button>';
+  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:1rem" onclick="setPnlPeriod(&apos;prev&apos;)"><i class="fas fa-chevron-left"></i></button>';
   h += '<div style="font-size:1.2rem;font-weight:800;color:#a78bfa;min-width:160px;text-align:center"><i class="fas fa-calendar-alt" style="margin-right:8px"></i>' + mFull[mNum] + ' ' + pnlPeriod.split('-')[0] + '</div>';
-  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:1rem" onclick="setPnlPeriod(\\'next\\')"><i class="fas fa-chevron-right"></i></button>';
+  h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:1rem" onclick="setPnlPeriod(&apos;next&apos;)"><i class="fas fa-chevron-right"></i></button>';
   h += '<span style="color:#475569;margin-left:8px">|</span>';
   h += '<input type="month" class="input" style="padding:4px 10px;width:160px;font-size:0.85rem" value="' + pnlPeriod + '" onchange="pnlPeriod=this.value;pnlData=null;loadPnlData()">';
   h += '<span style="color:#64748b;font-size:0.78rem;margin-left:6px">\u0432\u0430\u043b\u044e\u0442\u0430: AMD</span>';
@@ -2998,7 +2998,7 @@ function renderPnLTab() {
   h += '<div style="display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap">';
   for (var si = 0; si < subTabs.length; si++) {
     var st = subTabs[si];
-    h += '<button class="tab-btn' + (pnlSubTab === st.id ? ' active' : '') + '" onclick="pnlSubTab=\\'' + st.id + '\\';render()" style="padding:8px 14px;font-size:0.82rem"><i class="fas ' + st.icon + '" style="margin-right:5px"></i>' + st.label + '</button>';
+    h += '<button class="tab-btn' + (pnlSubTab === st.id ? ' active' : '') + '" onclick="pnlSubTab=&apos;' + st.id + '&apos;;render()" style="padding:8px 14px;font-size:0.82rem"><i class="fas ' + st.icon + '" style="margin-right:5px"></i>' + st.label + '</button>';
   }
   h += '</div>';
   if (pnlSubTab === 'cascade') h += renderPnlCascade(p);
@@ -3227,7 +3227,7 @@ function renderPnlCrudForm(type, item) {
     var curFrom = (linkedRule && linkedRule.apply_from) || '';
     // Toggle: auto (repeating) vs manual (one-time)
     h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(139,92,246,0.08);border-radius:8px;border:1px solid rgba(139,92,246,0.2)">';
-    h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#a78bfa;font-weight:600"><input type="checkbox" id="pnl_tax_is_auto"' + (isAuto ? ' checked' : '') + ' onchange="document.getElementById(\\'taxManualRow\\').style.display=this.checked?\\'none\\':\\'\\';document.getElementById(\\'taxAutoRow\\').style.display=this.checked?\\'grid\\':\\'none\\';document.getElementById(\\'taxRecurRow\\').style.display=this.checked?\\'grid\\':\\'none\\'"> <i class="fas fa-magic" style="margin-right:2px"></i>\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 (\u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0435\u0442\u0441\u044f \u043a\u0430\u0436\u0434\u044b\u0439 \u043c\u0435\u0441\u044f\u0446/\u043a\u0432\u0430\u0440\u0442\u0430\u043b)</label>';
+    h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.85rem;color:#a78bfa;font-weight:600"><input type="checkbox" id="pnl_tax_is_auto"' + (isAuto ? ' checked' : '') + ' onchange="document.getElementById(&apos;taxManualRow&apos;).style.display=this.checked?&apos;none&apos;:&apos;&apos;;document.getElementById(&apos;taxAutoRow&apos;).style.display=this.checked?&apos;grid&apos;:&apos;none&apos;;document.getElementById(&apos;taxRecurRow&apos;).style.display=this.checked?&apos;grid&apos;:&apos;none&apos;"> <i class="fas fa-magic" style="margin-right:2px"></i>\u0410\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442 (\u043f\u043e\u0432\u0442\u043e\u0440\u044f\u0435\u0442\u0441\u044f \u043a\u0430\u0436\u0434\u044b\u0439 \u043c\u0435\u0441\u044f\u0446/\u043a\u0432\u0430\u0440\u0442\u0430\u043b)</label>';
     h += '<div style="font-size:0.72rem;color:#64748b;margin-top:4px;padding-left:28px">\u0412\u041a\u041b = \u0441\u043e\u0437\u0434\u0430\u0451\u0442\u0441\u044f \u043f\u0440\u0430\u0432\u0438\u043b\u043e + \u043f\u043b\u0430\u0442\u0451\u0436 \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u043a\u0430\u0436\u0434\u044b\u0439 \u043f\u0435\u0440\u0438\u043e\u0434. \u0412\u042b\u041a\u041b = \u0440\u0430\u0437\u043e\u0432\u044b\u0439 \u043f\u043b\u0430\u0442\u0451\u0436 \u0437\u0430 \u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043c\u0435\u0441\u044f\u0446.</div>';
     h += '</div>';
     // Common fields: type (full width, no separate name — name auto-generated from type+rate)
@@ -3275,9 +3275,9 @@ function renderPnlCrudForm(type, item) {
     h += '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(239,68,68,0.08);border-radius:8px;border:1px solid rgba(239,68,68,0.2)">';
     h += '<label style="font-size:0.82rem;color:#EF4444;font-weight:600"><i class="fas fa-tag" style="margin-right:6px"></i>Тип кредита</label>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='annuity'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='annuity'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="annuity"' + (curLoanType==='annuity'?' checked':'') + ' onchange="switchLoanType(\\\'annuity\\\')""><i class="fas fa-university"></i> Потребительский</label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='manual'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='manual'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="manual"' + (curLoanType==='manual'?' checked':'') + ' onchange="switchLoanType(\\\'manual\\\')""><i class="fas fa-handshake"></i> Займ с руки</label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='overdraft'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='overdraft'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="overdraft"' + (curLoanType==='overdraft'?' checked':'') + ' onchange="switchLoanType(\\\'overdraft\\\')""><i class="fas fa-credit-card"></i> Овердрафт</label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='annuity'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='annuity'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="annuity"' + (curLoanType==='annuity'?' checked':'') + ' onchange="switchLoanType(\&apos;annuity\&apos;)""><i class="fas fa-university"></i> Потребительский</label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='manual'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='manual'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="manual"' + (curLoanType==='manual'?' checked':'') + ' onchange="switchLoanType(\&apos;manual\&apos;)""><i class="fas fa-handshake"></i> Займ с руки</label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curLoanType==='overdraft'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curLoanType==='overdraft'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_loan_type_radio" value="overdraft"' + (curLoanType==='overdraft'?' checked':'') + ' onchange="switchLoanType(\&apos;overdraft\&apos;)""><i class="fas fa-credit-card"></i> Овердрафт</label>';
     h += '</div><input type="hidden" id="pnl_loan_loan_type" value="' + curLoanType + '">';
     h += '</div>';
     // Common fields: name, lender
@@ -3336,9 +3336,9 @@ function renderPnlCrudForm(type, item) {
     h += '<div style="margin-bottom:10px;padding:10px 14px;background:rgba(139,92,246,0.08);border-radius:8px;border:1px solid rgba(139,92,246,0.2)">';
     h += '<label style="font-size:0.82rem;color:#8B5CF6;font-weight:600"><i class="fas fa-clock" style="margin-right:6px"></i>Режим выплат</label>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:6px">';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='monthly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='monthly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="monthly"' + (curSchedule==='monthly'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_schedule\\').value=\\'monthly\\'"> <span><b>Ежемесячно</b></span></label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='quarterly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='quarterly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="quarterly"' + (curSchedule==='quarterly'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_schedule\\').value=\\'quarterly\\'"> <span><b>Ежеквартально</b></span></label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='yearly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='yearly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="yearly"' + (curSchedule==='yearly'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_schedule\\').value=\\'yearly\\'"> <span><b>Ежегодно</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='monthly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='monthly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="monthly"' + (curSchedule==='monthly'?' checked':'') + ' onchange="document.getElementById(&apos;pnl_dividend_schedule&apos;).value=&apos;monthly&apos;"> <span><b>Ежемесячно</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='quarterly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='quarterly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="quarterly"' + (curSchedule==='quarterly'?' checked':'') + ' onchange="document.getElementById(&apos;pnl_dividend_schedule&apos;).value=&apos;quarterly&apos;"> <span><b>Ежеквартально</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curSchedule==='yearly'?'rgba(139,92,246,0.15)':'#0f172a') + ';border:1px solid ' + (curSchedule==='yearly'?'#8B5CF6':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_schedule_radio" value="yearly"' + (curSchedule==='yearly'?' checked':'') + ' onchange="document.getElementById(&apos;pnl_dividend_schedule&apos;).value=&apos;yearly&apos;"> <span><b>Ежегодно</b></span></label>';
     h += '</div><input type="hidden" id="pnl_dividend_schedule" value="' + curSchedule + '">';
     h += '</div>';
     // Net profit hint + auto-calc from %
@@ -3357,8 +3357,8 @@ function renderPnlCrudForm(type, item) {
     // Base selector: before or after loans
     h += '<div style="margin-bottom:8px"><label style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px;display:block">База расчёта дивидендов</label>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='after_loans'?'rgba(34,197,94,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='after_loans'?'#22C55E':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="after_loans"' + (curCalcBase==='after_loans'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_calc_base\\').value=\\'after_loans\\';calcDividendFromPct()"> <span><b>\u041f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
-    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='before_loans'?'rgba(245,158,11,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='before_loans'?'#F59E0B':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="before_loans"' + (curCalcBase==='before_loans'?' checked':'') + ' onchange="document.getElementById(\\'pnl_dividend_calc_base\\').value=\\'before_loans\\';calcDividendFromPct()"> <span><b>\u0414\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='after_loans'?'rgba(34,197,94,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='after_loans'?'#22C55E':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="after_loans"' + (curCalcBase==='after_loans'?' checked':'') + ' onchange="document.getElementById(&apos;pnl_dividend_calc_base&apos;).value=&apos;after_loans&apos;;calcDividendFromPct()"> <span><b>\u041f\u043e\u0441\u043b\u0435 \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
+    h += '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;padding:6px 10px;border-radius:6px;font-size:0.78rem;background:' + (curCalcBase==='before_loans'?'rgba(245,158,11,0.15)':'#0f172a') + ';border:1px solid ' + (curCalcBase==='before_loans'?'#F59E0B':'#334155') + ';color:#e2e8f0"><input type="radio" name="pnl_div_calc_base_radio" value="before_loans"' + (curCalcBase==='before_loans'?' checked':'') + ' onchange="document.getElementById(&apos;pnl_dividend_calc_base&apos;).value=&apos;before_loans&apos;;calcDividendFromPct()"> <span><b>\u0414\u043e \u043a\u0440\u0435\u0434\u0438\u0442\u043e\u0432</b></span></label>';
     h += '</div><input type="hidden" id="pnl_dividend_calc_base" value="' + curCalcBase + '"></div>';
     // Dynamic info block — updated by calcDividendFromPct
     h += '<div id="div_calc_info">';
@@ -3427,7 +3427,7 @@ function renderPnlCrudForm(type, item) {
     h += '</div>';
     h += '<div style="margin-top:10px"><label style="font-size:0.78rem;color:#64748b">\u0417\u0430\u043c\u0435\u0442\u043a\u0438</label><input class="input" id="pnl_other_notes" value="' + escHtml((item && item.notes) || '') + '"></div>';
   }
-  h += '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" onclick="savePnlItem(\\'' + type + '\\')"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>';
+  h += '<div style="margin-top:12px;display:flex;gap:8px"><button class="btn btn-primary" onclick="savePnlItem(&apos;' + type + '&apos;)"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c</button>';
   h += '<button class="btn btn-outline" onclick="showPnlAddForm=false;pnlEditId=0;render()">\u041e\u0442\u043c\u0435\u043d\u0430</button></div>';
   h += '</div>';
   return h;
@@ -3444,7 +3444,7 @@ function renderPnlTaxes(p) {
   var bases = (p && p._bases) || {};
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-landmark" style="color:#F59E0B;margin-right:8px"></i>\u041d\u0430\u043b\u043e\u0433\u043e\u0432\u044b\u0435 \u043f\u043b\u0430\u0442\u0435\u0436\u0438</h3>';
-  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'tax\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043d\u0430\u043b\u043e\u0433</button></div>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(&apos;tax&apos;)"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043d\u0430\u043b\u043e\u0433</button></div>';
   // Current bases info
   h += '<div class="card" style="padding:12px 16px;margin-bottom:14px;background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.2)">';
   h += '<div style="font-weight:600;color:#a78bfa;font-size:0.82rem;margin-bottom:8px"><i class="fas fa-database" style="margin-right:6px"></i>\u0411\u0430\u0437\u044b \u0434\u043b\u044f \u0430\u0432\u0442\u043e\u0440\u0430\u0441\u0447\u0451\u0442\u0430 (\u0442\u0435\u043a\u0443\u0449\u0438\u0439 \u043f\u0435\u0440\u0438\u043e\u0434):</div>';
@@ -3494,8 +3494,8 @@ function renderPnlTaxes(p) {
     h += '<div style="display:flex;align-items:center;gap:10px;flex-shrink:0">';
     h += '<span style="font-weight:700;color:#F59E0B;font-size:1.05rem">' + fmtAmt(displayAmount) + '</span>';
     h += '<span class="badge" style="background:' + (statusColors[t.status] || '#64748b') + '22;color:' + (statusColors[t.status] || '#64748b') + '">' + (statusLabels[t.status] || t.status) + '</span>';
-    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'tax\\',' + t.id + ')"><i class="fas fa-edit"></i></button>';
-    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'tax\\',' + t.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(&apos;tax&apos;,' + t.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(&apos;tax&apos;,' + t.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
     h += '</div></div></div>';
   }
   h += '<div style="padding:14px 16px;background:rgba(245,158,11,0.08);display:flex;justify-content:space-between;align-items:center"><span style="font-weight:700;color:#94a3b8"><i class="fas fa-sigma" style="margin-right:6px"></i>\u0418\u0442\u043e\u0433\u043e \u043d\u0430\u043b\u043e\u0433\u043e\u0432:</span><span style="font-weight:800;color:#F59E0B;font-size:1.1rem">' + fmtAmt(total) + '</span></div>';
@@ -3626,7 +3626,7 @@ function renderPnlTaxes(p) {
 function renderPnlAssets(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-building" style="color:#3B82F6;margin-right:8px"></i>\u041e\u0441\u043d\u043e\u0432\u043d\u044b\u0435 \u0441\u0440\u0435\u0434\u0441\u0442\u0432\u0430 \u0438 \u0430\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</h3>';
-  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'asset\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0430\u043a\u0442\u0438\u0432</button></div>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(&apos;asset&apos;)"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0430\u043a\u0442\u0438\u0432</button></div>';
   if (showPnlAddForm && pnlEditType === 'asset') {
     var editItem = pnlEditId ? (data.assets || []).find(function(a) { return a.id === pnlEditId; }) : null;
     h += renderPnlCrudForm('asset', editItem);
@@ -3647,8 +3647,8 @@ function renderPnlAssets(p) {
     h += '<div><div style="font-weight:600;color:#e2e8f0">' + escHtml(a.name) + ' <span style="color:#64748b;font-size:0.75rem">' + (a.category || '') + '</span></div>';
     h += '<div style="font-size:0.75rem;color:#64748b">\u041a\u0443\u043f\u043b\u0435\u043d: ' + (a.purchase_date || '?') + ' | \u0421\u0440\u043e\u043a: ' + (a.useful_life_months || 60) + ' \u043c\u0435\u0441.</div></div>';
     h += '<div style="display:flex;align-items:center;gap:8px">';
-    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'asset\\',' + a.id + ')"><i class="fas fa-edit"></i></button>';
-    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'asset\\',' + a.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(&apos;asset&apos;,' + a.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(&apos;asset&apos;,' + a.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button>';
     h += '</div></div>';
     h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">';
     h += '<div style="text-align:center"><div style="font-size:0.7rem;color:#64748b">\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c</div><div style="font-weight:700;color:#3B82F6">' + fmtAmt(a.purchase_cost) + '</div></div>';
@@ -3678,7 +3678,7 @@ function renderPnlLoans(p) {
   var loanPeriodYear = (pnlPeriod || '').split('-')[0] || '';
   var loanPeriodLabel = mNamesFull[loanPeriodMonth] + ' ' + loanPeriodYear;
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:8px"></i>\u041a\u0440\u0435\u0434\u0438\u0442\u044b \u0438 \u0437\u0430\u0439\u043c\u044b <span style="font-size:0.75rem;font-weight:600;padding:3px 8px;background:rgba(139,92,246,0.15);border-radius:6px;color:#a78bfa;margin-left:8px"><i class="fas fa-calendar-alt" style="margin-right:4px"></i>' + loanPeriodLabel + '</span></h3>';
-  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'loan\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u0440\u0435\u0434\u0438\u0442</button></div>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(&apos;loan&apos;)"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u0440\u0435\u0434\u0438\u0442</button></div>';
   // === SYSTEM-WIDE REPAYMENT MODE — COLLAPSIBLE CARD ===
   var ls = data.loanSettings || { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 };
   var isAggr = ls.repayment_mode === 'aggressive';
@@ -3943,7 +3943,7 @@ function renderPnlLoans(p) {
       h += '<span style="padding:2px 6px;background:rgba(' + (extraAmt > 0 ? '245,158,11' : '59,130,246') + ',0.2);border-radius:4px;font-size:0.65rem;color:' + aggrColor + ';font-weight:700"><i class="fas fa-bolt" style="margin-right:2px"></i>\u2261 ' + fmtAmt(aggrTargetPmt) + (extraAmt > 0 ? ' (+' + fmtAmt(extraAmt) + ' \u0434\u043e\u043f.)' : '') + '</span>';
     }
     h += '</div></div>';
-    h += '<div style="display:flex;gap:6px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-edit"></i></button><button class="tier-del-btn" onclick="deletePnlItem(\\'loan\\',' + l.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
+    h += '<div style="display:flex;gap:6px"><button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(&apos;loan&apos;,' + l.id + ')"><i class="fas fa-edit"></i></button><button class="tier-del-btn" onclick="deletePnlItem(&apos;loan&apos;,' + l.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
     if (l.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-bottom:8px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(l.notes) + '</div>';
     // === OVERDRAFT CARD ===
     if (isOD) {
@@ -4464,7 +4464,7 @@ function renderPnlDividends(p) {
   var scheduleColors = {monthly:'#22C55E',quarterly:'#3B82F6',yearly:'#F59E0B'};
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-money-check-alt" style="color:#8B5CF6;margin-right:8px"></i>\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b</h3>';
-  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'dividend\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(&apos;dividend&apos;)"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
   if (showPnlAddForm && pnlEditType === 'dividend') {
     var editItem = pnlEditId ? (data.dividends || []).find(function(d) { return d.id === pnlEditId; }) : null;
     h += renderPnlCrudForm('dividend', editItem);
@@ -4487,8 +4487,8 @@ function renderPnlDividends(p) {
     if (d.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-top:2px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(d.notes) + '</div>';
     h += '</div>';
     h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;color:#8B5CF6">' + fmtAmt(d.amount) + '</span>';
-    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'dividend\\',' + d.id + ')"><i class="fas fa-edit"></i></button>';
-    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'dividend\\',' + d.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(&apos;dividend&apos;,' + d.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(&apos;dividend&apos;,' + d.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
   }
   h += '<div style="padding:12px 16px;background:rgba(139,92,246,0.08);display:flex;justify-content:space-between"><span style="font-weight:700;color:#94a3b8">\u0418\u0442\u043e\u0433\u043e:</span><span style="font-weight:800;color:#8B5CF6">' + fmtAmt(total) + '</span></div>';
   h += '</div>';
@@ -4498,7 +4498,7 @@ function renderPnlDividends(p) {
 function renderPnlOther(p) {
   var h = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">';
   h += '<h3 style="font-weight:700;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#10B981;margin-right:8px"></i>\u041f\u0440\u043e\u0447\u0438\u0435 \u0434\u043e\u0445\u043e\u0434\u044b / \u0440\u0430\u0441\u0445\u043e\u0434\u044b</h3>';
-  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(\\'other\\')"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
+  h += '<button class="btn btn-primary" style="padding:8px 14px;font-size:0.85rem" onclick="showPnlForm(&apos;other&apos;)"><i class="fas fa-plus" style="margin-right:6px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>';
   if (showPnlAddForm && pnlEditType === 'other') {
     var editItem = pnlEditId ? (data.otherIncomeExpenses || []).find(function(o) { return o.id === pnlEditId; }) : null;
     h += renderPnlCrudForm('other', editItem);
@@ -4514,8 +4514,8 @@ function renderPnlOther(p) {
     if (o.notes) h += '<div style="font-size:0.72rem;color:#8B5CF6;margin-top:2px"><i class="fas fa-comment" style="margin-right:4px;font-size:0.6rem"></i>' + escHtml(o.notes) + '</div>';
     h += '</div>';
     h += '<div style="display:flex;align-items:center;gap:8px"><span style="font-weight:700;color:' + (isIncome ? '#22C55E' : '#EF4444') + '">' + (isIncome ? '+' : '-') + fmtAmt(o.amount) + '</span>';
-    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(\\'other\\',' + o.id + ')"><i class="fas fa-edit"></i></button>';
-    h += '<button class="tier-del-btn" onclick="deletePnlItem(\\'other\\',' + o.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
+    h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.75rem" onclick="editPnlItem(&apos;other&apos;,' + o.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="tier-del-btn" onclick="deletePnlItem(&apos;other&apos;,' + o.id + ')"><i class="fas fa-trash" style="font-size:0.6rem"></i></button></div></div>';
   }
   h += '</div>';
   return h;
@@ -4770,7 +4770,7 @@ function renderBizOverviewV2(d, sd, fin) {
     var cnt = Number(rawV.count) || 0; var amt = Number(rawV.amount) || 0;
     var svcAmt = Number(rawV.services) || 0; var artAmt = Number(rawV.articles) || 0;
     var opacity = isExcl ? '0.35' : '1';
-    h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer;opacity:' + opacity + '" onclick="navigate(\\'leads\\');setLeadsFilter(\\'status\\',\\'' + st.key + '\\')">';
+    h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer;opacity:' + opacity + '" onclick="navigate(&apos;leads&apos;);setLeadsFilter(&apos;status&apos;,&apos;' + st.key + '&apos;)">';
     h += '<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas ' + st.icon + '" style="color:' + st.color + ';margin-right:4px"></i>' + st.label + '</div>';
     h += '<div style="font-size:1.8rem;font-weight:800;color:' + st.color + '">' + cnt + '</div>';
     h += '<div style="font-size:0.82rem;color:#e2e8f0;margin-top:4px;font-weight:600">' + fmtAmt(amt) + '</div>';
@@ -4933,7 +4933,7 @@ function renderBizOverviewV2(d, sd, fin) {
     if (!isExcl2) { totalLeads2 += cnt2; totalAmt2 += amt2; totalSvc += svc2; totalArt += art2; }
     var rowOpacity = isExcl2 ? 'opacity:0.35;' : '';
     h += '<tr style="border-bottom:1px solid #1e293b;' + rowOpacity + '">';
-    h += '<td style="padding:10px 8px;text-align:center"><input type="checkbox" ' + (isExcl2 ? '' : 'checked') + ' onchange="toggleExcludeStatus(\\'' + s2.key + '\\',this.checked)" style="cursor:pointer;accent-color:#8B5CF6"></td>';
+    h += '<td style="padding:10px 8px;text-align:center"><input type="checkbox" ' + (isExcl2 ? '' : 'checked') + ' onchange="toggleExcludeStatus(&apos;' + s2.key + '&apos;,this.checked)" style="cursor:pointer;accent-color:#8B5CF6"></td>';
     h += '<td style="padding:10px 16px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + s2.color + ';margin-right:8px"></span>' + s2.label + '</td>';
     h += '<td style="padding:10px;text-align:right;font-weight:600">' + cnt2 + '</td>';
     h += '<td style="padding:10px;text-align:right;font-weight:600">' + fmtAmt(amt2) + '</td>';
@@ -5211,8 +5211,8 @@ function renderBizCostsV2(d, sd, fin) {
       h += '<td style="padding:10px;text-align:right;font-weight:600;color:#EF4444">' + (uFines < 0 ? '\u2212' + fmtAmt(Math.abs(uFines)) : '\u2014') + '</td>';
       h += '<td style="padding:10px;text-align:right;font-weight:700;color:' + (uNet >= 0 ? '#a78bfa' : '#EF4444') + '">' + fmtAmt(uNet) + '</td>';
       h += '<td style="padding:10px"><div style="display:flex;gap:4px">';
-      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#22C55E;border-color:#22C55E44" onclick="showAddBonusUserId=' + u.id + ';addBonusType=\\'bonus\\';render()" title="Добавить бонус"><i class="fas fa-plus"></i></button>';
-      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#EF4444;border-color:#EF444444" onclick="showAddBonusUserId=' + u.id + ';addBonusType=\\'fine\\';render()" title="Добавить штраф"><i class="fas fa-minus"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#22C55E;border-color:#22C55E44" onclick="showAddBonusUserId=' + u.id + ';addBonusType=&apos;bonus&apos;;render()" title="Добавить бонус"><i class="fas fa-plus"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#EF4444;border-color:#EF444444" onclick="showAddBonusUserId=' + u.id + ';addBonusType=&apos;fine&apos;;render()" title="Добавить штраф"><i class="fas fa-minus"></i></button>';
       h += '<button class="btn btn-outline" style="padding:4px 7px;font-size:0.68rem;color:#64748b" onclick="toggleBonusList(' + u.id + ')" title="Показать историю"><i class="fas fa-list"></i></button>';
       h += '</div></td></tr>';
       // Bonus/fine form
@@ -5223,7 +5223,7 @@ function renderBizCostsV2(d, sd, fin) {
         h += '<input class="input" id="bonus-amount-' + u.id + '" type="number" placeholder="Сумма" style="width:120px;padding:6px 10px" min="0">';
         h += '<input class="input" id="bonus-desc-' + u.id + '" placeholder="' + (isFine ? 'Причина штрафа' : 'Описание бонуса') + '" style="flex:1;padding:6px 10px;min-width:120px">';
         h += '<input class="input" id="bonus-date-' + u.id + '" type="date" style="width:140px;padding:6px 10px" required value="' + (new Date().toISOString().slice(0,10)) + '">';
-        h += '<button class="btn ' + (isFine ? 'btn-outline' : 'btn-success') + '" style="padding:6px 12px;' + (isFine ? 'color:#EF4444;border-color:#EF4444' : '') + '" onclick="saveBonus(' + u.id + ',\\'' + (isFine ? 'fine' : 'bonus') + '\\')"><i class="fas fa-check"></i></button>';
+        h += '<button class="btn ' + (isFine ? 'btn-outline' : 'btn-success') + '" style="padding:6px 12px;' + (isFine ? 'color:#EF4444;border-color:#EF4444' : '') + '" onclick="saveBonus(' + u.id + ',&apos;' + (isFine ? 'fine' : 'bonus') + '&apos;)"><i class="fas fa-check"></i></button>';
         h += '<button class="btn btn-outline" style="padding:6px 12px" onclick="showAddBonusUserId=0;render()"><i class="fas fa-times"></i></button>';
         h += '</div></td></tr>';
       }
@@ -5244,7 +5244,7 @@ function renderBizCostsV2(d, sd, fin) {
             h += '<td style="padding:5px"><input class="input" id="edit-bonus-amt-' + b.id + '" type="number" value="' + Math.abs(bAmt) + '" style="padding:4px 8px;font-size:0.75rem;width:80px;text-align:right" min="0"></td>';
             h += '<td style="padding:5px"><input class="input" id="edit-bonus-date-' + b.id + '" type="date" value="' + (b.bonus_date || '') + '" style="padding:4px 6px;font-size:0.72rem"></td>';
             h += '<td style="padding:5px;text-align:center;white-space:nowrap">';
-            h += '<button class="btn btn-success" style="padding:2px 6px;font-size:0.6rem;margin-right:2px" onclick="saveBonusEdit(' + b.id + ',' + u.id + ',\\'' + bType + '\\')" title="\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c"><i class="fas fa-check"></i></button>';
+            h += '<button class="btn btn-success" style="padding:2px 6px;font-size:0.6rem;margin-right:2px" onclick="saveBonusEdit(' + b.id + ',' + u.id + ',&apos;' + bType + '&apos;)" title="\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c"><i class="fas fa-check"></i></button>';
             h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem" onclick="editingBonusId=0;render()" title="\u041e\u0442\u043c\u0435\u043d\u0430"><i class="fas fa-times"></i></button>';
             h += '</td></tr>';
           } else {
@@ -5566,7 +5566,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:center;white-space:nowrap">';
     // Edit button for ANY non-future month
     if (!isFuture) {
-      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=\\'' + mKey + '\\';render();setTimeout(function(){loadSalarySummary(\\'' + mKey + '\\')},100)" title="Редактировать"><i class="fas fa-pencil-alt"></i></button>';
+      h += '<button class="btn btn-outline" style="padding:3px 7px;font-size:0.6rem;color:#F59E0B;border-color:#F59E0B44" onclick="editingMonthKey=&apos;' + mKey + '&apos;;render();setTimeout(function(){loadSalarySummary(&apos;' + mKey + '&apos;)},100)" title="Редактировать"><i class="fas fa-pencil-alt"></i></button>';
     }
     h += '</td></tr>';
     // Editable inline form for ANY month (when editing)
@@ -5636,7 +5636,7 @@ function renderBizPeriodsV2(d, sd, fin) {
           h += '<span style="color:' + (adjIsInflow ? '#22C55E' : '#EF4444') + ';font-weight:700;font-size:0.85rem;min-width:80px">' + (adjIsInflow ? '+' : '-') + fmtAmt(Math.abs(adj.amount)) + '</span>';
           h += '<span style="color:' + (adjIsInflow ? '#34d399' : '#f87171') + ';font-size:0.72rem;padding:2px 8px;background:' + (adjIsInflow ? 'rgba(34,197,94,0.1)' : 'rgba(239,68,68,0.1)') + ';border-radius:4px;min-width:50px;text-align:center">' + (adjIsInflow ? 'Приток' : 'Отток') + '</span>';
           h += '<span style="color:#94a3b8;font-size:0.75rem">' + (adj.comment || '') + '</span>';
-          h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#EF4444;border-color:#EF444433;margin-left:auto;flex-shrink:0" onclick="deleteAdjustment(\\'' + mKey + '\\',' + snapId4Edit + ',' + ai + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
+          h += '<button class="btn btn-outline" style="padding:2px 6px;font-size:0.6rem;color:#EF4444;border-color:#EF444433;margin-left:auto;flex-shrink:0" onclick="deleteAdjustment(&apos;' + mKey + '&apos;,' + snapId4Edit + ',' + ai + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
           h += '</div>';
         }
         h += '</div>';
@@ -5649,8 +5649,8 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '<div><label style="font-size:0.7rem;color:#64748b">Тип</label><select class="input" id="edit-adj-type-' + mKey + '" style="width:100%;padding:6px 10px"><option value="inflow">Приток (плюс к прибыли)</option><option value="outflow">Отток (минус из прибыли)</option></select></div>';
       h += '<div><label style="font-size:0.7rem;color:#64748b">Комментарий</label><input class="input" id="edit-adj-comment-' + mKey + '" placeholder="Описание" style="width:100%;padding:6px 10px"></div>';
       h += '</div></div>';
-      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(\\'' + mKey + '\\',' + snapId4Edit + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
-      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=\\'\\';render()">Отмена</button></div>';
+      h += '<div style="display:flex;gap:8px"><button class="btn btn-success" style="padding:6px 14px;font-size:0.82rem" onclick="saveEditedMonth(&apos;' + mKey + '&apos;,' + snapId4Edit + ')"><i class="fas fa-check" style="margin-right:4px"></i>Сохранить</button>';
+      h += '<button class="btn btn-outline" style="padding:6px 14px;font-size:0.82rem" onclick="editingMonthKey=&apos;&apos;;render()">Отмена</button></div>';
       h += '</td></tr>';
     }
   }
@@ -5804,7 +5804,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:' + (qNetProfit >= 0 ? '#10B981' : '#EF4444') + '">' + (qNetProfit || qTaxes ? fmtAmt(qNetProfit) : '\u2014') + '</td>';
     h += '<td style="padding:8px;text-align:center">';
     if (qNum < currentQ && closedInQ === 3 && !qLocked) {
-      h += '<button class="btn btn-primary" style="padding:3px 10px;font-size:0.72rem" onclick="closePeriodAction(\\'quarter\\',\\'' + qKey + '\\',true)"><i class="fas fa-lock"></i></button>';
+      h += '<button class="btn btn-primary" style="padding:3px 10px;font-size:0.72rem" onclick="closePeriodAction(&apos;quarter&apos;,&apos;' + qKey + '&apos;,true)"><i class="fas fa-lock"></i></button>';
     } else if (qLocked) {
       h += '<span style="color:#22C55E;font-size:0.72rem"><i class="fas fa-check-circle"></i></span>';
     }
@@ -5822,7 +5822,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<div style="font-size:0.85rem;color:#64748b;margin-top:4px">\u041a\u0432\u0430\u0440\u0442\u0430\u043b\u043e\u0432 \u0437\u0430\u043a\u0440\u044b\u0442\u043e: ' + closedQ + '/4</div>';
   if (yearSnap) h += '<div style="font-size:0.85rem;margin-top:8px">\u041f\u0440\u0438\u0431\u044b\u043b\u044c \u0437\u0430 \u0433\u043e\u0434: <strong style="color:' + ((yearSnap.net_profit||0) >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearSnap.net_profit) + '</strong></div>';
   if (closedQ === 4 && !(yearSnap && yearSnap.is_locked)) {
-    h += '<button class="btn btn-primary" style="margin-top:12px" onclick="closePeriodAction(\\'year\\',\\'' + yearKey + '\\',true)"><i class="fas fa-lock" style="margin-right:6px"></i>\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u0433\u043e\u0434</button>';
+    h += '<button class="btn btn-primary" style="margin-top:12px" onclick="closePeriodAction(&apos;year&apos;,&apos;' + yearKey + '&apos;,true)"><i class="fas fa-lock" style="margin-right:6px"></i>\u0417\u0430\u043a\u0440\u044b\u0442\u044c \u0433\u043e\u0434</button>';
   }
   h += '</div></div>';
 
@@ -5838,23 +5838,23 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<span style="font-size:0.78rem;color:#94a3b8;font-weight:600"><i class="fas fa-bolt" style="margin-right:4px;color:#F59E0B"></i>\u0411\u044b\u0441\u0442\u0440\u044b\u0439 \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440:</span>';
     // Single period quick view
     if (monthSnaps.length >= 1) {
-      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'\\';render()"><i class="fas fa-eye" style="margin-right:3px"></i>' + monthSnaps[0].period_key.slice(5) + '</button>';
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=&apos;' + monthSnaps[0].id + '&apos;;comparePeriod2=&apos;&apos;;render()"><i class="fas fa-eye" style="margin-right:3px"></i>' + monthSnaps[0].period_key.slice(5) + '</button>';
     }
     // 1-month vs prev month
     if (monthSnaps.length >= 2) {
-      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[1].id + '\\';render()"><i class="fas fa-calendar-day" style="margin-right:3px"></i>1 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[1].period_key.slice(5) + '</button>';
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=&apos;' + monthSnaps[0].id + '&apos;;comparePeriod2=&apos;' + monthSnaps[1].id + '&apos;;render()"><i class="fas fa-calendar-day" style="margin-right:3px"></i>1 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[1].period_key.slice(5) + '</button>';
     }
     // 2-month comparison (latest vs 2 months ago)
     if (monthSnaps.length >= 3) {
-      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[2].id + '\\';render()"><i class="fas fa-calendar-alt" style="margin-right:3px"></i>2 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[2].period_key.slice(5) + '</button>';
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=&apos;' + monthSnaps[0].id + '&apos;;comparePeriod2=&apos;' + monthSnaps[2].id + '&apos;;render()"><i class="fas fa-calendar-alt" style="margin-right:3px"></i>2 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[2].period_key.slice(5) + '</button>';
     }
     // 3-month comparison (latest vs 3 months ago)
     if (monthSnaps.length >= 4) {
-      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + monthSnaps[0].id + '\\';comparePeriod2=\\'' + monthSnaps[3].id + '\\';render()"><i class="fas fa-calendar-week" style="margin-right:3px"></i>3 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[3].period_key.slice(5) + '</button>';
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=&apos;' + monthSnaps[0].id + '&apos;;comparePeriod2=&apos;' + monthSnaps[3].id + '&apos;;render()"><i class="fas fa-calendar-week" style="margin-right:3px"></i>3 \u043c\u0435\u0441: ' + monthSnaps[0].period_key.slice(5) + ' vs ' + monthSnaps[3].period_key.slice(5) + '</button>';
     }
     // Quarter comparison
     if (quarterSnaps.length >= 2) {
-      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=\\'' + quarterSnaps[0].id + '\\';comparePeriod2=\\'' + quarterSnaps[1].id + '\\';render()"><i class="fas fa-layer-group" style="margin-right:3px"></i>\u041a\u0432\u0430\u0440\u0442: ' + quarterSnaps[0].period_key + ' vs ' + quarterSnaps[1].period_key + '</button>';
+      h += '<button class="tab-btn" style="padding:5px 12px;font-size:0.75rem" onclick="comparePeriod1=&apos;' + quarterSnaps[0].id + '&apos;;comparePeriod2=&apos;' + quarterSnaps[1].id + '&apos;;render()"><i class="fas fa-layer-group" style="margin-right:3px"></i>\u041a\u0432\u0430\u0440\u0442: ' + quarterSnaps[0].period_key + ' vs ' + quarterSnaps[1].period_key + '</button>';
     }
     h += '</div>';
   }
@@ -8405,7 +8405,8 @@ async function cloneCompanyRole(id) {
   render();
 }
 
-// ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace V2 =====
+
+// ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace V3 =====
 var sbLangView = 'both'; // 'both', 'ru', 'am'
 var sbExpandedBlocks = {}; // track which blocks are expanded
 var sbSearchQuery = ''; // search/filter blocks
@@ -8437,7 +8438,7 @@ function renderSiteBlocks() {
   // ── Header ──
   h += '<div style="margin-bottom:24px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">' +
-      '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков</h1>' +
+      '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков V3</h1>' +
       '<p style="color:#64748b;font-size:0.82rem;margin:0">Перетаскивайте блоки мышкой для изменения порядка. Тексты сохраняются автоматически.</p></div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
@@ -8448,8 +8449,8 @@ function renderSiteBlocks() {
   // ── Tabs: Blocks / Calculator ──
   h += '<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin-bottom:16px">' +
     '<div class="sb-tabs">' +
-      '<button class="sb-tab' + (sbActiveTab==='blocks'?' active':'') + '" onclick="sbActiveTab=\\'blocks\\';render()"><i class="fas fa-cubes" style="margin-right:6px"></i>Блоки сайта <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + contentBlocks.length + ')</span></button>' +
-      '<button class="sb-tab' + (sbActiveTab==='calculator'?' active':'') + '" onclick="sbActiveTab=\\'calculator\\';render()"><i class="fas fa-calculator" style="margin-right:6px"></i>Калькулятор <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + calcBlocks.length + ')</span></button>' +
+      '<button class="sb-tab' + (sbActiveTab==='blocks'?' active':'') + '" onclick="sbActiveTab=&apos;blocks&apos;;render()"><i class="fas fa-cubes" style="margin-right:6px"></i>Блоки сайта <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + contentBlocks.length + ')</span></button>' +
+      '<button class="sb-tab' + (sbActiveTab==='calculator'?' active':'') + '" onclick="sbActiveTab=&apos;calculator&apos;;render()"><i class="fas fa-calculator" style="margin-right:6px"></i>Калькулятор <span style="opacity:0.7;font-size:0.75rem;margin-left:4px">(' + calcBlocks.length + ')</span></button>' +
     '</div>' +
     '<div style="flex:1;min-width:200px;max-width:320px" class="sb-search-box"><i class="fas fa-search"></i><input class="input" placeholder="Поиск по блокам..." value="' + escHtml(sbSearchQuery) + '" oninput="sbSearchQuery=this.value;render()" style="font-size:0.85rem"></div>' +
   '</div>';
@@ -8458,9 +8459,9 @@ function renderSiteBlocks() {
   h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">' +
     '<div style="display:flex;gap:4px;align-items:center">' +
       '<span style="font-size:0.78rem;color:#64748b;margin-right:4px"><i class="fas fa-language" style="margin-right:3px"></i>Язык:</span>' +
-      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'both\\';render()">RU + AM</button>' +
-      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'ru\\';render()">RU</button>' +
-      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=\\'am\\';render()">AM</button>' +
+      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;both&apos;;render()">RU + AM</button>' +
+      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;ru&apos;;render()">RU</button>' +
+      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;am&apos;;render()">AM</button>' +
     '</div>' +
     '<div style="display:flex;gap:10px;align-items:center;font-size:0.78rem;color:#475569">' +
       '<span><i class="fas fa-eye" style="color:#10B981;margin-right:3px"></i>' + blocks.filter(function(b){return b.is_visible}).length + ' видимых</span>' +
@@ -8476,7 +8477,7 @@ function renderSiteBlocks() {
     h += '<div style="margin-bottom:16px;padding:14px 18px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;display:flex;align-items:center;gap:12px">' +
       '<i class="fas fa-calculator" style="color:#10B981;font-size:1.1rem"></i>' +
       '<span style="font-size:0.85rem;color:#94a3b8">Настройки калькулятора (цены, услуги) доступны в разделе:</span>' +
-      '<button class="btn btn-outline" style="padding:5px 14px;font-size:0.78rem;border-color:rgba(16,185,129,0.3);color:#10B981" onclick="navigate(\\'calculator\\')"><i class="fas fa-external-link-alt" style="margin-right:5px"></i>Калькулятор</button>' +
+      '<button class="btn btn-outline" style="padding:5px 14px;font-size:0.78rem;border-color:rgba(16,185,129,0.3);color:#10B981" onclick="navigate(&apos;calculator&apos;)"><i class="fas fa-external-link-alt" style="margin-right:5px"></i>Калькулятор</button>' +
     '</div>';
   }
 
@@ -8498,6 +8499,7 @@ function renderSiteBlocks() {
       var textsAm = b.texts_am || [];
       var maxTexts = Math.max(textsRu.length, textsAm.length);
       var btnsCount = (b.buttons||[]).length;
+      var isTicker = (b.block_key === 'ticker' || b.block_type === 'ticker');
 
       h += '<div class="card sb-block-item" data-block-id="' + b.id + '" style="margin-bottom:12px;padding:0;overflow:hidden;opacity:' + (b.is_visible ? '1' : '0.5') + ';border-left:4px solid ' + (b.is_visible ? '#8B5CF6' : '#475569') + '">';
 
@@ -8517,6 +8519,7 @@ function renderSiteBlocks() {
       h += '<div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow:hidden">';
       h += '<span style="font-weight:700;font-size:0.95rem;color:' + (b.is_visible ? '#e2e8f0' : '#94a3b8') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px">' + escHtml(b.title_ru || b.block_key) + '</span>';
       h += '<span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(b.block_key) + '</span>';
+      if (b.block_type && b.block_type !== 'section') h += '<span class="badge" style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:0.68rem">' + escHtml(b.block_type) + '</span>';
       if (maxTexts > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.12);color:#60a5fa;font-size:0.68rem">' + maxTexts + ' текст.</span>';
       if (btnsCount > 0) h += '<span class="badge badge-amber" style="font-size:0.68rem">' + btnsCount + ' кноп.</span>';
       h += '</div>';
@@ -8540,62 +8543,109 @@ function renderSiteBlocks() {
         h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '200px 1fr 1fr' : '200px 1fr') + ';gap:12px;margin-bottom:18px">';
         h += '<div class="sb-field-group"><div class="sb-field-label" style="color:#64748b"><i class="fas fa-key"></i> ID блока</div><input class="input" value="' + escHtml(b.block_key) + '" disabled style="font-size:0.82rem;opacity:0.6;cursor:not-allowed"></div>';
         if (showRu) h += '<div class="sb-field-group"><div class="sb-field-label ru"><i class="fas fa-heading"></i> Название блока (RU)</div><input class="input" id="sb_title_ru_' + b.id + '" value="' + escHtml(b.title_ru) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-        if (showAm) h += '<div class="sb-field-group"><div class="sb-field-label am"><i class="fas fa-heading"></i> Անվանումը (AM)</div><input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        if (showAm) h += '<div class="sb-field-group"><div class="sb-field-label am"><i class="fas fa-heading"></i> Վերնագիր (AM)</div><input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div>';
 
-        // ── Semantic text pairs ──
-        h += '<div style="margin-bottom:16px">';
-        h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
-          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-align-left" style="color:#8B5CF6;margin-right:6px"></i>Тексты блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + maxTexts + ' элементов)</span></h4>' +
-          '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTextPair(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
-        '</div>';
-
-        for (var ti = 0; ti < maxTexts; ti++) {
-          var ruText = ti < textsRu.length ? textsRu[ti] : '';
-          var amText = ti < textsAm.length ? textsAm[ti] : '';
-          var isLong = ruText.length > 100 || amText.length > 100;
-          var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
-
-          h += '<div class="sb-text-pair">';
-          h += '<div class="sb-text-pair-num">' + fieldLabel + '</div>';
-          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
-          if (showRu) {
-            h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
-            if (isLong) {
-              h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(ruText) + '</textarea>';
-            } else {
-              h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
-            }
-            h += '</div>';
-          }
-          if (showAm) {
-            h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label am" style="margin-bottom:3px">AM</div>';
-            if (isLong) {
-              h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>';
-            } else {
-              h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
-            }
+        // ── TICKER EDITOR (special for ticker blocks) ──
+        if (isTicker) {
+          h += '<div style="margin-bottom:16px;padding:14px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:10px">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">' +
+            '<h4 style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-stream" style="margin-right:6px"></i>Элементы бегущей строки <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + maxTexts + ' элементов)</span></h4>' +
+            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTickerItem(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить элемент</button>' +
+          '</div>';
+          for (var ti = 0; ti < maxTexts; ti++) {
+            var ruT = ti < textsRu.length ? textsRu[ti] : '';
+            var amT = ti < textsAm.length ? textsAm[ti] : '';
+            // Try to extract icon from images array
+            var tickerIcons = [];
+            try { tickerIcons = b.images || []; } catch(e) {}
+            var tickerIcon = (tickerIcons[ti]) || 'fa-check-circle';
+            h += '<div style="display:grid;grid-template-columns:120px ' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 28px;gap:8px;margin-bottom:6px;padding:8px 10px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
+            h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:4px">Иконка (FA)</div><input class="input" id="sb_ticon_' + b.id + '_' + ti + '" value="' + escHtml(tickerIcon) + '" placeholder="fa-star" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+            if (showRu) h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:4px">Текст RU</div><input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruT) + '" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+            if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:4px">Текст AM</div><input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amT) + '" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+            h += '<button class="tier-del-btn" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')"><i class="fas fa-times"></i></button>';
             h += '</div>';
           }
           h += '</div>';
-          h += '<button class="tier-del-btn" style="position:absolute;top:6px;right:6px" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>';
-          h += '</div>'; // end sb-text-pair
-        }
-        h += '</div>';
+        } else {
+          // ── Semantic text pairs (for non-ticker blocks) ──
+          h += '<div style="margin-bottom:16px">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
+            '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-align-left" style="color:#8B5CF6;margin-right:6px"></i>Тексты блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + maxTexts + ' элементов)</span></h4>' +
+            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTextPair(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
+          '</div>';
 
-        // ── Buttons section ──
+          for (var ti = 0; ti < maxTexts; ti++) {
+            var ruText = ti < textsRu.length ? textsRu[ti] : '';
+            var amText = ti < textsAm.length ? textsAm[ti] : '';
+            var isLong = ruText.length > 100 || amText.length > 100;
+            var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
+
+            h += '<div class="sb-text-pair">';
+            h += '<div class="sb-text-pair-num">' + fieldLabel + '</div>';
+            h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
+            if (showRu) {
+              h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
+              if (isLong) {
+                h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(ruText) + '</textarea>';
+              } else {
+                h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
+              }
+              h += '</div>';
+            }
+            if (showAm) {
+              h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label am" style="margin-bottom:3px">AM</div>';
+              if (isLong) {
+                h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>';
+              } else {
+                h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
+              }
+              h += '</div>';
+            }
+            h += '</div>';
+            h += '<button class="tier-del-btn" style="position:absolute;top:6px;right:6px" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>';
+            h += '</div>'; // end sb-text-pair
+          }
+          h += '</div>';
+        }
+
+        // ── Buttons section with FULL info: URL, icon, action_type, message template ──
         h += '<div style="margin-bottom:16px">';
         h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
-          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки / Ссылки</h4>' +
+          '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки / Ссылки <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + btnsCount + ')</span></h4>' +
           '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
         '</div>';
         for (var bti = 0; bti < (b.buttons || []).length; bti++) {
           var btn = b.buttons[bti];
-          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ' 1.2fr 28px;gap:8px;margin-bottom:6px;padding:8px 10px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
-          if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст (RU)" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')">';
-          if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="Տeքստ (AM)" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')">';
-          h += '<input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url) + '" placeholder="https://..." style="font-size:0.82rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
-          h += '<button class="tier-del-btn" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
+          h += '<div style="margin-bottom:10px;padding:12px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
+          // Row 1: Button text (RU/AM) + icon
+          h += '<div style="display:grid;grid-template-columns:80px ' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:8px;margin-bottom:8px;align-items:end">';
+          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="fas fa-icons" style="margin-right:3px"></i>Иконка</div><input class="input" id="sb_btnicon_' + b.id + '_' + bti + '" value="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" placeholder="fas fa-..." style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          if (showRu) h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:3px">Текст кнопки (RU)</div><input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px">Текст кнопки (AM)</div><input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="AM տեքստ" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '</div>';
+          // Row 2: URL + action type
+          h += '<div style="display:grid;grid-template-columns:1fr 160px;gap:8px;margin-bottom:8px;align-items:end">';
+          h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>Ссылка (URL)</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/goo_to_top" style="font-size:0.82rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="fas fa-bolt" style="margin-right:3px"></i>Действие</div><select class="input" id="sb_btnact_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
+            '<option value="telegram"' + (btn.action_type === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
+            '<option value="whatsapp"' + (btn.action_type === 'whatsapp' ? ' selected' : '') + '>WhatsApp</option>' +
+            '<option value="link"' + (btn.action_type === 'link' ? ' selected' : '') + '>Ссылка</option>' +
+            '<option value="calculator"' + (btn.action_type === 'calculator' ? ' selected' : '') + '>Калькулятор</option>' +
+            '<option value="lead_form"' + (btn.action_type === 'lead_form' ? ' selected' : '') + '>Создать лид</option>' +
+          '</select></div>';
+          h += '</div>';
+          // Row 3: Message template (collapsible)
+          h += '<details style="margin-top:4px"><summary style="font-size:0.72rem;color:#8B5CF6;cursor:pointer;user-select:none"><i class="fas fa-envelope" style="margin-right:4px"></i>Шаблон сообщения при клике (авто-лид)</summary>';
+          h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:8px;margin-top:8px">';
+          if (showRu) h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:3px">Сообщение RU</div><textarea class="input" id="sb_btnmsg_ru_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_ru || '') + '</textarea></div>';
+          if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px">Сообщение AM</div><textarea class="input" id="sb_btnmsg_am_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_am || '') + '</textarea></div>';
+          h += '</div>';
+          h += '<div style="font-size:0.68rem;color:#475569;margin-top:6px"><i class="fas fa-info-circle" style="margin-right:3px"></i>Когда пользователь нажмёт кнопку, автоматически создастся лид + отправится сообщение в Telegram/WhatsApp</div>';
+          h += '</details>';
+          // Delete button
+          h += '<button class="tier-del-btn" style="position:absolute;top:8px;right:8px" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
         }
         if ((b.buttons || []).length === 0) {
@@ -8603,12 +8653,61 @@ function renderSiteBlocks() {
         }
         h += '</div>';
 
+        // ── Social Links section ──
+        var socials = [];
+        try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
+        if (!Array.isArray(socials)) socials = [];
+        h += '<div style="margin-bottom:16px">';
+        h += '<details' + (socials.length > 0 ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-share-alt" style="color:#10B981;margin-right:6px"></i>Соц. сети <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + socials.length + ')</span></summary>';
+        h += '<div style="margin-bottom:6px">';
+        for (var si = 0; si < socials.length; si++) {
+          var soc = socials[si];
+          h += '<div style="display:grid;grid-template-columns:120px 1fr 28px;gap:8px;margin-bottom:6px;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
+          h += '<select class="input" id="sb_soctype_' + b.id + '_' + si + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
+            '<option value="instagram"' + (soc.type === 'instagram' ? ' selected' : '') + '>Instagram</option>' +
+            '<option value="facebook"' + (soc.type === 'facebook' ? ' selected' : '') + '>Facebook</option>' +
+            '<option value="telegram"' + (soc.type === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
+            '<option value="whatsapp"' + (soc.type === 'whatsapp' ? ' selected' : '') + '>WhatsApp</option>' +
+            '<option value="youtube"' + (soc.type === 'youtube' ? ' selected' : '') + '>YouTube</option>' +
+            '<option value="tiktok"' + (soc.type === 'tiktok' ? ' selected' : '') + '>TikTok</option>' +
+            '<option value="twitter"' + (soc.type === 'twitter' ? ' selected' : '') + '>Twitter/X</option>' +
+            '<option value="linkedin"' + (soc.type === 'linkedin' ? ' selected' : '') + '>LinkedIn</option>' +
+            '<option value="vk"' + (soc.type === 'vk' ? ' selected' : '') + '>VK</option>' +
+          '</select>';
+          h += '<input class="input" id="sb_socurl_' + b.id + '_' + si + '" value="' + escHtml(soc.url || '') + '" placeholder="https://..." style="font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<button class="tier-del-btn" onclick="sbRemoveSocial(' + b.id + ',' + si + ')"><i class="fas fa-times"></i></button>';
+          h += '</div>';
+        }
+        h += '</div>';
+        h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
+        h += '</details></div>';
+
+        // ── Optional features toggles ──
+        var opts = {};
+        try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+        h += '<div style="margin-bottom:16px">';
+        h += '<details><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-sliders-h" style="color:#f59e0b;margin-right:6px"></i>Опции блока</summary>';
+        h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
+        // Show social links toggle
+        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
+          '<input type="checkbox" id="sb_opt_socials_' + b.id + '"' + (opts.show_socials ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
+          '<span><i class="fas fa-share-alt" style="color:#10B981;margin-right:4px"></i>Соц. сети в блоке</span></label>';
+        // Photo upload toggle
+        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
+          '<input type="checkbox" id="sb_opt_photos_' + b.id + '"' + (opts.show_photos ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
+          '<span><i class="fas fa-camera" style="color:#60a5fa;margin-right:4px"></i>Фото-галерея</span></label>';
+        // Slot counter toggle
+        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
+          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
+          '<span><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:4px"></i>Счётчик слотов</span></label>';
+        h += '</div></details></div>';
+
         // ── Footer: Save ──
         h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #1e293b">' +
-          '<div style="font-size:0.72rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:4px"></i>Изменения сохраняются при выходе из поля. Ctrl+S — принудительное сохранение.</div>' +
+          '<div style="font-size:0.72rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:4px"></i>Изменения сохраняются автоматически. Ctrl+S — принудительное сохранение всех блоков.</div>' +
           '<div style="display:flex;gap:8px">' +
             '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')" style="font-size:0.82rem">Свернуть</button>' +
-            '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:160px;font-size:0.82rem"><i class="fas fa-save" style="margin-right:5px"></i>Сохранить</button>' +
+            '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:160px;font-size:0.82rem"><i class="fas fa-save" style="margin-right:5px"></i>Сохранить и синхр.</button>' +
           '</div>' +
         '</div>';
 
@@ -8621,8 +8720,8 @@ function renderSiteBlocks() {
 
   // ── Save status indicator ──
   h += '<div id="sbSaveIndicator" class="sb-save-indicator ' + sbSaveStatus + '">' +
-    (sbSaveStatus === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение...' : '') +
-    (sbSaveStatus === 'saved' ? '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено' : '') +
+    (sbSaveStatus === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение и синхронизация...' : '') +
+    (sbSaveStatus === 'saved' ? '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено и синхронизировано' : '') +
   '</div>';
 
   h += '</div>'; // end wrapper
@@ -8635,7 +8734,6 @@ function renderSiteBlocks() {
 
 // ── Semantic field labels based on block key and position ──
 function sbGetFieldLabel(blockKey, idx, total) {
-  // Default numbering
   var num = '#' + (idx + 1);
   if (total <= 1) return 'Текст';
   if (idx === 0 && total >= 2) return 'Заголовок';
@@ -8670,14 +8768,11 @@ async function sbReorderAfterDrag() {
   var newIds = [];
   items.forEach(function(item) { newIds.push(parseInt(item.getAttribute('data-block-id'))); });
 
-  // Build order for API
   var orders = newIds.map(function(id, i) { return { id: id, sort_order: i }; });
 
-  // Update local data order
   var blockMap = {};
   (data.siteBlocks || []).forEach(function(b) { blockMap[b.id] = b; });
   var reordered = newIds.map(function(id) { return blockMap[id]; }).filter(Boolean);
-  // Keep calculator blocks appended
   var calcBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type === 'calculator'; });
   var contentBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
   
@@ -8689,9 +8784,7 @@ async function sbReorderAfterDrag() {
 
   toast('Порядок обновлён');
   
-  // Save to server
   await api('/site-blocks/reorder', { method: 'POST', body: JSON.stringify({ orders: orders }) });
-  // Sync section_order for live site
   var sectionOrders = reordered.map(function(b, i) { return { section_id: b.block_key, sort_order: i }; });
   await api('/section-order', { method: 'PUT', body: JSON.stringify({ orders: sectionOrders }) });
 }
@@ -8710,7 +8803,7 @@ function sbShowSaveStatus(status) {
   var ind = document.getElementById('sbSaveIndicator');
   if (ind) {
     ind.className = 'sb-save-indicator ' + status;
-    ind.innerHTML = status === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение...' : '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено';
+    ind.innerHTML = status === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение и синхронизация...' : '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено и синхронизировано';
   }
   if (status === 'saved') {
     setTimeout(function() {
@@ -8736,34 +8829,12 @@ function sbCollapseAll() {
   render();
 }
 
-// ── Move block (fallback for non-drag) ──
-async function sbMoveBlock(id, direction) {
-  var blocks = (data.siteBlocks || []).filter(function(b) { return b.block_type !== 'calculator'; });
-  var idx = blocks.findIndex(function(b) { return b.id === id; });
-  if (idx < 0) return;
-  var newIdx = idx + direction;
-  if (newIdx < 0 || newIdx >= blocks.length) return;
-  var temp = blocks[idx];
-  blocks[idx] = blocks[newIdx];
-  blocks[newIdx] = temp;
-  var calcBlocks = (data.siteBlocks || []).filter(function(b) { return b.block_type === 'calculator'; });
-  var allBlocks = blocks.concat(calcBlocks);
-  var orders = allBlocks.map(function(b, i) { return { id: b.id, sort_order: i }; });
-  data.siteBlocks = allBlocks;
-  render();
-  await api('/site-blocks/reorder', { method: 'POST', body: JSON.stringify({ orders: orders }) });
-  var sectionOrders = blocks.map(function(b, i) { return { section_id: b.block_key, sort_order: i }; });
-  await api('/section-order', { method: 'PUT', body: JSON.stringify({ orders: sectionOrders }) });
-  toast('Порядок обновлён');
-}
-
 // ── Visibility toggle ──
 async function toggleSbVisible(id, val) {
   await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify({ is_visible: val }) });
   var b = (data.siteBlocks || []).find(function(x) { return x.id === id; });
   if (b) b.is_visible = val;
   render();
-  // Sync visibility to section_order
   if (b) await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' });
   toast(val ? 'Блок показан на сайте' : 'Блок скрыт с сайта');
 }
@@ -8799,12 +8870,26 @@ function sbAddTextPair(blockId) {
   render();
 }
 
+// ── Add ticker item ──
+function sbAddTickerItem(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  if (!b.texts_ru) b.texts_ru = [];
+  if (!b.texts_am) b.texts_am = [];
+  if (!b.images) b.images = [];
+  b.texts_ru.push('');
+  b.texts_am.push('');
+  b.images.push('fa-check-circle');
+  render();
+}
+
 // ── Remove text pair ──
 function sbRemoveTextPair(blockId, idx) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
   if (!b) return;
   if (b.texts_ru && idx < b.texts_ru.length) b.texts_ru.splice(idx, 1);
   if (b.texts_am && idx < b.texts_am.length) b.texts_am.splice(idx, 1);
+  if (b.images && idx < b.images.length) b.images.splice(idx, 1);
   render();
   sbAutoSave(blockId);
 }
@@ -8814,7 +8899,7 @@ function sbAddButton(blockId) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
   if (!b) return;
   if (!b.buttons) b.buttons = [];
-  b.buttons.push({ text_ru: '', text_am: '', url: '' });
+  b.buttons.push({ text_ru: '', text_am: '', url: 'https://t.me/goo_to_top', icon: 'fas fa-arrow-right', action_type: 'telegram', message_ru: '', message_am: '' });
   render();
 }
 
@@ -8827,9 +8912,34 @@ function sbRemoveButton(blockId, idx) {
   sbAutoSave(blockId);
 }
 
+// ── Add social link ──
+function sbAddSocial(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var socials = [];
+  try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
+  if (!Array.isArray(socials)) socials = [];
+  socials.push({ type: 'instagram', url: '' });
+  b.social_links = socials;
+  render();
+}
+
+// ── Remove social link ──
+function sbRemoveSocial(blockId, idx) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var socials = [];
+  try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
+  if (!Array.isArray(socials)) socials = [];
+  socials.splice(idx, 1);
+  b.social_links = socials;
+  render();
+  sbAutoSave(blockId);
+}
+
 // ── Create new block (modal) ──
 function createSiteBlock() {
-  var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], is_visible: 1, custom_css: '', custom_html: '' };
+  var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], social_links: '[]', is_visible: 1, custom_css: '', custom_html: '' };
   editingBlock = newBlock;
   showBlockEditor();
 }
@@ -8859,22 +8969,74 @@ async function sbSaveBlock(id) {
   b.texts_ru = newRu;
   b.texts_am = newAm;
 
-  // Collect buttons
+  // Collect ticker icons (stored in images array for ticker blocks)
+  var isTicker = (b.block_key === 'ticker' || b.block_type === 'ticker');
+  if (isTicker) {
+    var newIcons = [];
+    for (var ii = 0; ii < maxTexts; ii++) {
+      var iconEl = document.getElementById('sb_ticon_' + id + '_' + ii);
+      newIcons.push(iconEl ? iconEl.value : ((b.images && b.images[ii]) || 'fa-check-circle'));
+    }
+    b.images = newIcons;
+  }
+
+  // Collect buttons (full data)
   var newBtns = [];
   for (var bti = 0; bti < (b.buttons || []).length; bti++) {
     var btnRu = document.getElementById('sb_btnru_' + id + '_' + bti);
     var btnAm = document.getElementById('sb_btnam_' + id + '_' + bti);
     var btnUrl = document.getElementById('sb_btnurl_' + id + '_' + bti);
+    var btnIcon = document.getElementById('sb_btnicon_' + id + '_' + bti);
+    var btnAct = document.getElementById('sb_btnact_' + id + '_' + bti);
+    var btnMsgRu = document.getElementById('sb_btnmsg_ru_' + id + '_' + bti);
+    var btnMsgAm = document.getElementById('sb_btnmsg_am_' + id + '_' + bti);
     newBtns.push({
       text_ru: btnRu ? btnRu.value : (b.buttons[bti].text_ru || ''),
       text_am: btnAm ? btnAm.value : (b.buttons[bti].text_am || ''),
-      url: btnUrl ? btnUrl.value : (b.buttons[bti].url || '')
+      url: btnUrl ? btnUrl.value : (b.buttons[bti].url || ''),
+      icon: btnIcon ? btnIcon.value : (b.buttons[bti].icon || 'fas fa-arrow-right'),
+      action_type: btnAct ? btnAct.value : (b.buttons[bti].action_type || 'telegram'),
+      message_ru: btnMsgRu ? btnMsgRu.value : (b.buttons[bti].message_ru || ''),
+      message_am: btnMsgAm ? btnMsgAm.value : (b.buttons[bti].message_am || '')
     });
   }
   b.buttons = newBtns;
 
+  // Collect social links
+  var socials = [];
+  try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
+  if (!Array.isArray(socials)) socials = [];
+  var newSocials = [];
+  for (var si = 0; si < socials.length; si++) {
+    var socType = document.getElementById('sb_soctype_' + id + '_' + si);
+    var socUrl = document.getElementById('sb_socurl_' + id + '_' + si);
+    newSocials.push({
+      type: socType ? socType.value : (socials[si].type || 'instagram'),
+      url: socUrl ? socUrl.value : (socials[si].url || '')
+    });
+  }
+  b.social_links = newSocials;
+
+  // Collect option toggles (stored in custom_html as JSON)
+  var blockOpts = {};
+  try { blockOpts = JSON.parse(b.custom_html || '{}'); } catch(e) { blockOpts = {}; }
+  var optSocials = document.getElementById('sb_opt_socials_' + id);
+  var optPhotos = document.getElementById('sb_opt_photos_' + id);
+  var optSlots = document.getElementById('sb_opt_slots_' + id);
+  if (optSocials) blockOpts.show_socials = optSocials.checked;
+  if (optPhotos) blockOpts.show_photos = optPhotos.checked;
+  if (optSlots) blockOpts.show_slots = optSlots.checked;
+  b.custom_html = JSON.stringify(blockOpts);
+
   // Save to server
-  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(b) }, true);
+  var saveData = Object.assign({}, b);
+  saveData.social_links = JSON.stringify(newSocials);
+  saveData.images = JSON.stringify(b.images || []);
+  saveData.buttons = JSON.stringify(b.buttons || []);
+  saveData.texts_ru = JSON.stringify(b.texts_ru || []);
+  saveData.texts_am = JSON.stringify(b.texts_am || []);
+  
+  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(saveData) }, true);
   // Sync to site_content for instant site update
   await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' }, true);
   
@@ -8885,7 +9047,6 @@ async function sbSaveBlock(id) {
 document.addEventListener('keydown', function(e) {
   if ((e.ctrlKey || e.metaKey) && e.key === 's' && currentPage === 'blocks') {
     e.preventDefault();
-    // Save all expanded blocks
     var expandedIds = Object.keys(sbExpandedBlocks);
     expandedIds.forEach(function(id) { sbSaveBlock(parseInt(id)); });
     if (expandedIds.length === 0) toast('Раскройте блок для сохранения');
@@ -8902,11 +9063,11 @@ function showBlockEditor() {
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:1.1rem;font-weight:700"><i class="fas fa-plus-circle" style="color:#8B5CF6;margin-right:8px"></i>Новый блок</h3><button class="btn btn-outline" style="padding:6px 10px" onclick="closeBlockEditor()"><i class="fas fa-times"></i></button></div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
   h += '<div><label class="sb-field-label" style="color:#94a3b8"><i class="fas fa-key"></i> Ключ блока</label><input class="input" id="sbKey" value="' + escHtml(b.block_key) + '" placeholder="my_block"></div>';
-  h += '<div><label class="sb-field-label" style="color:#94a3b8"><i class="fas fa-tag"></i> Тип</label><select class="input" id="sbType"><option value="section">Секция</option><option value="hero">Hero</option><option value="cta">CTA</option></select></div>';
+  h += '<div><label class="sb-field-label" style="color:#94a3b8"><i class="fas fa-tag"></i> Тип</label><select class="input" id="sbType"><option value="section">Секция</option><option value="hero">Hero</option><option value="ticker">Бегущая строка</option><option value="banner">Баннер</option><option value="footer">Футер</option><option value="floating">Плавающая кнопка</option><option value="popup">Popup</option></select></div>';
   h += '</div>';
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">';
   h += '<div><label class="sb-field-label ru"><i class="fas fa-heading"></i> Название (RU)</label><input class="input" id="sbTitleRu" value="' + escHtml(b.title_ru) + '" placeholder="Название блока"></div>';
-  h += '<div><label class="sb-field-label am"><i class="fas fa-heading"></i> Անվdelays (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '" placeholder="Բdelays անdelays"></div>';
+  h += '<div><label class="sb-field-label am"><i class="fas fa-heading"></i> Վերնագիր (AM)</label><input class="input" id="sbTitleAm" value="' + escHtml(b.title_am) + '" placeholder=""></div>';
   h += '</div>';
   h += '<div style="text-align:right;margin-top:16px"><button class="btn btn-success" onclick="saveSiteBlockModal()" style="min-width:180px"><i class="fas fa-save" style="margin-right:6px"></i>Создать блок</button></div>';
   h += '</div></div>';
@@ -8920,20 +9081,6 @@ function closeBlockEditor() {
   editingBlock = null;
   var modal = document.getElementById('siteBlockModal');
   if (modal) modal.remove();
-}
-
-function addSbText(lang) {
-  if (!editingBlock) return;
-  if (!editingBlock['texts_' + lang]) editingBlock['texts_' + lang] = [];
-  editingBlock['texts_' + lang].push('');
-  closeBlockEditor();
-  showBlockEditor();
-}
-function rmSbText(lang, idx) {
-  if (!editingBlock) return;
-  if (editingBlock['texts_' + lang] && idx < editingBlock['texts_' + lang].length) editingBlock['texts_' + lang].splice(idx, 1);
-  closeBlockEditor();
-  showBlockEditor();
 }
 
 async function saveSiteBlockModal() {
@@ -8970,9 +9117,9 @@ async function importSiteBlocks() {
   toast('Загрузка блоков с сайта...');
   var result = await api('/site-blocks/import-from-site', { method: 'POST' });
   if (result && result.success) {
-    toast('Загружено ' + (result.imported || 0) + ' блоков на 2 языках!');
+    toast('Загружено ' + (result.imported || 0) + ' блоков с кнопками, ссылками и текстами!');
   } else {
-    toast('Ошибка загрузки', 'error');
+    toast('Ошибка загрузки: ' + (result?.error || 'unknown'), 'error');
   }
   var res = await api('/site-blocks');
   data.siteBlocks = (res && res.blocks) || [];

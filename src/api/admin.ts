@@ -4,6 +4,7 @@
 import { Hono } from 'hono'
 import { verifyToken, hashPassword, verifyPassword, createToken, initDefaultAdmin, generatePassword } from '../lib/auth'
 import { initDatabase, ALL_ROLES, ALL_SECTIONS, ROLE_LABELS, SECTION_LABELS, DEFAULT_PERMISSIONS } from '../lib/db'
+import { SEED_CONTENT_SECTIONS, SEED_TG_MESSAGES } from '../seed-data'
 
 type Bindings = { DB: D1Database }
 const api = new Hono<{ Bindings: Bindings }>()
@@ -1178,6 +1179,7 @@ api.get('/site-blocks', authMiddleware, async (c) => {
     texts_am: JSON.parse(b.texts_am || '[]'),
     images: JSON.parse(b.images || '[]'),
     buttons: JSON.parse(b.buttons || '[]'),
+    social_links: b.social_links || '[]',
   }));
   return c.json({ blocks });
 });
@@ -1205,14 +1207,15 @@ api.put('/site-blocks/:id', authMiddleware, async (c) => {
   if (d.block_type !== undefined) { fields.push('block_type=?'); vals.push(d.block_type); }
   if (d.title_ru !== undefined) { fields.push('title_ru=?'); vals.push(d.title_ru); }
   if (d.title_am !== undefined) { fields.push('title_am=?'); vals.push(d.title_am); }
-  if (d.texts_ru !== undefined) { fields.push('texts_ru=?'); vals.push(JSON.stringify(d.texts_ru)); }
-  if (d.texts_am !== undefined) { fields.push('texts_am=?'); vals.push(JSON.stringify(d.texts_am)); }
-  if (d.images !== undefined) { fields.push('images=?'); vals.push(JSON.stringify(d.images)); }
-  if (d.buttons !== undefined) { fields.push('buttons=?'); vals.push(JSON.stringify(d.buttons)); }
+  if (d.texts_ru !== undefined) { fields.push('texts_ru=?'); vals.push(typeof d.texts_ru === 'string' ? d.texts_ru : JSON.stringify(d.texts_ru)); }
+  if (d.texts_am !== undefined) { fields.push('texts_am=?'); vals.push(typeof d.texts_am === 'string' ? d.texts_am : JSON.stringify(d.texts_am)); }
+  if (d.images !== undefined) { fields.push('images=?'); vals.push(typeof d.images === 'string' ? d.images : JSON.stringify(d.images)); }
+  if (d.buttons !== undefined) { fields.push('buttons=?'); vals.push(typeof d.buttons === 'string' ? d.buttons : JSON.stringify(d.buttons)); }
   if (d.custom_css !== undefined) { fields.push('custom_css=?'); vals.push(d.custom_css); }
   if (d.custom_html !== undefined) { fields.push('custom_html=?'); vals.push(d.custom_html); }
   if (d.is_visible !== undefined) { fields.push('is_visible=?'); vals.push(d.is_visible ? 1 : 0); }
   if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
+  if (d.social_links !== undefined) { fields.push('social_links=?'); vals.push(typeof d.social_links === 'string' ? d.social_links : JSON.stringify(d.social_links)); }
   if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
@@ -1236,76 +1239,142 @@ api.post('/site-blocks/reorder', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-// ===== IMPORT BLOCKS FROM SITE (populate site_blocks from site_content + calculator) =====
+// ===== IMPORT BLOCKS FROM SITE (populate site_blocks from seed data + DB) =====
 api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
   const db = c.env.DB;
   
-  // 1. Load all content sections
-  const contentRes = await db.prepare('SELECT * FROM site_content ORDER BY sort_order').all();
-  const sections = contentRes.results || [];
+  // Button mapping: section_key -> array of buttons with urls/messages from seed TG messages
+  // Map button labels to their TG message data
+  const tgMsgMap: Record<string, any> = {};
+  for (const tm of SEED_TG_MESSAGES) {
+    tgMsgMap[tm.labelRu] = tm;
+  }
   
-  // 2. Load calculator tabs + services
-  const tabsRes = await db.prepare('SELECT * FROM calculator_tabs WHERE is_active = 1 ORDER BY sort_order').all();
-  const svcsRes = await db.prepare(`SELECT cs.*, ct.tab_key, ct.name_ru as tab_name_ru, ct.name_am as tab_name_am 
-    FROM calculator_services cs 
-    JOIN calculator_tabs ct ON cs.tab_id = ct.id 
-    WHERE cs.is_active = 1 
-    ORDER BY cs.tab_id, cs.sort_order`).all();
+  // Define which sections have which CTA buttons (mirrors the actual HTML structure)
+  const sectionButtons: Record<string, {text_ru: string, text_am: string, icon: string}[]> = {
+    'hero': [
+      {text_ru: 'Написать в Telegram', text_am: 'Գրել Telegram- delays', icon: 'fab fa-telegram'},
+      {text_ru: 'Рассчитать стоимость', text_am: 'Հdelays', icon: 'fas fa-calculator'}
+    ],
+    'wb_banner': [{text_ru: 'Узнать', text_am: 'Իdelays', icon: 'fas fa-arrow-right'}],
+    'about': [{text_ru: 'Заказать сейчас', text_am: 'Պdelays', icon: 'fas fa-shopping-cart'}],
+    'services': [
+      {text_ru: 'Начать продвижение', text_am: 'Սdelays', icon: 'fas fa-rocket'},
+      {text_ru: 'Заказать съёмку', text_am: 'Պdelays', icon: 'fas fa-camera'}
+    ],
+    'buyout_detail': [
+      {text_ru: 'Начать выкupы сейчас', text_am: 'Սdelays', icon: 'fas fa-shopping-bag'},
+      {text_ru: 'Получить индividальный расчёт', text_am: 'Սdelays', icon: 'fas fa-calculator'}
+    ],
+    'why_buyouts': [{text_ru: 'Начать выкупы по ключевикам', text_am: 'Սdelays', icon: 'fas fa-fire'}],
+    'wb_official': [{text_ru: 'Занять ТОП прямо сейчас', text_am: 'Զбdelays', icon: 'fas fa-rocket'}],
+    'process': [{text_ru: 'Написать менеджеру', text_am: 'Գdelays', icon: 'fab fa-telegram'}],
+    'warehouse': [{text_ru: 'Заказать сейчас', text_am: 'Պdelays', icon: 'fas fa-shopping-cart'}],
+    'guarantee': [{text_ru: 'Начать продвижение', text_am: 'Սdelays', icon: 'fas fa-rocket'}],
+    'comparison': [{text_ru: 'Убedites сами — начните сейчас', text_am: 'Սdelays', icon: 'fas fa-rocket'}],
+    'important': [{text_ru: 'Уточнить условия', text_am: 'Գdelays', icon: 'fab fa-telegram'}],
+    'faq': [{text_ru: 'Остались вопросы? Напишите нам', text_am: 'Հdelays', icon: 'fas fa-shopping-cart'}],
+    'contact': [{text_ru: 'Отправить заявку', text_am: 'Ուdelays', icon: 'fas fa-paper-plane'}],
+    'floating_tg': [{text_ru: 'Написать нам', text_am: 'Գdelays', icon: 'fab fa-telegram'}],
+    'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Սdelays', icon: 'fab fa-telegram'}]
+  };
   
-  // 3. Load section order for visibility/labels
+  // Load section order for visibility
   const orderRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
   const orderMap: Record<string, any> = {};
   for (const o of (orderRes.results || [])) {
     orderMap[o.section_id as string] = o;
   }
   
-  // 4. Clear existing site_blocks
+  // Load existing DB content (may have edits)
+  const contentRes = await db.prepare('SELECT * FROM site_content ORDER BY sort_order').all();
+  const dbContentMap: Record<string, any[]> = {};
+  for (const row of (contentRes.results || [])) {
+    try { dbContentMap[row.section_key as string] = JSON.parse(row.content_json as string); } catch { dbContentMap[row.section_key as string] = []; }
+  }
+  
+  // Load TG messages from DB
+  const tgRes = await db.prepare('SELECT * FROM telegram_messages ORDER BY sort_order').all();
+  const dbTgMessages: Record<string, any> = {};
+  for (const row of (tgRes.results || [])) {
+    dbTgMessages[row.button_key as string] = row;
+    // Also index by label for matching
+    dbTgMessages['label:' + (row.button_label_ru as string)] = row;
+  }
+  
+  // Clear existing site_blocks
   await db.prepare('DELETE FROM site_blocks').run();
   
-  // 5. Create blocks from site_content sections
+  // Create blocks from SEED_CONTENT_SECTIONS (mirrors exact site order)
   let sortIdx = 0;
-  for (const sec of sections) {
-    const key = sec.section_key as string;
-    const name = sec.section_name as string;
-    let items: any[] = [];
-    try { items = JSON.parse(sec.content_json as string); } catch { items = []; }
+  for (const seedSec of SEED_CONTENT_SECTIONS) {
+    const key = seedSec.key;
+    const name = seedSec.name;
     
-    const textsRu = items.map((it: any) => it.ru || '');
-    const textsAm = items.map((it: any) => it.am || '');
+    // Use DB content if available (may have admin edits), fallback to seed
+    const dbItems = dbContentMap[key] || [];
+    const seedItems = seedSec.items;
+    const useItems = dbItems.length >= seedItems.length ? dbItems : seedItems;
+    
+    const textsRu = useItems.map((it: any) => it.ru || '');
+    const textsAm = useItems.map((it: any) => it.am || '');
+    
+    // Build buttons array with full data
+    const buttons: any[] = [];
+    const secBtns = sectionButtons[key] || [];
+    for (const btnDef of secBtns) {
+      const tgMsg = tgMsgMap[btnDef.text_ru] || {};
+      const dbTg = dbTgMessages['label:' + btnDef.text_ru] || {};
+      buttons.push({
+        text_ru: dbTg.button_label_ru || tgMsg.labelRu || btnDef.text_ru,
+        text_am: dbTg.button_label_am || tgMsg.labelAm || btnDef.text_am,
+        url: dbTg.telegram_url || tgMsg.url || 'https://t.me/goo_to_top',
+        icon: btnDef.icon || 'fas fa-arrow-right',
+        action_type: 'telegram',
+        message_ru: dbTg.message_template_ru || tgMsg.msgRu || '',
+        message_am: dbTg.message_template_am || tgMsg.msgAm || ''
+      });
+    }
+    
     const order = orderMap[key];
     const isVisible = order ? (order.is_visible === 1 || order.is_visible === true) : true;
-    const labelAm = order?.label_am || '';
+    const titleAm = order?.label_am || '';
     
-    await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(key, 'section', name, labelAm, JSON.stringify(textsRu), JSON.stringify(textsAm), '[]', '[]', '', '', isVisible ? 1 : 0, sortIdx).run();
+    // Determine block type
+    let blockType = 'section';
+    if (key === 'nav') blockType = 'navigation';
+    else if (key === 'hero') blockType = 'hero';
+    else if (key === 'ticker') blockType = 'ticker';
+    else if (key === 'calculator') blockType = 'calculator';
+    else if (key === 'footer') blockType = 'footer';
+    else if (key === 'floating_tg') blockType = 'floating';
+    else if (key === 'popup') blockType = 'popup';
+    else if (key === 'stats_bar') blockType = 'stats';
+    else if (key === 'wb_banner') blockType = 'banner';
+    
+    // For ticker blocks, store icons in images array
+    let images: any[] = [];
+    if (key === 'ticker') {
+      images = (seedSec.items as any[]).map((it: any) => it.icon || 'fa-check-circle');
+    }
+    
+    // Default social links for footer block
+    let socialLinks: any[] = [];
+    if (key === 'footer') {
+      socialLinks = [
+        { type: 'instagram', url: 'https://instagram.com/gototop.win' },
+        { type: 'facebook', url: 'https://facebook.com/gototop.win' },
+        { type: 'telegram', url: 'https://t.me/goo_to_top' },
+        { type: 'tiktok', url: 'https://tiktok.com/@gototop.win' }
+      ];
+    }
+    
+    await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(key, blockType, name, titleAm, JSON.stringify(textsRu), JSON.stringify(textsAm), JSON.stringify(images), JSON.stringify(buttons), '', '', isVisible ? 1 : 0, sortIdx, JSON.stringify(socialLinks)).run();
     sortIdx++;
   }
   
-  // 6. Create calculator block with tabs + services info
-  const calcTextsRu: string[] = [];
-  const calcTextsAm: string[] = [];
-  for (const tab of (tabsRes.results || [])) {
-    calcTextsRu.push(`[TAB] ${tab.name_ru}`);
-    calcTextsAm.push(`[TAB] ${tab.name_am}`);
-  }
-  for (const svc of (svcsRes.results || [])) {
-    const price = svc.price as number;
-    const priceType = svc.price_type as string;
-    let tiersStr = '';
-    if (priceType === 'tiered' && svc.price_tiers_json) {
-      try {
-        const tiers = JSON.parse(svc.price_tiers_json as string);
-        tiersStr = ' [TIERS: ' + tiers.map((t: any) => `${t.min}-${t.max}: ${t.price}֏`).join(', ') + ']';
-      } catch {}
-    }
-    calcTextsRu.push(`[SVC:${svc.tab_key}] ${svc.name_ru} — ${price}֏${tiersStr}`);
-    calcTextsAm.push(`[SVC:${svc.tab_key}] ${svc.name_am} — ${price}֏${tiersStr}`);
-  }
-  
-  await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .bind('calculator_data', 'calculator', 'Калькулятор (услуги и цены)', 'Հաdelays (ділaymentner ev gner)', JSON.stringify(calcTextsRu), JSON.stringify(calcTextsAm), '[]', '[]', '', '', 1, sortIdx).run();
-  
-  return c.json({ success: true, imported: sortIdx + 1 });
+  return c.json({ success: true, imported: sortIdx });
 });
 
 // ===== SYNC BLOCK BACK TO SITE CONTENT (for instant site update) =====
@@ -1391,6 +1460,18 @@ api.post('/site-blocks/:id/sync-to-site', authMiddleware, async (c) => {
   if (orderExists) {
     await db.prepare('UPDATE section_order SET is_visible = ?, label_ru = ?, label_am = ? WHERE section_id = ?')
       .bind(block.is_visible, block.title_ru, block.title_am, blockKey).run();
+  }
+  
+  // Sync buttons back to telegram_messages
+  let btns: any[] = [];
+  try { btns = JSON.parse(block.buttons as string || '[]'); } catch {}
+  for (const btn of btns) {
+    if (!btn.text_ru) continue;
+    const existingTg = await db.prepare('SELECT id FROM telegram_messages WHERE button_label_ru = ?').bind(btn.text_ru).first();
+    if (existingTg) {
+      await db.prepare('UPDATE telegram_messages SET button_label_am = ?, telegram_url = ?, message_template_ru = ?, message_template_am = ? WHERE id = ?')
+        .bind(btn.text_am || '', btn.url || '', btn.message_ru || '', btn.message_am || '', existingTg.id).run();
+    }
   }
   
   return c.json({ success: true, synced: blockKey });

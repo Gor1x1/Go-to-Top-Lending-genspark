@@ -75,6 +75,29 @@ app.get('/api/site-data', async (c) => {
     // Load photo blocks (for frontend rendering)
     const photoBlocksRes = await db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all();
     
+    // Load ticker items from site_blocks (editable in admin)
+    let tickerItems: any[] = [];
+    try {
+      const tickerBlock = await db.prepare("SELECT texts_ru, texts_am, images FROM site_blocks WHERE block_key = 'ticker' LIMIT 1").first();
+      if (tickerBlock) {
+        const tRu = JSON.parse(tickerBlock.texts_ru as string || '[]');
+        const tAm = JSON.parse(tickerBlock.texts_am as string || '[]');
+        const tIcons = JSON.parse(tickerBlock.images as string || '[]');
+        for (let i = 0; i < Math.max(tRu.length, tAm.length); i++) {
+          tickerItems.push({ icon: tIcons[i] || 'fa-check-circle', ru: tRu[i] || '', am: tAm[i] || '' });
+        }
+      }
+    } catch(te) { /* ticker not yet imported */ }
+
+    // Load footer social links from site_blocks
+    let footerSocials: any[] = [];
+    try {
+      const footerBlock = await db.prepare("SELECT social_links FROM site_blocks WHERE block_key = 'footer' LIMIT 1").first();
+      if (footerBlock && footerBlock.social_links) {
+        footerSocials = JSON.parse(footerBlock.social_links as string || '[]');
+      }
+    } catch(fe) { /* footer not yet imported */ }
+
     // Set Cache-Control to no-cache so edits appear instantly
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
@@ -89,11 +112,13 @@ app.get('/api/site-data', async (c) => {
       sectionOrder: sectionOrderRes.results,
       slotCounters: slotCountersRes.results,
       photoBlocks: photoBlocksRes.results,
+      tickerItems: tickerItems.length > 0 ? tickerItems : null,
+      footerSocials: footerSocials.length > 0 ? footerSocials : null,
       _ts: Date.now()
     });
   } catch (e: any) {
     // If DB not initialized yet, return empty — frontend will use hardcoded fallback
-    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], _ts: Date.now() });
+    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], tickerItems: null, footerSocials: null, _ts: Date.now() });
   }
 });
 
@@ -161,6 +186,25 @@ app.post('/api/popup-lead', async (c) => {
   } catch (e) {
     console.error('Popup lead error:', e);
     return c.json({ error: 'Failed to save lead' }, 500);
+  }
+})
+
+// API endpoint for button-click auto-lead (creates lead when CTA button clicked)
+app.post('/api/button-lead', async (c) => {
+  try {
+    const db = c.env.DB;
+    await initDatabase(db);
+    const body = await c.req.json();
+    const ua = c.req.header('User-Agent') || '';
+    const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
+    const nextNum = ((lastLead?.max_num as number) || 0) + 1;
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent) VALUES (?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'button_click', body.name||'', body.contact||'', body.button_text||'', body.section||'', body.message||'', body.lang||'ru', ua.substring(0,200)).run();
+    notifyTelegram(db, { name: body.name||'(кнопка)', contact: body.contact||'', source: 'button_click', message: `Кнопка: ${body.button_text||''}. Секция: ${body.section||''}` });
+    return c.json({ success: true, lead_number: nextNum });
+  } catch (e) {
+    console.error('Button lead error:', e);
+    return c.json({ error: 'Failed' }, 500);
   }
 })
 
@@ -785,11 +829,12 @@ img{max-width:100%;height:auto}
 .footer-col li{margin-bottom:10px}
 .footer-col a{color:var(--text-sec);font-size:0.88rem;transition:var(--t)}
 .footer-col a:hover{color:var(--purple)}
+.footer-social-btn:hover{transform:scale(1.15)}
 .footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--border);font-size:0.78rem;color:var(--text-muted)}
-.tg-float{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:12px;padding:14px 24px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white;border-radius:50px;box-shadow:0 8px 30px rgba(139,92,246,0.4);transition:var(--t);font-weight:600;font-size:0.88rem}
+.tg-float{position:fixed;bottom:86px;right:24px;z-index:999;display:flex;align-items:center;gap:12px;padding:14px 24px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white;border-radius:50px;box-shadow:0 8px 30px rgba(139,92,246,0.4);transition:var(--t);font-weight:600;font-size:0.88rem}
 .tg-float:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 40px rgba(139,92,246,0.5)}
 .tg-float i{font-size:1.2rem}
-.calc-float{position:fixed;bottom:24px;left:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 22px;background:linear-gradient(135deg,#10B981,#059669);color:white;border-radius:50px;box-shadow:0 8px 30px rgba(16,185,129,0.4);transition:var(--t);font-weight:600;font-size:0.88rem;cursor:pointer}
+.calc-float{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 22px;background:linear-gradient(135deg,#10B981,#059669);color:white;border-radius:50px;box-shadow:0 8px 30px rgba(16,185,129,0.4);transition:var(--t);font-weight:600;font-size:0.88rem;cursor:pointer}
 .calc-float:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 40px rgba(16,185,129,0.5)}
 .calc-float i{font-size:1.1rem}
 .lightbox{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.9);z-index:9999;align-items:center;justify-content:center;padding:40px;cursor:pointer}
@@ -1036,7 +1081,7 @@ img{max-width:100%;height:auto}
   .footer-grid{grid-template-columns:1fr}
   .footer-bottom{flex-direction:column;gap:8px;text-align:center}
   .tg-float span{display:none}
-  .tg-float{padding:16px;border-radius:50%}
+  .tg-float{padding:16px;border-radius:50%;bottom:76px}
   .calc-float span{display:none}
   .calc-float{padding:16px;border-radius:50%}
   .popup-card .pf-row{grid-template-columns:1fr}
@@ -2243,7 +2288,7 @@ console.log('Go to Top — site loaded v6 - CTA buttons + team photo moved');
 
 /* ===== DYNAMIC DATA FROM D1 DATABASE v2 ===== */
 // Helper functions
-function escCalc(s) { return s ? String(s).replace(/'/g, "\\\\'").replace(/"/g, '&quot;') : ''; }
+function escCalc(s) { return s ? String(s).replace(/'/g, "&#39;").replace(/"/g, '&quot;') : ''; }
 function formatNum(n) { return Number(n).toLocaleString('ru-RU'); }
 
 function getTierPrice(tiers, qty) {
@@ -2454,7 +2499,7 @@ switchLang = function(l) {
         if (tabsDiv) {
           var th = '';
           db.tabs.forEach(function(tab, idx) {
-            th += '<div class="calc-tab' + (idx === 0 ? ' active' : '') + '" onclick="showCalcTab(\\''+tab.tab_key+'\\',this)" data-ru="'+escCalc(tab.name_ru)+'" data-am="'+escCalc(tab.name_am)+'">' + (lang === 'am' ? tab.name_am : tab.name_ru) + '</div>';
+            th += '<div class="calc-tab' + (idx === 0 ? ' active' : '') + '" onclick="showCalcTab(&apos;'+tab.tab_key+'&apos;,this)" data-ru="'+escCalc(tab.name_ru)+'" data-am="'+escCalc(tab.name_am)+'">' + (lang === 'am' ? tab.name_am : tab.name_ru) + '</div>';
           });
           tabsDiv.innerHTML = th;
         }
@@ -2484,10 +2529,10 @@ switchLang = function(l) {
             if (hasTiers && tiers && tiers.length > 0) {
               var svcId = 'tiered_' + svc.id;
               var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;');
-              gh += '<div class="calc-row" data-price="tiered" data-tiers=\\''+tiersAttr+'\\' id="row_'+svcId+'">';
+              gh += '<div class="calc-row" data-price="tiered" data-tiers="'+tiersAttr+'" id="row_'+svcId+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang==='am' ? svc.name_am : svc.name_ru) + '</div>';
               gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ֏</div>';
-              gh += '<div class="calc-input"><button onclick="ccTiered(\\''+svcId+'\\',-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(\\''+svcId+'\\')"><button onclick="ccTiered(\\''+svcId+'\\',1)">+</button></div>';
+              gh += '<div class="calc-input"><button onclick="ccTiered(&apos;'+svcId+'&apos;,-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(&apos;'+svcId+'&apos;)"><button onclick="ccTiered(&apos;'+svcId+'&apos;,1)">+</button></div>';
               gh += '</div>';
               gh += '<div class="buyout-tier-info"><strong>'+( lang==='am' ? 'Որքան շատ — այնքան էժան:' : 'Чем больше — тем дешевле:')+'</strong><br>';
               gh += '<span>' + tiers.map(function(t) { 
@@ -2563,6 +2608,74 @@ switchLang = function(l) {
       }
       
       console.log('[DB] Telegram data loaded and applied:', Object.keys(db.telegram).length, 'messages');
+    }
+    
+    // ===== 3b. TRACK BUTTON CLICKS -> AUTO-CREATE LEAD =====
+    document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a.btn-primary, a.cta-btn').forEach(function(a) {
+      if (a.dataset._trackAttached) return;
+      a.dataset._trackAttached = '1';
+      a.addEventListener('click', function() {
+        try {
+          var section = '';
+          var parent = a.closest('[data-section-id]');
+          if (parent) section = parent.getAttribute('data-section-id') || '';
+          var btnText = '';
+          var span = a.querySelector('span[data-ru]');
+          if (span) btnText = span.getAttribute('data-ru') || span.textContent || '';
+          else btnText = a.textContent || '';
+          btnText = btnText.trim().substring(0, 100);
+          if (!btnText || btnText.length < 2) return;
+          fetch('/api/button-lead', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ button_text: btnText, section: section, lang: lang, name: '(button click)', contact: '' })
+          }).catch(function(){});
+        } catch(e) {}
+      });
+    });
+    console.log('[DB] Button click tracking attached');
+    
+    // ===== 3c. DYNAMIC TICKER FROM DB =====
+    if (db.tickerItems && db.tickerItems.length > 0) {
+      var tickerTrack = document.getElementById('tickerTrack');
+      if (tickerTrack) {
+        var th = '';
+        for (var ti = 0; ti < 2; ti++) {
+          db.tickerItems.forEach(function(it) {
+            th += '<div class="ticker-item"><i class="fas ' + (it.icon || 'fa-check-circle') + '"></i><span data-ru="' + (it.ru||'').replace(/"/g,'&quot;') + '" data-am="' + (it.am||'').replace(/"/g,'&quot;') + '">' + (lang === 'am' ? (it.am||it.ru) : it.ru) + '</span></div>';
+          });
+        }
+        tickerTrack.innerHTML = th;
+        console.log('[DB] Ticker updated from admin:', db.tickerItems.length, 'items');
+      }
+    }
+    
+    // ===== 3d. FOOTER SOCIAL LINKS FROM DB =====
+    if (db.footerSocials && db.footerSocials.length > 0) {
+      var footerSocialEl = document.querySelector('.footer-social, .social-links, footer .socials');
+      if (!footerSocialEl) {
+        // Create social links container in footer
+        var footerEl = document.querySelector('footer');
+        if (footerEl) {
+          footerSocialEl = document.createElement('div');
+          footerSocialEl.className = 'footer-socials';
+          footerSocialEl.style.cssText = 'display:flex;gap:12px;justify-content:center;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1)';
+          footerEl.appendChild(footerSocialEl);
+        }
+      }
+      if (footerSocialEl) {
+        var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk' };
+        var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2' };
+        var sh = '';
+        db.footerSocials.forEach(function(s) {
+          var icon = socialIcons[s.type] || 'fas fa-link';
+          var color = socialColors[s.type] || '#8B5CF6';
+          sh += '<a href="' + (s.url||'#') + '" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:' + color + ';color:white;font-size:1.1rem;transition:transform 0.2s">' +
+            '<i class="' + icon + '"></i></a>';
+        });
+        footerSocialEl.innerHTML = sh;
+        console.log('[DB] Footer social links applied:', db.footerSocials.length);
+      }
     }
     
     // ===== 4. INJECT CUSTOM SCRIPTS =====

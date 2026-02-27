@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS site_blocks (
   custom_html TEXT DEFAULT '',
   is_visible INTEGER DEFAULT 1,
   sort_order INTEGER DEFAULT 0,
+  social_links TEXT DEFAULT '[]',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
@@ -633,6 +634,8 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE dividends ADD COLUMN schedule TEXT DEFAULT 'monthly'").run(); } catch {}
   // v22: Overdraft term/payment fields for unified calculations
   try { await db.prepare("ALTER TABLE loans ADD COLUMN bank_monthly_payment REAL DEFAULT 0").run(); } catch {}
+  // v23: site_blocks — add social_links column for per-block social media links
+  try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN social_links TEXT DEFAULT '[]'").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
