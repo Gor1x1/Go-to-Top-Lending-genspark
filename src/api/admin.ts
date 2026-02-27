@@ -929,8 +929,21 @@ api.get('/pdf-template', authMiddleware, async (c) => {
 api.put('/pdf-template', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare(`UPDATE pdf_templates SET header_ru=?, header_am=?, footer_ru=?, footer_am=?, intro_ru=?, intro_am=?, outro_ru=?, outro_am=?, company_name=?, company_phone=?, company_email=?, company_address=?, btn_order_ru=?, btn_order_am=?, btn_download_ru=?, btn_download_am=?, order_telegram_url=?, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`)
-    .bind(d.header_ru||'', d.header_am||'', d.footer_ru||'', d.footer_am||'', d.intro_ru||'', d.intro_am||'', d.outro_ru||'', d.outro_am||'', d.company_name||'', d.company_phone||'', d.company_email||'', d.company_address||'', d.btn_order_ru||'Заказать сейчас', d.btn_order_am||'Պատվիրել հիմա', d.btn_download_ru||'Скачать', d.btn_download_am||'Ներబేறնել', d.order_telegram_url||'https://t.me/goo_to_top').run();
+  await db.prepare(`UPDATE pdf_templates SET header_ru=?, header_am=?, header_en=?, footer_ru=?, footer_am=?, footer_en=?, intro_ru=?, intro_am=?, intro_en=?, outro_ru=?, outro_am=?, outro_en=?, company_name=?, company_phone=?, company_email=?, company_address=?, company_logo_url=?, company_website=?, company_inn=?, btn_order_ru=?, btn_order_am=?, btn_order_en=?, btn_download_ru=?, btn_download_am=?, btn_download_en=?, order_telegram_url=?, invoice_prefix=?, show_qr=?, accent_color=?, terms_ru=?, terms_am=?, terms_en=?, bank_details_ru=?, bank_details_am=?, bank_details_en=?, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`)
+    .bind(
+      d.header_ru||'', d.header_am||'', d.header_en||'Commercial Proposal',
+      d.footer_ru||'', d.footer_am||'', d.footer_en||'',
+      d.intro_ru||'', d.intro_am||'', d.intro_en||'',
+      d.outro_ru||'', d.outro_am||'', d.outro_en||'',
+      d.company_name||'', d.company_phone||'', d.company_email||'', d.company_address||'',
+      d.company_logo_url||'', d.company_website||'', d.company_inn||'',
+      d.btn_order_ru||'\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441', d.btn_order_am||'\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561', d.btn_order_en||'Order Now',
+      d.btn_download_ru||'\u0421\u043a\u0430\u0447\u0430\u0442\u044c', d.btn_download_am||'\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c', d.btn_download_en||'Download',
+      d.order_telegram_url||'https://t.me/goo_to_top',
+      d.invoice_prefix||'INV', d.show_qr ? 1 : 0, d.accent_color||'#8B5CF6',
+      d.terms_ru||'', d.terms_am||'', d.terms_en||'',
+      d.bank_details_ru||'', d.bank_details_am||'', d.bank_details_en||''
+    ).run();
   return c.json({ success: true });
 });
 

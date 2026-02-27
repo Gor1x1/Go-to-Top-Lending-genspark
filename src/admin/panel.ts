@@ -6977,73 +6977,170 @@ async function deleteTgBot(id) {
 }
 
 // ===== PDF TEMPLATE =====
+var pdfLangTab = 'ru'; // 'ru', 'am', 'en'
 function renderPdfTemplate() {
   var t = data.pdfTemplate || {};
-  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Шаблон PDF (Коммерческое предложение)</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Тексты для автоматически генерируемого PDF-файла калькулятора</p>' +
-    '<div class="card">' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Заголовок (RU)</label><input class="input" id="pdf_header_ru" value="' + escHtml(t.header_ru) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Заголовок (AM)</label><input class="input" id="pdf_header_am" value="' + escHtml(t.header_am) + '"></div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Вступление (RU)</label><textarea class="input" id="pdf_intro_ru">' + escHtml(t.intro_ru) + '</textarea></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Вступление (AM)</label><textarea class="input" id="pdf_intro_am">' + escHtml(t.intro_am) + '</textarea></div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Завершение (RU)</label><textarea class="input" id="pdf_outro_ru">' + escHtml(t.outro_ru) + '</textarea></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Завершение (AM)</label><textarea class="input" id="pdf_outro_am">' + escHtml(t.outro_am) + '</textarea></div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Подпись/Footer (RU)</label><input class="input" id="pdf_footer_ru" value="' + escHtml(t.footer_ru) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Подпись/Footer (AM)</label><input class="input" id="pdf_footer_am" value="' + escHtml(t.footer_am) + '"></div>' +
-    '</div>' +
-    '<h3 style="font-weight:700;margin:20px 0 12px;color:#a78bfa"><i class="fas fa-building" style="margin-right:8px"></i>Данные компании</h3>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Название компании</label><input class="input" id="pdf_company" value="' + escHtml(t.company_name) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Телефон</label><input class="input" id="pdf_phone" value="' + escHtml(t.company_phone) + '"></div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Email</label><input class="input" id="pdf_email" value="' + escHtml(t.company_email) + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Адрес</label><input class="input" id="pdf_address" value="' + escHtml(t.company_address) + '"></div>' +
-    '</div>' +
-    '<h3 style="font-weight:700;margin:20px 0 12px;color:#a78bfa"><i class="fas fa-hand-pointer" style="margin-right:8px"></i>Кнопки на странице КП</h3>' +
-    '<p style="color:#94a3b8;font-size:0.82rem;margin-bottom:12px">Настройте названия кнопок на странице расчёта</p>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#10B981;font-weight:600">Кнопка «Заказать» (RU)</label><input class="input" id="pdf_btn_order_ru" value="' + escHtml(t.btn_order_ru || 'Заказать сейчас') + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Кнопка «Заказать» (AM)</label><input class="input" id="pdf_btn_order_am" value="' + escHtml(t.btn_order_am || 'Պատվիրել հիմա') + '"></div>' +
-    '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600">Кнопка «Скачать» (RU)</label><input class="input" id="pdf_btn_dl_ru" value="' + escHtml(t.btn_download_ru || 'Скачать') + '"></div>' +
-      '<div><label style="font-size:0.75rem;color:#F59E0B;font-weight:600">Кнопка «Скачать» (AM)</label><input class="input" id="pdf_btn_dl_am" value="' + escHtml(t.btn_download_am || 'Ներбেறնел') + '"></div>' +
-    '</div>' +
-    '<div style="margin-bottom:20px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Telegram URL менеджера (для кнопки «Заказать»)</label><input class="input" id="pdf_order_tg" value="' + escHtml(t.order_telegram_url || 'https://t.me/goo_to_top') + '" placeholder="https://t.me/your_username"></div>' +
-    '<button class="btn btn-success" onclick="savePdfTemplate()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить шаблон</button>' +
-    '</div></div>';
+  var h = '<div style="padding:24px 28px;max-width:1400px;margin:0 auto">';
+  
+  // Header
+  h += '<div style="margin-bottom:24px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">' +
+      '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-file-invoice" style="color:#8B5CF6;margin-right:10px"></i>PDF \u0428\u0430\u0431\u043b\u043e\u043d (\u041f\u0440\u043e\u0444. \u0418\u043d\u0432\u043e\u0439\u0441)</h1>' +
+      '<p style="color:#64748b;font-size:0.82rem;margin:0">\u041f\u0440\u043e\u0444\u0435\u0441\u0441\u0438\u043e\u043d\u0430\u043b\u044c\u043d\u044b\u0439 \u0438\u043d\u0432\u043e\u0439\u0441 \u0434\u043b\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432 \u043d\u0430 3 \u044f\u0437\u044b\u043a\u0430\u0445. PDF \u0433\u0435\u043d\u0435\u0440\u0438\u0440\u0443\u0435\u0442\u0441\u044f \u0430\u0432\u0442\u043e\u043c\u0430\u0442\u0438\u0447\u0435\u0441\u043a\u0438 \u0438\u0437 \u0434\u0430\u043d\u043d\u044b\u0445 \u043b\u0438\u0434\u043e\u0432.</p></div>' +
+      '<div style="display:flex;gap:8px">' +
+        '<a class="btn btn-outline" href="/#calculator" target="_blank" style="font-size:0.82rem"><i class="fas fa-external-link-alt" style="margin-right:4px"></i>\u041f\u0440\u0435\u0434\u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440</a>' +
+      '</div>' +
+    '</div>';
+  
+  // Language tabs (like Constructor blocks)
+  var pdfLangs = [
+    { id: 'ru', icon: '', label: '\u0420\u0443\u0441\u0441\u043a\u0438\u0439 (RU)', color: '#8B5CF6' },
+    { id: 'am', icon: '', label: '\u0540\u0561\u0575\u0565\u0580\u0565\u0576 (AM)', color: '#F59E0B' },
+    { id: 'en', icon: '', label: 'English (EN)', color: '#3B82F6' }
+  ];
+  h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
+  for (var li = 0; li < pdfLangs.length; li++) {
+    var pl = pdfLangs[li];
+    h += '<button class="tab-btn' + (pdfLangTab === pl.id ? ' active' : '') + '" onclick="pdfLangTab=&apos;' + pl.id + '&apos;;render()" style="padding:10px 20px;border-left:3px solid ' + pl.color + '"><i class="fas fa-globe" style="margin-right:6px;color:' + pl.color + '"></i>' + pl.label + '</button>';
+  }
+  h += '</div></div>';
+  
+  var lang = pdfLangTab;
+  var lColor = lang === 'ru' ? '#8B5CF6' : lang === 'am' ? '#F59E0B' : '#3B82F6';
+  var lSuffix = '_' + lang;
+  
+  // ── 1. Content section (language-specific) ──
+  h += '<div class="card" style="margin-bottom:20px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;color:' + lColor + '"><i class="fas fa-file-alt" style="margin-right:8px"></i>\u041a\u043e\u043d\u0442\u0435\u043d\u0442 \u0438\u043d\u0432\u043e\u0439\u0441\u0430 (' + lang.toUpperCase() + ')</h3>';
+  h += '<div style="display:grid;grid-template-columns:1fr;gap:16px">';
+  h += '<div><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fas fa-heading" style="margin-right:4px"></i>\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a \u0434\u043e\u043a\u0443\u043c\u0435\u043d\u0442\u0430</label><input class="input" id="pdf_header' + lSuffix + '" value="' + escHtml(t['header' + lSuffix] || '') + '" placeholder="' + (lang==='ru' ? '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435' : lang==='en' ? 'Commercial Proposal' : '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f') + '"></div>';
+  h += '<div><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fas fa-pen-fancy" style="margin-right:4px"></i>\u0412\u0441\u0442\u0443\u043f\u043b\u0435\u043d\u0438\u0435 (\u043f\u043e\u0434 \u0437\u0430\u0433\u043e\u043b\u043e\u0432\u043a\u043e\u043c)</label><textarea class="input" id="pdf_intro' + lSuffix + '" rows="3" placeholder="' + (lang==='en' ? 'Thank you for your interest. Here is your calculation...' : '\u0411\u043b\u0430\u0433\u043e\u0434\u0430\u0440\u0438\u043c \u0437\u0430 \u0438\u043d\u0442\u0435\u0440\u0435\u0441...') + '">' + escHtml(t['intro' + lSuffix] || '') + '</textarea></div>';
+  h += '<div><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fas fa-comment-dots" style="margin-right:4px"></i>\u0417\u0430\u0432\u0435\u0440\u0448\u0435\u043d\u0438\u0435 (\u043f\u043e\u0441\u043b\u0435 \u0442\u0430\u0431\u043b\u0438\u0446\u044b)</label><textarea class="input" id="pdf_outro' + lSuffix + '" rows="3" placeholder="' + (lang==='en' ? 'We look forward to working with you...' : '\u0411\u0443\u0434\u0435\u043c \u0440\u0430\u0434\u044b \u0441\u043e\u0442\u0440\u0443\u0434\u043d\u0438\u0447\u0435\u0441\u0442\u0432\u0443...') + '">' + escHtml(t['outro' + lSuffix] || '') + '</textarea></div>';
+  h += '<div><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fas fa-shoe-prints" style="margin-right:4px"></i>Footer (\u043f\u043e\u0434\u043f\u0438\u0441\u044c \u0432\u043d\u0438\u0437\u0443)</label><input class="input" id="pdf_footer' + lSuffix + '" value="' + escHtml(t['footer' + lSuffix] || '') + '" placeholder="' + (lang==='en' ? 'All rights reserved. Go to Top Agency.' : '\u00a9 Go to Top') + '"></div>';
+  h += '</div>';
+  
+  // Terms & Conditions
+  h += '<div style="margin-top:16px"><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fas fa-gavel" style="margin-right:4px"></i>\u0423\u0441\u043b\u043e\u0432\u0438\u044f \u0438 \u043f\u043e\u043b\u043e\u0436\u0435\u043d\u0438\u044f (' + lang.toUpperCase() + ')</label><textarea class="input" id="pdf_terms' + lSuffix + '" rows="2" placeholder="' + (lang==='en' ? 'Payment terms: 50% prepayment, 50% upon completion...' : '\u0423\u0441\u043b\u043e\u0432\u0438\u044f \u043e\u043f\u043b\u0430\u0442\u044b...') + '">' + escHtml(t['terms' + lSuffix] || '') + '</textarea></div>';
+  
+  // Bank details
+  h += '<div style="margin-top:12px"><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fas fa-university" style="margin-right:4px"></i>\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b (' + lang.toUpperCase() + ')</label><textarea class="input" id="pdf_bank' + lSuffix + '" rows="2" placeholder="' + (lang==='en' ? 'Bank: ..., Account: ..., SWIFT: ...' : '\u0411\u0430\u043d\u043a: ..., \u0421\u0447\u0451\u0442: ...') + '">' + escHtml(t['bank_details' + lSuffix] || '') + '</textarea></div>';
+  h += '</div>';
+  
+  // ── 2. Button labels (language-specific) ──
+  h += '<div class="card" style="margin-bottom:20px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa"><i class="fas fa-hand-pointer" style="margin-right:8px"></i>\u041a\u043d\u043e\u043f\u043a\u0438 \u043d\u0430 \u0441\u0442\u0440\u0430\u043d\u0438\u0446\u0435 PDF (' + lang.toUpperCase() + ')</h3>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  h += '<div><label style="font-size:0.75rem;color:#10B981;font-weight:600"><i class="fab fa-telegram" style="margin-right:4px"></i>\u041a\u043d\u043e\u043f\u043a\u0430 \u00ab\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c\u00bb</label><input class="input" id="pdf_btn_order' + lSuffix + '" value="' + escHtml(t['btn_order' + lSuffix] || (lang==='en' ? 'Order Now' : lang==='am' ? '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561' : '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441')) + '"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600"><i class="fas fa-download" style="margin-right:4px"></i>\u041a\u043d\u043e\u043f\u043a\u0430 \u00ab\u0421\u043a\u0430\u0447\u0430\u0442\u044c\u00bb</label><input class="input" id="pdf_btn_dl' + lSuffix + '" value="' + escHtml(t['btn_download' + lSuffix] || (lang==='en' ? 'Download' : lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c')) + '"></div>';
+  h += '</div></div>';
+  
+  // ── 3. Company info (shared across languages) ──
+  h += '<div class="card" style="margin-bottom:20px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa"><i class="fas fa-building" style="margin-right:8px"></i>\u0414\u0430\u043d\u043d\u044b\u0435 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438</h3>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438</label><input class="input" id="pdf_company" value="' + escHtml(t.company_name || '') + '"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0422\u0435\u043b\u0435\u0444\u043e\u043d</label><input class="input" id="pdf_phone" value="' + escHtml(t.company_phone || '') + '"></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Email</label><input class="input" id="pdf_email" value="' + escHtml(t.company_email || '') + '"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0410\u0434\u0440\u0435\u0441</label><input class="input" id="pdf_address" value="' + escHtml(t.company_address || '') + '"></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0421\u0430\u0439\u0442</label><input class="input" id="pdf_website" value="' + escHtml(t.company_website || '') + '" placeholder="https://gototop.agency"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0418\u041d\u041d / \u0420\u0435\u0433\u0438\u0441\u0442\u0440\u0430\u0446\u0438\u043e\u043d\u043d\u044b\u0439 \u043d\u043e\u043c\u0435\u0440</label><input class="input" id="pdf_inn" value="' + escHtml(t.company_inn || '') + '" placeholder="00000000"></div>';
+  h += '</div>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041b\u043e\u0433\u043e\u0442\u0438\u043f (URL)</label><input class="input" id="pdf_logo" value="' + escHtml(t.company_logo_url || '') + '" placeholder="https://...logo.png"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Telegram URL \u043c\u0435\u043d\u0435\u0434\u0436\u0435\u0440\u0430</label><input class="input" id="pdf_order_tg" value="' + escHtml(t.order_telegram_url || 'https://t.me/goo_to_top') + '" placeholder="https://t.me/your_username"></div>';
+  h += '</div></div>';
+  
+  // ── 4. Invoice Settings ──
+  h += '<div class="card" style="margin-bottom:20px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa"><i class="fas fa-cog" style="margin-right:8px"></i>\u041d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u0438\u043d\u0432\u043e\u0439\u0441\u0430</h3>';
+  h += '<div style="display:grid;grid-template-columns:120px 120px 1fr;gap:16px">';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041f\u0440\u0435\u0444\u0438\u043a\u0441 \u2116</label><input class="input" id="pdf_prefix" value="' + escHtml(t.invoice_prefix || 'INV') + '" placeholder="INV"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u0410\u043a\u0446\u0435\u043d\u0442\u043d\u044b\u0439 \u0446\u0432\u0435\u0442</label><input class="input" type="color" id="pdf_accent" value="' + escHtml(t.accent_color || '#8B5CF6') + '" style="height:38px;padding:4px;cursor:pointer"></div>';
+  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">QR-\u043a\u043e\u0434 \u0441\u0441\u044b\u043b\u043a\u0438 \u043d\u0430 \u0441\u0430\u0439\u0442</label><label style="display:flex;align-items:center;gap:8px;font-size:0.82rem;color:#94a3b8;margin-top:4px"><input type="checkbox" id="pdf_qr"' + (t.show_qr ? ' checked' : '') + ' style="accent-color:#8B5CF6;width:16px;height:16px">\u041f\u043e\u043a\u0430\u0437\u044b\u0432\u0430\u0442\u044c QR-\u043a\u043e\u0434</label></div>';
+  h += '</div></div>';
+  
+  // ── 5. Quick stats & Preview ──
+  h += '<div class="card" style="margin-bottom:20px;background:rgba(139,92,246,0.04);border-color:rgba(139,92,246,0.2)">';
+  h += '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-chart-bar" style="margin-right:8px"></i>\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u043b\u0438\u0434\u043e\u0432 PDF</h3>';
+  var leads = data.leads || [];
+  var pdfLeads = leads.filter(function(l) { return l.source === 'calculator_pdf'; });
+  var totalRevenue = pdfLeads.reduce(function(s, l) { return s + (parseFloat(l.total_amount) || 0); }, 0);
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
+  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">' + pdfLeads.length + '</div><div style="font-size:0.72rem;color:#64748b">\u0417\u0430\u044f\u0432\u043e\u043a \u0447\u0435\u0440\u0435\u0437 PDF</div></div>';
+  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#10B981">' + Math.round(totalRevenue).toLocaleString('ru-RU') + ' \u058f</div><div style="font-size:0.72rem;color:#64748b">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430</div></div>';
+  var avgAmount = pdfLeads.length > 0 ? Math.round(totalRevenue / pdfLeads.length) : 0;
+  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#F59E0B">' + avgAmount.toLocaleString('ru-RU') + ' \u058f</div><div style="font-size:0.72rem;color:#64748b">\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0447\u0435\u043a</div></div>';
+  var todayLeads = pdfLeads.filter(function(l) { var d = new Date(l.created_at); var n = new Date(); return d.toDateString() === n.toDateString(); }).length;
+  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#60a5fa">' + todayLeads + '</div><div style="font-size:0.72rem;color:#64748b">\u0421\u0435\u0433\u043e\u0434\u043d\u044f</div></div>';
+  h += '</div>';
+  
+  // Recent PDF leads
+  if (pdfLeads.length > 0) {
+    h += '<div style="margin-top:16px"><div style="font-size:0.78rem;font-weight:700;color:#94a3b8;margin-bottom:8px"><i class="fas fa-history" style="margin-right:4px"></i>\u041f\u043e\u0441\u043b\u0435\u0434\u043d\u0438\u0435 \u0437\u0430\u044f\u0432\u043a\u0438 PDF</div>';
+    h += '<div style="overflow-x:auto"><table style="width:100%;font-size:0.75rem;border-collapse:collapse">';
+    h += '<tr style="color:#64748b"><th style="text-align:left;padding:6px 8px">#</th><th style="text-align:left;padding:6px 8px">\u0418\u043c\u044f</th><th style="text-align:left;padding:6px 8px">\u041a\u043e\u043d\u0442\u0430\u043a\u0442</th><th style="text-align:right;padding:6px 8px">\u0421\u0443\u043c\u043c\u0430</th><th style="text-align:left;padding:6px 8px">\u0414\u0430\u0442\u0430</th><th style="padding:6px 8px"></th></tr>';
+    var recentPdf = pdfLeads.slice(0, 5);
+    for (var rpi = 0; rpi < recentPdf.length; rpi++) {
+      var rl = recentPdf[rpi];
+      h += '<tr style="border-top:1px solid #1e293b">' +
+        '<td style="padding:6px 8px;color:#8B5CF6;font-weight:600">#' + (rl.lead_number || rl.id) + '</td>' +
+        '<td style="padding:6px 8px">' + escHtml(rl.name || '-') + '</td>' +
+        '<td style="padding:6px 8px;color:#60a5fa">' + escHtml(rl.contact || '-') + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:600;color:#10B981">' + Math.round(parseFloat(rl.total_amount) || 0).toLocaleString('ru-RU') + ' \u058f</td>' +
+        '<td style="padding:6px 8px;color:#64748b">' + (rl.created_at ? new Date(rl.created_at).toLocaleString('ru') : '-') + '</td>' +
+        '<td style="padding:6px 8px"><a href="/pdf/' + rl.id + '" target="_blank" class="btn btn-outline" style="padding:2px 8px;font-size:0.68rem"><i class="fas fa-eye"></i></a></td>' +
+      '</tr>';
+    }
+    h += '</table></div></div>';
+  }
+  h += '</div>';
+  
+  // Save button
+  h += '<button class="btn btn-success" style="min-width:200px;font-size:1rem;padding:14px 24px" onclick="savePdfTemplate()"><i class="fas fa-save" style="margin-right:8px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0448\u0430\u0431\u043b\u043e\u043d</button>';
+  h += '</div>';
   return h;
 }
 
 async function savePdfTemplate() {
-  await api('/pdf-template', { method: 'PUT', body: JSON.stringify({
-    header_ru: document.getElementById('pdf_header_ru').value,
-    header_am: document.getElementById('pdf_header_am').value,
-    intro_ru: document.getElementById('pdf_intro_ru').value,
-    intro_am: document.getElementById('pdf_intro_am').value,
-    outro_ru: document.getElementById('pdf_outro_ru').value,
-    outro_am: document.getElementById('pdf_outro_am').value,
-    footer_ru: document.getElementById('pdf_footer_ru').value,
-    footer_am: document.getElementById('pdf_footer_am').value,
-    company_name: document.getElementById('pdf_company').value,
-    company_phone: document.getElementById('pdf_phone').value,
-    company_email: document.getElementById('pdf_email').value,
-    company_address: document.getElementById('pdf_address').value,
-    btn_order_ru: document.getElementById('pdf_btn_order_ru').value,
-    btn_order_am: document.getElementById('pdf_btn_order_am').value,
-    btn_download_ru: document.getElementById('pdf_btn_dl_ru').value,
-    btn_download_am: document.getElementById('pdf_btn_dl_am').value,
-    order_telegram_url: document.getElementById('pdf_order_tg').value
-  }) });
-  toast('Шаблон PDF сохранён');
+  var payload = {};
+  var langs = ['ru', 'am', 'en'];
+  for (var li = 0; li < langs.length; li++) {
+    var l = langs[li];
+    var sfx = '_' + l;
+    var hEl = document.getElementById('pdf_header' + sfx);
+    var iEl = document.getElementById('pdf_intro' + sfx);
+    var oEl = document.getElementById('pdf_outro' + sfx);
+    var fEl = document.getElementById('pdf_footer' + sfx);
+    var boEl = document.getElementById('pdf_btn_order' + sfx);
+    var bdEl = document.getElementById('pdf_btn_dl' + sfx);
+    var tEl = document.getElementById('pdf_terms' + sfx);
+    var bkEl = document.getElementById('pdf_bank' + sfx);
+    if (hEl) payload['header' + sfx] = hEl.value;
+    if (iEl) payload['intro' + sfx] = iEl.value;
+    if (oEl) payload['outro' + sfx] = oEl.value;
+    if (fEl) payload['footer' + sfx] = fEl.value;
+    if (boEl) payload['btn_order' + sfx] = boEl.value;
+    if (bdEl) payload['btn_download' + sfx] = bdEl.value;
+    if (tEl) payload['terms' + sfx] = tEl.value;
+    if (bkEl) payload['bank_details' + sfx] = bkEl.value;
+  }
+  // Shared fields
+  var fields = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_logo': 'company_logo_url', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
+  var fkeys = Object.keys(fields);
+  for (var fi = 0; fi < fkeys.length; fi++) {
+    var el = document.getElementById(fkeys[fi]);
+    if (el) payload[fields[fkeys[fi]]] = el.value;
+  }
+  var qrEl = document.getElementById('pdf_qr');
+  if (qrEl) payload.show_qr = qrEl.checked ? 1 : 0;
+  
+  await api('/pdf-template', { method: 'PUT', body: JSON.stringify(payload) });
+  data.pdfTemplate = Object.assign(data.pdfTemplate || {}, payload);
+  toast('\u0428\u0430\u0431\u043b\u043e\u043d PDF \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
 }
 
 // ===== SLOT COUNTER =====
@@ -8761,9 +8858,7 @@ function renderSiteBlocks() {
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
     { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns },
-    { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length },
-    { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер', count: 1 },
-    { id: 'photos', icon: 'fa-images', label: 'Фото-галерея', count: (data.photoBlocks || []).length }
+    { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length }
   ];
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
@@ -8783,20 +8878,6 @@ function renderSiteBlocks() {
   if (sbActiveTab === 'slots') {
     h += '</div>'; // close header
     h += renderSlotCounter();
-    return h;
-  }
-
-  // ── If footer tab selected, render footer inline ──
-  if (sbActiveTab === 'footer') {
-    h += '</div>'; // close header
-    h += renderFooter();
-    return h;
-  }
-
-  // ── If photos tab selected, render photo gallery inline ──
-  if (sbActiveTab === 'photos') {
-    h += '</div>'; // close header
-    h += renderPhotos();
     return h;
   }
 
@@ -9059,7 +9140,7 @@ function renderSiteBlocks() {
         }
         h += '</div>';
 
-        // ── Social Links section (only for blocks that support socials) ──
+        // ── Social Links section (integrated in block as single unit) ──
         var socials = [];
         try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
         if (!Array.isArray(socials)) socials = [];
@@ -9077,25 +9158,62 @@ function renderSiteBlocks() {
           {v:'email',l:'Email',i:'fas fa-envelope',c:'#F59E0B'},{v:'phone',l:'Телефон',i:'fas fa-phone',c:'#10B981'}
         ];
         h += '<div style="margin-bottom:16px">';
-        h += '<details' + (socials.length > 0 ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-share-alt" style="color:#10B981;margin-right:6px"></i>Соц. сети <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + socials.length + ')</span></summary>';
+        h += '<details' + (socials.length > 0 ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-share-alt" style="color:#10B981;margin-right:6px"></i>Соц. сети (встроенный блок) <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + socials.length + ')</span></summary>';
+        
+        // ── Social Section Settings (header, subtitle, layout, icon size, offsets) ──
+        var socOpts = opts.social_settings || {};
+        h += '<div style="padding:10px;background:rgba(16,185,129,0.04);border:1px solid rgba(16,185,129,0.12);border-radius:8px;margin-bottom:10px">';
+        h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок и описание</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">';
+        if (showRu) h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:2px">Заголовок (RU)</div><input class="input" id="sb_soctitle_ru_' + b.id + '" value="' + escHtml(socOpts.title_ru || '') + '" placeholder="Мы в соц. сетях" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        if (showAm) h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:2px">Заголовок (AM)</div><input class="input" id="sb_soctitle_am_' + b.id + '" value="' + escHtml(socOpts.title_am || '') + '" placeholder="Հետdelays մեզ" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+        if (showRu) h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:2px">Подзаголовок (RU)</div><input class="input" id="sb_socsubtitle_ru_' + b.id + '" value="' + escHtml(socOpts.subtitle_ru || '') + '" placeholder="Подпишитесь и будьте в курсе" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        if (showAm) h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:2px">Подзаголовок (AM)</div><input class="input" id="sb_socsubtitle_am_' + b.id + '" value="' + escHtml(socOpts.subtitle_am || '') + '" placeholder="AM подзаголовок" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '</div>';
+        
+        h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-sliders-h" style="margin-right:4px"></i>Визуальные настройки</div>';
+        h += '<div style="display:grid;grid-template-columns:80px 80px 100px 100px;gap:6px;margin-bottom:6px">';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Размер иконки</div><input class="input" id="sb_socsize_' + b.id + '" type="number" value="' + (socOpts.icon_size || 36) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Зазор (px)</div><input class="input" id="sb_socgap_' + b.id + '" type="number" value="' + (socOpts.gap || 8) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Выравнивание</div><select class="input" id="sb_socalign_' + b.id + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"><option value="center"' + (socOpts.align==='center'?' selected':'') + '>Центр</option><option value="left"' + (socOpts.align==='left'?' selected':'') + '>Лево</option><option value="right"' + (socOpts.align==='right'?' selected':'') + '>Право</option></select></div>';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Позиция</div><select class="input" id="sb_socpos_' + b.id + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"><option value="bottom"' + (socOpts.position==='bottom'||!socOpts.position?' selected':'') + '>Внизу блока</option><option value="top"' + (socOpts.position==='top'?' selected':'') + '>Вверху</option><option value="inline"' + (socOpts.position==='inline'?' selected':'') + '>В строку</option></select></div>';
+        h += '</div>';
+        // Position offsets (left/right/top/bottom in px)
+        h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-arrows-alt" style="margin-right:4px"></i>Позиция иконок (отступ, px)</div>';
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:6px">';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Сверху</div><input class="input" id="sb_socoff_top_' + b.id + '" type="number" value="' + (socOpts.offset_top || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Справа</div><input class="input" id="sb_socoff_right_' + b.id + '" type="number" value="' + (socOpts.offset_right || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Снизу</div><input class="input" id="sb_socoff_bottom_' + b.id + '" type="number" value="' + (socOpts.offset_bottom || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '<div><div style="font-size:0.62rem;color:#64748b;margin-bottom:2px">Слева</div><input class="input" id="sb_socoff_left_' + b.id + '" type="number" value="' + (socOpts.offset_left || 0) + '" style="font-size:0.75rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+        h += '</div></div>';
+
+        // ── Social links list (each icon with URL + per-icon text) ──
         h += '<div style="margin-bottom:6px">';
         for (var si = 0; si < socials.length; si++) {
           var soc = socials[si];
           var socNet = socialNetworks.find(function(n) { return n.v === soc.type; }) || {v:'website',l:'Сайт',i:'fas fa-globe',c:'#8B5CF6'};
-          h += '<div style="display:grid;grid-template-columns:30px 130px 1fr 28px;gap:8px;margin-bottom:6px;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
-          h += '<i class="' + socNet.i + '" style="color:' + socNet.c + ';font-size:1.1rem;text-align:center"></i>';
-          h += '<select class="input" id="sb_soctype_' + b.id + '_' + si + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<div style="margin-bottom:5px;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+          h += '<div style="display:grid;grid-template-columns:28px 110px 1fr 24px;gap:6px;align-items:center">';
+          h += '<i class="' + socNet.i + '" style="color:' + socNet.c + ';font-size:1rem;text-align:center"></i>';
+          h += '<select class="input" id="sb_soctype_' + b.id + '_' + si + '" style="font-size:0.75rem;padding:4px 6px" onchange="sbAutoSave(' + b.id + ')">';
           for (var sni = 0; sni < socialNetworks.length; sni++) {
             var sn = socialNetworks[sni];
             h += '<option value="' + sn.v + '"' + (soc.type === sn.v ? ' selected' : '') + '>' + sn.l + '</option>';
           }
           h += '</select>';
-          h += '<input class="input" id="sb_socurl_' + b.id + '_' + si + '" value="' + escHtml(soc.url || '') + '" placeholder="https://..." style="font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
-          h += '<button class="tier-del-btn" onclick="sbRemoveSocial(' + b.id + ',' + si + ')"><i class="fas fa-times"></i></button>';
+          h += '<input class="input" id="sb_socurl_' + b.id + '_' + si + '" value="' + escHtml(soc.url || '') + '" placeholder="https://..." style="font-size:0.75rem;color:#60a5fa;padding:4px 8px" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<button class="tier-del-btn" style="width:22px;height:22px;font-size:0.65rem" onclick="sbRemoveSocial(' + b.id + ',' + si + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
+          // Per-icon text label
+          h += '<div style="display:grid;grid-template-columns:28px 1fr;gap:6px;margin-top:4px;align-items:center">';
+          h += '<span></span>';
+          h += '<input class="input" id="sb_soclabel_' + b.id + '_' + si + '" value="' + escHtml(soc.label || '') + '" placeholder="Подпись иконки (необязательно)" style="font-size:0.72rem;padding:4px 6px;color:#94a3b8" onchange="sbAutoSave(' + b.id + ')">';
+          h += '</div></div>';
         }
         h += '</div>';
-        h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
+        h += '<button class="btn btn-outline" style="padding:3px 10px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
         h += '</details></div>';
         } // end hasSocials
 
@@ -9157,24 +9275,12 @@ function renderSiteBlocks() {
           h += '</details></div>';
         }
         h += '<div style="margin-bottom:16px">';
-        h += '<details' + (opts.show_slots ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-sliders-h" style="color:#f59e0b;margin-right:6px"></i>Опции блока</summary>';
-        h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
-        // Show social links toggle (only for social-capable blocks)
-        if (socialBlocks[b.block_key]) {
-        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
-          '<input type="checkbox" id="sb_opt_socials_' + b.id + '"' + (opts.show_socials ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
-          '<span><i class="fas fa-share-alt" style="color:#10B981;margin-right:4px"></i>Соц. сети в блоке</span></label>';
-        }
-        // Photo gallery toggle (only for photo-capable blocks)
-        if (photoBlocks[b.block_key]) {
-        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
-          '<input type="checkbox" id="sb_opt_photos_' + b.id + '"' + (opts.show_photos ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
-          '<span><i class="fas fa-camera" style="color:#60a5fa;margin-right:4px"></i>Фото-галерея</span></label>';
-        }
-        // Slot counter toggle
-        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
-          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbToggleSlotCounter(' + b.id + ',this.checked)" style="accent-color:#8B5CF6;width:16px;height:16px">' +
-          '<span><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:4px"></i>Счётчик слотов</span></label>';
+        // ── Slot Counter Settings (direct, no useless checkboxes) ──
+        h += '<details' + (opts.show_slots ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:6px"></i>Счётчик слотов</summary>';
+        h += '<div style="padding:10px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
+        h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8;margin-bottom:8px">' +
+          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbToggleSlotCounter(' + b.id + ',this.checked)" style="accent-color:#fbbf24;width:16px;height:16px">' +
+          '<span><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:4px"></i>Включить счётчик слотов для этого блока</span></label>';
         h += '</div>';
         h += '</details>';
         
@@ -9199,6 +9305,18 @@ function renderSiteBlocks() {
           }
           h += '</div>';
           
+          // ── Dropdown to select existing counter ──
+          h += '<div style="margin-bottom:10px"><div style="font-size:0.72rem;color:#64748b;margin-bottom:4px;font-weight:600">Привязать существующий счётчик:</div>';
+          h += '<select class="input" id="sb_sc_select_' + b.id + '" style="font-size:0.82rem" onchange="sbLinkCounter(' + b.id + ',&apos;' + b.block_key + '&apos;,this.value)">';
+          h += '<option value="">— Выберите счётчик —</option>';
+          for (var sci2 = 0; sci2 < counters.length; sci2++) {
+            var sc2 = counters[sci2];
+            var sc2Free = Math.max(0, (sc2.total_slots || 0) - (sc2.booked_slots || 0));
+            var sc2Selected = blockCounter && blockCounter.id === sc2.id;
+            h += '<option value="' + sc2.id + '"' + (sc2Selected ? ' selected' : '') + '>' + escHtml(sc2.counter_name || 'Счётчик #' + sc2.id) + ' (' + sc2Free + '/' + (sc2.total_slots || 0) + ' своб.)</option>';
+          }
+          h += '</select></div>';
+
           if (blockCounter) {
             var scId = blockCounter.id;
             var scFree = Math.max(0, (blockCounter.total_slots || 10) - (blockCounter.booked_slots || 0));
@@ -9676,6 +9794,22 @@ async function sbCreateSlotForBlockFull(blockKey, blockId) {
   await loadData(); render();
 }
 
+// ── Link existing slot counter to block ──
+async function sbLinkCounter(blockId, blockKey, counterId) {
+  if (!counterId) return;
+  var counter = (data.slotCounters || []).find(function(c) { return c.id === parseInt(counterId); });
+  if (!counter) return;
+  // Update counter position to point to this block
+  await api('/slot-counter/' + counterId, { method: 'PUT', body: JSON.stringify({
+    total_slots: counter.total_slots, booked_slots: counter.booked_slots,
+    label_ru: counter.label_ru, label_am: counter.label_am,
+    show_timer: counter.show_timer, position: 'in-' + blockKey,
+    counter_name: counter.counter_name
+  }) });
+  toast('Счётчик привязан к блоку «' + blockKey + '»!');
+  await loadData(); render();
+}
+
 // ── Create new slot counter for block (simple) ──
 async function sbCreateSlotForBlock(blockKey) {
   var pos = 'in-' + blockKey;
@@ -9759,9 +9893,11 @@ async function sbSaveBlock(id) {
   for (var si = 0; si < socials.length; si++) {
     var socType = document.getElementById('sb_soctype_' + id + '_' + si);
     var socUrl = document.getElementById('sb_socurl_' + id + '_' + si);
+    var socLabel = document.getElementById('sb_soclabel_' + id + '_' + si);
     newSocials.push({
       type: socType ? socType.value : (socials[si].type || 'instagram'),
-      url: socUrl ? socUrl.value : (socials[si].url || '')
+      url: socUrl ? socUrl.value : (socials[si].url || ''),
+      label: socLabel ? socLabel.value : (socials[si].label || '')
     });
   }
   b.social_links = newSocials;
@@ -9769,12 +9905,38 @@ async function sbSaveBlock(id) {
   // Collect option toggles (stored in custom_html as JSON)
   var blockOpts = {};
   try { blockOpts = JSON.parse(b.custom_html || '{}'); } catch(e) { blockOpts = {}; }
-  var optSocials = document.getElementById('sb_opt_socials_' + id);
-  var optPhotos = document.getElementById('sb_opt_photos_' + id);
   var optSlots = document.getElementById('sb_opt_slots_' + id);
-  if (optSocials) blockOpts.show_socials = optSocials.checked;
-  if (optPhotos) blockOpts.show_photos = optPhotos.checked;
   if (optSlots) blockOpts.show_slots = optSlots.checked;
+  // Collect social section settings
+  var socTitleRu = document.getElementById('sb_soctitle_ru_' + id);
+  var socTitleAm = document.getElementById('sb_soctitle_am_' + id);
+  var socSize = document.getElementById('sb_socsize_' + id);
+  var socGap = document.getElementById('sb_socgap_' + id);
+  var socAlign = document.getElementById('sb_socalign_' + id);
+  var socPos = document.getElementById('sb_socpos_' + id);
+  var socSubRu = document.getElementById('sb_socsubtitle_ru_' + id);
+  var socSubAm = document.getElementById('sb_socsubtitle_am_' + id);
+  var socOffTop = document.getElementById('sb_socoff_top_' + id);
+  var socOffRight = document.getElementById('sb_socoff_right_' + id);
+  var socOffBottom = document.getElementById('sb_socoff_bottom_' + id);
+  var socOffLeft = document.getElementById('sb_socoff_left_' + id);
+  if (socTitleRu || socTitleAm || socSize) {
+    if (!blockOpts.social_settings) blockOpts.social_settings = {};
+    if (socTitleRu) blockOpts.social_settings.title_ru = socTitleRu.value;
+    if (socTitleAm) blockOpts.social_settings.title_am = socTitleAm.value;
+    if (socSubRu) blockOpts.social_settings.subtitle_ru = socSubRu.value;
+    if (socSubAm) blockOpts.social_settings.subtitle_am = socSubAm.value;
+    if (socSize) blockOpts.social_settings.icon_size = parseInt(socSize.value) || 36;
+    if (socGap) blockOpts.social_settings.gap = parseInt(socGap.value) || 8;
+    if (socAlign) blockOpts.social_settings.align = socAlign.value || 'center';
+    if (socPos) blockOpts.social_settings.position = socPos.value || 'bottom';
+    if (socOffTop) blockOpts.social_settings.offset_top = parseInt(socOffTop.value) || 0;
+    if (socOffRight) blockOpts.social_settings.offset_right = parseInt(socOffRight.value) || 0;
+    if (socOffBottom) blockOpts.social_settings.offset_bottom = parseInt(socOffBottom.value) || 0;
+    if (socOffLeft) blockOpts.social_settings.offset_left = parseInt(socOffLeft.value) || 0;
+  }
+  // Social visibility based on links presence
+  blockOpts.show_socials = newSocials.length > 0;
   // Keep existing values if checkbox element wasn't rendered
   // (e.g. for blocks where the option is not applicable)
 

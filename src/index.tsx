@@ -366,11 +366,11 @@ app.get('/pdf/:id', async (c) => {
     
     const lang = (lead.lang as string) || 'ru';
     const isAm = lang === 'am';
+    const isEn = lang === 'en';
     let calcData: any = {};
     try { calcData = JSON.parse(lead.calc_data as string); } catch { calcData = { items: [], total: 0 }; }
     const items = calcData.items || [];
     const total = calcData.total || 0;
-    // subtotal = sum of all items BEFORE refund deduction; falls back to total for backward compat
     const subtotal = calcData.subtotal || total;
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
@@ -379,58 +379,54 @@ app.get('/pdf/:id', async (c) => {
     let tpl: any = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
     if (!tpl) tpl = {};
     
-    const header = isAm ? (tpl.header_am || '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f') : (tpl.header_ru || '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
-    const intro = isAm ? tpl.intro_am : tpl.intro_ru;
-    const outro = isAm ? tpl.outro_am : tpl.outro_ru;
-    const footer = isAm ? tpl.footer_am : tpl.footer_ru;
+    const lSuffix = '_' + lang;
+    const header = tpl['header' + lSuffix] || (isEn ? 'Commercial Proposal' : isAm ? '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f' : '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
+    const intro = tpl['intro' + lSuffix] || '';
+    const outro = tpl['outro' + lSuffix] || '';
+    const footer = tpl['footer' + lSuffix] || '';
+    const terms = tpl['terms' + lSuffix] || '';
+    const bankDetails = tpl['bank_details' + lSuffix] || '';
+    const accentColor = tpl.accent_color || '#8B5CF6';
+    const invoicePrefix = tpl.invoice_prefix || 'INV';
+    const companyLogo = tpl.company_logo_url || '';
+    const companyWebsite = tpl.company_website || '';
+    const companyInn = tpl.company_inn || '';
     
     let rows = '';
+    let rowNum = 0;
     for (const item of items) {
-      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td>' +
+      rowNum++;
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
     
-    const L = isAm
-      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', back: '\u0540\u0561\u0577\u057e\u056b\u0579' }
-      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', back: '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443' };
-    
-    // Sanitize headers - remove wrong language chars
-    const cleanHeader = String(header || '').replace(/[\u0400-\u04FF]/g, isAm ? '' : '$&').replace(/[\u0530-\u058F\u0561-\u0587]/g, isAm ? '$&' : '').trim() || (isAm ? '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f' : '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
-    const cleanIntro = isAm ? String(intro || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(intro || '').replace(/[\u0530-\u058F]/g, '').trim();
-    const cleanOutro = isAm ? String(outro || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(outro || '').replace(/[\u0530-\u058F]/g, '').trim();
-    const cleanFooter = isAm ? String(footer || '').replace(/[\u0400-\u04FF]/g, '').trim() : String(footer || '').replace(/[\u0530-\u058F]/g, '').trim();
+    const L = isEn
+      ? { svc: 'Service', qty: 'Qty', price: 'Price', sum: 'Total', total: 'TOTAL:', client: 'Client:', date: 'Date:', id: 'Invoice #', back: 'Back', num: '#', terms: 'Terms & Conditions', bank: 'Bank Details', inn: 'Reg. No.' }
+      : isAm
+      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', back: '\u0540\u0561\u0577\u057e\u056b\u0579', num: '\u2116', terms: '\u054a\u0561\u0575\u0574\u0561\u0576\u0576\u0565\u0580', bank: '\u0532\u0561\u0576\u056f\u0561\u0575\u056b\u0576 \u057f\u057e\u0575\u0561\u043b\u043d\u0565\u0440', inn: '\u0540\u0544' }
+      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', back: '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443', num: '\u2116', terms: '\u0423\u0441\u043b\u043e\u0432\u0438\u044f', bank: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b', inn: '\u0418\u041d\u041d' };
 
-    // Button labels from DB template
-    const btnOrder = String(isAm ? (tpl.btn_order_am || '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561') : (tpl.btn_order_ru || '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
-    const btnDl = String(isAm ? (tpl.btn_download_am || '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c') : (tpl.btn_download_ru || '\u0421\u043a\u0430\u0447\u0430\u0442\u044c'));
+    const btnOrder = String(tpl['btn_order' + lSuffix] || (isEn ? 'Order Now' : isAm ? '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561' : '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
+    const btnDl = String(tpl['btn_download' + lSuffix] || (isEn ? 'Download' : isAm ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c'));
     const messengerUrl = String(tpl.order_telegram_url || 'https://t.me/goo_to_top');
     
-    // Detect messenger type from URL for proper deep linking
     const isWhatsApp = messengerUrl.includes('wa.me') || messengerUrl.includes('whatsapp');
-    const isTelegram = messengerUrl.includes('t.me') || messengerUrl.includes('telegram');
     const messengerIcon = isWhatsApp ? 'fab fa-whatsapp' : 'fab fa-telegram';
     
-    // Build order message (same message used on PDF "Order" button)
-    const orderMsg = (isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')
-      + '\n' + (isAm ? '\u054c\u0561\u0577\u057e\u0561\u0580\u056f' : '\u0420\u0430\u0441\u0447\u0451\u0442') + ' #' + id
-      + '\n' + (isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430') + ': ' + Number(total).toLocaleString('ru-RU') + ' \u058f';
-    for (const it of items) {
-      orderMsg; // items are listed in the message
-    }
+    const orderMsg = (isEn ? 'Hello! I would like to place an order:' : isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')
+      + '\n' + invoicePrefix + '-' + id
+      + '\n' + L.total + ' ' + Number(total).toLocaleString('ru-RU') + ' \u058f';
     const orderMsgFull = orderMsg
-      + (clientName ? '\n' + (isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '')
-      + (clientContact ? '\n' + (isAm ? '\u053f\u0561\u057a' : '\u041a\u043e\u043d\u0442\u0430\u043a\u0442') + ': ' + clientContact : '');
+      + (clientName ? '\n' + (isEn ? 'Name' : isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '')
+      + (clientContact ? '\n' + (isEn ? 'Contact' : isAm ? '\u053f\u0561\u057a' : '\u041a\u043e\u043d\u0442\u0430\u043a\u0442') + ': ' + clientContact : '');
 
-    // Build messenger link with message
     let messengerLink = '';
     if (isWhatsApp) {
-      // WhatsApp: https://wa.me/NUMBER?text=MESSAGE or https://api.whatsapp.com/send?phone=NUMBER&text=MESSAGE
       const waBase = messengerUrl.includes('?') ? messengerUrl + '&text=' : messengerUrl + '?text=';
       messengerLink = waBase + encodeURIComponent(orderMsgFull);
     } else {
-      // Telegram: https://t.me/USERNAME?text=MESSAGE
       messengerLink = messengerUrl + '?text=' + encodeURIComponent(orderMsgFull);
     }
 
@@ -438,41 +434,47 @@ app.get('/pdf/:id', async (c) => {
     const companyPhone = String(tpl.company_phone || '');
     const companyEmail = String(tpl.company_email || '');
     const companyAddress = String(tpl.company_address || '');
-    const dateStr = new Date().toLocaleDateString(isAm ? 'hy-AM' : 'ru-RU');
-    // subtotalFormatted = sum of all items BEFORE refund (always shows as ԸՆԱԴdelays)
+    const localeCode = isEn ? 'en-US' : isAm ? 'hy-AM' : 'ru-RU';
+    const dateStr = new Date().toLocaleDateString(localeCode);
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    // finalTotal = subtotal minus refund for the final amount shown
     const finalTotal = refundAmount > 0 ? (Number(subtotal) - refundAmount) : Number(total);
     const totalFormatted = finalTotal.toLocaleString('ru-RU');
+    const invoiceNum = invoicePrefix + '-' + String(id).padStart(4, '0');
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
       + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
-      + '<title>' + cleanHeader + ' #' + id + '</title>'
+      + '<title>' + invoiceNum + ' | ' + companyName + '</title>'
       + '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">'
       + '<style>'
       + '*{margin:0;padding:0;box-sizing:border-box}'
       + 'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#f9fafb}'
-      + '#pc{padding:24px;max-width:800px;margin:0 auto;background:#fff;min-height:100vh}'
-      + '.hdr{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid #8B5CF6;flex-wrap:wrap;gap:12px}'
-      + '.logo{font-size:24px;font-weight:800;color:#8B5CF6}.ci{text-align:right;font-size:11px;color:#6b7280}'
+      + '#pc{padding:28px;max-width:800px;margin:0 auto;background:#fff;min-height:100vh}'
+      + '.hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;padding-bottom:16px;border-bottom:3px solid ' + accentColor + ';flex-wrap:wrap;gap:12px}'
+      + '.logo-wrap{display:flex;align-items:center;gap:12px}'
+      + '.logo-img{height:40px;max-width:160px;object-fit:contain}'
+      + '.logo{font-size:24px;font-weight:800;color:' + accentColor + '}'
+      + '.ci{text-align:right;font-size:11px;color:#6b7280;line-height:1.6}'
+      + '.inv-num{font-size:13px;font-weight:700;color:' + accentColor + ';background:' + accentColor + '12;padding:4px 10px;border-radius:6px;display:inline-block;margin-bottom:6px}'
       + '.ttl{font-size:20px;font-weight:700;color:#1f2937;margin-bottom:12px}'
       + '.meta{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:14px;font-size:12px;color:#6b7280}'
       + '.cli{background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px;margin-bottom:20px;font-size:14px}'
       + '.intro{margin-bottom:20px;line-height:1.6;color:#4b5563;font-size:14px}'
       + 'table{width:100%;border-collapse:collapse;margin-bottom:20px;border:1px solid #e5e7eb;font-size:13px}'
-      + 'th{background:#8B5CF6;color:white;padding:10px 12px;text-align:left;font-weight:600}'
+      + 'th{background:' + accentColor + ';color:white;padding:10px 12px;text-align:left;font-weight:600}'
       + 'td{padding:10px 12px;border-bottom:1px solid #e5e7eb}'
-      + '.tr{background:#f3f0ff;font-weight:700;font-size:16px}'
+      + '.tr{background:' + accentColor + '0d;font-weight:700;font-size:16px}'
       + '.outro{margin-top:20px;line-height:1.6;color:#4b5563;font-size:14px}'
+      + '.terms-box{margin-top:20px;padding:14px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;font-size:12px;color:#64748b;line-height:1.6}'
+      + '.terms-title{font-weight:700;color:#475569;margin-bottom:6px;font-size:13px}'
+      + '.bank-box{margin-top:12px;padding:12px;background:#fefce8;border:1px solid #fde68a;border-radius:8px;font-size:12px;color:#92400e;line-height:1.5}'
       + '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}'
-      // Action bar: desktop = inline after content; mobile = fixed bottom
       + '.actions{display:flex;gap:10px;align-items:center;justify-content:flex-end;flex-wrap:wrap;margin-top:28px;padding-top:20px;border-top:1px solid #e5e7eb}'
       + '.abtn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;border-radius:10px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;border:none;transition:all 0.2s}'
       + '.abtn-order{background:linear-gradient(135deg,#10B981,#059669);color:#fff}'
       + '.abtn-order:hover{box-shadow:0 4px 15px rgba(16,185,129,0.4)}'
       + '.abtn-dl{background:#f3f4f6;color:#374151;border:1px solid #d1d5db}'
       + '.abtn-dl:hover{background:#e5e7eb}'
-      + '.abtn-dl i{color:#8B5CF6}'
+      + '.abtn-dl i{color:' + accentColor + '}'
       + '.abtn-back{background:transparent;color:#6b7280;border:1px solid #d1d5db}'
       + '.abtn-back:hover{color:#1f2937;border-color:#9ca3af}'
       + '@media print{.actions{display:none!important}body{background:#fff}#pc{padding:16px;box-shadow:none}}'
@@ -481,23 +483,32 @@ app.get('/pdf/:id', async (c) => {
       + '.abtn{padding:10px 14px;font-size:12px}.abtn-back span{display:none}}'
       + '</style></head><body>'
       + '<div id="pc">'
-      + '<div class="hdr"><div class="logo">' + companyName + '</div><div class="ci">'
-      + (companyPhone ? '<div>' + companyPhone + '</div>' : '')
-      + (companyEmail ? '<div>' + companyEmail + '</div>' : '')
-      + (companyAddress ? '<div>' + companyAddress + '</div>' : '')
+      // Header with logo
+      + '<div class="hdr"><div>'
+      + '<div class="inv-num">' + invoiceNum + '</div>'
+      + '<div class="logo-wrap">'
+      + (companyLogo ? '<img class="logo-img" src="' + companyLogo + '" onerror="this.style.display=\'none\'">' : '')
+      + '<span class="logo">' + companyName + '</span></div>'
+      + '</div><div class="ci">'
+      + (companyPhone ? '<div><i class="fas fa-phone" style="margin-right:4px"></i>' + companyPhone + '</div>' : '')
+      + (companyEmail ? '<div><i class="fas fa-envelope" style="margin-right:4px"></i>' + companyEmail + '</div>' : '')
+      + (companyAddress ? '<div><i class="fas fa-map-marker-alt" style="margin-right:4px"></i>' + companyAddress + '</div>' : '')
+      + (companyWebsite ? '<div><i class="fas fa-globe" style="margin-right:4px"></i>' + companyWebsite + '</div>' : '')
+      + (companyInn ? '<div>' + L.inn + ': ' + companyInn + '</div>' : '')
       + '</div></div>'
-      + '<div class="ttl">' + cleanHeader + '</div>'
-      + '<div class="meta"><span>' + L.date + ' ' + dateStr + '</span><span>' + L.id + id + '</span></div>'
-      + (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '')
-      + (cleanIntro ? '<div class="intro">' + cleanIntro + '</div>' : '')
-      + '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
-      + '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
-      + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="3" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>'
-        + '<tr style="background:#f0fdf4"><td colspan="3" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0442\u043e\u0433\u043e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
+      + '<div class="ttl">' + header + '</div>'
+      + '<div class="meta"><span><i class="fas fa-calendar-alt" style="margin-right:4px"></i>' + L.date + ' ' + dateStr + '</span><span><i class="fas fa-hashtag" style="margin-right:4px"></i>' + L.id + ' ' + invoiceNum + '</span></div>'
+      + (clientName || clientContact ? '<div class="cli"><strong><i class="fas fa-user" style="margin-right:4px;color:' + accentColor + '"></i>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | <i class="fas fa-phone-alt" style="margin-right:4px;color:#10B981"></i>' + clientContact : '') + '</div>' : '')
+      + (intro ? '<div class="intro">' + intro + '</div>' : '')
+      + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
+      + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
+      + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>'
+        + '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Final Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0442\u043e\u0433\u043e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'
-      + (cleanOutro ? '<div class="outro">' + cleanOutro + '</div>' : '')
-      + (cleanFooter ? '<div class="ftr">' + cleanFooter + '</div>' : '')
-      // Action buttons — inline on desktop, fixed on mobile
+      + (outro ? '<div class="outro">' + outro + '</div>' : '')
+      + (terms ? '<div class="terms-box"><div class="terms-title"><i class="fas fa-gavel" style="margin-right:4px"></i>' + L.terms + '</div>' + terms + '</div>' : '')
+      + (bankDetails ? '<div class="bank-box"><strong><i class="fas fa-university" style="margin-right:4px"></i>' + L.bank + ':</strong><br>' + bankDetails + '</div>' : '')
+      + (footer ? '<div class="ftr">' + footer + '</div>' : '')
       + '<div class="actions">'
       + '<a class="abtn abtn-back" href="/#calculator"><i class="fas fa-arrow-left"></i> <span>' + L.back + '</span></a>'
       + '<button class="abtn abtn-dl" onclick="window.print()"><i class="fas fa-download"></i> ' + btnDl + '</button>'

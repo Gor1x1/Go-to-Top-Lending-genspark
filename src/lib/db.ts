@@ -433,6 +433,25 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_ru TEXT DEFAULT 'Скачать'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_am TEXT DEFAULT 'Ներբեռնdelays'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_telegram_url TEXT DEFAULT 'https://t.me/goo_to_top'").run(); } catch {}
+  // PDF EN language support
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN header_en TEXT DEFAULT 'Commercial Proposal'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN footer_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN intro_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN outro_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_order_en TEXT DEFAULT 'Order Now'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_en TEXT DEFAULT 'Download'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN company_logo_url TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN company_website TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN company_inn TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN invoice_prefix TEXT DEFAULT 'INV'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN show_qr INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN accent_color TEXT DEFAULT '#8B5CF6'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN terms_ru TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN terms_am TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN terms_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_ru TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_am TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_en TEXT DEFAULT ''").run(); } catch {}
   // v2 Migrations: employee system + site blocks
   try { await db.prepare("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''").run(); } catch {}
@@ -698,6 +717,25 @@ async function runSeeds(db: D1Database): Promise<void> {
       }
     }
   } catch {}
+  // v12: PDF EN language + professional invoice fields
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN header_en TEXT DEFAULT 'Commercial Proposal'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN footer_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN intro_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN outro_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_order_en TEXT DEFAULT 'Order Now'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN btn_download_en TEXT DEFAULT 'Download'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN company_logo_url TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN company_website TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN company_inn TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN invoice_prefix TEXT DEFAULT 'INV'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN show_qr INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN accent_color TEXT DEFAULT '#8B5CF6'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN terms_ru TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN terms_am TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN terms_en TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_ru TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_am TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_en TEXT DEFAULT ''").run(); } catch {}
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====
