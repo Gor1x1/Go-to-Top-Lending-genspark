@@ -1511,9 +1511,57 @@ api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
   const orig = await db.prepare('SELECT * FROM site_blocks WHERE id = ?').bind(id).first();
   if (!orig) return c.json({ error: 'Not found' }, 404);
   const newKey = `${orig.block_key}_copy_${Date.now()}`;
-  await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
-    .bind(newKey, orig.block_type, orig.title_ru + ' (копия)', orig.title_am, orig.texts_ru, orig.texts_am, orig.images, orig.buttons, orig.custom_css, orig.custom_html, orig.is_visible, (orig.sort_order as number || 0) + 1).run();
+  await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
+    .bind(newKey, orig.block_type, orig.title_ru + ' (копия)', orig.title_am, orig.texts_ru, orig.texts_am, orig.images, orig.buttons, orig.custom_css, orig.custom_html, orig.is_visible, (orig.sort_order as number || 0) + 1, orig.social_links || '[]').run();
   return c.json({ success: true });
+});
+
+// ===== UPLOAD IMAGE (base64 in D1) =====
+api.post('/upload-image', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try {
+    const body = await c.req.parseBody();
+    const file = body['file'] as any;
+    if (!file || !file.arrayBuffer) return c.json({ error: 'No file' }, 400);
+    const buffer = await file.arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    // Convert to base64
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+    const base64 = btoa(binary);
+    const mimeType = file.type || 'image/jpeg';
+    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const blockId = body['block_id'] ? parseInt(body['block_id'] as string) : null;
+    const filename = file.name || 'image.jpg';
+    await db.prepare('INSERT INTO uploads (filename, mime_type, data_base64, block_id) VALUES (?,?,?,?)')
+      .bind(filename, mimeType, dataUrl, blockId).run();
+    const lastRow = await db.prepare('SELECT id FROM uploads ORDER BY id DESC LIMIT 1').first();
+    const imageId = lastRow ? lastRow.id : 0;
+    return c.json({ success: true, url: `/api/admin/uploads/${imageId}`, id: imageId, data_url: dataUrl });
+  } catch(e: any) {
+    return c.json({ error: 'Upload failed: ' + (e?.message || 'unknown') }, 500);
+  }
+});
+
+// ===== GET UPLOADED IMAGE =====
+api.get('/uploads/:id', async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const row = await db.prepare('SELECT data_base64, mime_type FROM uploads WHERE id = ?').bind(id).first();
+  if (!row) return c.json({ error: 'Not found' }, 404);
+  const dataUrl = row.data_base64 as string;
+  // If it's a data URL, extract base64 part and return binary
+  if (dataUrl.startsWith('data:')) {
+    const parts = dataUrl.split(',');
+    const base64 = parts[1];
+    const mimeMatch = parts[0].match(/data:([^;]+)/);
+    const mime = mimeMatch ? mimeMatch[1] : (row.mime_type as string || 'image/jpeg');
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+    return new Response(bytes, { headers: { 'Content-Type': mime, 'Cache-Control': 'public, max-age=31536000' } });
+  }
+  return c.json({ error: 'Invalid format' }, 500);
 });
 
 // Recalculate lead total_amount from articles + services and update calc_data for PDF

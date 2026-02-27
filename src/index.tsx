@@ -2824,27 +2824,6 @@ switchLang = function(l) {
           else { section.appendChild(socDiv); }
         }
         
-        // Inject block photo gallery if photos exist
-        if (bf.show_photos && bf.photos && bf.photos.length > 0) {
-          var existingGallery = section.querySelector('.block-photo-gallery');
-          if (existingGallery) existingGallery.remove();
-          var galDiv = document.createElement('div');
-          galDiv.className = 'block-photo-gallery';
-          galDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 0;margin-top:12px';
-          var galH = '';
-          bf.photos.forEach(function(p) {
-            if (!p.url) return;
-            galH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer" onclick="if(typeof openLightbox===&apos;function&apos;)openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-              '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:180px;object-fit:cover">' +
-              (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#999)">' + p.caption + '</div>' : '') +
-            '</div>';
-          });
-          galDiv.innerHTML = galH;
-          var container = section.querySelector('.container');
-          if (container) container.appendChild(galDiv);
-          else section.appendChild(galDiv);
-        }
-
         // Inject slot counters if show_slots is on
         if (bf.show_slots && db.slotCounters && db.slotCounters.length > 0) {
           db.slotCounters.forEach(function(sc) {

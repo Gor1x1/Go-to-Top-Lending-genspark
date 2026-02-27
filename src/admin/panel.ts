@@ -8595,9 +8595,14 @@ var sbActiveTab = 'blocks'; // 'blocks', 'calculator', 'telegram', 'slots', 'foo
 
 function renderSiteBlocks() {
   var allBlocks = data.siteBlocks || [];
-  var contentBlocks = allBlocks.filter(function(b) { return b.block_type !== 'calculator'; });
+  var contentBlocks = allBlocks; // ALL blocks shown together (calculator included as card)
   var calcBlocks = allBlocks.filter(function(b) { return b.block_type === 'calculator'; });
-  var blocks = sbActiveTab === 'calculator' ? calcBlocks : contentBlocks;
+  var blocks = sbActiveTab === 'blocks' ? contentBlocks : (sbActiveTab === 'calculator' ? calcBlocks : contentBlocks);
+  
+  // Define which block_keys have photos by design
+  var photoBlocks = { hero: true, about: true, warehouse: true, wb_official: true, services: true, wb_banner: true };
+  // Define which blocks can have social links
+  var socialBlocks = { hero: true, about: true, services: true, contact: true, footer: true, wb_banner: true, wb_official: true };
   
   // Filter by search
   if (sbSearchQuery) {
@@ -8695,15 +8700,6 @@ function renderSiteBlocks() {
     '</div>' +
   '</div>';
   h += '</div>'; // end header
-
-  // ── Calculator link for blocks tab ──
-  if (sbActiveTab === 'blocks' && calcBlocks.length > 0) {
-    h += '<div style="margin-bottom:16px;padding:14px 18px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:10px;display:flex;align-items:center;gap:12px">' +
-      '<i class="fas fa-calculator" style="color:#10B981;font-size:1.1rem"></i>' +
-      '<span style="font-size:0.85rem;color:#94a3b8">Настройки калькулятора (цены, услуги) доступны в разделе:</span>' +
-      '<button class="btn btn-outline" style="padding:5px 14px;font-size:0.78rem;border-color:rgba(16,185,129,0.3);color:#10B981" onclick="navigate(&apos;calculator&apos;)"><i class="fas fa-external-link-alt" style="margin-right:5px"></i>Калькулятор</button>' +
-    '</div>';
-  }
 
   if (blocks.length === 0 && !sbSearchQuery) {
     h += '<div class="card" style="text-align:center;padding:60px;color:#64748b">' +
@@ -8898,10 +8894,12 @@ function renderSiteBlocks() {
         }
         h += '</div>';
 
-        // ── Social Links section ──
+        // ── Social Links section (only for blocks that support socials) ──
         var socials = [];
         try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
         if (!Array.isArray(socials)) socials = [];
+        var hasSocials = !!socialBlocks[b.block_key] || socials.length > 0;
+        if (hasSocials) {
         var socialNetworks = [
           {v:'instagram',l:'Instagram',i:'fab fa-instagram',c:'#E4405F'},{v:'facebook',l:'Facebook',i:'fab fa-facebook',c:'#1877F2'},
           {v:'telegram',l:'Telegram',i:'fab fa-telegram',c:'#26A5E4'},{v:'whatsapp',l:'WhatsApp',i:'fab fa-whatsapp',c:'#25D366'},
@@ -8934,14 +8932,16 @@ function renderSiteBlocks() {
         h += '</div>';
         h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
         h += '</details></div>';
+        } // end hasSocials
 
         // ── Optional features / opts (MUST be before photo section which uses it) ──
         var opts = {};
         try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
 
-        // ── Block Photos section (for hero, about, etc.) ──
+        // ── Block Photos section (only for blocks that have photos by design) ──
         var isTickerBlock = (b.block_key === 'ticker' || b.block_type === 'ticker');
-        if (!isTickerBlock) {
+        var hasPhotoSupport = !!photoBlocks[b.block_key] || !!(opts.photo_url) || (opts.photos && opts.photos.length > 0);
+        if (!isTickerBlock && hasPhotoSupport) {
           var blockPhotos = [];
           try { blockPhotos = opts.photos || []; } catch(e) { blockPhotos = []; }
           if (!Array.isArray(blockPhotos)) blockPhotos = [];
@@ -8950,10 +8950,11 @@ function renderSiteBlocks() {
           
           // Main photo URL (replaces main section image, e.g. Hero photo)
           h += '<div style="margin-bottom:10px;padding:8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
-          h += '<div style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-image" style="margin-right:4px"></i>Главное фото блока (заменяет фото на сайте)</div>';
-          h += '<div style="display:flex;gap:8px;align-items:center">';
+          h += '<div style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-image" style="margin-right:4px"></i>Главное фото блока</div>';
+          h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
           if (opts.photo_url) h += '<img src="' + escHtml(opts.photo_url) + '" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
-          h += '<input class="input" id="sb_mainphoto_' + b.id + '" value="' + escHtml(opts.photo_url || '') + '" placeholder="URL главного фото (замена фото в секции)" style="flex:1;font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<input class="input" id="sb_mainphoto_' + b.id + '" value="' + escHtml(opts.photo_url || '') + '" placeholder="URL фото или загрузите файл" style="flex:1;font-size:0.78rem;color:#60a5fa;min-width:200px" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить<input type="file" accept="image/*" style="display:none" onchange="sbUploadPhoto(this,' + b.id + ',&apos;main&apos;)"></label>';
           if (opts.photo_url) h += '<button class="tier-del-btn" onclick="document.getElementById(&apos;sb_mainphoto_' + b.id + '&apos;).value=&apos;&apos;;sbAutoSave(' + b.id + ')"><i class="fas fa-times"></i></button>';
           h += '</div></div>';
 
@@ -8961,33 +8962,95 @@ function renderSiteBlocks() {
           h += '<div style="margin-bottom:6px">';
           for (var phi = 0; phi < blockPhotos.length; phi++) {
             var ph = blockPhotos[phi];
-            h += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+            h += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;flex-wrap:wrap">';
             if (ph.url) h += '<img src="' + escHtml(ph.url) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
-            h += '<input class="input" id="sb_photo_' + b.id + '_' + phi + '" value="' + escHtml(ph.url || '') + '" placeholder="URL фото" style="flex:1;font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
-            h += '<input class="input" id="sb_photocap_' + b.id + '_' + phi + '" value="' + escHtml(ph.caption || '') + '" placeholder="Подпись" style="width:160px;font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+            h += '<input class="input" id="sb_photo_' + b.id + '_' + phi + '" value="' + escHtml(ph.url || '') + '" placeholder="URL фото" style="flex:1;font-size:0.78rem;color:#60a5fa;min-width:150px" onchange="sbAutoSave(' + b.id + ')">';
+            h += '<label class="btn btn-outline" style="padding:4px 10px;font-size:0.68rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:3px"></i>Загр.<input type="file" accept="image/*" style="display:none" onchange="sbUploadPhoto(this,' + b.id + ',&apos;gallery&apos;,' + phi + ')"></label>';
+            h += '<input class="input" id="sb_photocap_' + b.id + '_' + phi + '" value="' + escHtml(ph.caption || '') + '" placeholder="Подпись" style="width:140px;font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
             h += '<button class="tier-del-btn" onclick="sbRemovePhoto(' + b.id + ',' + phi + ')"><i class="fas fa-times"></i></button>';
             h += '</div>';
           }
           h += '</div>';
-          h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddPhoto(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить фото</button>';
+          h += '<div style="display:flex;gap:8px">';
+          h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddPhoto(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить фото (URL)</button>';
+          h += '<label class="btn btn-primary" style="padding:4px 12px;font-size:0.72rem;cursor:pointer"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить с устройства<input type="file" accept="image/*" multiple style="display:none" onchange="sbUploadPhotoBatch(this,' + b.id + ')"></label>';
+          h += '</div>';
           h += '</details></div>';
         }
         h += '<div style="margin-bottom:16px">';
         h += '<details><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-sliders-h" style="color:#f59e0b;margin-right:6px"></i>Опции блока</summary>';
         h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
-        // Show social links toggle
+        // Show social links toggle (only for social-capable blocks)
+        if (socialBlocks[b.block_key]) {
         h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
           '<input type="checkbox" id="sb_opt_socials_' + b.id + '"' + (opts.show_socials ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
           '<span><i class="fas fa-share-alt" style="color:#10B981;margin-right:4px"></i>Соц. сети в блоке</span></label>';
-        // Photo upload toggle
+        }
+        // Photo gallery toggle (only for photo-capable blocks)
+        if (photoBlocks[b.block_key]) {
         h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
           '<input type="checkbox" id="sb_opt_photos_' + b.id + '"' + (opts.show_photos ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
           '<span><i class="fas fa-camera" style="color:#60a5fa;margin-right:4px"></i>Фото-галерея</span></label>';
+        }
         // Slot counter toggle
         h += '<label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.82rem;color:#94a3b8">' +
-          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
+          '<input type="checkbox" id="sb_opt_slots_' + b.id + '"' + (opts.show_slots ? ' checked' : '') + ' onchange="sbToggleSlotCounter(' + b.id + ',this.checked);sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6;width:16px;height:16px">' +
           '<span><i class="fas fa-hourglass-half" style="color:#fbbf24;margin-right:4px"></i>Счётчик слотов</span></label>';
-        h += '</div></details></div>';
+        h += '</div>';
+        
+        // ── Inline Slot Counter Settings (shown when show_slots is on) ──
+        if (opts.show_slots) {
+          var blockCounter = null;
+          var counters = data.slotCounters || [];
+          // Find counter linked to this block key
+          for (var sci = 0; sci < counters.length; sci++) {
+            if (counters[sci].position === 'in-' + b.block_key || counters[sci].position === 'after-' + b.block_key.replace(/_/g,'-') || counters[sci].position === 'in-' + b.block_key.replace(/_/g,'-')) {
+              blockCounter = counters[sci]; break;
+            }
+          }
+          if (!blockCounter && counters.length > 0) {
+            // Find first visible counter
+            for (var sci = 0; sci < counters.length; sci++) { if (counters[sci].show_timer) { blockCounter = counters[sci]; break; } }
+          }
+          
+          h += '<div id="sb_slot_settings_' + b.id + '" style="margin-top:10px;padding:12px;background:#0f172a;border:1px solid #293548;border-radius:8px">';
+          h += '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:10px"><i class="fas fa-cog" style="margin-right:4px"></i>Настройки счётчика слотов для этого блока</div>';
+          
+          if (blockCounter) {
+            var scId = blockCounter.id;
+            var scFree = Math.max(0, (blockCounter.total_slots || 10) - (blockCounter.booked_slots || 0));
+            var scPct = blockCounter.total_slots > 0 ? Math.round((scFree / blockCounter.total_slots) * 100) : 0;
+            var scBarColor = scPct > 50 ? '#10B981' : scPct > 20 ? '#F59E0B' : '#EF4444';
+            
+            // Visual preview
+            h += '<div style="margin-bottom:10px;padding:8px;background:#1a2236;border-radius:6px">' +
+              '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">' +
+                '<span style="font-size:0.78rem;color:#94a3b8">' + escHtml(blockCounter.label_ru || 'Свободных мест') + '</span>' +
+                '<span style="font-size:1.2rem;font-weight:800;color:' + scBarColor + '">' + scFree + '<span style="color:#64748b;font-weight:400;font-size:0.75rem"> / ' + blockCounter.total_slots + '</span></span>' +
+              '</div>' +
+              '<div style="height:6px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="height:100%;width:' + scPct + '%;background:' + scBarColor + ';border-radius:3px"></div></div>' +
+            '</div>';
+            
+            h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Всего мест</div><input class="input" type="number" id="sb_sc_total_' + b.id + '" value="' + (blockCounter.total_slots || 10) + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Занято</div><input class="input" type="number" id="sb_sc_booked_' + b.id + '" value="' + (blockCounter.booked_slots || 0) + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Свободно</div><div style="font-size:1.3rem;font-weight:800;color:#10B981;padding:6px 0">' + scFree + '</div></div>';
+            h += '</div>';
+            h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
+            h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:3px">Надпись (RU)</div><input class="input" id="sb_sc_lru_' + b.id + '" value="' + escHtml(blockCounter.label_ru || '') + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
+            h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:3px">Надпись (AM)</div><input class="input" id="sb_sc_lam_' + b.id + '" value="' + escHtml(blockCounter.label_am || '') + '" style="font-size:0.78rem" onchange="sbSaveInlineSlot(' + b.id + ',' + scId + ')"></div>';
+            h += '</div>';
+            h += '<div style="font-size:0.68rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:3px"></i>Счётчик #' + scId + ' • Для детальных настроек перейдите во вкладку «Счётчики слотов»</div>';
+          } else {
+            h += '<div style="text-align:center;padding:10px;color:#64748b;font-size:0.82rem">' +
+              '<p style="margin-bottom:8px">Нет привязанного счётчика. Создайте новый.</p>' +
+              '<button class="btn btn-primary" style="font-size:0.78rem;padding:6px 14px" onclick="sbCreateSlotForBlock(&apos;' + b.block_key + '&apos;)"><i class="fas fa-plus" style="margin-right:4px"></i>Создать счётчик</button>' +
+            '</div>';
+          }
+          h += '</div>';
+        }
+        
+        h += '</details></div>';
 
         // ── Footer: Save ──
         h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;padding-top:14px;border-top:1px solid #1e293b">' +
@@ -9249,6 +9312,108 @@ function sbRemovePhoto(blockId, idx) {
   sbAutoSave(blockId);
 }
 
+// ── Upload photo from device ──
+async function sbUploadPhoto(input, blockId, target, idx) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { toast('Файл слишком большой (макс. 5 МБ)', 'error'); return; }
+  toast('Загрузка фото...');
+  var formData = new FormData();
+  formData.append('file', file);
+  formData.append('block_id', String(blockId));
+  try {
+    var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+    var result = await resp.json();
+    if (!result.success) { toast('Ошибка: ' + (result.error || 'unknown'), 'error'); return; }
+    var url = result.url || result.data_url;
+    var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+    if (!b) return;
+    var opts = {};
+    try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+    if (target === 'main') {
+      opts.photo_url = url;
+    } else {
+      if (!Array.isArray(opts.photos)) opts.photos = [];
+      if (typeof idx === 'number' && idx < opts.photos.length) {
+        opts.photos[idx].url = url;
+      } else {
+        opts.photos.push({ url: url, caption: '' });
+      }
+    }
+    b.custom_html = JSON.stringify(opts);
+    render();
+    sbAutoSave(blockId);
+    toast('Фото загружено!');
+  } catch(e) {
+    toast('Ошибка загрузки: ' + (e.message || 'network error'), 'error');
+  }
+}
+
+// ── Batch upload multiple photos ──
+async function sbUploadPhotoBatch(input, blockId) {
+  var files = input.files;
+  if (!files || files.length === 0) return;
+  toast('Загрузка ' + files.length + ' фото...');
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  if (!Array.isArray(opts.photos)) opts.photos = [];
+  
+  for (var fi = 0; fi < files.length; fi++) {
+    var file = files[fi];
+    if (file.size > 5 * 1024 * 1024) { toast('Пропущен: ' + file.name + ' (> 5 МБ)', 'error'); continue; }
+    var formData = new FormData();
+    formData.append('file', file);
+    formData.append('block_id', String(blockId));
+    try {
+      var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
+      var result = await resp.json();
+      if (result.success) {
+        opts.photos.push({ url: result.url || result.data_url, caption: '' });
+      }
+    } catch(e) {}
+  }
+  b.custom_html = JSON.stringify(opts);
+  render();
+  sbAutoSave(blockId);
+  toast('Загружено ' + files.length + ' фото!');
+}
+
+// ── Toggle slot counter for block ──
+function sbToggleSlotCounter(blockId, checked) {
+  if (checked) {
+    // Render will show inline settings on next render cycle
+  }
+  // Handled by sbAutoSave
+}
+
+// ── Save inline slot counter settings ──
+async function sbSaveInlineSlot(blockId, scId) {
+  var total = parseInt(document.getElementById('sb_sc_total_' + blockId)?.value) || 10;
+  var booked = parseInt(document.getElementById('sb_sc_booked_' + blockId)?.value) || 0;
+  var lru = document.getElementById('sb_sc_lru_' + blockId)?.value || '';
+  var lam = document.getElementById('sb_sc_lam_' + blockId)?.value || '';
+  
+  await api('/slot-counter/' + scId, { method: 'PUT', body: JSON.stringify({
+    total_slots: total, booked_slots: booked, label_ru: lru, label_am: lam, show_timer: 1
+  }) });
+  // Update local data
+  var counter = (data.slotCounters || []).find(function(c) { return c.id === scId; });
+  if (counter) { counter.total_slots = total; counter.booked_slots = booked; counter.label_ru = lru; counter.label_am = lam; }
+  toast('Счётчик обновлён');
+}
+
+// ── Create new slot counter for block ──
+async function sbCreateSlotForBlock(blockKey) {
+  var pos = 'in-' + blockKey;
+  await api('/slot-counter', { method: 'POST', body: JSON.stringify({
+    counter_name: 'Счётчик для ' + blockKey, total_slots: 10, booked_slots: 0, show_timer: 1, position: pos, label_ru: 'Свободных мест', label_am: ''
+  }) });
+  toast('Счётчик создан');
+  await loadData(); render();
+}
+
 // ── Create new block (modal) ──
 function createSiteBlock() {
   var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], social_links: '[]', is_visible: 1, custom_css: '', custom_html: '' };
@@ -9338,6 +9503,8 @@ async function sbSaveBlock(id) {
   if (optSocials) blockOpts.show_socials = optSocials.checked;
   if (optPhotos) blockOpts.show_photos = optPhotos.checked;
   if (optSlots) blockOpts.show_slots = optSlots.checked;
+  // Keep existing values if checkbox element wasn't rendered
+  // (e.g. for blocks where the option is not applicable)
 
   // Collect main photo URL
   var mainPhotoEl = document.getElementById('sb_mainphoto_' + id);

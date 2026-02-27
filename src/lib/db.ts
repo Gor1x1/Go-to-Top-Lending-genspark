@@ -391,6 +391,15 @@ CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_freq ON expenses(frequency_type_id);
 CREATE INDEX IF NOT EXISTS idx_bonuses_user ON employee_bonuses(user_id);
 CREATE INDEX IF NOT EXISTS idx_snapshots_period ON period_snapshots(period_type, period_key);
+
+CREATE TABLE IF NOT EXISTS uploads (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  filename TEXT DEFAULT '',
+  mime_type TEXT DEFAULT '',
+  data_base64 TEXT NOT NULL,
+  block_id INTEGER,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
 `;
 
 let dbInitialized = false;
