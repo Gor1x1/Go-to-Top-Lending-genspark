@@ -98,6 +98,29 @@ app.get('/api/site-data', async (c) => {
       }
     } catch(fe) { /* footer not yet imported */ }
 
+    // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
+    let siteBlockFeatures: any[] = [];
+    try {
+      const blocksRes = await db.prepare("SELECT block_key, social_links, images, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+      for (const blk of (blocksRes.results || [])) {
+        let socials: any[] = [];
+        try { socials = JSON.parse(blk.social_links as string || '[]'); } catch { socials = []; }
+        let blockOpts: any = {};
+        try { blockOpts = JSON.parse(blk.custom_html as string || '{}'); } catch { blockOpts = {}; }
+        let blockPhotos: any[] = [];
+        try { blockPhotos = Array.isArray(blockOpts.photos) ? blockOpts.photos : []; } catch { blockPhotos = []; }
+        siteBlockFeatures.push({
+            key: blk.block_key,
+            social_links: socials,
+            photos: blockPhotos,
+            photo_url: blockOpts.photo_url || '',
+            show_socials: socials.length > 0 || blockOpts.show_socials || false,
+            show_photos: blockPhotos.length > 0 || blockOpts.show_photos || false,
+            show_slots: blockOpts.show_slots || false,
+          });
+      }
+    } catch(bf) { /* blocks not yet imported */ }
+
     // Set Cache-Control to no-cache so edits appear instantly
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
@@ -114,6 +137,7 @@ app.get('/api/site-data', async (c) => {
       photoBlocks: photoBlocksRes.results,
       tickerItems: tickerItems.length > 0 ? tickerItems : null,
       footerSocials: footerSocials.length > 0 ? footerSocials : null,
+      blockFeatures: siteBlockFeatures.length > 0 ? siteBlockFeatures : null,
       _ts: Date.now()
     });
   } catch (e: any) {
@@ -2732,7 +2756,122 @@ switchLang = function(l) {
       }
     }
     
-    console.log('[DB] All dynamic data applied v2');
+    // ===== 6. INJECT BLOCK FEATURES (Social links, photos, slot counters per block) =====
+    if (db.blockFeatures && db.blockFeatures.length > 0) {
+      var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-x-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk', website:'fas fa-globe', email:'fas fa-envelope', phone:'fas fa-phone', pinterest:'fab fa-pinterest', snapchat:'fab fa-snapchat', discord:'fab fa-discord', github:'fab fa-github', threads:'fab fa-threads', viber:'fab fa-viber' };
+      var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2', website:'#8B5CF6', email:'#F59E0B', phone:'#10B981', pinterest:'#E60023', snapchat:'#FFFC00', discord:'#5865F2', github:'#333', threads:'#000', viber:'#7360F2' };
+      
+      db.blockFeatures.forEach(function(bf) {
+        // Map block_key (underscores) to data-section-id (hyphens)
+        var sectionId = bf.key.replace(/_/g, '-');
+        var section = document.querySelector('[data-section-id="' + sectionId + '"]');
+        if (!section) return;
+        
+        // Replace main photo if photo_url is set
+        if (bf.photo_url) {
+          var heroImg = section.querySelector('.hero-image img, img[alt]');
+          if (heroImg) {
+            heroImg.setAttribute('src', bf.photo_url);
+            console.log('[DB] Photo replaced in', sectionId);
+          }
+        }
+
+        // Inject photos if photos array has items (no toggle required)
+        if (bf.photos && bf.photos.length > 0) {
+          var existingPhotoGal = section.querySelector('.block-photo-gallery');
+          if (existingPhotoGal) existingPhotoGal.remove();
+          
+          var validPhotos = bf.photos.filter(function(p) { return p && p.url; });
+          if (validPhotos.length > 0) {
+            var photoDiv = document.createElement('div');
+            photoDiv.className = 'block-photo-gallery';
+            photoDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 0;margin-top:12px';
+            var phH = '';
+            validPhotos.forEach(function(p) {
+              phH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:180px;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
+                (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
+              '</div>';
+            });
+            photoDiv.innerHTML = phH;
+            var container = section.querySelector('.container');
+            if (container) container.appendChild(photoDiv);
+            else section.appendChild(photoDiv);
+          }
+        }
+        
+        // Inject social links if socials have URLs (no toggle required)
+        if (bf.social_links && bf.social_links.length > 0 && bf.social_links.some(function(s) { return !!s.url; })) {
+          // Remove existing social container if any
+          var existing = section.querySelector('.block-socials');
+          if (existing) existing.remove();
+          
+          var socDiv = document.createElement('div');
+          socDiv.className = 'block-socials';
+          socDiv.style.cssText = 'display:flex;gap:12px;justify-content:center;align-items:center;padding:16px 0;margin-top:12px;flex-wrap:wrap';
+          var socH = '';
+          bf.social_links.forEach(function(s) {
+            if (!s.url) return;
+            var icon = socialIcons[s.type] || 'fas fa-link';
+            var color = socialColors[s.type] || '#8B5CF6';
+            socH += '<a href="' + s.url + '" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:' + color + ';color:white;font-size:1.15rem;transition:transform 0.2s,box-shadow 0.2s;text-decoration:none" onmouseover="this.style.transform=&apos;scale(1.15)&apos;;this.style.boxShadow=&apos;0 4px 15px ' + color + '66&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;;this.style.boxShadow=&apos;none&apos;">' +
+              '<i class="' + icon + '"></i></a>';
+          });
+          socDiv.innerHTML = socH;
+          // Insert social links at the end of the container (or after first child container)
+          var container = section.querySelector('.container');
+          if (container) { container.appendChild(socDiv); }
+          else { section.appendChild(socDiv); }
+        }
+        
+        // Inject block photo gallery if photos exist
+        if (bf.show_photos && bf.photos && bf.photos.length > 0) {
+          var existingGallery = section.querySelector('.block-photo-gallery');
+          if (existingGallery) existingGallery.remove();
+          var galDiv = document.createElement('div');
+          galDiv.className = 'block-photo-gallery';
+          galDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 0;margin-top:12px';
+          var galH = '';
+          bf.photos.forEach(function(p) {
+            if (!p.url) return;
+            galH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer" onclick="if(typeof openLightbox===&apos;function&apos;)openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+              '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:180px;object-fit:cover">' +
+              (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#999)">' + p.caption + '</div>' : '') +
+            '</div>';
+          });
+          galDiv.innerHTML = galH;
+          var container = section.querySelector('.container');
+          if (container) container.appendChild(galDiv);
+          else section.appendChild(galDiv);
+        }
+
+        // Inject slot counters if show_slots is on
+        if (bf.show_slots && db.slotCounters && db.slotCounters.length > 0) {
+          db.slotCounters.forEach(function(sc) {
+            if (!sc.show_timer) return;
+            // Show first active slot counter in this block
+            var free = Math.max(0, (sc.total_slots || 10) - (sc.booked_slots || 0));
+            var pct = sc.total_slots > 0 ? Math.round(((sc.total_slots - free) / sc.total_slots) * 100) : 0;
+            var existingSlot = section.querySelector('.block-slot-counter');
+            if (existingSlot) return; // only one per block
+            var slotDiv = document.createElement('div');
+            slotDiv.className = 'block-slot-counter';
+            slotDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:16px;padding:14px 0;margin-top:8px;flex-wrap:wrap';
+            slotDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px">' +
+              '<div style="width:10px;height:10px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>' +
+              '<span style="font-size:0.9rem;font-weight:600;color:var(--text-secondary,#999)">' + (lang === 'am' && sc.label_am ? sc.label_am : (sc.label_ru || sc.counter_name || '')) + '</span></div>' +
+              '<span style="font-size:1.6rem;font-weight:900;color:var(--purple,#8B5CF6)">' + free + '<span style="color:var(--text-muted,#666);font-weight:400;font-size:0.8rem"> / ' + sc.total_slots + '</span></span>' +
+              '<div style="width:140px;height:6px;background:var(--bg-card,#1a1a2e);border-radius:4px;overflow:hidden"><div style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;width:' + pct + '%"></div></div>';
+            var container = section.querySelector('.container');
+            if (container) container.appendChild(slotDiv);
+            else section.appendChild(slotDiv);
+          });
+        }
+      });
+      console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
+    }
+    
+    console.log('[DB] All dynamic data applied v3');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
   }

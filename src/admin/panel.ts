@@ -347,9 +347,6 @@ const pages = [
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
   { id: 'pdf', icon: 'fa-file-pdf', label: 'PDF шаблон' },
   { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
-  { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов' },
-  { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер сайта' },
-  { id: 'telegram', icon: 'fa-telegram', label: 'Быстрые сообщения', fab: true },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
@@ -8594,7 +8591,7 @@ var sbSearchQuery = ''; // search/filter blocks
 var sbSortableInstance = null; // SortableJS instance
 var sbSaveTimers = {}; // per-block debounce timers
 var sbSaveStatus = 'hidden'; // 'hidden', 'saving', 'saved'
-var sbActiveTab = 'blocks'; // 'blocks', 'calculator', 'telegram'
+var sbActiveTab = 'blocks'; // 'blocks', 'calculator', 'telegram', 'slots', 'footer', 'photos'
 
 function renderSiteBlocks() {
   var allBlocks = data.siteBlocks || [];
@@ -8637,7 +8634,10 @@ function renderSiteBlocks() {
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
     { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор', count: calcBlocks.length },
-    { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns }
+    { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns },
+    { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length },
+    { id: 'footer', icon: 'fa-shoe-prints', label: 'Футер', count: 1 },
+    { id: 'photos', icon: 'fa-images', label: 'Фото-галерея', count: (data.photoBlocks || []).length }
   ];
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
@@ -8650,6 +8650,27 @@ function renderSiteBlocks() {
   if (sbActiveTab === 'telegram') {
     h += '</div>'; // close header
     h += renderTelegramInline();
+    return h;
+  }
+
+  // ── If slots tab selected, render slot counters inline ──
+  if (sbActiveTab === 'slots') {
+    h += '</div>'; // close header
+    h += renderSlotCounter();
+    return h;
+  }
+
+  // ── If footer tab selected, render footer inline ──
+  if (sbActiveTab === 'footer') {
+    h += '</div>'; // close header
+    h += renderFooter();
+    return h;
+  }
+
+  // ── If photos tab selected, render photo gallery inline ──
+  if (sbActiveTab === 'photos') {
+    h += '</div>'; // close header
+    h += renderPhotos();
     return h;
   }
 
@@ -8881,23 +8902,31 @@ function renderSiteBlocks() {
         var socials = [];
         try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
         if (!Array.isArray(socials)) socials = [];
+        var socialNetworks = [
+          {v:'instagram',l:'Instagram',i:'fab fa-instagram',c:'#E4405F'},{v:'facebook',l:'Facebook',i:'fab fa-facebook',c:'#1877F2'},
+          {v:'telegram',l:'Telegram',i:'fab fa-telegram',c:'#26A5E4'},{v:'whatsapp',l:'WhatsApp',i:'fab fa-whatsapp',c:'#25D366'},
+          {v:'youtube',l:'YouTube',i:'fab fa-youtube',c:'#FF0000'},{v:'tiktok',l:'TikTok',i:'fab fa-tiktok',c:'#000'},
+          {v:'twitter',l:'Twitter/X',i:'fab fa-x-twitter',c:'#1DA1F2'},{v:'linkedin',l:'LinkedIn',i:'fab fa-linkedin',c:'#0A66C2'},
+          {v:'vk',l:'VK',i:'fab fa-vk',c:'#4680C2'},{v:'pinterest',l:'Pinterest',i:'fab fa-pinterest',c:'#E60023'},
+          {v:'discord',l:'Discord',i:'fab fa-discord',c:'#5865F2'},{v:'github',l:'GitHub',i:'fab fa-github',c:'#333'},
+          {v:'threads',l:'Threads',i:'fab fa-threads',c:'#000'},{v:'viber',l:'Viber',i:'fab fa-viber',c:'#7360F2'},
+          {v:'snapchat',l:'Snapchat',i:'fab fa-snapchat',c:'#FFFC00'},{v:'website',l:'Сайт',i:'fas fa-globe',c:'#8B5CF6'},
+          {v:'email',l:'Email',i:'fas fa-envelope',c:'#F59E0B'},{v:'phone',l:'Телефон',i:'fas fa-phone',c:'#10B981'}
+        ];
         h += '<div style="margin-bottom:16px">';
         h += '<details' + (socials.length > 0 ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-share-alt" style="color:#10B981;margin-right:6px"></i>Соц. сети <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + socials.length + ')</span></summary>';
         h += '<div style="margin-bottom:6px">';
         for (var si = 0; si < socials.length; si++) {
           var soc = socials[si];
-          h += '<div style="display:grid;grid-template-columns:120px 1fr 28px;gap:8px;margin-bottom:6px;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
-          h += '<select class="input" id="sb_soctype_' + b.id + '_' + si + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
-            '<option value="instagram"' + (soc.type === 'instagram' ? ' selected' : '') + '>Instagram</option>' +
-            '<option value="facebook"' + (soc.type === 'facebook' ? ' selected' : '') + '>Facebook</option>' +
-            '<option value="telegram"' + (soc.type === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
-            '<option value="whatsapp"' + (soc.type === 'whatsapp' ? ' selected' : '') + '>WhatsApp</option>' +
-            '<option value="youtube"' + (soc.type === 'youtube' ? ' selected' : '') + '>YouTube</option>' +
-            '<option value="tiktok"' + (soc.type === 'tiktok' ? ' selected' : '') + '>TikTok</option>' +
-            '<option value="twitter"' + (soc.type === 'twitter' ? ' selected' : '') + '>Twitter/X</option>' +
-            '<option value="linkedin"' + (soc.type === 'linkedin' ? ' selected' : '') + '>LinkedIn</option>' +
-            '<option value="vk"' + (soc.type === 'vk' ? ' selected' : '') + '>VK</option>' +
-          '</select>';
+          var socNet = socialNetworks.find(function(n) { return n.v === soc.type; }) || {v:'website',l:'Сайт',i:'fas fa-globe',c:'#8B5CF6'};
+          h += '<div style="display:grid;grid-template-columns:30px 130px 1fr 28px;gap:8px;margin-bottom:6px;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;align-items:center">';
+          h += '<i class="' + socNet.i + '" style="color:' + socNet.c + ';font-size:1.1rem;text-align:center"></i>';
+          h += '<select class="input" id="sb_soctype_' + b.id + '_' + si + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+          for (var sni = 0; sni < socialNetworks.length; sni++) {
+            var sn = socialNetworks[sni];
+            h += '<option value="' + sn.v + '"' + (soc.type === sn.v ? ' selected' : '') + '>' + sn.l + '</option>';
+          }
+          h += '</select>';
           h += '<input class="input" id="sb_socurl_' + b.id + '_' + si + '" value="' + escHtml(soc.url || '') + '" placeholder="https://..." style="font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
           h += '<button class="tier-del-btn" onclick="sbRemoveSocial(' + b.id + ',' + si + ')"><i class="fas fa-times"></i></button>';
           h += '</div>';
@@ -8906,9 +8935,43 @@ function renderSiteBlocks() {
         h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddSocial(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить соц. сеть</button>';
         h += '</details></div>';
 
-        // ── Optional features toggles ──
+        // ── Optional features / opts (MUST be before photo section which uses it) ──
         var opts = {};
         try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+
+        // ── Block Photos section (for hero, about, etc.) ──
+        var isTickerBlock = (b.block_key === 'ticker' || b.block_type === 'ticker');
+        if (!isTickerBlock) {
+          var blockPhotos = [];
+          try { blockPhotos = opts.photos || []; } catch(e) { blockPhotos = []; }
+          if (!Array.isArray(blockPhotos)) blockPhotos = [];
+          h += '<div style="margin-bottom:16px">';
+          h += '<details' + (blockPhotos.length > 0 || opts.photo_url ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>Фото блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
+          
+          // Main photo URL (replaces main section image, e.g. Hero photo)
+          h += '<div style="margin-bottom:10px;padding:8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+          h += '<div style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-image" style="margin-right:4px"></i>Главное фото блока (заменяет фото на сайте)</div>';
+          h += '<div style="display:flex;gap:8px;align-items:center">';
+          if (opts.photo_url) h += '<img src="' + escHtml(opts.photo_url) + '" style="width:56px;height:56px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
+          h += '<input class="input" id="sb_mainphoto_' + b.id + '" value="' + escHtml(opts.photo_url || '') + '" placeholder="URL главного фото (замена фото в секции)" style="flex:1;font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
+          if (opts.photo_url) h += '<button class="tier-del-btn" onclick="document.getElementById(&apos;sb_mainphoto_' + b.id + '&apos;).value=&apos;&apos;;sbAutoSave(' + b.id + ')"><i class="fas fa-times"></i></button>';
+          h += '</div></div>';
+
+          // Additional photos gallery
+          h += '<div style="margin-bottom:6px">';
+          for (var phi = 0; phi < blockPhotos.length; phi++) {
+            var ph = blockPhotos[phi];
+            h += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+            if (ph.url) h += '<img src="' + escHtml(ph.url) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
+            h += '<input class="input" id="sb_photo_' + b.id + '_' + phi + '" value="' + escHtml(ph.url || '') + '" placeholder="URL фото" style="flex:1;font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')">';
+            h += '<input class="input" id="sb_photocap_' + b.id + '_' + phi + '" value="' + escHtml(ph.caption || '') + '" placeholder="Подпись" style="width:160px;font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+            h += '<button class="tier-del-btn" onclick="sbRemovePhoto(' + b.id + ',' + phi + ')"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+          }
+          h += '</div>';
+          h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddPhoto(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить фото</button>';
+          h += '</details></div>';
+        }
         h += '<div style="margin-bottom:16px">';
         h += '<details><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-sliders-h" style="color:#f59e0b;margin-right:6px"></i>Опции блока</summary>';
         h += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;padding:10px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
@@ -9161,6 +9224,31 @@ function sbRemoveSocial(blockId, idx) {
   sbAutoSave(blockId);
 }
 
+// ── Add photo to block ──
+function sbAddPhoto(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  if (!Array.isArray(opts.photos)) opts.photos = [];
+  opts.photos.push({ url: '', caption: '' });
+  b.custom_html = JSON.stringify(opts);
+  render();
+}
+
+// ── Remove photo from block ──
+function sbRemovePhoto(blockId, idx) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  if (!Array.isArray(opts.photos)) opts.photos = [];
+  opts.photos.splice(idx, 1);
+  b.custom_html = JSON.stringify(opts);
+  render();
+  sbAutoSave(blockId);
+}
+
 // ── Create new block (modal) ──
 function createSiteBlock() {
   var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], social_links: '[]', is_visible: 1, custom_css: '', custom_html: '' };
@@ -9250,6 +9338,28 @@ async function sbSaveBlock(id) {
   if (optSocials) blockOpts.show_socials = optSocials.checked;
   if (optPhotos) blockOpts.show_photos = optPhotos.checked;
   if (optSlots) blockOpts.show_slots = optSlots.checked;
+
+  // Collect main photo URL
+  var mainPhotoEl = document.getElementById('sb_mainphoto_' + id);
+  if (mainPhotoEl) blockOpts.photo_url = mainPhotoEl.value || '';
+
+  // Collect block photos from DOM
+  var isTicker = (b.block_key === 'ticker' || b.block_type === 'ticker');
+  if (!isTicker) {
+    var existingPhotos = blockOpts.photos || [];
+    if (!Array.isArray(existingPhotos)) existingPhotos = [];
+    var newPhotos = [];
+    for (var phi = 0; phi < existingPhotos.length; phi++) {
+      var phUrlEl = document.getElementById('sb_photo_' + id + '_' + phi);
+      var phCapEl = document.getElementById('sb_photocap_' + id + '_' + phi);
+      newPhotos.push({
+        url: phUrlEl ? phUrlEl.value : (existingPhotos[phi].url || ''),
+        caption: phCapEl ? phCapEl.value : (existingPhotos[phi].caption || '')
+      });
+    }
+    blockOpts.photos = newPhotos;
+  }
+  
   b.custom_html = JSON.stringify(blockOpts);
 
   // Save to server
@@ -9366,9 +9476,9 @@ function getPageHtml() {
     case 'calculator': return renderCalculator();
     case 'pdf': return renderPdfTemplate();
     case 'referrals': return renderReferrals();
-    case 'slots': return renderSlotCounter();
-    case 'footer': return renderFooter();
-    case 'photos': return renderPhotos();
+    case 'slots': sbActiveTab = 'slots'; return renderSiteBlocks();
+    case 'footer': sbActiveTab = 'footer'; return renderSiteBlocks();
+    case 'photos': sbActiveTab = 'photos'; return renderSiteBlocks();
     case 'telegram': sbActiveTab = 'telegram'; return renderSiteBlocks();
     case 'tgbot': return renderTelegramBot();
     case 'scripts': return renderScripts();
