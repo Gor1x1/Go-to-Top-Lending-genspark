@@ -2043,12 +2043,16 @@ function renderLeads() {
               (l.tz_link ? '<a href="' + escHtml(l.tz_link) + '" target="_blank" style="font-size:0.72rem;color:#F59E0B;text-decoration:none"><i class="fas fa-file-alt" style="margin-right:2px"></i>ТЗ</a>' : '') +
             '</div>' : '') +
             // Services/Articles amounts on main card
-            ((svcAmt > 0 || artAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
+          '</div>';
+      var discAmt = Number(calcData && calcData.discountAmount || 0);
+      var discPct = Number(calcData && calcData.discountPercent || 0);
+      h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
+              (discAmt > 0 ? '<span style="font-size:0.72rem;color:#8B5CF6;font-weight:600"><i class="fas fa-gift" style="margin-right:3px"></i>Скидка: -' + Number(discAmt).toLocaleString('ru-RU') + ' ֏ (' + discPct + '%)</span>' : '') +
               (refundAmt > 0 ? '<span style="font-size:0.72rem;color:#f87171;font-weight:600"><i class="fas fa-undo-alt" style="margin-right:3px"></i>Возврат: -' + Number(refundAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
-            '</div>' : '') +
-          '</div>';
+              (l.referral_code ? '<span style="font-size:0.72rem;color:#10B981;font-weight:600"><i class="fas fa-tag" style="margin-right:3px"></i>' + escHtml(l.referral_code) + '</span>' : '') +
+            '</div>' : '');
       
       // Right side: status + total + date + actions
       h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:200px">';
@@ -2258,6 +2262,18 @@ async function applyLeadRefCode(leadId) {
   infoHtml += '</div>';
   if (infoDiv) infoDiv.innerHTML = infoHtml;
   toast('Промокод применён: ' + (res.discount_percent ? res.discount_percent + '% скидка' : 'активен'));
+  
+  // Trigger recalculation to apply discount to total_amount
+  try {
+    var recalcRes = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+    if (recalcRes && recalcRes.total_amount !== undefined) {
+      if (lead) lead.total_amount = recalcRes.total_amount;
+      toast('Сумма пересчитана: ' + Number(recalcRes.total_amount).toLocaleString('ru-RU') + ' ֏');
+    }
+    // Reload data to update card display
+    await loadData();
+    renderLeads();
+  } catch(e) { console.log('Recalc error:', e); }
 }
 
 function getAssigneeName(id) {
@@ -2810,6 +2826,7 @@ async function saveLeadAll(leadId) {
   var tgEl = document.getElementById('lead-tg-' + leadId);
   var tzEl = document.getElementById('lead-tz-' + leadId);
   var refundEl = document.getElementById('lead-refund-' + leadId);
+  var refCodeEl = document.getElementById('lead-refcode-' + leadId);
   var updateData = {};
   if (nameEl) updateData.name = nameEl.value;
   if (contactEl) updateData.contact = contactEl.value;
@@ -2817,6 +2834,7 @@ async function saveLeadAll(leadId) {
   if (tgEl) updateData.telegram_group = tgEl.value;
   if (tzEl) updateData.tz_link = tzEl.value;
   if (refundEl) updateData.refund_amount = parseFloat(refundEl.value) || 0;
+  if (refCodeEl) updateData.referral_code = refCodeEl.value.trim();
   if (Object.keys(updateData).length > 0) {
     await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify(updateData) });
     var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
@@ -5788,6 +5806,45 @@ function renderBizFunnelV2(d, sd, fin) {
       h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + (svc.qty||svc.count||0) + '</td>';
       h += '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(Number(svc.revenue)||0) + '</td>';
       h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600">' + svcPctV + '%</span></div></td></tr>';
+    }
+    h += '</tbody></table></div></div>';
+  }
+
+  // ---- SECTION: PROMO CODE ANALYTICS ----
+  var promoCosts = d.promo_costs || {};
+  var promoKeys = Object.keys(promoCosts);
+  if (promoKeys.length > 0) {
+    var totalDiscCost = Number(d.total_discount_cost || 0);
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-gift" style="color:#8B5CF6;margin-right:8px"></i>Аналитика промокодов</h3>';
+    
+    // KPIs
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
+    h += '<div class="card" style="padding:16px;text-align:center;background:rgba(139,92,246,0.08);border-color:#8B5CF633"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-tags" style="margin-right:4px"></i>Промокодов использовано</div><div style="font-size:1.8rem;font-weight:800;color:#8B5CF6">' + promoKeys.length + '</div></div>';
+    var promoLeadsTotal = 0; promoKeys.forEach(function(k) { promoLeadsTotal += promoCosts[k].count; });
+    h += '<div class="card" style="padding:16px;text-align:center;background:rgba(16,185,129,0.08);border-color:#10B98133"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-users" style="margin-right:4px"></i>Лидов с промокодами</div><div style="font-size:1.8rem;font-weight:800;color:#10B981">' + promoLeadsTotal + '</div></div>';
+    h += '<div class="card" style="padding:16px;text-align:center;background:rgba(239,68,68,0.08);border-color:#EF444433"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-hand-holding-usd" style="margin-right:4px"></i>Общая стоимость скидок</div><div style="font-size:1.8rem;font-weight:800;color:#EF4444">' + fmtAmt(totalDiscCost) + '</div></div>';
+    var promoRevTotal = 0; promoKeys.forEach(function(k) { promoRevTotal += promoCosts[k].revenue; });
+    h += '<div class="card" style="padding:16px;text-align:center;background:rgba(59,130,246,0.08);border-color:#3B82F633"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-coins" style="margin-right:4px"></i>Выручка с промокодами</div><div style="font-size:1.8rem;font-weight:800;color:#3B82F6">' + fmtAmt(promoRevTotal) + '</div></div>';
+    h += '</div>';
+    
+    // Table
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Промокод</th><th style="padding:10px;text-align:center;color:#94a3b8">Скидка %</th><th style="padding:10px;text-align:center;color:#94a3b8">Лидов</th><th style="padding:10px;text-align:right;color:#94a3b8">Стоимость скидки</th><th style="padding:10px;text-align:right;color:#94a3b8">Ср. скидка / лид</th><th style="padding:10px;text-align:right;color:#94a3b8">Выручка</th><th style="padding:10px;text-align:center;color:#94a3b8">Статус</th></tr></thead><tbody>';
+    var sortedPromo = promoKeys.sort(function(a,b) { return promoCosts[b].discount_total - promoCosts[a].discount_total; });
+    for (var pri = 0; pri < sortedPromo.length; pri++) {
+      var pk = sortedPromo[pri]; var pc = promoCosts[pk]; var cd2 = pc.code_details || {};
+      var avgDisc = pc.count > 0 ? Math.round(pc.discount_total / pc.count) : 0;
+      var isActive = cd2.is_active !== 0;
+      h += '<tr style="border-bottom:1px solid #1e293b">';
+      h += '<td style="padding:8px 16px;font-weight:700;color:#a78bfa"><i class="fas fa-tag" style="margin-right:6px;color:#8B5CF6"></i>' + escHtml(pk) + (cd2.description ? '<div style="font-size:0.68rem;color:#64748b;margin-top:2px">' + escHtml(cd2.description) + '</div>' : '') + '</td>';
+      h += '<td style="padding:8px;text-align:center;font-weight:600;color:#fbbf24">' + (cd2.discount_percent || 0) + '%</td>';
+      h += '<td style="padding:8px;text-align:center;font-weight:600">' + pc.count + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:700;color:#EF4444">' + (pc.discount_total > 0 ? '-' + fmtAmt(pc.discount_total) : '0 ֏') + '</td>';
+      h += '<td style="padding:8px;text-align:right;color:#94a3b8">' + fmtAmt(avgDisc) + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#10B981">' + fmtAmt(pc.revenue) + '</td>';
+      h += '<td style="padding:8px;text-align:center"><span class="badge ' + (isActive ? 'badge-green' : 'badge-red') + '">' + (isActive ? 'Актив' : 'Неактив') + '</span></td>';
+      h += '</tr>';
     }
     h += '</tbody></table></div></div>';
   }
@@ -9069,7 +9126,14 @@ function renderSiteBlocks() {
   var blocks = sbActiveTab === 'blocks' ? contentBlocks : contentBlocks;
   
   // Define which block_keys have photos by design
-  var photoBlocks = { hero: true, about: true, warehouse: true, wb_official: true, services: true, wb_banner: true };
+  // All block types support photos EXCEPT calculator and ticker
+  var noPhotoTypes = { calculator: true, ticker: true };
+  var photoBlocks = {};
+  for (var pbx = 0; pbx < blocks.length; pbx++) {
+    if (!noPhotoTypes[blocks[pbx].block_type] && !noPhotoTypes[blocks[pbx].block_key]) {
+      photoBlocks[blocks[pbx].block_key] = true;
+    }
+  }
   // Define which blocks can have social links
   var socialBlocks = { hero: true, about: true, services: true, contact: true, footer: true, wb_banner: true, wb_official: true };
   
@@ -10127,6 +10191,7 @@ async function sbLinkCounter(blockId, blockKey, counterId) {
         show_timer: sc.show_timer, position: '',
         counter_name: sc.counter_name
       }) });
+      sc.position = ''; // update local data
     }
   }
   
@@ -10137,8 +10202,17 @@ async function sbLinkCounter(blockId, blockKey, counterId) {
     show_timer: counter.show_timer, position: 'in-' + blockKey,
     counter_name: counter.counter_name
   }) });
+  counter.position = 'in-' + blockKey; // update local data
   toast('Счётчик #' + counterId + ' привязан к блоку «' + blockKey + '»!');
-  await loadData(); render();
+  
+  // Re-render only the site blocks section instead of full page reload
+  // Save scroll position and expanded states
+  var scrollY = window.scrollY || window.pageYOffset;
+  var expandedBefore = Object.assign({}, sbExpandedBlocks);
+  await loadData();
+  sbExpandedBlocks = expandedBefore;
+  renderSiteBlocks();
+  window.scrollTo(0, scrollY);
 }
 
 // ── Create new slot counter for block (simple) ──

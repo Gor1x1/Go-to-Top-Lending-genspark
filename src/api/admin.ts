@@ -835,11 +835,38 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
   const conversionRate = (total?.count || 0) > 0 ? ((statusCounts.done / (total?.count || 1)) * 100).toFixed(1) : '0';
   const avgCheck = statusCounts.done > 0 ? Math.round((byStatus.done?.amount || 0) / statusCounts.done) : 0;
   
-  // Referral stats
+  // Referral stats — with discount cost calculation
   let refResults: any[] = [];
+  let totalDiscountCost = 0;
   try {
     const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dateFilter + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
     refResults = refRes.results || [];
+  } catch {}
+  
+  // Calculate actual discount amounts from calc_data for each lead with a promo code
+  const promoCodeCosts: Record<string, { count: number; discount_total: number; revenue: number; code_details?: any }> = {};
+  for (const lead of allLeadsResults) {
+    const rc = lead.referral_code as string;
+    if (!rc) continue;
+    if (!promoCodeCosts[rc]) promoCodeCosts[rc] = { count: 0, discount_total: 0, revenue: 0 };
+    promoCodeCosts[rc].count++;
+    promoCodeCosts[rc].revenue += Number(lead.total_amount || 0);
+    try {
+      const cd = JSON.parse((lead.calc_data as string) || '{}');
+      const da = Number(cd.discountAmount || 0);
+      promoCodeCosts[rc].discount_total += da;
+      totalDiscountCost += da;
+    } catch {}
+  }
+  // Enrich with referral_codes table data
+  try {
+    const allCodes = await db.prepare("SELECT * FROM referral_codes").all();
+    for (const code of (allCodes.results || [])) {
+      const key = code.code as string;
+      if (promoCodeCosts[key]) {
+        promoCodeCosts[key].code_details = { discount_percent: code.discount_percent, free_reviews: code.free_reviews, uses_count: code.uses_count, is_active: code.is_active, description: code.description };
+      }
+    }
   } catch {}
   
   return c.json({
@@ -856,6 +883,8 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
     conversion_rate: conversionRate,
     avg_check: avgCheck,
     referrals: refResults,
+    promo_costs: promoCodeCosts,
+    total_discount_cost: totalDiscountCost,
     date_from: dateFrom,
     date_to: dateTo,
   });
@@ -1737,12 +1766,48 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   // Total = services + articles; refund stored separately, does NOT reduce total_amount
   const refundAmount = Number(leadRow.refund_amount) || 0;
   const subtotalAmount = servicesTotalAmount + articlesTotalAmount;
-  const totalAmount = subtotalAmount; // total_amount stays unchanged by refunds
   const allItems = [...serviceItems, ...articleItems];
   
+  // Apply referral code discount
+  const referralCode = (leadRow.referral_code as string) || existingCalcData?.referralCode || '';
+  let discountPercent = 0;
+  let discountAmount = 0;
+  let refFreeServices: any[] = [];
+  if (referralCode) {
+    try {
+      const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
+      if (refRow) {
+        discountPercent = Number(refRow.discount_percent) || 0;
+        if (discountPercent > 0) {
+          discountAmount = Math.round(subtotalAmount * discountPercent / 100);
+        }
+        // Load free services
+        const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
+        refFreeServices = (fsRes.results || []).map((fs: any) => ({
+          name: fs.name_ru || '',
+          name_am: fs.name_am || '',
+          qty: fs.quantity || 1,
+          price: Number(fs.price) || 0,
+          discount_percent: fs.discount_percent,
+          subtotal: 0 // free services are 0 cost
+        }));
+      }
+    } catch {}
+  }
+  
+  const totalAmount = subtotalAmount - discountAmount;
+  
   // Update lead total_amount and calc_data (for PDF)
-  // subtotal = raw sum of all items, total = same (refund tracked separately in refund_amount field)
-  const calcData = JSON.stringify({ items: allItems, subtotal: subtotalAmount, total: totalAmount, refund: refundAmount, referralCode: existingCalcData?.referralCode || '' });
+  const calcData = JSON.stringify({
+    items: allItems,
+    subtotal: subtotalAmount,
+    total: totalAmount,
+    refund: refundAmount,
+    referralCode: referralCode,
+    discountPercent: discountPercent,
+    discountAmount: discountAmount,
+    freeServices: refFreeServices
+  });
   await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
     .bind(totalAmount, calcData, leadId).run();
   // Set source to calculator_pdf so PDF route works — update regardless of current source

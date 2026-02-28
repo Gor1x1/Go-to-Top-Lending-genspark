@@ -272,6 +272,41 @@ app.post('/api/generate-pdf', async (c) => {
     const clientContact = body.clientContact || '';
     const referralCode = body.referralCode || '';
 
+    // Calculate subtotal from items (before any discount)
+    let subtotal = 0;
+    for (const item of items) { subtotal += Number(item.subtotal || 0); }
+    // If frontend sent total that matches subtotal, use subtotal; otherwise total might already include discount
+    const frontendTotal = Number(total) || 0;
+    
+    // Load referral code details and compute discount
+    let discountPercent = 0;
+    let discountAmount = 0;
+    let freeServices: any[] = [];
+    if (referralCode) {
+      try {
+        const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
+        if (refRow) {
+          discountPercent = Number(refRow.discount_percent) || 0;
+          if (discountPercent > 0) {
+            discountAmount = Math.round(subtotal * discountPercent / 100);
+          }
+          // Load free services
+          const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
+          freeServices = (fsRes.results || []).map((fs: any) => ({
+            name: fs.name_ru || '',
+            name_am: fs.name_am || '',
+            qty: fs.quantity || 1,
+            price: Number(fs.price) || 0,
+            discount_percent: fs.discount_percent,
+            subtotal: 0
+          }));
+        }
+      } catch {}
+    }
+    
+    // Final total = subtotal - discount
+    const finalTotal = discountAmount > 0 ? (subtotal - discountAmount) : frontendTotal;
+
     // Run template fetch and lead number in parallel for speed
     const [tplRow, lastLead] = await Promise.all([
       db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first(),
@@ -294,8 +329,17 @@ app.post('/api/generate-pdf', async (c) => {
     // Save lead with unique ID (using pre-fetched lastLead)
     const ua = c.req.header('User-Agent') || '';
     const nextNum = ((lastLead?.max_num as number) || 0) + 1;
+    const calcDataJson = JSON.stringify({ 
+      items, 
+      subtotal, 
+      total: finalTotal, 
+      referralCode, 
+      discountPercent, 
+      discountAmount,
+      freeServices 
+    });
     const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'calculator_pdf', clientName, clientContact, JSON.stringify({ items, total, referralCode }), lang, referralCode, ua.substring(0,200), total).run();
+      .bind(nextNum, 'calculator_pdf', clientName, clientContact, calcDataJson, lang, referralCode, ua.substring(0,200), finalTotal).run();
     const leadId = leadResult.meta?.last_row_id || 0;
     // Increment referral code usage
     if (referralCode) {
@@ -307,9 +351,9 @@ app.post('/api/generate-pdf', async (c) => {
       '\ud83d\udccb ' + (isAm ? '\u0546\u0578\u0580 \u0570\u0561\u0575\u057f #' : '\u041d\u043e\u0432\u0430\u044f \u0437\u0430\u044f\u0432\u043a\u0430 #') + leadId,
       '\ud83d\udc64 ' + (clientName || '-'),
       '\ud83d\udcde ' + (clientContact || '-'),
-      '\ud83d\udcb0 ' + Number(total).toLocaleString('ru-RU') + ' \u058f'
+      '\ud83d\udcb0 ' + Number(finalTotal).toLocaleString('ru-RU') + ' \u058f'
     ];
-    if (referralCode) tgLines.push('\ud83c\udff7 ' + (isAm ? '\u054a\u0580\u0578\u0574\u0578: ' : '\u041f\u0440\u043e\u043c\u043e: ') + referralCode);
+    if (referralCode) tgLines.push('\ud83c\udff7 ' + (isAm ? '\u054a\u0580\u0578\u0574\u0578: ' : '\u041f\u0440\u043e\u043c\u043e: ') + referralCode + (discountPercent > 0 ? ' (-' + discountPercent + '%, -' + discountAmount.toLocaleString('ru-RU') + ' \u058f)' : ''));
     tgLines.push((isAm ? '\ud83d\udcc4 \u0550\u0561\u0577\u057e\u0561\u0580\u056f:' : '\ud83d\udcc4 \u0420\u0430\u0441\u0447\u0451\u0442:'));
     for (const it of items) { tgLines.push('  \u2022 ' + it.name + ' \u00d7 ' + it.qty + ' = ' + Number(it.subtotal).toLocaleString('ru-RU') + ' \u058f'); }
     // Fire and forget — don't wait for TG notification
@@ -479,7 +523,11 @@ app.get('/pdf/:id', async (c) => {
     const localeCode = isEn ? 'en-US' : isAm ? 'hy-AM' : 'ru-RU';
     const dateStr = new Date().toLocaleDateString(localeCode);
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    const finalTotal = refundAmount > 0 ? (Number(subtotal) - refundAmount) : Number(total);
+    // Apply referral discount to final total
+    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
+    const calcDiscountAmount = calcData.discountAmount || (calcDiscountPercent > 0 ? Math.round(Number(subtotal) * calcDiscountPercent / 100) : 0);
+    const afterDiscount = calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal);
+    const finalTotal = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
     const totalFormatted = finalTotal.toLocaleString('ru-RU');
     const invoiceNum = invoicePrefix + '-' + String(id).padStart(4, '0');
 
@@ -544,9 +592,10 @@ app.get('/pdf/:id', async (c) => {
       + (intro ? '<div class="intro">' + intro + '</div>' : '')
       + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (refDiscount > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + refDiscount + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em">' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
-      + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
-      + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>'
-        + '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Final Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0442\u043e\u0433\u043e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
+      + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + (isEn ? 'Subtotal:' : isAm ? '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:') + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
+      + (calcDiscountAmount > 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount' : isAm ? '\u0536\u0565\u0572\u0573' : '\u0421\u043a\u0438\u0434\u043a\u0430') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
+      + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
+      + ((calcDiscountAmount > 0 || refundAmount > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0422\u041e\u0413\u041e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'
       + (outro ? '<div class="outro">' + outro + '</div>' : '')
       + (terms ? '<div class="terms-box"><div class="terms-title"><i class="fas fa-gavel" style="margin-right:4px"></i>' + L.terms + '</div>' + terms + '</div>' : '')
