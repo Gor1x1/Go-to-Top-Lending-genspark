@@ -9172,7 +9172,6 @@ function renderSiteBlocks() {
   }
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
-    { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length },
     { id: 'pdf_inline', icon: 'fa-file-pdf', label: 'PDF шаблон', count: 0 },
     { id: 'referrals_inline', icon: 'fa-gift', label: 'Реферальные коды', count: data.referrals.length }
   ];
@@ -9240,8 +9239,11 @@ function renderSiteBlocks() {
     for (var bi = 0; bi < blocks.length; bi++) {
       var b = blocks[bi];
       var isExpanded = !!sbExpandedBlocks[b.id];
-      var textsRu = b.texts_ru || [];
-      var textsAm = b.texts_am || [];
+      var textsRu = Array.isArray(b.texts_ru) ? b.texts_ru : [];
+      var textsAm = Array.isArray(b.texts_am) ? b.texts_am : [];
+      // Ensure all items are strings (protect against null/undefined entries)
+      for (var _ti = 0; _ti < textsRu.length; _ti++) { if (textsRu[_ti] == null) textsRu[_ti] = ''; }
+      for (var _ti2 = 0; _ti2 < textsAm.length; _ti2++) { if (textsAm[_ti2] == null) textsAm[_ti2] = ''; }
       var maxTexts = Math.max(textsRu.length, textsAm.length);
       var btnsCount = (b.buttons||[]).length;
       var isTicker = (b.block_key === 'ticker' || b.block_type === 'ticker');
@@ -9302,8 +9304,8 @@ function renderSiteBlocks() {
           // Show only first 2 texts (heading + subheading)
           var calcTextsCount = Math.min(maxTexts, 2);
           for (var ti = 0; ti < calcTextsCount; ti++) {
-            var ruText = ti < textsRu.length ? textsRu[ti] : '';
-            var amText = ti < textsAm.length ? textsAm[ti] : '';
+            var ruText = (ti < textsRu.length ? textsRu[ti] : '') || '';
+            var amText = (ti < textsAm.length ? textsAm[ti] : '') || '';
             var isLong = ruText.length > 100 || amText.length > 100;
             var fieldLabel = ti === 0 ? 'Заголовок секции' : 'Подзаголовок';
             h += '<div class="sb-text-pair" style="margin-bottom:10px">';
@@ -9339,8 +9341,8 @@ function renderSiteBlocks() {
             '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTickerItem(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить элемент</button>' +
           '</div>';
           for (var ti = 0; ti < maxTexts; ti++) {
-            var ruT = ti < textsRu.length ? textsRu[ti] : '';
-            var amT = ti < textsAm.length ? textsAm[ti] : '';
+            var ruT = (ti < textsRu.length ? textsRu[ti] : '') || '';
+            var amT = (ti < textsAm.length ? textsAm[ti] : '') || '';
             // Try to extract icon from images array
             var tickerIcons = [];
             try { tickerIcons = b.images || []; } catch(e) {}
@@ -9362,8 +9364,8 @@ function renderSiteBlocks() {
           '</div>';
 
           for (var ti = 0; ti < maxTexts; ti++) {
-            var ruText = ti < textsRu.length ? textsRu[ti] : '';
-            var amText = ti < textsAm.length ? textsAm[ti] : '';
+            var ruText = (ti < textsRu.length ? textsRu[ti] : '') || '';
+            var amText = (ti < textsAm.length ? textsAm[ti] : '') || '';
             var isLong = ruText.length > 100 || amText.length > 100;
             var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
 
@@ -9470,7 +9472,8 @@ function renderSiteBlocks() {
 
         // ── Social Links section (integrated in block as single unit) ──
         var socials = [];
-        try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = b.social_links || []; }
+        if (Array.isArray(b.social_links)) { socials = b.social_links; }
+        else { try { socials = JSON.parse(b.social_links || '[]'); } catch(e) { socials = []; } }
         if (!Array.isArray(socials)) socials = [];
         var hasSocials = !!socialBlocks[b.block_key] || socials.length > 0;
         if (hasSocials) {
@@ -9631,18 +9634,6 @@ function renderSiteBlocks() {
             h += '<span class="badge badge-green" style="font-size:0.65rem">ID #' + blockCounter.id + '</span>';
           }
           h += '</div>';
-          
-          // ── Dropdown to select existing counter ──
-          h += '<div style="margin-bottom:10px"><div style="font-size:0.72rem;color:#64748b;margin-bottom:4px;font-weight:600">Привязать существующий счётчик:</div>';
-          h += '<select class="input" id="sb_sc_select_' + b.id + '" style="font-size:0.82rem" onchange="sbLinkCounter(' + b.id + ',&apos;' + b.block_key + '&apos;,this.value)">';
-          h += '<option value="">— Выберите счётчик —</option>';
-          for (var sci2 = 0; sci2 < counters.length; sci2++) {
-            var sc2 = counters[sci2];
-            var sc2Free = Math.max(0, (sc2.total_slots || 0) - (sc2.booked_slots || 0));
-            var sc2Selected = blockCounter && blockCounter.id === sc2.id;
-            h += '<option value="' + sc2.id + '"' + (sc2Selected ? ' selected' : '') + '>' + escHtml(sc2.counter_name || 'Счётчик #' + sc2.id) + ' (' + sc2Free + '/' + (sc2.total_slots || 0) + ' своб.)</option>';
-          }
-          h += '</select></div>';
 
           if (blockCounter) {
             var scId = blockCounter.id;
@@ -9670,7 +9661,7 @@ function renderSiteBlocks() {
             h += '</div>';
             h += '<div style="display:flex;justify-content:space-between;align-items:center">';
             h += '<button class="btn btn-success" style="font-size:0.78rem;padding:6px 14px" onclick="sbSaveInlineSlot(' + b.id + ',' + scId + ')"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить счётчик</button>';
-            h += '<span style="font-size:0.68rem;color:#475569"><i class="fas fa-info-circle" style="margin-right:3px"></i>Детали во вкладке «Счётчики слотов»</span>';
+            h += '<button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px;color:#f87171;border-color:rgba(248,113,113,0.3)" onclick="sbUnlinkSlot(' + b.id + ',' + scId + ')"><i class="fas fa-unlink" style="margin-right:3px"></i>Отвязать</button>';
             h += '</div>';
           } else {
             // No counter linked — show create form inline
@@ -9698,6 +9689,9 @@ function renderSiteBlocks() {
         // Character count stats
         var totalCharsRu = (b.texts_ru || []).reduce(function(sum, t) { return sum + (t||'').length; }, 0);
         var totalCharsAm = (b.texts_am || []).reduce(function(sum, t) { return sum + (t||'').length; }, 0);
+        var footerSocials = [];
+        try { footerSocials = Array.isArray(socials) ? socials : (typeof socials !== 'undefined' ? socials : []); } catch(e) { footerSocials = []; }
+        if (!Array.isArray(footerSocials)) footerSocials = [];
         
         h += '<div style="padding-top:14px;border-top:1px solid #1e293b">';
         // Pro stats bar
@@ -9705,7 +9699,7 @@ function renderSiteBlocks() {
         h += '<span title="Символов RU"><i class="fas fa-font" style="color:#8B5CF6;margin-right:2px"></i>RU: ' + totalCharsRu + ' симв.</span>';
         h += '<span title="Символов AM"><i class="fas fa-font" style="color:#F59E0B;margin-right:2px"></i>AM: ' + totalCharsAm + ' симв.</span>';
         h += '<span title="Кнопок"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:2px"></i>' + btnsCount + ' кноп.</span>';
-        if (socials.length > 0) h += '<span title="Соцсетей"><i class="fas fa-share-alt" style="color:#10B981;margin-right:2px"></i>' + socials.length + ' соц.</span>';
+        if (footerSocials.length > 0) h += '<span title="Соцсетей"><i class="fas fa-share-alt" style="color:#10B981;margin-right:2px"></i>' + footerSocials.length + ' соц.</span>';
         h += '<span title="Последнее обновление"><i class="fas fa-clock" style="margin-right:2px"></i>' + (b.updated_at ? new Date(b.updated_at).toLocaleString('ru') : 'не задано') + '</span>';
         h += '</div>';
         
@@ -10170,6 +10164,21 @@ async function sbCreateSlotForBlockFull(blockKey, blockId) {
   await loadData(); render();
 }
 
+// ── Unlink slot counter from block (reset position to empty) ──
+async function sbUnlinkSlot(blockId, scId) {
+  if (!confirm('Отвязать счётчик от этого блока?')) return;
+  var counter = (data.slotCounters || []).find(function(c) { return c.id === scId; });
+  if (!counter) return;
+  await api('/slot-counter/' + scId, { method: 'PUT', body: JSON.stringify({
+    total_slots: counter.total_slots, booked_slots: counter.booked_slots,
+    label_ru: counter.label_ru, label_am: counter.label_am,
+    show_timer: counter.show_timer, position: '', counter_name: counter.counter_name
+  }) });
+  counter.position = '';
+  toast('Счётчик отвязан');
+  render();
+}
+
 // ── Link existing slot counter to block ──
 async function sbLinkCounter(blockId, blockKey, counterId) {
   if (!counterId) return;
@@ -10211,7 +10220,7 @@ async function sbLinkCounter(blockId, blockKey, counterId) {
   var expandedBefore = Object.assign({}, sbExpandedBlocks);
   await loadData();
   sbExpandedBlocks = expandedBefore;
-  renderSiteBlocks();
+  render();
   window.scrollTo(0, scrollY);
 }
 
@@ -10222,6 +10231,31 @@ async function sbCreateSlotForBlock(blockKey) {
     counter_name: 'Счётчик для ' + blockKey, total_slots: 10, booked_slots: 0, show_timer: 1, position: pos, label_ru: 'Свободных мест', label_am: ''
   }) });
   toast('Счётчик создан');
+  await loadData(); render();
+}
+
+// ── Quick-create Reviews block ──
+async function createReviewsBlock() {
+  var title = prompt('Название блока отзывов:', 'Отзывы наших клиентов');
+  if (!title) return;
+  var key = 'reviews_' + Date.now().toString(36);
+  var textsRu = [title, 'Результаты говорят сами за себя'];
+  var textsAm = ['', ''];
+  var customHtml = { bg_class: 'section', photos: [], show_photos: true };
+  var blockData = {
+    block_key: key, block_type: 'reviews', title_ru: title, title_am: '',
+    texts_ru: textsRu, texts_am: textsAm,
+    images: [], buttons: [], social_links: '[]',
+    is_visible: 1, custom_css: '', custom_html: JSON.stringify(customHtml)
+  };
+  await api('/site-blocks', { method: 'POST', body: JSON.stringify(blockData) });
+  var content = textsRu.map(function(ru) { return { ru: ru, am: '' }; });
+  await api('/content', { method: 'POST', body: JSON.stringify({ section_key: key, section_name: title, content_json: content }) });
+  var keyHyphen = key.replace(/_/g, '-');
+  var maxOrder = 0;
+  try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch {}
+  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: [{ section_id: keyHyphen, sort_order: maxOrder + 1, is_visible: 1, label_ru: title, label_am: '' }] }) });
+  toast('Блок отзывов «' + title + '» создан! Загрузите скриншоты отзывов в раздел "Фото блока".');
   await loadData(); render();
 }
 

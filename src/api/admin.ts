@@ -1396,6 +1396,7 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     'comparison': [{text_ru: 'Убедитесь сами — начните сейчас', text_am: 'Համozvek — sksel hima', icon: 'fas fa-rocket'}],
     'important': [{text_ru: 'Уточнить условия', text_am: 'Shtkel paymannere', icon: 'fab fa-telegram'}],
     'faq': [{text_ru: 'Остались вопросы? Напишите нам', text_am: 'Hartser uneq? Greq mez', icon: 'fas fa-comment-dots'}],
+    'client_reviews': [],
     'contact': [{text_ru: 'Отправить заявку', text_am: 'Ughарkel hayty', icon: 'fas fa-paper-plane'}],
     'floating_tg': [{text_ru: 'Написать нам', text_am: 'Гrel mez', icon: 'fab fa-telegram'}],
     'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Ստandsanal hashvark Telegram-ov', icon: 'fab fa-telegram'}]
@@ -1779,7 +1780,8 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
       if (refRow) {
         discountPercent = Number(refRow.discount_percent) || 0;
         if (discountPercent > 0) {
-          discountAmount = Math.round(subtotalAmount * discountPercent / 100);
+          // Discount applies ONLY to services, NOT to WB articles (buyouts)
+          discountAmount = Math.round(servicesTotalAmount * discountPercent / 100);
         }
         // Load free services
         const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
@@ -1801,6 +1803,8 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   const calcData = JSON.stringify({
     items: allItems,
     subtotal: subtotalAmount,
+    servicesSubtotal: servicesTotalAmount,
+    articlesSubtotal: articlesTotalAmount,
     total: totalAmount,
     refund: refundAmount,
     referralCode: referralCode,
