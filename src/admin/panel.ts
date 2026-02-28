@@ -1788,15 +1788,15 @@ function renderReferrals() {
 }
 
 async function addReferral() {
-  const codeEl = document.getElementById('new_ref_code') as HTMLInputElement;
-  const descEl = document.getElementById('new_ref_desc') as HTMLInputElement;
-  const discEl = document.getElementById('new_ref_disc') as HTMLInputElement;
-  const freeEl = document.getElementById('new_ref_free') as HTMLInputElement;
-  const code = (codeEl?.value || '').trim();
+  var codeEl = document.getElementById('new_ref_code');
+  var descEl = document.getElementById('new_ref_desc');
+  var discEl = document.getElementById('new_ref_disc');
+  var freeEl = document.getElementById('new_ref_free');
+  var code = (codeEl?.value || '').trim();
   if (!code) { toast('Введите кодовое слово', 'error'); codeEl?.focus(); return; }
-  const desc = (descEl?.value || '').trim();
-  const disc = parseInt(discEl?.value || '0') || 0;
-  const free = parseInt(freeEl?.value || '0') || 0;
+  var desc = (descEl?.value || '').trim();
+  var disc = parseInt(discEl?.value || '0') || 0;
+  var free = parseInt(freeEl?.value || '0') || 0;
   await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free }) });
   toast('Код "' + code.toUpperCase() + '" добавлен');
   // Clear form fields
