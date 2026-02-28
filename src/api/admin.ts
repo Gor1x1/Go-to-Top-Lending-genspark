@@ -1402,6 +1402,7 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     else if (key === 'popup') blockType = 'popup';
     else if (key === 'stats_bar') blockType = 'stats';
     else if (key === 'wb_banner') blockType = 'banner';
+    else if (key === 'client_reviews' || key === 'client-reviews') blockType = 'reviews';
     
     // For ticker blocks, store icons in images array
     let images: any[] = [];

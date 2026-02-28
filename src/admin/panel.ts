@@ -354,10 +354,8 @@ const pages = [
   { id: 'analytics', icon: 'fa-chart-line', label: 'Бизнес-аналитика' },
   { id: 'employees', icon: 'fa-user-friends', label: 'Сотрудники' },
   { id: 'team_access', icon: 'fa-shield-alt', label: 'Роли и доступы' },
-  { id: 'blocks', icon: 'fa-cubes', label: 'Конструктор блоков' },
+  { id: 'blocks', icon: 'fa-cubes', label: 'Управление сайтом' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
-  { id: 'pdf', icon: 'fa-file-pdf', label: 'PDF шаблон' },
-  { id: 'referrals', icon: 'fa-gift', label: 'Реферальные коды' },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
@@ -8952,8 +8950,8 @@ function renderSiteBlocks() {
   // ── Header ──
   h += '<div style="margin-bottom:24px">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">' +
-      '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Конструктор блоков V3</h1>' +
-      '<p style="color:#64748b;font-size:0.82rem;margin:0">Перетаскивайте блоки мышкой для изменения порядка. Тексты сохраняются автоматически.</p></div>' +
+      '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Управление сайтом</h1>' +
+      '<p style="color:#64748b;font-size:0.82rem;margin:0">Блоки, счётчики, PDF-шаблон, реферальные коды — всё в одном месте.</p></div>' +
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
         '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
@@ -8970,9 +8968,9 @@ function renderSiteBlocks() {
   }
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
-    { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns },
     { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length },
-    { id: 'pdf_inline', icon: 'fa-file-pdf', label: 'PDF шаблон', count: 0 }
+    { id: 'pdf_inline', icon: 'fa-file-pdf', label: 'PDF шаблон', count: 0 },
+    { id: 'referrals_inline', icon: 'fa-gift', label: 'Реферальные коды', count: data.referrals.length }
   ];
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
@@ -8980,13 +8978,6 @@ function renderSiteBlocks() {
     h += '<button class="tab-btn' + (sbActiveTab === st.id ? ' active' : '') + '" onclick="sbActiveTab=&apos;' + st.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + st.icon + '" style="margin-right:6px"></i>' + st.label + ' <span style="opacity:0.6;font-size:0.75rem;margin-left:4px">(' + st.count + ')</span></button>';
   }
   h += '</div>';
-
-  // ── If TG tab selected, render TG messages inline ──
-  if (sbActiveTab === 'telegram') {
-    h += '</div>'; // close header
-    h += renderTelegramInline();
-    return h;
-  }
 
   // ── If slots tab selected, render slot counters inline ──
   if (sbActiveTab === 'slots') {
@@ -8999,6 +8990,13 @@ function renderSiteBlocks() {
   if (sbActiveTab === 'pdf_inline') {
     h += '</div>'; // close header
     h += renderPdfTemplate();
+    return h;
+  }
+
+  // ── If referrals tab selected, render referral codes inline ──
+  if (sbActiveTab === 'referrals_inline') {
+    h += '</div>'; // close header
+    h += renderReferrals();
     return h;
   }
 
@@ -9215,8 +9213,8 @@ function renderSiteBlocks() {
             }
           }
           var tgBadge = matchedTgMsg 
-            ? '<span class="badge badge-green" style="font-size:0.65rem;cursor:pointer" onclick="event.stopPropagation();sbActiveTab=&apos;telegram&apos;;render()" title="Связан с TG-шаблоном. Нажмите для редактирования"><i class="fab fa-telegram" style="margin-right:3px"></i>Шаблон</span>'
-            : '<span class="badge" style="font-size:0.65rem;background:rgba(245,158,11,0.12);color:#fbbf24" title="Нет TG-шаблона"><i class="fas fa-unlink" style="margin-right:3px"></i>Без шаблона</span>';
+            ? '<span class="badge badge-green" style="font-size:0.65rem" title="Связан с TG-шаблоном"><i class="fas fa-link" style="margin-right:3px"></i>TG</span>'
+            : '';
           
           h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
           // Compact row: icon + text RU + text AM + action + TG badge + link
@@ -9251,7 +9249,7 @@ function renderSiteBlocks() {
           if (showAm) h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px">Шаблон сообщения AM</div><textarea class="input" id="sb_btnmsg_am_' + b.id + '_' + bti + '" rows="2" style="font-size:0.78rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(btn.message_am || '') + '</textarea></div>';
           h += '</div>';
           if (matchedTgMsg) {
-            h += '<div style="font-size:0.70rem;color:#26A5E4;margin-top:8px;padding:6px 10px;background:rgba(38,165,228,0.06);border-radius:6px;cursor:pointer" onclick="sbActiveTab=&apos;telegram&apos;;render()"><i class="fab fa-telegram" style="margin-right:5px"></i>Открыть полный шаблон в «Быстрые сообщения» <i class="fas fa-external-link-alt" style="margin-left:4px;font-size:0.6rem"></i></div>';
+            // TG template info shown inline — no separate tab needed
           }
           h += '</details>';
           h += '</div>';
@@ -10240,8 +10238,8 @@ function getPageHtml() {
     case 'company_roles': return renderTeamAccess();
     case 'blocks': return renderSiteBlocks();
     case 'calculator': return renderCalculator();
-    case 'pdf': return renderPdfTemplate();
-    case 'referrals': return renderReferrals();
+    case 'pdf': sbActiveTab = 'pdf_inline'; return renderSiteBlocks();
+    case 'referrals': sbActiveTab = 'referrals_inline'; return renderSiteBlocks();
     case 'slots': sbActiveTab = 'slots'; return renderSiteBlocks();
     case 'footer': sbActiveTab = 'footer'; return renderSiteBlocks();
     case 'photos': sbActiveTab = 'photos'; return renderSiteBlocks();

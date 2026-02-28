@@ -101,7 +101,7 @@ app.get('/api/site-data', async (c) => {
     // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
     let siteBlockFeatures: any[] = [];
     try {
-      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
         try { socials = JSON.parse(blk.social_links as string || '[]'); } catch { socials = []; }
@@ -109,6 +109,8 @@ app.get('/api/site-data', async (c) => {
         try { blockOpts = JSON.parse(blk.custom_html as string || '{}'); } catch { blockOpts = {}; }
         let blockPhotos: any[] = [];
         try { blockPhotos = Array.isArray(blockOpts.photos) ? blockOpts.photos : []; } catch { blockPhotos = []; }
+        let blockBtns: any[] = [];
+        try { blockBtns = JSON.parse(blk.buttons as string || '[]'); } catch { blockBtns = []; }
         siteBlockFeatures.push({
             key: blk.block_key,
             social_links: socials,
@@ -119,6 +121,7 @@ app.get('/api/site-data', async (c) => {
             show_photos: blockPhotos.length > 0 || blockOpts.show_photos || false,
             show_slots: blockOpts.show_slots || false,
             block_type: blk.block_type || 'section',
+            buttons: blockBtns,
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -1802,6 +1805,24 @@ img{max-width:100%;height:auto}
 </div>
 </section>
 
+<!-- ===== CLIENT REVIEWS / REAL CASES ===== -->
+<section class="section" id="client-reviews" data-section-id="client-reviews">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Реальные кейсы" data-am="Իրական դեdelays">Реальные кейсы</span></div>
+    <h2 class="section-title" data-ru="Отзывы наших клиентов" data-am="Մեர հաdelays կարdelays">Отзывы наших клиентов</h2>
+    <p class="section-sub" data-ru="Результаты говорят сами за себя — вот что получают наши клиенты" data-am="Արdelays խdelays delays — delays delays">Результаты говорят сами за себя — вот что получают наши клиенты</p>
+  </div>
+  <div class="reviews-carousel-placeholder fade-up" id="reviewsCarouselArea" style="min-height:100px">
+    <!-- Photos injected dynamically from admin panel via blockFeatures -->
+    <div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)">
+      <i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i>
+      <span data-ru="Фото отзывов загружаются..." data-am="Կարdelays delaysload...">Фото отзывов загружаются...</span>
+    </div>
+  </div>
+</div>
+</section>
+
 <!-- ===== FAQ ===== -->
 <section class="section section-dark" id="faq" data-section-id="faq">
 <div class="container">
@@ -2776,6 +2797,57 @@ switchLang = function(l) {
     }
     
     // ===== 6. INJECT BLOCK FEATURES (Social links, photos, slot counters per block) =====
+    // First, create missing sections for blocks that exist in DB but not in HTML (e.g. copied blocks)
+    if (db.blockFeatures && db.blockFeatures.length > 0 && db.sectionOrder) {
+      var footer = document.querySelector('footer');
+      var mainParent = footer ? footer.parentElement : document.querySelector('main') || document.body;
+      db.blockFeatures.forEach(function(bf) {
+        if (bf.key === 'floating_tg' || bf.block_type === 'floating' || bf.block_type === 'calculator') return;
+        var sectionId = bf.key.replace(/_/g, '-');
+        var existing = document.querySelector('[data-section-id="' + sectionId + '"]');
+        if (existing) return; // already exists in HTML
+        // Check if it should be visible
+        var orderInfo = null;
+        for (var oi = 0; oi < db.sectionOrder.length; oi++) {
+          if (db.sectionOrder[oi].section_id === bf.key || db.sectionOrder[oi].section_id === sectionId) {
+            orderInfo = db.sectionOrder[oi]; break;
+          }
+        }
+        if (orderInfo && !orderInfo.is_visible) return;
+        // Find texts from content
+        var blockTexts = [];
+        if (db.content) {
+          for (var ck in db.content) {
+            if (ck === bf.key || ck === sectionId) { blockTexts = db.content[ck] || []; break; }
+          }
+        }
+        // Create new section element
+        var newSec = document.createElement('section');
+        newSec.className = 'section fade-up';
+        newSec.setAttribute('data-section-id', sectionId);
+        newSec.id = sectionId;
+        var secH = '<div class="container">';
+        // Title
+        if (blockTexts.length > 0 && blockTexts[0]) {
+          var titleText = lang === 'am' && blockTexts[0].am ? blockTexts[0].am : (blockTexts[0].ru || blockTexts[0] || '');
+          secH += '<h2 class="section-title" style="text-align:center;margin-bottom:32px"><span data-ru="' + (blockTexts[0].ru||'') + '" data-am="' + (blockTexts[0].am||'') + '">' + titleText + '</span></h2>';
+        }
+        // Subtitle and other texts
+        for (var ti = 1; ti < blockTexts.length; ti++) {
+          var t = blockTexts[ti];
+          if (t) {
+            var tText = lang === 'am' && t.am ? t.am : (t.ru || t || '');
+            secH += '<p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto"><span data-ru="' + (t.ru||'') + '" data-am="' + (t.am||'') + '">' + tText + '</span></p>';
+          }
+        }
+        secH += '</div>';
+        newSec.innerHTML = secH;
+        // Insert before footer
+        if (footer && mainParent) { mainParent.insertBefore(newSec, footer); }
+        else if (mainParent) { mainParent.appendChild(newSec); }
+      });
+    }
+    
     if (db.blockFeatures && db.blockFeatures.length > 0) {
       var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-x-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk', website:'fas fa-globe', email:'fas fa-envelope', phone:'fas fa-phone', pinterest:'fab fa-pinterest', snapchat:'fab fa-snapchat', discord:'fab fa-discord', github:'fab fa-github', threads:'fab fa-threads', viber:'fab fa-viber' };
       var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2', website:'#8B5CF6', email:'#F59E0B', phone:'#10B981', pinterest:'#E60023', snapchat:'#FFFC00', discord:'#5865F2', github:'#333', threads:'#000', viber:'#7360F2' };
@@ -2928,6 +3000,61 @@ switchLang = function(l) {
             if (container) container.appendChild(slotDiv);
             else section.appendChild(slotDiv);
           });
+        }
+
+        // Dynamic buttons: update CTA buttons in section from DB
+        if (bf.buttons && bf.buttons.length > 0) {
+          var sectionIdH = bf.key.replace(/_/g, '-');
+          
+          // Special handling for floating_tg block
+          if (bf.key === 'floating_tg') {
+            var floatEl = document.querySelector('.tg-float');
+            if (floatEl && bf.buttons[0]) {
+              var fb = bf.buttons[0];
+              if (fb.url) floatEl.setAttribute('href', fb.url);
+              var fIcon = floatEl.querySelector('i');
+              if (fIcon && fb.icon) fIcon.className = fb.icon;
+              var fSpan = floatEl.querySelector('span');
+              if (fSpan) {
+                var fText = lang === 'am' && fb.text_am ? fb.text_am : (fb.text_ru || '');
+                if (fText) { fSpan.textContent = fText; fSpan.setAttribute('data-ru', fb.text_ru || ''); fSpan.setAttribute('data-am', fb.text_am || ''); }
+              }
+            }
+            // Handle second floating button (calc)
+            if (bf.buttons[1]) {
+              var calcFloat = document.querySelector('.calc-float');
+              if (calcFloat) {
+                var cb = bf.buttons[1];
+                if (cb.url) calcFloat.setAttribute('href', cb.url);
+                var cIcon = calcFloat.querySelector('i');
+                if (cIcon && cb.icon) cIcon.className = cb.icon;
+                var cSpan = calcFloat.querySelector('span');
+                if (cSpan) {
+                  var cText = lang === 'am' && cb.text_am ? cb.text_am : (cb.text_ru || '');
+                  if (cText) { cSpan.textContent = cText; cSpan.setAttribute('data-ru', cb.text_ru || ''); cSpan.setAttribute('data-am', cb.text_am || ''); }
+                }
+              }
+            }
+          } else {
+            // For regular sections, update existing CTA buttons
+            var ctaBtns = section.querySelectorAll('a.btn-primary, a.cta-btn, a[data-btn-idx]');
+            if (ctaBtns.length > 0) {
+              for (var bIdx = 0; bIdx < Math.min(ctaBtns.length, bf.buttons.length); bIdx++) {
+                var dbBtn = bf.buttons[bIdx];
+                var domBtn = ctaBtns[bIdx];
+                if (dbBtn.url) domBtn.setAttribute('href', dbBtn.url);
+                // Update icon
+                var btnIcon = domBtn.querySelector('i');
+                if (btnIcon && dbBtn.icon) btnIcon.className = dbBtn.icon;
+                // Update text - find span or text node
+                var btnSpan = domBtn.querySelector('span[data-ru]');
+                if (btnSpan) {
+                  var bText = lang === 'am' && dbBtn.text_am ? dbBtn.text_am : (dbBtn.text_ru || '');
+                  if (bText) { btnSpan.textContent = bText; btnSpan.setAttribute('data-ru', dbBtn.text_ru || ''); btnSpan.setAttribute('data-am', dbBtn.text_am || ''); }
+                }
+              }
+            }
+          }
         }
       });
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
