@@ -1037,21 +1037,33 @@ api.get('/pdf-template', authMiddleware, async (c) => {
 api.put('/pdf-template', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  await db.prepare(`UPDATE pdf_templates SET header_ru=?, header_am=?, header_en=?, footer_ru=?, footer_am=?, footer_en=?, intro_ru=?, intro_am=?, intro_en=?, outro_ru=?, outro_am=?, outro_en=?, company_name=?, company_phone=?, company_email=?, company_address=?, company_logo_url=?, company_website=?, company_inn=?, btn_order_ru=?, btn_order_am=?, btn_order_en=?, btn_download_ru=?, btn_download_am=?, btn_download_en=?, order_telegram_url=?, invoice_prefix=?, show_qr=?, accent_color=?, terms_ru=?, terms_am=?, terms_en=?, bank_details_ru=?, bank_details_am=?, bank_details_en=?, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`)
-    .bind(
-      d.header_ru||'', d.header_am||'', d.header_en||'Commercial Proposal',
-      d.footer_ru||'', d.footer_am||'', d.footer_en||'',
-      d.intro_ru||'', d.intro_am||'', d.intro_en||'',
-      d.outro_ru||'', d.outro_am||'', d.outro_en||'',
-      d.company_name||'', d.company_phone||'', d.company_email||'', d.company_address||'',
-      d.company_logo_url||'', d.company_website||'', d.company_inn||'',
-      d.btn_order_ru||'\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441', d.btn_order_am||'\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561', d.btn_order_en||'Order Now',
-      d.btn_download_ru||'\u0421\u043a\u0430\u0447\u0430\u0442\u044c', d.btn_download_am||'\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c', d.btn_download_en||'Download',
-      d.order_telegram_url||'https://t.me/goo_to_top',
-      d.invoice_prefix||'INV', d.show_qr ? 1 : 0, d.accent_color||'#8B5CF6',
-      d.terms_ru||'', d.terms_am||'', d.terms_en||'',
-      d.bank_details_ru||'', d.bank_details_am||'', d.bank_details_en||''
-    ).run();
+  // Build dynamic update — save all known fields
+  const fieldMap: Record<string, any> = {
+    header_ru: d.header_ru||'', header_am: d.header_am||'', header_en: d.header_en||'Commercial Proposal',
+    footer_ru: d.footer_ru||'', footer_am: d.footer_am||'', footer_en: d.footer_en||'',
+    intro_ru: d.intro_ru||'', intro_am: d.intro_am||'', intro_en: d.intro_en||'',
+    outro_ru: d.outro_ru||'', outro_am: d.outro_am||'', outro_en: d.outro_en||'',
+    company_name: d.company_name||'', company_phone: d.company_phone||'', company_email: d.company_email||'', company_address: d.company_address||'',
+    company_logo_url: d.company_logo_url||'', company_website: d.company_website||'', company_inn: d.company_inn||'',
+    btn_order_ru: d.btn_order_ru||'\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441', btn_order_am: d.btn_order_am||'\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561', btn_order_en: d.btn_order_en||'Order Now',
+    btn_download_ru: d.btn_download_ru||'\u0421\u043a\u0430\u0447\u0430\u0442\u044c', btn_download_am: d.btn_download_am||'\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c', btn_download_en: d.btn_download_en||'Download',
+    order_telegram_url: d.order_telegram_url||'https://t.me/goo_to_top',
+    invoice_prefix: d.invoice_prefix||'INV', show_qr: d.show_qr ? 1 : 0, accent_color: d.accent_color||'#8B5CF6',
+    terms_ru: d.terms_ru||'', terms_am: d.terms_am||'', terms_en: d.terms_en||'',
+    bank_details_ru: d.bank_details_ru||'', bank_details_am: d.bank_details_am||'', bank_details_en: d.bank_details_en||'',
+  };
+  // New label fields — only update if provided in request
+  const labelFields = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
+  for (const lf of labelFields) {
+    for (const lng of ['_ru','_am','_en']) {
+      const key = lf + lng;
+      if (d[key] !== undefined) fieldMap[key] = d[key];
+    }
+  }
+  const keys = Object.keys(fieldMap);
+  const setClauses = keys.map(k => k + '=?').join(', ');
+  const vals = keys.map(k => fieldMap[k]);
+  await db.prepare(`UPDATE pdf_templates SET ${setClauses}, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`).bind(...vals).run();
   return c.json({ success: true });
 });
 
@@ -2345,7 +2357,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     }
 
     // Parse calc_data for SERVICES only; articles come exclusively from lead_articles table to avoid double-counting
-    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount, assigned_to FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
+    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount, assigned_to, referral_code, name, created_at FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
     let totalRefunds = 0;
     const leadsById: Record<number, any> = {};
     for (const lead of (allLeads.results || [])) {
@@ -2859,6 +2871,8 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     return c.json({
       status_data: {}, financial: {}, daily: [], by_assignee: [], by_source: {},
       services: [], referrals: [], employees: [], total_leads: 0,
+      promo_costs: {}, total_discount_cost: 0, total_discount_leads: 0,
+      services_before_discount: 0, ref_code_services: {}, monthly_discounts: {},
       date_from: '', date_to: '', month: '', error: 'Analytics error: ' + (err?.message || 'unknown')
     });
   }

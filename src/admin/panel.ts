@@ -1706,8 +1706,19 @@ function renderReferrals() {
   });
   
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Реферальные коды</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Промокоды со скидками, бесплатными услугами и отзывами. Можно привязать конкретные услуги из калькулятора.</p>' +
-    '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить код</button>';
+    '<p style="color:#94a3b8;margin-bottom:24px">Промокоды со скидками, бесплатными услугами и отзывами. Можно привязать конкретные услуги из калькулятора.</p>';
+  
+  // ── Inline form for adding new referral code ──
+  h += '<div class="card" style="margin-bottom:24px;border:1px dashed rgba(139,92,246,0.4);background:rgba(139,92,246,0.03)">' +
+    '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa;font-size:0.95rem"><i class="fas fa-plus-circle" style="margin-right:8px"></i>Добавить новый код</h3>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Кодовое слово</label><input class="input" id="new_ref_code" placeholder="PROMO2026" style="text-transform:uppercase"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Скидка (%)</label><input class="input" type="number" id="new_ref_disc" value="0" min="0" max="100"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" id="new_ref_free" value="0" min="0"></div>' +
+      '<div style="display:flex;align-items:end"><button class="btn btn-primary" style="width:100%;padding:10px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Создать</button></div>' +
+    '</div>' +
+    '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание (для кого этот код)</label><input class="input" id="new_ref_desc" placeholder="Блогер Иван, партнёр, VIP-клиент..."></div>' +
+  '</div>';
   
   for (const ref of data.referrals) {
     var refServices = ref._services || [];
@@ -1777,13 +1788,22 @@ function renderReferrals() {
 }
 
 async function addReferral() {
-  const code = prompt('Кодовое слово (латиница, будет в верхнем регистре):');
-  if (!code) return;
-  const desc = prompt('Описание (для кого этот код):') || '';
-  const disc = parseInt(prompt('Скидка в процентах (0-100):') || '0');
-  const free = parseInt(prompt('Количество бесплатных отзывов (0 = нет):') || '0');
+  const codeEl = document.getElementById('new_ref_code') as HTMLInputElement;
+  const descEl = document.getElementById('new_ref_desc') as HTMLInputElement;
+  const discEl = document.getElementById('new_ref_disc') as HTMLInputElement;
+  const freeEl = document.getElementById('new_ref_free') as HTMLInputElement;
+  const code = (codeEl?.value || '').trim();
+  if (!code) { toast('Введите кодовое слово', 'error'); codeEl?.focus(); return; }
+  const desc = (descEl?.value || '').trim();
+  const disc = parseInt(discEl?.value || '0') || 0;
+  const free = parseInt(freeEl?.value || '0') || 0;
   await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free }) });
-  toast('Код добавлен');
+  toast('Код "' + code.toUpperCase() + '" добавлен');
+  // Clear form fields
+  if (codeEl) codeEl.value = '';
+  if (descEl) descEl.value = '';
+  if (discEl) discEl.value = '0';
+  if (freeEl) freeEl.value = '0';
   await loadData(); await loadRefServices(); render();
 }
 
@@ -7706,6 +7726,33 @@ function renderPdfTemplate() {
   h += '<div><label style="font-size:0.75rem;color:#8B5CF6;font-weight:600"><i class="fas fa-download" style="margin-right:4px"></i>\u041a\u043d\u043e\u043f\u043a\u0430 \u00ab\u0421\u043a\u0430\u0447\u0430\u0442\u044c\u00bb</label><input class="input" id="pdf_btn_dl' + lSuffix + '" value="' + escHtml(t['btn_download' + lSuffix] || (lang==='en' ? 'Download' : lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c')) + '"></div>';
   h += '</div></div>';
   
+  // ── 2b. Table labels (language-specific) ──
+  h += '<div class="card" style="margin-bottom:20px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa"><i class="fas fa-table" style="margin-right:8px"></i>\u041b\u0435\u0439\u0431\u043b\u044b \u0442\u0430\u0431\u043b\u0438\u0446\u044b PDF (' + lang.toUpperCase() + ')</h3>';
+  h += '<p style="font-size:0.72rem;color:#64748b;margin-bottom:12px">\u0422\u0435\u043a\u0441\u0442\u044b \u0437\u0430\u0433\u043e\u043b\u043e\u0432\u043a\u043e\u0432 \u0442\u0430\u0431\u043b\u0438\u0446\u044b, \u043c\u0435\u0442\u043a\u0438 \u0438\u0442\u043e\u0433\u043e\u0432 \u0438 \u043d\u0430\u0432\u0438\u0433\u0430\u0446\u0438\u0438.</p>';
+  h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px">';
+  var labelFields = [
+    { key: 'label_service', label: '\u0423\u0441\u043b\u0443\u0433\u0430', def_ru: '\u0423\u0441\u043b\u0443\u0433\u0430', def_am: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', def_en: 'Service' },
+    { key: 'label_qty', label: '\u041a\u043e\u043b-\u0432\u043e', def_ru: '\u041a\u043e\u043b-\u0432\u043e', def_am: '\u0554\u0561\u0576\u0561\u056f', def_en: 'Qty' },
+    { key: 'label_price', label: '\u0426\u0435\u043d\u0430', def_ru: '\u0426\u0435\u043d\u0430', def_am: '\u0533\u056b\u0576', def_en: 'Price' },
+    { key: 'label_sum', label: '\u0421\u0443\u043c\u043c\u0430', def_ru: '\u0421\u0443\u043c\u043c\u0430', def_am: '\u0533\u0578\u0582\u0574\u0561\u0580', def_en: 'Total' },
+    { key: 'label_total', label: '\u0418\u0422\u041e\u0413\u041e', def_ru: '\u0418\u0422\u041e\u0413\u041e:', def_am: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', def_en: 'TOTAL:' },
+    { key: 'label_subtotal', label: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433', def_ru: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:', def_am: '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0440\u0561\u056f:', def_en: 'Subtotal:' },
+    { key: 'label_client', label: '\u041a\u043b\u0438\u0435\u043d\u0442', def_ru: '\u041a\u043b\u0438\u0435\u043d\u0442:', def_am: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', def_en: 'Client:' },
+    { key: 'label_date', label: '\u0414\u0430\u0442\u0430', def_ru: '\u0414\u0430\u0442\u0430:', def_am: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', def_en: 'Date:' },
+    { key: 'label_invoice', label: '\u0417\u0430\u044f\u0432\u043a\u0430', def_ru: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', def_am: '\u0540\u0561\u0575\u057f \u2116', def_en: 'Invoice #' },
+    { key: 'label_back', label: '\u041d\u0430\u0437\u0430\u0434', def_ru: '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443', def_am: '\u0540\u0561\u0577\u057e\u056b\u0579', def_en: 'Back' }
+  ];
+  for (var lfi = 0; lfi < labelFields.length; lfi++) {
+    var lf = labelFields[lfi];
+    var lfKey = lf.key + lSuffix;
+    var lfDef = lang === 'ru' ? lf.def_ru : lang === 'am' ? lf.def_am : lf.def_en;
+    h += '<div><label style="font-size:0.7rem;color:' + lColor + ';font-weight:600">' + lf.label + '</label><input class="input" id="pdf_' + lfKey + '" value="' + escHtml(t[lfKey] || lfDef) + '" placeholder="' + escHtml(lfDef) + '" style="font-size:0.85rem"></div>';
+  }
+  h += '</div>';
+  h += '<div style="margin-top:12px"><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fab fa-telegram" style="margin-right:4px"></i>\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430 \u0432 \u043c\u0435\u0441\u0441\u0435\u043d\u0434\u0436\u0435\u0440 (' + lang.toUpperCase() + ')</label><input class="input" id="pdf_order_message' + lSuffix + '" value="' + escHtml(t['order_message' + lSuffix] || (lang==='en' ? 'Hello! I would like to place an order:' : lang==='am' ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')) + '" placeholder="\u0422\u0435\u043a\u0441\u0442 \u043f\u0440\u0438 \u043d\u0430\u0436\u0430\u0442\u0438\u0438 \u043a\u043d\u043e\u043f\u043a\u0438 \u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c"></div>';
+  h += '</div>';
+  
   // ── 3. Company info (shared across languages) ──
   h += '<div class="card" style="margin-bottom:20px">';
   h += '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa"><i class="fas fa-building" style="margin-right:8px"></i>\u0414\u0430\u043d\u043d\u044b\u0435 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438</h3>';
@@ -7812,6 +7859,13 @@ async function savePdfTemplate() {
     if (bdEl) payload['btn_download' + sfx] = bdEl.value;
     if (tEl) payload['terms' + sfx] = tEl.value;
     if (bkEl) payload['bank_details' + sfx] = bkEl.value;
+    // Save table label fields
+    var labelKeys = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
+    for (var lki = 0; lki < labelKeys.length; lki++) {
+      var lkKey = labelKeys[lki] + sfx;
+      var lkEl = document.getElementById('pdf_' + lkKey);
+      if (lkEl) payload[lkKey] = lkEl.value;
+    }
   }
   // Shared fields
   var fields = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_logo': 'company_logo_url', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
@@ -9562,7 +9616,6 @@ function renderSiteBlocks() {
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
         '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
-        '<button class="btn btn-outline" onclick="createReviewsBlock()" style="white-space:nowrap;font-size:0.82rem;border-color:rgba(245,158,11,0.4);color:#F59E0B"><i class="fas fa-star" style="margin-right:5px"></i>Блок отзывов</button>' +
       '</div>' +
     '</div>';
 

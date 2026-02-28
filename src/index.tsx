@@ -553,11 +553,21 @@ app.get('/pdf/:id', async (c) => {
       rows += '<tr style="background:#FEF3C7;opacity:0.8"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#92400E">' + (isEn ? 'Articles subtotal:' : isAm ? '\u0531\u0580\u057f\u056b\u056f\u0578\u0582\u056c\u0576\u0565\u0580 \u0565\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;color:#92400E;white-space:nowrap">' + artSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
     
-    const L = isEn
-      ? { svc: 'Service', qty: 'Qty', price: 'Price', sum: 'Total', total: 'TOTAL:', client: 'Client:', date: 'Date:', id: 'Invoice #', back: 'Back', num: '#', terms: 'Terms & Conditions', bank: 'Bank Details', inn: 'Reg. No.' }
-      : isAm
-      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', back: '\u0540\u0561\u0577\u057e\u056b\u0579', num: '\u2116', terms: '\u054a\u0561\u0575\u0574\u0561\u0576\u0576\u0565\u0580', bank: '\u0532\u0561\u0576\u056f\u0561\u0575\u056b\u0576 \u057f\u057e\u0575\u0561\u043b\u043d\u0565\u0440', inn: '\u0540\u0544' }
-      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', back: '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443', num: '\u2116', terms: '\u0423\u0441\u043b\u043e\u0432\u0438\u044f', bank: '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b', inn: '\u0418\u041d\u041d' };
+    const L = {
+      svc: tpl['label_service' + lSuffix] || (isEn ? 'Service' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576' : '\u0423\u0441\u043b\u0443\u0433\u0430'),
+      qty: tpl['label_qty' + lSuffix] || (isEn ? 'Qty' : isAm ? '\u0554\u0561\u0576\u0561\u056f' : '\u041a\u043e\u043b-\u0432\u043e'),
+      price: tpl['label_price' + lSuffix] || (isEn ? 'Price' : isAm ? '\u0533\u056b\u0576' : '\u0426\u0565\u043d\u0430'),
+      sum: tpl['label_sum' + lSuffix] || (isEn ? 'Total' : isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430'),
+      total: tpl['label_total' + lSuffix] || (isEn ? 'TOTAL:' : isAm ? '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:' : '\u0418\u0422\u041e\u0413\u041e:'),
+      client: tpl['label_client' + lSuffix] || (isEn ? 'Client:' : isAm ? '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:' : '\u041a\u043b\u0438\u0435\u043d\u0442:'),
+      date: tpl['label_date' + lSuffix] || (isEn ? 'Date:' : isAm ? '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:' : '\u0414\u0430\u0442\u0430:'),
+      id: tpl['label_invoice' + lSuffix] || (isEn ? 'Invoice #' : isAm ? '\u0540\u0561\u0575\u057f \u2116' : '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116'),
+      back: tpl['label_back' + lSuffix] || (isEn ? 'Back' : isAm ? '\u0540\u0561\u0577\u057e\u056b\u0579' : '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443'),
+      num: '\u2116',
+      terms: tpl['terms' + lSuffix] ? (isEn ? 'Terms & Conditions' : isAm ? '\u054a\u0561\u0575\u0574\u0561\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u043e\u0432\u0438\u044f') : '',
+      bank: isEn ? 'Bank Details' : isAm ? '\u0532\u0561\u0576\u056f\u0561\u0575\u056b\u0576 \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580' : '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b',
+      inn: isEn ? 'Reg. No.' : isAm ? '\u0540\u0544' : '\u0418\u041d\u041d'
+    };
 
     const btnOrder = String(tpl['btn_order' + lSuffix] || (isEn ? 'Order Now' : isAm ? '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561' : '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
     const btnDl = String(tpl['btn_download' + lSuffix] || (isEn ? 'Download' : isAm ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c'));
@@ -566,7 +576,7 @@ app.get('/pdf/:id', async (c) => {
     const isWhatsApp = messengerUrl.includes('wa.me') || messengerUrl.includes('whatsapp');
     const messengerIcon = isWhatsApp ? 'fab fa-whatsapp' : 'fab fa-telegram';
     
-    const orderMsg = (isEn ? 'Hello! I would like to place an order:' : isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')
+    const orderMsg = String(tpl['order_message' + lSuffix] || (isEn ? 'Hello! I would like to place an order:' : isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:'))
       + '\n' + invoicePrefix + '-' + id
       + '\n' + L.total + ' ' + Number(total).toLocaleString('ru-RU') + ' \u058f';
     const orderMsgFull = orderMsg
@@ -1799,10 +1809,10 @@ img{max-width:100%;height:auto}
     <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div style="flex:1;min-width:200px">
-          <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:6px"><i class="fas fa-gift" style="margin-right:6px"></i><span data-ru="Есть промокод?" data-am="Պրոմоկոդ ունեք?">Есть промокод?</span></label>
+          <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:6px"><i class="fas fa-gift" style="margin-right:6px"></i><span data-ru="Есть промокод?" data-am="Պրոմոկոդ ունեք?">Есть промокод?</span></label>
           <input type="text" id="refCodeInput" placeholder="PROMO2026" style="width:100%;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;font-family:inherit;text-transform:uppercase;outline:none;transition:var(--t)" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor='var(--border)'">
         </div>
-        <button onclick="checkRefCode()" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;white-space:nowrap"><i class="fas fa-check-circle" style="margin-right:6px"></i><span data-ru="Применить" data-am="Կիրառեл">Применить</span></button>
+        <button onclick="checkRefCode()" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;white-space:nowrap"><i class="fas fa-check-circle" style="margin-right:6px"></i><span data-ru="Применить" data-am="Կիրառել">Применить</span></button>
       </div>
       <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
     </div>

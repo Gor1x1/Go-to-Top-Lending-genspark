@@ -462,6 +462,40 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_ru TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_am TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_en TEXT DEFAULT ''").run(); } catch {}
+  // PDF table label fields (editable labels for PDF invoice)
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_service_ru TEXT DEFAULT '\u0423\u0441\u043b\u0443\u0433\u0430'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_service_am TEXT DEFAULT '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_service_en TEXT DEFAULT 'Service'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_qty_ru TEXT DEFAULT '\u041a\u043e\u043b-\u0432\u043e'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_qty_am TEXT DEFAULT '\u0554\u0561\u0576\u0561\u056f'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_qty_en TEXT DEFAULT 'Qty'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_price_ru TEXT DEFAULT '\u0426\u0435\u043d\u0430'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_price_am TEXT DEFAULT '\u0533\u056b\u0576'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_price_en TEXT DEFAULT 'Price'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_sum_ru TEXT DEFAULT '\u0421\u0443\u043c\u043c\u0430'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_sum_am TEXT DEFAULT '\u0533\u0578\u0582\u0574\u0561\u0580'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_sum_en TEXT DEFAULT 'Total'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_total_ru TEXT DEFAULT '\u0418\u0422\u041e\u0413\u041e:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_total_am TEXT DEFAULT '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_total_en TEXT DEFAULT 'TOTAL:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_ru TEXT DEFAULT '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_am TEXT DEFAULT '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0440\u0561\u056f:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_en TEXT DEFAULT 'Subtotal:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_client_ru TEXT DEFAULT '\u041a\u043b\u0438\u0435\u043d\u0442:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_client_am TEXT DEFAULT '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_client_en TEXT DEFAULT 'Client:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_date_ru TEXT DEFAULT '\u0414\u0430\u0442\u0430:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_date_am TEXT DEFAULT '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_date_en TEXT DEFAULT 'Date:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_invoice_ru TEXT DEFAULT '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_invoice_am TEXT DEFAULT '\u0540\u0561\u0575\u057f \u2116'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_invoice_en TEXT DEFAULT 'Invoice #'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_back_ru TEXT DEFAULT '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_back_am TEXT DEFAULT '\u0540\u0561\u0577\u057e\u056b\u0579'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_back_en TEXT DEFAULT 'Back'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_message_ru TEXT DEFAULT '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_message_am TEXT DEFAULT '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN order_message_en TEXT DEFAULT 'Hello! I would like to place an order:'").run(); } catch {}
   // v2 Migrations: employee system + site blocks
   try { await db.prepare("ALTER TABLE users ADD COLUMN phone TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE users ADD COLUMN email TEXT DEFAULT ''").run(); } catch {}
