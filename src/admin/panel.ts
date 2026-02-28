@@ -930,6 +930,20 @@ async function submitCreateBlock() {
     if (withPhoto2 && photoUrl2) {
       await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: newName + ' фото', position: newId, is_visible: 1, photos_json: JSON.stringify([{ url: photoUrl2, caption: '' }]) }) });
     }
+
+    // Copy site_block entry from source for immediate editing
+    var srcSiteBlock2 = (data.siteBlocks || []).find(function(sb) { return sb.block_key === copyFrom; });
+    if (srcSiteBlock2) {
+      await api('/site-blocks', { method: 'POST', body: JSON.stringify({
+        block_key: newId, block_type: srcSiteBlock2.block_type || 'section',
+        title_ru: newName, title_am: '',
+        texts_ru: srcSiteBlock2.texts_ru || [], texts_am: srcSiteBlock2.texts_am || [],
+        images: srcSiteBlock2.images || [], buttons: srcSiteBlock2.buttons || [],
+        custom_css: srcSiteBlock2.custom_css || '', custom_html: srcSiteBlock2.custom_html || '{}',
+        social_links: typeof srcSiteBlock2.social_links === 'string' ? srcSiteBlock2.social_links : JSON.stringify(srcSiteBlock2.social_links || []),
+        is_visible: 1
+      }) });
+    }
   }
 
   document.getElementById('createBlockModal').remove();
@@ -962,6 +976,34 @@ async function duplicateBlock(idx) {
   var srcPhotos = (data.photoBlocks || []).filter(function(p) { return p.position === sec.section_id; });
   for (var pi = 0; pi < srcPhotos.length; pi++) {
     await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: srcPhotos[pi].block_name + ' (копия)', position: newId, is_visible: 1, photos_json: srcPhotos[pi].photos_json }) });
+  }
+
+  // Copy site_block entry so the new block is immediately editable in Constructor
+  var srcSiteBlock = (data.siteBlocks || []).find(function(sb) { return sb.block_key === sec.section_id; });
+  if (srcSiteBlock) {
+    var copiedBlock = {
+      block_key: newId,
+      block_type: srcSiteBlock.block_type || 'section',
+      title_ru: newName,
+      title_am: srcSiteBlock.title_am || '',
+      texts_ru: srcSiteBlock.texts_ru || [],
+      texts_am: srcSiteBlock.texts_am || [],
+      images: srcSiteBlock.images || [],
+      buttons: srcSiteBlock.buttons || [],
+      custom_css: srcSiteBlock.custom_css || '',
+      custom_html: srcSiteBlock.custom_html || '{}',
+      social_links: typeof srcSiteBlock.social_links === 'string' ? srcSiteBlock.social_links : JSON.stringify(srcSiteBlock.social_links || []),
+      is_visible: 1,
+      sort_order: idx + 1
+    };
+    await api('/site-blocks', { method: 'POST', body: JSON.stringify(copiedBlock) });
+    // Sync the new block to site immediately
+    var updatedBlocks = await api('/site-blocks');
+    data.siteBlocks = (updatedBlocks && updatedBlocks.blocks) || [];
+    var newBlock = data.siteBlocks.find(function(sb) { return sb.block_key === newId; });
+    if (newBlock) {
+      await api('/site-blocks/' + newBlock.id + '/sync-to-site', { method: 'POST' });
+    }
   }
 
   toast('Блок скопирован!');
@@ -7129,7 +7171,8 @@ function renderPdfTemplate() {
         '<td style="padding:6px 8px;color:#60a5fa">' + escHtml(rl.contact || '-') + '</td>' +
         '<td style="padding:6px 8px;text-align:right;font-weight:600;color:#10B981">' + Math.round(parseFloat(rl.total_amount) || 0).toLocaleString('ru-RU') + ' \u058f</td>' +
         '<td style="padding:6px 8px;color:#64748b">' + (rl.created_at ? new Date(rl.created_at).toLocaleString('ru') : '-') + '</td>' +
-        '<td style="padding:6px 8px"><a href="/pdf/' + rl.id + '" target="_blank" class="btn btn-outline" style="padding:2px 8px;font-size:0.68rem"><i class="fas fa-eye"></i></a></td>' +
+        '<td style="padding:6px 8px;white-space:nowrap"><a href="/pdf/' + rl.id + '" target="_blank" class="btn btn-outline" style="padding:2px 8px;font-size:0.68rem;margin-right:4px"><i class="fas fa-eye"></i></a>' +
+        '<button class="btn btn-danger" style="padding:2px 8px;font-size:0.68rem" onclick="deletePdfLead(' + rl.id + ')"><i class="fas fa-trash"></i></button></td>' +
       '</tr>';
     }
     h += '</table></div></div>';
@@ -7140,6 +7183,13 @@ function renderPdfTemplate() {
   h += '<button class="btn btn-success" style="min-width:200px;font-size:1rem;padding:14px 24px" onclick="savePdfTemplate()"><i class="fas fa-save" style="margin-right:8px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0448\u0430\u0431\u043b\u043e\u043d</button>';
   h += '</div>';
   return h;
+}
+
+async function deletePdfLead(id) {
+  if (!confirm('Удалить эту PDF-заявку? Действие необратимо.')) return;
+  await api('/leads/' + id, { method: 'DELETE' });
+  toast('PDF-заявка удалена');
+  await loadData(); render();
 }
 
 async function savePdfTemplate() {
@@ -8907,6 +8957,7 @@ function renderSiteBlocks() {
       '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
         '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
+        '<button class="btn btn-outline" onclick="createReviewsBlock()" style="white-space:nowrap;font-size:0.82rem;border-color:rgba(245,158,11,0.4);color:#F59E0B"><i class="fas fa-star" style="margin-right:5px"></i>Блок отзывов</button>' +
       '</div>' +
     '</div>';
 
@@ -8920,7 +8971,8 @@ function renderSiteBlocks() {
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
     { id: 'telegram', icon: 'fa-paper-plane', label: 'Быстрые сообщения', count: totalBlockBtns },
-    { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length }
+    { id: 'slots', icon: 'fa-clock', label: 'Счётчики слотов', count: (data.slotCounters || []).length },
+    { id: 'pdf_inline', icon: 'fa-file-pdf', label: 'PDF шаблон', count: 0 }
   ];
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
@@ -8940,6 +8992,13 @@ function renderSiteBlocks() {
   if (sbActiveTab === 'slots') {
     h += '</div>'; // close header
     h += renderSlotCounter();
+    return h;
+  }
+
+  // ── If PDF tab selected, render PDF template inline ──
+  if (sbActiveTab === 'pdf_inline') {
+    h += '</div>'; // close header
+    h += renderPdfTemplate();
     return h;
   }
 
@@ -9289,15 +9348,23 @@ function renderSiteBlocks() {
           // Recommended photo dimensions per block type
           var photoDims = { hero: '600×800px (портрет) или 1200×675px (16:9)', about: '800×600px (горизонт) или 600×600px (квадрат)', warehouse: '800×500px (горизонт, 16:10)', wb_official: '1200×675px (16:9)', services: '600×400px (горизонт)', wb_banner: '1200×400px (баннер, 3:1)' };
           var dimHint = photoDims[b.block_key] || '800×600px (рекомендуемый размер)';
+          var isReviewsBlock = (b.block_type === 'reviews');
+          if (isReviewsBlock) dimHint = '280×360px (вертикальный скриншот отзыва)';
           
           h += '<div style="margin-bottom:16px">';
-          h += '<details' + (blockPhotos.length > 0 || opts.photo_url ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>Фото блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
+          h += '<details' + (blockPhotos.length > 0 || opts.photo_url ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>' + (isReviewsBlock ? 'Скриншоты отзывов (карусель)' : 'Фото блока') + ' <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
           
           // Photo size recommendation
           h += '<div style="padding:6px 10px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:6px">' +
             '<i class="fas fa-ruler-combined" style="color:#60a5fa;font-size:0.75rem"></i>' +
             '<span style="font-size:0.72rem;color:#60a5fa">Рекомендуемый размер: <b>' + dimHint + '</b> • Макс: 5 МБ • JPG/PNG/WebP</span>' +
           '</div>';
+          if (isReviewsBlock) {
+            h += '<div style="padding:8px 12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:8px">' +
+              '<i class="fas fa-star" style="color:#F59E0B;font-size:0.85rem"></i>' +
+              '<span style="font-size:0.75rem;color:#F59E0B">Блок отзывов: фото отображаются как горизонтальная карусель с навигацией. Загрузите скриншоты отзывов — они автоматически будут в формате слайдера.</span>' +
+            '</div>';
+          }
           
           // Main photo URL (replaces main section image, e.g. Hero photo)
           h += '<div style="margin-bottom:10px;padding:8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
@@ -9640,7 +9707,7 @@ function sbAddButton(blockId) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
   if (!b) return;
   if (!b.buttons) b.buttons = [];
-  b.buttons.push({ text_ru: '', text_am: '', url: 'https://t.me/goo_to_top', icon: 'fas fa-arrow-right', action_type: 'telegram', message_ru: '', message_am: '' });
+  b.buttons.push({ text_ru: '', text_am: '', url: '', icon: 'fas fa-link', action_type: 'link', message_ru: '', message_am: '' });
   render();
 }
 
@@ -9898,6 +9965,38 @@ function createSiteBlock() {
   var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], social_links: '[]', is_visible: 1, custom_css: '', custom_html: '' };
   editingBlock = newBlock;
   showBlockEditor();
+}
+
+// ── Create client reviews block with carousel ──
+async function createReviewsBlock() {
+  var name = prompt('Название блока отзывов:', 'Отзывы клиентов');
+  if (!name) return;
+  var key = 'reviews_' + Date.now().toString(36);
+  var blockData = {
+    block_key: key,
+    block_type: 'reviews',
+    title_ru: name,
+    title_am: '',
+    texts_ru: [name, 'Что говорят наши клиенты'],
+    texts_am: [],
+    images: [],
+    buttons: [],
+    social_links: '[]',
+    is_visible: 1,
+    custom_css: '',
+    custom_html: JSON.stringify({ photos: [], show_photos: true })
+  };
+  await api('/site-blocks', { method: 'POST', body: JSON.stringify(blockData) });
+  
+  // Also add to sectionOrder so it appears on the site
+  var maxOrder = data.sectionOrder.reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0);
+  data.sectionOrder.push({ section_id: key, sort_order: maxOrder + 1, is_visible: 1, label_ru: name, label_am: '' });
+  await saveAllBlocks();
+  // Create content entry
+  await api('/content', { method: 'POST', body: JSON.stringify({ section_key: key, section_name: name, content_json: [{ ru: name, am: '' }, { ru: 'Что говорят наши клиенты', am: '' }] }) });
+  
+  toast('Блок отзывов создан! Загрузите скриншоты отзывов через фото-галерею блока.');
+  await loadData(); render();
 }
 
 // ── Save block (collect from DOM + send to API) ──

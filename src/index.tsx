@@ -101,7 +101,7 @@ app.get('/api/site-data', async (c) => {
     // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
     let siteBlockFeatures: any[] = [];
     try {
-      const blocksRes = await db.prepare("SELECT block_key, social_links, images, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
         try { socials = JSON.parse(blk.social_links as string || '[]'); } catch { socials = []; }
@@ -118,6 +118,7 @@ app.get('/api/site-data', async (c) => {
             show_socials: socials.length > 0 || blockOpts.show_socials || false,
             show_photos: blockPhotos.length > 0 || blockOpts.show_photos || false,
             show_slots: blockOpts.show_slots || false,
+            block_type: blk.block_type || 'section',
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -1065,6 +1066,8 @@ img{max-width:100%;height:auto}
 /* ===== REVIEWS DETAIL ===== */
 .reviews-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;margin-top:32px}
 .reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:32px}
+.reviews-carousel-wrap div[id^="reviewsCar"]::-webkit-scrollbar{display:none}
+.reviews-carousel-wrap div[id^="reviewsCar"]{-ms-overflow-style:none;scrollbar-width:none}
 .review-point{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;transition:var(--t)}
 .review-point:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-3px)}
 .review-point i{font-size:2rem;color:var(--purple);margin-bottom:14px}
@@ -2796,23 +2799,55 @@ switchLang = function(l) {
         if (bf.photos && bf.photos.length > 0) {
           var existingPhotoGal = section.querySelector('.block-photo-gallery');
           if (existingPhotoGal) existingPhotoGal.remove();
+          var existingReviewCarousel = section.querySelector('.reviews-carousel-wrap');
+          if (existingReviewCarousel) existingReviewCarousel.remove();
           
           var validPhotos = bf.photos.filter(function(p) { return p && p.url; });
           if (validPhotos.length > 0) {
-            var photoDiv = document.createElement('div');
-            photoDiv.className = 'block-photo-gallery';
-            photoDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 0;margin-top:12px';
-            var phH = '';
-            validPhotos.forEach(function(p) {
-              phH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-                '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:180px;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
-                (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
-              '</div>';
-            });
-            photoDiv.innerHTML = phH;
-            var container = section.querySelector('.container');
-            if (container) container.appendChild(photoDiv);
-            else section.appendChild(photoDiv);
+            // Reviews carousel mode for block_type = 'reviews'
+            if (bf.block_type === 'reviews') {
+              var carouselWrap = document.createElement('div');
+              carouselWrap.className = 'reviews-carousel-wrap';
+              var carId = 'reviewsCar_' + bf.key;
+              carouselWrap.style.cssText = 'position:relative;padding:20px 0;margin-top:12px;overflow:hidden';
+              var cH = '<div id="' + carId + '" style="display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding:8px 4px">';
+              validPhotos.forEach(function(p,pi) {
+                cH += '<div style="flex:0 0 280px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                  '<img src="' + p.url + '" alt="' + (p.caption||'Отзыв') + '" style="width:100%;height:360px;object-fit:cover;transition:transform 0.3s" loading="lazy">' +
+                  (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
+                '</div>';
+              });
+              cH += '</div>';
+              // Navigation arrows
+              if (validPhotos.length > 1) {
+                cH += '<button onclick="document.getElementById(&apos;' + carId + '&apos;).scrollBy({left:-296,behavior:&apos;smooth&apos;})" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:2"><i class="fas fa-chevron-left"></i></button>';
+                cH += '<button onclick="document.getElementById(&apos;' + carId + '&apos;).scrollBy({left:296,behavior:&apos;smooth&apos;})" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:2"><i class="fas fa-chevron-right"></i></button>';
+                // Dot indicators
+                cH += '<div style="display:flex;justify-content:center;gap:6px;margin-top:12px">';
+                validPhotos.forEach(function(_,di) { cH += '<div style="width:8px;height:8px;border-radius:50%;background:' + (di===0?'#8B5CF6':'rgba(139,92,246,0.3)') + '"></div>'; });
+                cH += '</div>';
+              }
+              carouselWrap.innerHTML = cH;
+              var container = section.querySelector('.container');
+              if (container) container.appendChild(carouselWrap);
+              else section.appendChild(carouselWrap);
+            } else {
+              // Default grid view for regular blocks
+              var photoDiv = document.createElement('div');
+              photoDiv.className = 'block-photo-gallery';
+              photoDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 0;margin-top:12px';
+              var phH = '';
+              validPhotos.forEach(function(p) {
+                phH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                  '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:180px;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
+                  (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
+                '</div>';
+              });
+              photoDiv.innerHTML = phH;
+              var container = section.querySelector('.container');
+              if (container) container.appendChild(photoDiv);
+              else section.appendChild(photoDiv);
+            }
           }
         }
         
@@ -2867,11 +2902,16 @@ switchLang = function(l) {
           }
         }
         
-        // Inject slot counters if show_slots is on
+        // Inject slot counters if show_slots is on — filter by position matching this block
         if (bf.show_slots && db.slotCounters && db.slotCounters.length > 0) {
+          var bfKey = bf.key;
+          var bfKeyHyphen = bfKey.replace(/_/g, '-');
           db.slotCounters.forEach(function(sc) {
             if (!sc.show_timer) return;
-            // Show first active slot counter in this block
+            // Only show counters linked to THIS block (position matches)
+            var cpos = sc.position || '';
+            if (cpos !== 'in-' + bfKey && cpos !== 'after-' + bfKey && cpos !== 'before-' + bfKey &&
+                cpos !== 'in-' + bfKeyHyphen && cpos !== 'after-' + bfKeyHyphen && cpos !== 'before-' + bfKeyHyphen) return;
             var free = Math.max(0, (sc.total_slots || 10) - (sc.booked_slots || 0));
             var pct = sc.total_slots > 0 ? Math.round(((sc.total_slots - free) / sc.total_slots) * 100) : 0;
             var existingSlot = section.querySelector('.block-slot-counter');
