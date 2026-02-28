@@ -5340,9 +5340,12 @@ function renderBizOverviewV2(d, sd, fin) {
   var totalDiscCostOV = Number(d.total_discount_cost || 0);
   var totalDiscLeadsOV = Number(d.total_discount_leads || 0);
   var svcBeforeDisc = Number(d.services_before_discount || 0);
-  if (promoKeys2.length > 0 || totalDiscCostOV > 0) {
+  {
     h += '<div style="margin-bottom:32px">';
     h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-gift" style="color:#FBBF24;margin-right:8px"></i>Влияние реферальных кодов и скидок</h3>';
+    if (promoKeys2.length === 0 && totalDiscCostOV === 0) {
+      h += '<div class="card" style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-tag" style="font-size:1.5rem;margin-bottom:8px;display:block;color:#475569"></i>За выбранный период нет лидов с промокодами. Примените промокод к лиду, чтобы видеть аналитику здесь.</div>';
+    }
     // KPI cards
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
     // 1. Codes used
@@ -5821,10 +5824,13 @@ function renderBizCostsV2(d, sd, fin) {
   var totalDiscCost2 = Number(d.total_discount_cost || 0);
   var totalDiscLeads2 = Number(d.total_discount_leads || 0);
   var svcBeforeDisc2 = Number(d.services_before_discount || 0);
-  if (promoKeys3.length > 0 || totalDiscCost2 > 0) {
+  {
     h += '<div style="margin-bottom:32px">';
     h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#FBBF24;margin-right:8px"></i>Упущенная выручка (скидки)</h3>';
     h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Скидки клиентам по промокодам — это выручка, от которой вы отказались. Ниже — полная картина стоимости скидок.</div>';
+    if (promoKeys3.length === 0 && totalDiscCost2 === 0) {
+      h += '<div class="card" style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-hand-holding-usd" style="font-size:1.5rem;margin-bottom:8px;display:block;color:#475569"></i>Нет данных по скидкам за выбранный период. Когда лидам будут назначены промокоды, здесь появится отчёт по стоимости скидок.</div>';
+    }
     // KPI cards
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
     h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #FBBF24"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-tags" style="color:#FBBF24;margin-right:4px"></i>Активных промокодов</div><div style="font-size:1.5rem;font-weight:800;color:#FBBF24">' + promoKeys3.length + '</div></div>';
@@ -6034,8 +6040,13 @@ function renderBizFunnelV2(d, sd, fin) {
   var allLeadsRaw = d.all_leads_status || [];
   var allPC = d.promo_costs || {};
   var allPCKeys = Object.keys(allPC);
-  if (allPCKeys.length > 0) {
-    // Aggregate: leads with promo vs without promo
+  {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#FBBF24;margin-right:8px"></i>Эффективность промокодов: конверсия и средний чек</h3>';
+    h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Сравнение поведения лидов с промокодом и без — помогает оценить ROI скидочной программы.</div>';
+    if (allPCKeys.length === 0) {
+      h += '<div class="card" style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-exchange-alt" style="font-size:1.5rem;margin-bottom:8px;display:block;color:#475569"></i>Нет данных для сравнения. Когда лидам будут применены промокоды, здесь появится сравнение конверсии и среднего чека.</div>';
+    } else {
     var withPromoTotal = 0, withPromoDone = 0, withPromoRev = 0, withPromoSvc = 0;
     var withoutPromoTotal = 0, withoutPromoDone = 0, withoutPromoRev = 0, withoutPromoSvc = 0;
     // Use per-code data: total leads with promo codes
@@ -6104,15 +6115,20 @@ function renderBizFunnelV2(d, sd, fin) {
     h += '<div style="color:#e2e8f0"><span style="color:#94a3b8">ROI скидок:</span> <span style="color:' + (Number(promoROI) > 0 || promoROI === '∞' ? '#22C55E' : '#EF4444') + ';font-weight:700">' + promoROI + '%</span> <span style="color:#475569;font-size:0.68rem">(выручка промо / стоимость скидок)</span></div>';
     h += '</div></div>';
     h += '</div>';
+    } // end else (allPCKeys.length > 0)
+    h += '</div>';
   }
 
   // ---- SECTION: PROMO CODE ANALYTICS ----
   var promoCosts = d.promo_costs || {};
   var promoKeys = Object.keys(promoCosts);
-  if (promoKeys.length > 0) {
+  {
     var totalDiscCost = Number(d.total_discount_cost || 0);
     h += '<div style="margin-bottom:32px">';
     h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-gift" style="color:#8B5CF6;margin-right:8px"></i>Аналитика промокодов</h3>';
+    if (promoKeys.length === 0) {
+      h += '<div class="card" style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-gift" style="font-size:1.5rem;margin-bottom:8px;display:block;color:#475569"></i>Нет использованных промокодов за выбранный период. Добавьте промокод в разделе «Реферальные коды» и примените к лиду.</div>';
+    }
     
     // KPIs
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px">';
