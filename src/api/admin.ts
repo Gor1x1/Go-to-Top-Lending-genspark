@@ -2540,13 +2540,88 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     }
     const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
 
-    // 10. Referral stats
+    // 10. Referral stats — COMPREHENSIVE referral & discount analytics
     let refResults: any[] = [];
+    let totalDiscountCost = 0;
+    let totalDiscountLeads = 0;
+    let servicesBeforeDiscount = 0; // What services would cost WITHOUT discounts
+    const promoCodeCosts: Record<string, { count: number; discount_total: number; revenue: number; services_total: number; code_details?: any; leads: any[] }> = {};
     try {
       const dfNoAlias = dateFilter.replace(/l\./g, '');
       const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dfNoAlias + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
       refResults = refRes.results || [];
     } catch {}
+    // Build per-code detailed costs from all leads
+    for (const lead of (allLeads.results || [])) {
+      const rc = lead.referral_code as string;
+      if (!rc) continue;
+      if (!promoCodeCosts[rc]) promoCodeCosts[rc] = { count: 0, discount_total: 0, revenue: 0, services_total: 0, leads: [] };
+      promoCodeCosts[rc].count++;
+      promoCodeCosts[rc].revenue += Number(lead.total_amount || 0);
+      try {
+        const cd = JSON.parse((lead.calc_data as string) || '{}');
+        const da = Number(cd.discountAmount || 0);
+        const svcSub = Number(cd.servicesSubtotal || 0);
+        promoCodeCosts[rc].discount_total += da;
+        promoCodeCosts[rc].services_total += svcSub;
+        totalDiscountCost += da;
+        if (da > 0) totalDiscountLeads++;
+        servicesBeforeDiscount += svcSub;
+        promoCodeCosts[rc].leads.push({
+          id: lead.id, name: (lead as any).name || '', status: lead.status,
+          total: Number(lead.total_amount || 0), discount: da,
+          services: svcSub, date: (lead as any).created_at || ''
+        });
+      } catch {}
+    }
+    // Enrich with referral_codes table data (including services)
+    try {
+      const allCodes = await db.prepare("SELECT * FROM referral_codes").all();
+      for (const code of (allCodes.results || [])) {
+        const key = code.code as string;
+        if (promoCodeCosts[key]) {
+          promoCodeCosts[key].code_details = {
+            id: code.id, discount_percent: code.discount_percent, free_reviews: code.free_reviews,
+            uses_count: code.uses_count, is_active: code.is_active, description: code.description
+          };
+        }
+      }
+    } catch {}
+    // Load referral_free_services for each code (service-specific discounts)
+    const refCodeServices: Record<string, any[]> = {};
+    try {
+      const allRfs = await db.prepare(`SELECT rfs.*, cs.name_ru, cs.price, rc.code
+        FROM referral_free_services rfs 
+        JOIN referral_codes rc ON rfs.referral_code_id = rc.id
+        LEFT JOIN calculator_services cs ON rfs.service_id = cs.id`).all();
+      for (const rfs of (allRfs.results || [])) {
+        const code = rfs.code as string;
+        if (!refCodeServices[code]) refCodeServices[code] = [];
+        refCodeServices[code].push({
+          service_name: rfs.name_ru || '', price: Number(rfs.price || 0),
+          discount_percent: Number(rfs.discount_percent || 0), quantity: Number(rfs.quantity || 1)
+        });
+      }
+    } catch {}
+    // Monthly discount breakdown
+    const monthlyDiscounts: Record<string, { discount_total: number; leads_count: number; services_before: number }> = {};
+    for (const lead of (allLeads.results || [])) {
+      const rc = lead.referral_code as string;
+      if (!rc) continue;
+      try {
+        const cd = JSON.parse((lead.calc_data as string) || '{}');
+        const da = Number(cd.discountAmount || 0);
+        const svcSub = Number(cd.servicesSubtotal || 0);
+        const created = (lead as any).created_at as string || '';
+        const monthKey = created.substring(0, 7); // '2026-02'
+        if (monthKey) {
+          if (!monthlyDiscounts[monthKey]) monthlyDiscounts[monthKey] = { discount_total: 0, leads_count: 0, services_before: 0 };
+          monthlyDiscounts[monthKey].discount_total += da;
+          if (da > 0) monthlyDiscounts[monthKey].leads_count++;
+          monthlyDiscounts[monthKey].services_before += svcSub;
+        }
+      } catch {}
+    }
 
     // 11. By source
     const bySource: Record<string, any> = {};
@@ -2761,6 +2836,12 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       by_source: bySource,
       services: serviceList,
       referrals: refResults,
+      promo_costs: promoCodeCosts,
+      total_discount_cost: totalDiscountCost,
+      total_discount_leads: totalDiscountLeads,
+      services_before_discount: servicesBeforeDiscount,
+      ref_code_services: refCodeServices,
+      monthly_discounts: monthlyDiscounts,
       employees,
       rejected_leads: rejectedLeads,
       stage_timings: stageTimings,

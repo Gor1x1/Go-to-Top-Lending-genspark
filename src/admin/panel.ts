@@ -3555,6 +3555,12 @@ function renderPnlCascade(p) {
   
   // Revenue
   h += pnlRow('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (Revenue)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0443\u0441\u043b\u0443\u0433 \u0438\u0437 \u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432'), p.revenue, {bold:true, color:'#22C55E', icon:'fa-coins', mom:mom.revenue, momPct:mp.revenue, ytd:ytd.revenue});
+  // Discount impact (from promo codes)
+  var pnlDiscCost = Number((analyticsData && analyticsData.total_discount_cost) || 0);
+  var pnlDiscLeads = Number((analyticsData && analyticsData.total_discount_leads) || 0);
+  if (pnlDiscCost > 0) {
+    h += pnlRow('  \u0421\u043a\u0438\u0434\u043a\u0438 \u043f\u043e \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434\u0430\u043c (' + pnlDiscLeads + ' \u043b\u0438\u0434\u043e\u0432)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0441\u043a\u0438\u0434\u043e\u043a \u043a\u043b\u0438\u0435\u043d\u0442\u0430\u043c \u043f\u043e \u0440\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u044b\u043c \u043a\u043e\u0434\u0430\u043c. \u0423\u043c\u0435\u043d\u044c\u0448\u0430\u0435\u0442 \u0432\u044b\u0440\u0443\u0447\u043a\u0443.'), -pnlDiscCost, {indent:2, color:'#FBBF24', sub:true, icon:'fa-gift'});
+  }
   h += pnlRow('\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b', -(p.refunds||0), {indent:1, color:'#EF4444', sub:true});
   h += pnlRow('\u0427\u0438\u0441\u0442\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430', p.net_revenue, {indent:1, color:'#22C55E', sub:true, ytd:ytd.net_revenue});
   // COGS
@@ -5328,6 +5334,54 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '</div>';
   h += '</div>';
 
+  // ---- SECTION: Referral & Discount Impact ----
+  var promoD = d.promo_costs || {};
+  var promoKeys2 = Object.keys(promoD);
+  var totalDiscCostOV = Number(d.total_discount_cost || 0);
+  var totalDiscLeadsOV = Number(d.total_discount_leads || 0);
+  var svcBeforeDisc = Number(d.services_before_discount || 0);
+  if (promoKeys2.length > 0 || totalDiscCostOV > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-gift" style="color:#FBBF24;margin-right:8px"></i>Влияние реферальных кодов и скидок</h3>';
+    // KPI cards
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
+    // 1. Codes used
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #8B5CF6"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-tags" style="color:#8B5CF6;margin-right:4px"></i>Промокодов</div><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">' + promoKeys2.length + '</div></div>';
+    // 2. Leads with discounts
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #10B981"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-users" style="color:#10B981;margin-right:4px"></i>Лидов со скидкой</div><div style="font-size:1.5rem;font-weight:800;color:#10B981">' + totalDiscLeadsOV + '</div></div>';
+    // 3. Total discount cost
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #EF4444"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:4px"></i>Сумма скидок</div><div style="font-size:1.5rem;font-weight:800;color:#EF4444">' + (totalDiscCostOV > 0 ? '-' : '') + fmtAmt(totalDiscCostOV) + '</div></div>';
+    // 4. Revenue with promos
+    var promoRevTotalOV = 0; promoKeys2.forEach(function(k) { promoRevTotalOV += promoD[k].revenue; });
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #3B82F6"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-coins" style="color:#3B82F6;margin-right:4px"></i>Выручка по промо</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6">' + fmtAmt(promoRevTotalOV) + '</div></div>';
+    // 5. Avg discount per lead
+    var avgDiscPerLead = totalDiscLeadsOV > 0 ? Math.round(totalDiscCostOV / totalDiscLeadsOV) : 0;
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-calculator" style="color:#F59E0B;margin-right:4px"></i>Ср. скидка / лид</div><div style="font-size:1.5rem;font-weight:800;color:#F59E0B">' + fmtAmt(avgDiscPerLead) + '</div></div>';
+    // 6. Discount rate (% of services given as discount)
+    var discRatePct = svcBeforeDisc > 0 ? (totalDiscCostOV / svcBeforeDisc * 100).toFixed(1) : '0';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #a78bfa"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-percent" style="color:#a78bfa;margin-right:4px"></i>Доля скидок</div><div style="font-size:1.5rem;font-weight:800;color:#a78bfa">' + discRatePct + '%</div><div style="font-size:0.58rem;color:#475569;margin-top:2px">от стоимости услуг</div></div>';
+    h += '</div>';
+    // Quick table of top promo codes
+    if (promoKeys2.length > 0) {
+      var sortedPromoOV = promoKeys2.sort(function(a,b) { return promoD[b].count - promoD[a].count; }).slice(0, 5);
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:8px 14px;text-align:left;color:#94a3b8">Код</th><th style="padding:8px;text-align:center;color:#94a3b8">Скидка</th><th style="padding:8px;text-align:center;color:#94a3b8">Лидов</th><th style="padding:8px;text-align:right;color:#94a3b8">Стоимость скидки</th><th style="padding:8px;text-align:right;color:#94a3b8">Подитог услуг</th><th style="padding:8px;text-align:right;color:#94a3b8">Выручка</th></tr></thead><tbody>';
+      for (var pvi = 0; pvi < sortedPromoOV.length; pvi++) {
+        var pvk = sortedPromoOV[pvi]; var pvc = promoD[pvk]; var pvcd = pvc.code_details || {};
+        h += '<tr style="border-bottom:1px solid #1e293b">';
+        h += '<td style="padding:8px 14px;font-weight:700;color:#a78bfa"><i class="fas fa-tag" style="margin-right:4px;color:#8B5CF6"></i>' + escHtml(pvk) + '</td>';
+        h += '<td style="padding:8px;text-align:center;color:#fbbf24;font-weight:600">' + (pvcd.discount_percent || 0) + '%</td>';
+        h += '<td style="padding:8px;text-align:center;font-weight:600">' + pvc.count + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#EF4444;font-weight:700">' + (pvc.discount_total > 0 ? '-' + fmtAmt(pvc.discount_total) : '0 ֏') + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#94a3b8">' + fmtAmt(pvc.services_total || 0) + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#10B981;font-weight:600">' + fmtAmt(pvc.revenue) + '</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div>';
+  }
+
   // ---- SECTION: Loan Summary (if any loans exist) ----
   var oLoans = (data.loans || []).filter(function(l) { return l.is_active !== 0; });
   if (oLoans.length > 0) {
@@ -5761,6 +5815,106 @@ function renderBizCostsV2(d, sd, fin) {
   }
   h += '</div>';
 
+  // ---- SECTION: Lost Revenue (Discounts as hidden cost) ----
+  var promoD2 = d.promo_costs || {};
+  var promoKeys3 = Object.keys(promoD2);
+  var totalDiscCost2 = Number(d.total_discount_cost || 0);
+  var totalDiscLeads2 = Number(d.total_discount_leads || 0);
+  var svcBeforeDisc2 = Number(d.services_before_discount || 0);
+  if (promoKeys3.length > 0 || totalDiscCost2 > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-hand-holding-usd" style="color:#FBBF24;margin-right:8px"></i>Упущенная выручка (скидки)</h3>';
+    h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Скидки клиентам по промокодам — это выручка, от которой вы отказались. Ниже — полная картина стоимости скидок.</div>';
+    // KPI cards
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #FBBF24"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-tags" style="color:#FBBF24;margin-right:4px"></i>Активных промокодов</div><div style="font-size:1.5rem;font-weight:800;color:#FBBF24">' + promoKeys3.length + '</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #EF4444;background:rgba(239,68,68,0.04)"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-money-bill-wave" style="color:#EF4444;margin-right:4px"></i>Общая сумма скидок</div><div style="font-size:1.5rem;font-weight:800;color:#EF4444">' + (totalDiscCost2 > 0 ? '-' : '') + fmtAmt(totalDiscCost2) + '</div><div style="font-size:0.58rem;color:#475569;margin-top:2px">упущенная выручка</div></div>';
+    var avgDiscPerLead2 = totalDiscLeads2 > 0 ? Math.round(totalDiscCost2 / totalDiscLeads2) : 0;
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-user-tag" style="color:#F59E0B;margin-right:4px"></i>Ср. скидка / лид</div><div style="font-size:1.5rem;font-weight:800;color:#F59E0B">' + fmtAmt(avgDiscPerLead2) + '</div><div style="font-size:0.58rem;color:#475569;margin-top:2px">' + totalDiscLeads2 + ' лидов</div></div>';
+    var discRatePct2 = svcBeforeDisc2 > 0 ? (totalDiscCost2 / svcBeforeDisc2 * 100).toFixed(1) : '0';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #a78bfa"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-percent" style="color:#a78bfa;margin-right:4px"></i>Доля от выручки услуг</div><div style="font-size:1.5rem;font-weight:800;color:#a78bfa">' + discRatePct2 + '%</div><div style="font-size:0.58rem;color:#475569;margin-top:2px">от ' + fmtAmt(svcBeforeDisc2) + '</div></div>';
+    h += '</div>';
+    // Compare discount cost vs other expense categories
+    var totalExpensesAll = 0;
+    for (var ei2 = 0; ei2 < exps.length; ei2++) totalExpensesAll += (Number(exps[ei2].amount) || 0);
+    var discVsExpPct = totalExpensesAll > 0 ? (totalDiscCost2 / totalExpensesAll * 100).toFixed(1) : '0';
+    var discVsSalPct = totalSalary > 0 ? (totalDiscCost2 / totalSalary * 100).toFixed(1) : '0';
+    h += '<div class="card" style="padding:16px;margin-bottom:16px;background:rgba(251,191,36,0.05);border-color:#FBBF2433">';
+    h += '<div style="font-weight:700;color:#FBBF24;margin-bottom:10px;font-size:0.88rem"><i class="fas fa-balance-scale" style="margin-right:6px"></i>Сравнение скидок с расходами</div>';
+    h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">';
+    // Bar 1: Discounts vs Total expenses
+    h += '<div><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px">Скидки / Все затраты</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:#1e293b;border-radius:4px;overflow:hidden"><div style="width:' + Math.min(100, Number(discVsExpPct)) + '%;height:100%;background:linear-gradient(90deg,#FBBF24,#EF4444);border-radius:4px"></div></div>';
+    h += '<span style="font-weight:700;color:#FBBF24;font-size:0.88rem;min-width:45px;text-align:right">' + discVsExpPct + '%</span></div>';
+    h += '<div style="font-size:0.62rem;color:#475569;margin-top:3px">' + fmtAmt(totalDiscCost2) + ' vs ' + fmtAmt(totalExpensesAll) + '</div></div>';
+    // Bar 2: Discounts vs Salaries
+    h += '<div><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px">Скидки / ФОТ</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:#1e293b;border-radius:4px;overflow:hidden"><div style="width:' + Math.min(100, Number(discVsSalPct)) + '%;height:100%;background:linear-gradient(90deg,#FBBF24,#3B82F6);border-radius:4px"></div></div>';
+    h += '<span style="font-weight:700;color:#3B82F6;font-size:0.88rem;min-width:45px;text-align:right">' + discVsSalPct + '%</span></div>';
+    h += '<div style="font-size:0.62rem;color:#475569;margin-top:3px">' + fmtAmt(totalDiscCost2) + ' vs ' + fmtAmt(totalSalary) + '</div></div>';
+    // Bar 3: What could have been (revenue without discounts)
+    var revenueWithoutDisc = (Number(fin.services) || 0) + totalDiscCost2;
+    var actualPct2 = revenueWithoutDisc > 0 ? ((Number(fin.services) || 0) / revenueWithoutDisc * 100).toFixed(1) : '100';
+    h += '<div><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:6px">Факт vs Потенциал выручки</div>';
+    h += '<div style="display:flex;align-items:center;gap:8px"><div style="flex:1;height:8px;background:#1e293b;border-radius:4px;overflow:hidden"><div style="width:' + actualPct2 + '%;height:100%;background:linear-gradient(90deg,#22C55E,#8B5CF6);border-radius:4px"></div></div>';
+    h += '<span style="font-weight:700;color:#22C55E;font-size:0.88rem;min-width:45px;text-align:right">' + actualPct2 + '%</span></div>';
+    h += '<div style="font-size:0.62rem;color:#475569;margin-top:3px">' + fmtAmt(Number(fin.services) || 0) + ' из ' + fmtAmt(revenueWithoutDisc) + '</div></div>';
+    h += '</div></div>';
+    // Per-code breakdown table
+    if (promoKeys3.length > 0) {
+      var sortedPromo2 = promoKeys3.sort(function(a,b) { return (promoD2[b].discount_total||0) - (promoD2[a].discount_total||0); });
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:8px 14px;text-align:left;color:#94a3b8">Промокод</th><th style="padding:8px;text-align:center;color:#94a3b8">Скидка %</th><th style="padding:8px;text-align:center;color:#94a3b8">Лидов</th><th style="padding:8px;text-align:right;color:#94a3b8">Подитог услуг</th><th style="padding:8px;text-align:right;color:#94a3b8">Стоимость скидки</th><th style="padding:8px;text-align:right;color:#94a3b8">Факт. оплата</th><th style="padding:8px;text-align:right;color:#94a3b8">Доля скидки</th></tr></thead><tbody>';
+      for (var pi2 = 0; pi2 < sortedPromo2.length; pi2++) {
+        var pk2 = sortedPromo2[pi2]; var pc2 = promoD2[pk2]; var cd22 = pc2.code_details || {};
+        var pcDiscPct2 = pc2.services_total > 0 ? (pc2.discount_total / pc2.services_total * 100).toFixed(1) : '0';
+        h += '<tr style="border-bottom:1px solid #1e293b">';
+        h += '<td style="padding:8px 14px;font-weight:700;color:#a78bfa"><i class="fas fa-tag" style="margin-right:4px;color:#8B5CF6"></i>' + escHtml(pk2) + '</td>';
+        h += '<td style="padding:8px;text-align:center;color:#fbbf24;font-weight:600">' + (cd22.discount_percent || 0) + '%</td>';
+        h += '<td style="padding:8px;text-align:center;font-weight:600">' + pc2.count + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#94a3b8">' + fmtAmt(pc2.services_total || 0) + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#EF4444;font-weight:700">' + (pc2.discount_total > 0 ? '-' + fmtAmt(pc2.discount_total) : '0 ֏') + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#10B981;font-weight:600">' + fmtAmt(pc2.revenue || 0) + '</td>';
+        h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:50px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + Math.min(100, Number(pcDiscPct2)) + '%;height:100%;background:#FBBF24;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600;color:#FBBF24">' + pcDiscPct2 + '%</span></div></td>';
+        h += '</tr>';
+      }
+      var totalSvcBefore2 = 0, totalDiscSum2 = 0, totalRevPromo = 0;
+      sortedPromo2.forEach(function(k) { totalSvcBefore2 += (promoD2[k].services_total||0); totalDiscSum2 += (promoD2[k].discount_total||0); totalRevPromo += (promoD2[k].revenue||0); });
+      var totalDiscPctAll = totalSvcBefore2 > 0 ? (totalDiscSum2 / totalSvcBefore2 * 100).toFixed(1) : '0';
+      h += '<tr style="border-top:2px solid #FBBF24;font-weight:700"><td style="padding:10px 14px">ИТОГО</td><td></td><td style="padding:8px;text-align:center">' + totalDiscLeads2 + '</td>';
+      h += '<td style="padding:8px;text-align:right;color:#94a3b8">' + fmtAmt(totalSvcBefore2) + '</td>';
+      h += '<td style="padding:8px;text-align:right;color:#EF4444;font-weight:800">' + (totalDiscSum2 > 0 ? '-' + fmtAmt(totalDiscSum2) : '0 ֏') + '</td>';
+      h += '<td style="padding:8px;text-align:right;color:#10B981;font-weight:700">' + fmtAmt(totalRevPromo) + '</td>';
+      h += '<td style="padding:8px;text-align:right;color:#FBBF24;font-weight:700">' + totalDiscPctAll + '%</td></tr>';
+      h += '</tbody></table></div>';
+    }
+    // Monthly discount trend (costs perspective)
+    var mDiscounts2 = d.monthly_discounts || {};
+    var mDiscKeys2 = Object.keys(mDiscounts2).sort();
+    if (mDiscKeys2.length > 0) {
+      var maxMDisc = 0;
+      mDiscKeys2.forEach(function(k) { var v = Number(mDiscounts2[k].discount_total||0); if(v>maxMDisc) maxMDisc=v; });
+      h += '<div style="margin-top:16px">';
+      h += '<h4 style="font-weight:600;font-size:0.92rem;color:#e2e8f0;margin-bottom:10px"><i class="fas fa-chart-bar" style="color:#FBBF24;margin-right:6px"></i>Динамика скидок по месяцам</h4>';
+      h += '<div class="card" style="padding:20px">';
+      h += '<div style="display:flex;gap:8px;align-items:flex-end;height:120px;padding-bottom:24px">';
+      var mNames4 = ['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      for (var md2i = 0; md2i < mDiscKeys2.length; md2i++) {
+        var md2k = mDiscKeys2[md2i]; var md2v = mDiscounts2[md2k];
+        var md2Amt = Number(md2v.discount_total || 0);
+        var barH2 = maxMDisc > 0 ? Math.max(4, Math.round((md2Amt / maxMDisc) * 90)) : 4;
+        var md2MNum = parseInt(md2k.split('-')[1]);
+        h += '<div style="flex:1;text-align:center;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%">';
+        h += '<div style="font-size:0.58rem;font-weight:700;color:' + (md2Amt > 0 ? '#EF4444' : '#475569') + ';margin-bottom:2px">' + (md2Amt > 0 ? fmtAmt(md2Amt) : '') + '</div>';
+        h += '<div style="background:' + (md2Amt > 0 ? 'linear-gradient(180deg,#FBBF24,#EF4444)' : '#334155') + ';width:100%;max-width:40px;height:' + barH2 + 'px;border-radius:3px 3px 0 0"></div>';
+        h += '<div style="font-size:0.6rem;color:#94a3b8;margin-top:4px">' + (mNames4[md2MNum] || '') + '</div>';
+        h += '</div>';
+      }
+      h += '</div></div></div>';
+    }
+    h += '</div>';
+  }
+
   return h;
 }
 
@@ -5875,6 +6029,83 @@ function renderBizFunnelV2(d, sd, fin) {
     h += '</tbody></table></div></div>';
   }
 
+  // ---- SECTION: Referral Conversion Comparison ----
+  // Count leads with and without promo codes, their conversion to 'done'
+  var allLeadsRaw = d.all_leads_status || [];
+  var allPC = d.promo_costs || {};
+  var allPCKeys = Object.keys(allPC);
+  if (allPCKeys.length > 0) {
+    // Aggregate: leads with promo vs without promo
+    var withPromoTotal = 0, withPromoDone = 0, withPromoRev = 0, withPromoSvc = 0;
+    var withoutPromoTotal = 0, withoutPromoDone = 0, withoutPromoRev = 0, withoutPromoSvc = 0;
+    // Use per-code data: total leads with promo codes
+    allPCKeys.forEach(function(k) { 
+      var pc3 = allPC[k]; 
+      withPromoTotal += pc3.count;
+      withPromoRev += pc3.revenue;
+      withPromoSvc += (pc3.services_total||0);
+      if (pc3.leads) {
+        for (var lpi = 0; lpi < pc3.leads.length; lpi++) {
+          if (pc3.leads[lpi].status === 'done') withPromoDone++;
+        }
+      }
+    });
+    var totalAllLeads = Number(d.total_leads || 0);
+    withoutPromoTotal = totalAllLeads - withPromoTotal;
+    var doneAll = Number((sd.done || {}).count || 0);
+    withoutPromoDone = doneAll - withPromoDone;
+    var svcAll = Number(fin.services || 0);
+    withoutPromoSvc = svcAll - withPromoSvc;
+    var amtAll = Number(fin.turnover || 0);
+    withoutPromoRev = amtAll - withPromoRev;
+    var convWithPromo = withPromoTotal > 0 ? (withPromoDone / withPromoTotal * 100).toFixed(1) : '0';
+    var convWithoutPromo = withoutPromoTotal > 0 ? (withoutPromoDone / withoutPromoTotal * 100).toFixed(1) : '0';
+    var avgCheckPromo = withPromoDone > 0 ? Math.round(withPromoSvc / withPromoDone) : 0;
+    var avgCheckNoPromo = withoutPromoDone > 0 ? Math.round(withoutPromoSvc / withoutPromoDone) : 0;
+
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#FBBF24;margin-right:8px"></i>Эффективность промокодов: конверсия и средний чек</h3>';
+    h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Сравнение поведения лидов с промокодом и без — помогает оценить ROI скидочной программы.</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
+    // Card: With promo
+    h += '<div class="card" style="padding:20px;border-left:3px solid #FBBF24;background:rgba(251,191,36,0.04)">';
+    h += '<div style="font-size:0.82rem;font-weight:700;color:#FBBF24;margin-bottom:12px"><i class="fas fa-tag" style="margin-right:6px"></i>С промокодом</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Лидов</div><div style="font-size:1.3rem;font-weight:800;color:#FBBF24">' + withPromoTotal + '</div></div>';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Конверсия</div><div style="font-size:1.3rem;font-weight:800;color:' + (Number(convWithPromo) > Number(convWithoutPromo) ? '#22C55E' : '#EF4444') + '">' + convWithPromo + '%</div></div>';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Завершено</div><div style="font-size:1.3rem;font-weight:800;color:#22C55E">' + withPromoDone + '</div></div>';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Ср. чек (услуги)</div><div style="font-size:1.1rem;font-weight:800;color:#8B5CF6">' + fmtAmt(avgCheckPromo) + '</div></div>';
+    h += '</div>';
+    h += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #334155"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:4px">Выручка</div><div style="font-size:1.1rem;font-weight:700;color:#10B981">' + fmtAmt(withPromoRev) + '</div></div>';
+    h += '</div>';
+    // Card: Without promo
+    h += '<div class="card" style="padding:20px;border-left:3px solid #3B82F6;background:rgba(59,130,246,0.04)">';
+    h += '<div style="font-size:0.82rem;font-weight:700;color:#3B82F6;margin-bottom:12px"><i class="fas fa-user" style="margin-right:6px"></i>Без промокода</div>';
+    h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Лидов</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6">' + withoutPromoTotal + '</div></div>';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Конверсия</div><div style="font-size:1.3rem;font-weight:800;color:' + (Number(convWithoutPromo) > Number(convWithPromo) ? '#22C55E' : '#EF4444') + '">' + convWithoutPromo + '%</div></div>';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Завершено</div><div style="font-size:1.3rem;font-weight:800;color:#22C55E">' + withoutPromoDone + '</div></div>';
+    h += '<div><div style="font-size:0.68rem;color:#94a3b8">Ср. чек (услуги)</div><div style="font-size:1.1rem;font-weight:800;color:#8B5CF6">' + fmtAmt(avgCheckNoPromo) + '</div></div>';
+    h += '</div>';
+    h += '<div style="margin-top:12px;padding-top:10px;border-top:1px solid #334155"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:4px">Выручка</div><div style="font-size:1.1rem;font-weight:700;color:#10B981">' + fmtAmt(withoutPromoRev) + '</div></div>';
+    h += '</div>';
+    h += '</div>';
+    // Insight box
+    var convDiff = (Number(convWithPromo) - Number(convWithoutPromo)).toFixed(1);
+    var checkDiff = avgCheckPromo - avgCheckNoPromo;
+    h += '<div class="card" style="padding:14px 18px;background:rgba(139,92,246,0.05);border-color:#8B5CF633">';
+    h += '<div style="font-weight:700;color:#a78bfa;margin-bottom:8px;font-size:0.82rem"><i class="fas fa-lightbulb" style="margin-right:6px"></i>Выводы</div>';
+    h += '<div style="display:flex;gap:20px;flex-wrap:wrap;font-size:0.8rem">';
+    h += '<div style="color:#e2e8f0"><span style="color:#94a3b8">Конверсия:</span> промо ' + (Number(convDiff) >= 0 ? '<span style="color:#22C55E">+' + convDiff + '%</span>' : '<span style="color:#EF4444">' + convDiff + '%</span>') + ' vs обычные</div>';
+    h += '<div style="color:#e2e8f0"><span style="color:#94a3b8">Ср. чек:</span> промо ' + (checkDiff >= 0 ? '<span style="color:#22C55E">+' + fmtAmt(checkDiff) + '</span>' : '<span style="color:#EF4444">' + fmtAmt(checkDiff) + '</span>') + ' vs обычные</div>';
+    var discCostAll = Number(d.total_discount_cost || 0);
+    var promoRevenueGain = withPromoRev;
+    var promoROI = discCostAll > 0 ? ((promoRevenueGain / discCostAll - 1) * 100).toFixed(0) : '∞';
+    h += '<div style="color:#e2e8f0"><span style="color:#94a3b8">ROI скидок:</span> <span style="color:' + (Number(promoROI) > 0 || promoROI === '∞' ? '#22C55E' : '#EF4444') + ';font-weight:700">' + promoROI + '%</span> <span style="color:#475569;font-size:0.68rem">(выручка промо / стоимость скидок)</span></div>';
+    h += '</div></div>';
+    h += '</div>';
+  }
+
   // ---- SECTION: PROMO CODE ANALYTICS ----
   var promoCosts = d.promo_costs || {};
   var promoKeys = Object.keys(promoCosts);
@@ -5911,7 +6142,91 @@ function renderBizFunnelV2(d, sd, fin) {
       h += '<td style="padding:8px;text-align:center"><span class="badge ' + (isActive ? 'badge-green' : 'badge-red') + '">' + (isActive ? 'Актив' : 'Неактив') + '</span></td>';
       h += '</tr>';
     }
-    h += '</tbody></table></div></div>';
+    h += '</tbody></table></div>';
+    // Service-specific discounts configured per referral code
+    var refCodeSvcs = d.ref_code_services || {};
+    var hasCodeSvcs = Object.keys(refCodeSvcs).length > 0;
+    if (hasCodeSvcs) {
+      h += '<div style="margin-top:16px">';
+      h += '<h4 style="font-weight:600;font-size:0.92rem;color:#e2e8f0;margin-bottom:10px"><i class="fas fa-percentage" style="color:#FBBF24;margin-right:6px"></i>Скидки на конкретные услуги (по кодам)</h4>';
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:8px 14px;text-align:left;color:#94a3b8">Код</th><th style="padding:8px 14px;text-align:left;color:#94a3b8">Услуга</th><th style="padding:8px;text-align:center;color:#94a3b8">Скидка</th><th style="padding:8px;text-align:center;color:#94a3b8">Кол-во</th><th style="padding:8px;text-align:right;color:#94a3b8">Цена</th><th style="padding:8px;text-align:right;color:#94a3b8">Тип</th></tr></thead><tbody>';
+      var rcKeys = Object.keys(refCodeSvcs);
+      for (var rci = 0; rci < rcKeys.length; rci++) {
+        var rcCode = rcKeys[rci]; var rcSvcs = refCodeSvcs[rcCode];
+        for (var rcsi = 0; rcsi < rcSvcs.length; rcsi++) {
+          var rcs = rcSvcs[rcsi];
+          var isFreeRc = rcs.discount_percent === 0 || rcs.discount_percent >= 100;
+          var typeLabel = isFreeRc ? '<span class="badge badge-green" style="font-size:0.68rem">Бесплатно</span>' : '<span class="badge badge-amber" style="font-size:0.68rem">-' + rcs.discount_percent + '%</span>';
+          h += '<tr style="border-bottom:1px solid #1e293b">';
+          h += '<td style="padding:6px 14px;font-weight:600;color:#a78bfa">' + (rcsi === 0 ? '<i class="fas fa-tag" style="margin-right:4px;color:#8B5CF6"></i>' + escHtml(rcCode) : '') + '</td>';
+          h += '<td style="padding:6px 14px;color:#e2e8f0">' + escHtml(rcs.service_name || '\u2014') + '</td>';
+          h += '<td style="padding:6px 8px;text-align:center;font-weight:600;color:#fbbf24">' + (isFreeRc ? '100%' : rcs.discount_percent + '%') + '</td>';
+          h += '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + (rcs.quantity || 1) + '</td>';
+          h += '<td style="padding:6px 8px;text-align:right;color:#94a3b8">' + fmtAmt(rcs.price || 0) + '</td>';
+          h += '<td style="padding:6px 8px;text-align:right">' + typeLabel + '</td></tr>';
+        }
+      }
+      h += '</tbody></table></div></div>';
+    }
+    // Per-lead discount details (expandable)
+    var allPromoLeads = [];
+    promoKeys.forEach(function(k) { 
+      var pc2 = promoCosts[k]; 
+      if (pc2.leads) { 
+        for (var pli = 0; pli < pc2.leads.length; pli++) { 
+          pc2.leads[pli]._code = k; 
+          allPromoLeads.push(pc2.leads[pli]); 
+        } 
+      } 
+    });
+    if (allPromoLeads.length > 0) {
+      allPromoLeads.sort(function(a,b) { return b.discount - a.discount; });
+      h += '<div style="margin-top:16px">';
+      h += '<h4 style="font-weight:600;font-size:0.92rem;color:#e2e8f0;margin-bottom:10px;cursor:pointer" onclick="toggleSection(&apos;promo-leads-body&apos;,&apos;promo-leads-arrow&apos;)"><i class="fas fa-list" style="color:#3B82F6;margin-right:6px"></i>Детализация скидок по лидам (' + allPromoLeads.length + ') <i id="promo-leads-arrow" class="fas fa-chevron-right" style="font-size:0.7rem;color:#64748b;margin-left:6px;transition:transform 0.2s"></i></h4>';
+      h += '<div id="promo-leads-body" style="display:none">';
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">#</th><th style="padding:8px 12px;text-align:left;color:#94a3b8">Клиент</th><th style="padding:8px;text-align:center;color:#94a3b8">Код</th><th style="padding:8px;text-align:center;color:#94a3b8">Статус</th><th style="padding:8px;text-align:right;color:#94a3b8">Услуги</th><th style="padding:8px;text-align:right;color:#94a3b8">Скидка</th><th style="padding:8px;text-align:right;color:#94a3b8">Итого</th><th style="padding:8px;text-align:right;color:#94a3b8">Дата</th></tr></thead><tbody>';
+      var statusLabels2 = {new:'\uD83D\uDFE2 Новый',contacted:'\uD83D\uDCAC Связь',in_progress:'\uD83D\uDD04 Работа',checking:'\uD83D\uDD0D Проверка',done:'\u2705 Готов',rejected:'\u274C Откл'};
+      for (var pli2 = 0; pli2 < Math.min(allPromoLeads.length, 50); pli2++) {
+        var pl = allPromoLeads[pli2];
+        h += '<tr style="border-bottom:1px solid #1e293b;cursor:pointer" onclick="navigate(&apos;leads&apos;);setTimeout(function(){handleCardClick({stopPropagation:function(){}},'+pl.id+')},500)">';
+        h += '<td style="padding:6px 12px;color:#a78bfa;font-weight:600">#' + pl.id + '</td>';
+        h += '<td style="padding:6px 12px;color:#e2e8f0">' + escHtml(pl.name || '\u2014') + '</td>';
+        h += '<td style="padding:6px 8px;text-align:center"><span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(pl._code) + '</span></td>';
+        h += '<td style="padding:6px 8px;text-align:center;font-size:0.72rem">' + (statusLabels2[pl.status] || pl.status) + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#94a3b8">' + fmtAmt(pl.services || 0) + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#EF4444;font-weight:600">' + (pl.discount > 0 ? '-' + fmtAmt(pl.discount) : '0 \u058f') + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#e2e8f0;font-weight:600">' + fmtAmt(pl.total) + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#64748b;font-size:0.72rem;white-space:nowrap">' + (pl.date ? pl.date.substring(0,10) : '') + '</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div></div></div>';
+    }
+    // Monthly discount trend
+    var mDiscounts = d.monthly_discounts || {};
+    var mDiscKeys = Object.keys(mDiscounts).sort();
+    if (mDiscKeys.length > 1) {
+      h += '<div style="margin-top:16px">';
+      h += '<h4 style="font-weight:600;font-size:0.92rem;color:#e2e8f0;margin-bottom:10px"><i class="fas fa-chart-area" style="color:#EF4444;margin-right:6px"></i>Скидки по месяцам</h4>';
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:8px 14px;text-align:left;color:#94a3b8">Месяц</th><th style="padding:8px;text-align:center;color:#94a3b8">Лидов</th><th style="padding:8px;text-align:right;color:#94a3b8">Сумма скидок</th><th style="padding:8px;text-align:right;color:#94a3b8">Подитог услуг</th><th style="padding:8px;text-align:right;color:#94a3b8">% скидок</th></tr></thead><tbody>';
+      var mNames3 = ['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+      for (var mdi = 0; mdi < mDiscKeys.length; mdi++) {
+        var mdKey = mDiscKeys[mdi]; var mdVal = mDiscounts[mdKey];
+        var mdMonthNum = parseInt(mdKey.split('-')[1]);
+        var mdPct = mdVal.services_before > 0 ? (mdVal.discount_total / mdVal.services_before * 100).toFixed(1) : '0';
+        h += '<tr style="border-bottom:1px solid #1e293b">';
+        h += '<td style="padding:6px 14px;font-weight:600;color:#e2e8f0">' + (mNames3[mdMonthNum] || mdKey) + ' ' + mdKey.split('-')[0] + '</td>';
+        h += '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + (mdVal.leads_count || 0) + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#EF4444;font-weight:600">' + (mdVal.discount_total > 0 ? '-' + fmtAmt(mdVal.discount_total) : '0 \u058f') + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#94a3b8">' + fmtAmt(mdVal.services_before || 0) + '</td>';
+        h += '<td style="padding:6px 8px;text-align:right;color:#fbbf24;font-weight:600">' + mdPct + '%</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div></div>';
+    }
+    h += '</div>';
   }
 
   return h;
@@ -5942,6 +6257,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap">Выкупы</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#f87171;white-space:nowrap" title="Возвраты клиентам от выкупов">Возврат</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6;white-space:nowrap">Услуги</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#FBBF24;white-space:nowrap" title="Скидки по промокодам">Скидки</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap">Расходы</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#22C55E;white-space:nowrap" title="Услуги - Расходы">Прибыль</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap" title="Налоги за месяц">Налоги</th>';
@@ -5952,7 +6268,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;width:60px"></th>';
   h += '</tr></thead><tbody>';
   var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, refunds:0, expenses:0, profit:0, taxes:0, loanPayments:0, dividends:0, netProfit:0};
+  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, refunds:0, expenses:0, profit:0, taxes:0, loanPayments:0, dividends:0, netProfit:0, discounts:0};
   for (var mi3 = 1; mi3 <= 12; mi3++) {
     var mKey = currentYear + '-' + String(mi3).padStart(2,'0');
     var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
@@ -6066,6 +6382,11 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? '-' + fmtAmt(Math.abs(mRefunds)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
+    // Monthly discount from promo codes
+    var mDiscData = (d.monthly_discounts || {})[mKey];
+    var mDiscAmt = mDiscData ? Number(mDiscData.discount_total || 0) : 0;
+    yearTotals.discounts += mDiscAmt;
+    h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (mDiscAmt > 0 ? '-' + fmtAmt(mDiscAmt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mExp ? '-' + fmtAmt(Math.abs(mExp)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (mProfit >= 0 ? '#22C55E' : '#EF4444') + '">' + ((mProfit || isCurrent) ? fmtAmt(mProfit) : '\u2014');
     if (mAdjTotal !== 0) h += '<div style="font-size:0.6rem;color:' + (mAdjTotal > 0 ? '#22C55E' : '#EF4444') + '">' + (mAdjTotal > 0 ? '+' : '') + fmtAmt(mAdjTotal) + '</div>';
@@ -6102,7 +6423,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       // is_locked in DB always overrides custom_data.status
       if (isLocked) { snapStatus = 'locked'; }
       else if (!snapStatus) { snapStatus = isCurrent ? 'current' : isPast ? 'open' : ''; }
-      h += '<tr style="background:#0f172a"><td colspan="17" style="padding:12px 16px">';
+      h += '<tr style="background:#0f172a"><td colspan="18" style="padding:12px 16px">';
       h += '<div style="font-weight:700;color:#F59E0B;margin-bottom:10px"><i class="fas fa-pencil-alt" style="margin-right:6px"></i>Редактирование: ' + monthNames[mi3-1] + ' ' + currentYear + '</div>';
       // Row 1: Lead counts
       h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:10px">';
@@ -6186,6 +6507,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (yearTotals.articles ? fmtAmt(yearTotals.articles) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (yearTotals.refunds ? '-' + fmtAmt(Math.abs(yearTotals.refunds)) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (yearTotals.discounts > 0 ? '-' + fmtAmt(yearTotals.discounts) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (yearTotals.expenses ? '-' + fmtAmt(Math.abs(yearTotals.expenses)) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:' + (yearTotals.profit >= 0 ? '#22C55E' : '#EF4444') + '">' + fmtAmt(yearTotals.profit) + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;font-weight:700;color:#F59E0B">' + (yearTotals.taxes ? fmtAmt(yearTotals.taxes) : '\u2014') + '</td>';
