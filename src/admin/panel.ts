@@ -2077,6 +2077,11 @@ function renderLeads() {
           '</div>';
       // ALWAYS recalculate discount from services only (never trust stale calcData.discountAmount)
       var discPct = Number(calcData && calcData.discountPercent || 0);
+      // FALLBACK: if discountPercent is 0 but lead has a referral code, look up from data.referrals
+      if (discPct === 0 && l.referral_code && data.referrals) {
+        var refMatch = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
+        if (refMatch) discPct = Number(refMatch.discount_percent || 0);
+      }
       var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
       h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
@@ -2160,6 +2165,11 @@ function renderLeads() {
       if (leadRefCode) {
         // Show discount breakdown — ALWAYS recalculate from services to ensure correctness
         var refDiscPct = Number(calcData && calcData.discountPercent || 0);
+        // FALLBACK: look up from data.referrals if calc_data has no discountPercent
+        if (refDiscPct === 0 && data.referrals) {
+          var refMatch2 = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === leadRefCode.toUpperCase(); });
+          if (refMatch2) refDiscPct = Number(refMatch2.discount_percent || 0);
+        }
         var refSvcBase = svcAmt || Number(calcData && calcData.servicesSubtotal || 0);
         // Recalculate discount from services base (never trust stored discountAmount — may be stale)
         var refDiscAmt = refDiscPct > 0 ? Math.round(refSvcBase * refDiscPct / 100) : 0;
@@ -2184,6 +2194,11 @@ function renderLeads() {
       var svcTotal = 0;
       for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
       var leadDiscPct2 = Number(calcData && calcData.discountPercent || 0);
+      // FALLBACK: look up from data.referrals if calc_data has no discountPercent
+      if (leadDiscPct2 === 0 && l.referral_code && data.referrals) {
+        var refMatch3 = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
+        if (refMatch3) leadDiscPct2 = Number(refMatch3.discount_percent || 0);
+      }
       // Recalculate discount from actual services total
       var leadDiscAmt2 = leadDiscPct2 > 0 && l.referral_code ? Math.round(svcTotal * leadDiscPct2 / 100) : 0;
       var svcAfterDisc2 = leadDiscAmt2 > 0 ? (svcTotal - leadDiscAmt2) : svcTotal;

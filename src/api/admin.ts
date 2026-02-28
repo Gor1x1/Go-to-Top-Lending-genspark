@@ -2563,6 +2563,19 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dfNoAlias + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
       refResults = refRes.results || [];
     } catch {}
+
+    // Pre-load referral_codes lookup for fallback discount calculation
+    const refCodesLookup: Record<string, { discount_percent: number; id: number }> = {};
+    try {
+      const allRefCodes = await db.prepare("SELECT id, code, discount_percent FROM referral_codes").all();
+      for (const rc of (allRefCodes.results || [])) {
+        refCodesLookup[(rc.code as string || '').toUpperCase()] = {
+          discount_percent: Number(rc.discount_percent || 0),
+          id: Number(rc.id)
+        };
+      }
+    } catch {}
+
     // Build per-code detailed costs from all leads
     for (const lead of (allLeads.results || [])) {
       const rc = lead.referral_code as string;
@@ -2572,8 +2585,28 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       promoCodeCosts[rc].revenue += Number(lead.total_amount || 0);
       try {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
-        const da = Number(cd.discountAmount || 0);
-        const svcSub = Number(cd.servicesSubtotal || 0);
+        let da = Number(cd.discountAmount || 0);
+        let svcSub = Number(cd.servicesSubtotal || 0);
+
+        // FALLBACK: if lead has referral_code but discountAmount=0 in calc_data,
+        // recalculate discount dynamically from services items + referral_codes table
+        if (da === 0 && rc) {
+          const refInfo = refCodesLookup[rc.toUpperCase()];
+          if (refInfo && refInfo.discount_percent > 0) {
+            // Calculate services subtotal from items if not stored
+            if (svcSub === 0 && cd.items && Array.isArray(cd.items)) {
+              for (const item of cd.items) {
+                if (!item.wb_article) svcSub += Number(item.subtotal || 0);
+              }
+            }
+            // Also try legacy subtotal field
+            if (svcSub === 0) svcSub = Number(cd.subtotal || 0);
+            if (svcSub > 0) {
+              da = Math.round(svcSub * refInfo.discount_percent / 100);
+            }
+          }
+        }
+
         promoCodeCosts[rc].discount_total += da;
         promoCodeCosts[rc].services_total += svcSub;
         totalDiscountCost += da;
@@ -2622,8 +2655,21 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       if (!rc) continue;
       try {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
-        const da = Number(cd.discountAmount || 0);
-        const svcSub = Number(cd.servicesSubtotal || 0);
+        let da = Number(cd.discountAmount || 0);
+        let svcSub = Number(cd.servicesSubtotal || 0);
+        // FALLBACK: same logic as main promo stats — recalc if needed
+        if (da === 0 && rc) {
+          const refInfo = refCodesLookup[rc.toUpperCase()];
+          if (refInfo && refInfo.discount_percent > 0) {
+            if (svcSub === 0 && cd.items && Array.isArray(cd.items)) {
+              for (const item of cd.items) {
+                if (!item.wb_article) svcSub += Number(item.subtotal || 0);
+              }
+            }
+            if (svcSub === 0) svcSub = Number(cd.subtotal || 0);
+            if (svcSub > 0) da = Math.round(svcSub * refInfo.discount_percent / 100);
+          }
+        }
         const created = (lead as any).created_at as string || '';
         const monthKey = created.substring(0, 7); // '2026-02'
         if (monthKey) {
