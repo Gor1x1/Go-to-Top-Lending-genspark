@@ -9219,8 +9219,9 @@ function renderSiteBlocks() {
           h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
           // Compact row: icon + text RU + text AM + action + TG badge + link
           h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
-          // Icon
-          h += '<div style="min-width:36px;text-align:center"><i class="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" style="color:#8B5CF6;font-size:0.9rem"></i></div>';
+          // Icon: priority — manual selection > auto-detect from URL > default
+          var displayIcon = sbResolveButtonIcon(btn.icon, btn.url);
+          h += '<div style="min-width:36px;text-align:center"><i class="' + escHtml(displayIcon) + '" style="color:#8B5CF6;font-size:0.9rem"></i></div>';
           // Button text RU
           if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbAutoSave(' + b.id + ')">';
           // Button text AM
@@ -9591,7 +9592,14 @@ async function sbReorderAfterDrag() {
   toast('Порядок обновлён');
   
   await api('/site-blocks/reorder', { method: 'POST', body: JSON.stringify({ orders: orders }) });
-  var sectionOrders = reordered.map(function(b, i) { return { section_id: b.block_key, sort_order: i }; });
+  // Send both underscore and hyphen variants to cover all section_order records
+  var sectionOrders = [];
+  reordered.forEach(function(b, i) {
+    var key = b.block_key;
+    var keyHyphen = key.replace(/_/g, '-');
+    sectionOrders.push({ section_id: key, sort_order: i });
+    if (keyHyphen !== key) sectionOrders.push({ section_id: keyHyphen, sort_order: i });
+  });
   await api('/section-order', { method: 'PUT', body: JSON.stringify({ orders: sectionOrders }) });
 }
 
@@ -9701,6 +9709,32 @@ function sbRemoveTextPair(blockId, idx) {
 }
 
 // ── Add button ──
+// ── Resolve button icon with priority: manual > auto-detect from URL > default ──
+function sbResolveButtonIcon(icon, url) {
+  var defaultIcons = ['fas fa-link', 'fas fa-arrow-right', ''];
+  var isDefault = !icon || defaultIcons.indexOf(icon) >= 0;
+  
+  // If icon is manually set (not default), use it as priority
+  if (!isDefault) return icon;
+  
+  // Auto-detect from URL
+  if (url) {
+    if (url.indexOf('t.me/') >= 0 || url.indexOf('telegram.') >= 0) return 'fab fa-telegram';
+    if (url.indexOf('wa.me/') >= 0 || url.indexOf('whatsapp.') >= 0 || url.indexOf('api.whatsapp.') >= 0) return 'fab fa-whatsapp';
+    if (url.indexOf('instagram.com') >= 0) return 'fab fa-instagram';
+    if (url.indexOf('facebook.com') >= 0 || url.indexOf('fb.com') >= 0) return 'fab fa-facebook';
+    if (url.indexOf('tiktok.com') >= 0) return 'fab fa-tiktok';
+    if (url.indexOf('youtube.com') >= 0 || url.indexOf('youtu.be') >= 0) return 'fab fa-youtube';
+    if (url.indexOf('vk.com') >= 0) return 'fab fa-vk';
+    if (url.indexOf('viber.') >= 0) return 'fab fa-viber';
+    if (url.indexOf('#calculator') >= 0 || url.indexOf('#calc') >= 0) return 'fas fa-calculator';
+    if (url.indexOf('tel:') >= 0) return 'fas fa-phone';
+    if (url.indexOf('mailto:') >= 0) return 'fas fa-envelope';
+  }
+  
+  return icon || 'fas fa-link';
+}
+
 function sbAddButton(blockId) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
   if (!b) return;

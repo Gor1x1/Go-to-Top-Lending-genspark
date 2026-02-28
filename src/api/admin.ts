@@ -1538,10 +1538,18 @@ api.post('/site-blocks/:id/sync-to-site', authMiddleware, async (c) => {
   }
   
   // Also update section_order visibility and labels
-  const orderExists = await db.prepare('SELECT id FROM section_order WHERE section_id = ?').bind(blockKey).first();
+  // Try both underscore and hyphen variants since section_order may use either format
+  const blockKeyHyphen = blockKey.replace(/_/g, '-');
+  const orderExists = await db.prepare('SELECT id FROM section_order WHERE section_id = ? OR section_id = ?').bind(blockKey, blockKeyHyphen).first();
   if (orderExists) {
+    const existingId = orderExists.section_id as string;
     await db.prepare('UPDATE section_order SET is_visible = ?, label_ru = ?, label_am = ? WHERE section_id = ?')
-      .bind(block.is_visible, block.title_ru, block.title_am, blockKey).run();
+      .bind(block.is_visible, block.title_ru, block.title_am, existingId).run();
+  } else {
+    // Create section_order entry if it doesn't exist (e.g. for copied blocks)
+    const sortOrder = block.sort_order || 999;
+    await db.prepare('INSERT INTO section_order (section_id, sort_order, is_visible, label_ru, label_am) VALUES (?,?,?,?,?)')
+      .bind(blockKeyHyphen, sortOrder, block.is_visible ?? 1, block.title_ru || '', block.title_am || '').run();
   }
   
   // Sync buttons back to telegram_messages
@@ -1567,6 +1575,20 @@ api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
   const newKey = `${orig.block_key}_copy_${Date.now()}`;
   await db.prepare('INSERT INTO site_blocks (block_key, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)')
     .bind(newKey, orig.block_type, orig.title_ru + ' (копия)', orig.title_am, orig.texts_ru, orig.texts_am, orig.images, orig.buttons, orig.custom_css, orig.custom_html, orig.is_visible, (orig.sort_order as number || 0) + 1, orig.social_links || '[]').run();
+  
+  // Also create section_order entry for the copied block so it appears on the site
+  const newKeyHyphen = newKey.replace(/_/g, '-');
+  const newSortOrder = (orig.sort_order as number || 0) + 1;
+  await db.prepare('INSERT INTO section_order (section_id, sort_order, is_visible, label_ru, label_am) VALUES (?,?,?,?,?)')
+    .bind(newKeyHyphen, newSortOrder, orig.is_visible ?? 1, (orig.title_ru || '') + ' (копия)', orig.title_am || '').run();
+  
+  // Also copy content to site_content
+  const origContent = await db.prepare('SELECT * FROM site_content WHERE section_key = ?').bind(orig.block_key).first();
+  if (origContent) {
+    await db.prepare('INSERT INTO site_content (section_key, section_name, content_json, sort_order) VALUES (?,?,?,?)')
+      .bind(newKey, (orig.title_ru || '') + ' (копия)', origContent.content_json, newSortOrder).run();
+  }
+  
   return c.json({ success: true });
 });
 

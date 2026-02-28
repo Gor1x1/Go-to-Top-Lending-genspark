@@ -2765,10 +2765,66 @@ switchLang = function(l) {
       }
     }
     
-    // ===== 5. REORDER SECTIONS =====
+    // ===== 5a. CREATE MISSING SECTIONS (for copied/new blocks) =====
+    // Must happen BEFORE reordering so new sections participate in sort
+    if (db.blockFeatures && db.blockFeatures.length > 0) {
+      var footer5 = document.querySelector('footer');
+      var mainParent5 = footer5 ? footer5.parentElement : document.querySelector('main') || document.body;
+      db.blockFeatures.forEach(function(bf) {
+        if (bf.key === 'floating_tg' || bf.block_type === 'floating' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup') return;
+        var sectionId = bf.key.replace(/_/g, '-');
+        var existing = document.querySelector('[data-section-id="' + sectionId + '"]');
+        if (existing) return; // already in HTML
+        // Check visibility from sectionOrder
+        if (db.sectionOrder) {
+          for (var oi = 0; oi < db.sectionOrder.length; oi++) {
+            var so = db.sectionOrder[oi];
+            if ((so.section_id === bf.key || so.section_id === sectionId) && !so.is_visible) return;
+          }
+        }
+        // Find texts from content
+        var blockTexts = [];
+        if (db.content) {
+          for (var ck in db.content) {
+            if (ck === bf.key || ck === sectionId) { blockTexts = db.content[ck] || []; break; }
+          }
+        }
+        // Create section element
+        var newSec = document.createElement('section');
+        newSec.className = 'section fade-up';
+        newSec.setAttribute('data-section-id', sectionId);
+        newSec.id = sectionId;
+        var secH = '<div class="container">';
+        if (blockTexts.length > 0 && blockTexts[0]) {
+          var titleText = lang === 'am' && blockTexts[0].am ? blockTexts[0].am : (blockTexts[0].ru || blockTexts[0] || '');
+          secH += '<h2 class="section-title" style="text-align:center;margin-bottom:32px"><span data-ru="' + (blockTexts[0].ru||'') + '" data-am="' + (blockTexts[0].am||'') + '">' + titleText + '</span></h2>';
+        }
+        for (var ti = 1; ti < blockTexts.length; ti++) {
+          var t = blockTexts[ti];
+          if (t) {
+            var tText = lang === 'am' && t.am ? t.am : (t.ru || t || '');
+            secH += '<p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto"><span data-ru="' + (t.ru||'') + '" data-am="' + (t.am||'') + '">' + tText + '</span></p>';
+          }
+        }
+        secH += '</div>';
+        newSec.innerHTML = secH;
+        if (footer5 && mainParent5) { mainParent5.insertBefore(newSec, footer5); }
+        else if (mainParent5) { mainParent5.appendChild(newSec); }
+        console.log('[DB] Created missing section:', sectionId);
+      });
+    }
+    
+    // ===== 5b. REORDER ALL SECTIONS (including newly created ones) =====
     if (db.sectionOrder && db.sectionOrder.length > 0) {
+      // Build orderMap with BOTH underscore and hyphen key lookups
       var orderMap = {};
-      db.sectionOrder.forEach(function(s) { orderMap[s.section_id] = s; });
+      db.sectionOrder.forEach(function(s) {
+        orderMap[s.section_id] = s;
+        // Also map the alternate format (hyphen <-> underscore)
+        var alt = s.section_id.indexOf('-') >= 0 ? s.section_id.replace(/-/g, '_') : s.section_id.replace(/_/g, '-');
+        if (!orderMap[alt]) orderMap[alt] = s;
+      });
+      // Re-query all sections (including dynamically created ones from step 5a)
       var allSections = document.querySelectorAll('[data-section-id]');
       var parent = allSections.length > 0 ? allSections[0].parentNode : null;
       if (parent) {
@@ -2780,7 +2836,6 @@ switchLang = function(l) {
           var sb = ob ? ob.sort_order : 999;
           return sa - sb;
         });
-        // Get footer and floating elements as anchor
         var footer = document.querySelector('footer');
         sectionArr.forEach(function(section) {
           var sid = section.getAttribute('data-section-id');
@@ -2792,60 +2847,8 @@ switchLang = function(l) {
             parent.insertBefore(section, footer);
           }
         });
-        console.log('[DB] Sections reordered:', db.sectionOrder.length);
+        console.log('[DB] Sections reordered:', db.sectionOrder.length, 'total sections:', sectionArr.length);
       }
-    }
-    
-    // ===== 6. INJECT BLOCK FEATURES (Social links, photos, slot counters per block) =====
-    // First, create missing sections for blocks that exist in DB but not in HTML (e.g. copied blocks)
-    if (db.blockFeatures && db.blockFeatures.length > 0 && db.sectionOrder) {
-      var footer = document.querySelector('footer');
-      var mainParent = footer ? footer.parentElement : document.querySelector('main') || document.body;
-      db.blockFeatures.forEach(function(bf) {
-        if (bf.key === 'floating_tg' || bf.block_type === 'floating' || bf.block_type === 'calculator') return;
-        var sectionId = bf.key.replace(/_/g, '-');
-        var existing = document.querySelector('[data-section-id="' + sectionId + '"]');
-        if (existing) return; // already exists in HTML
-        // Check if it should be visible
-        var orderInfo = null;
-        for (var oi = 0; oi < db.sectionOrder.length; oi++) {
-          if (db.sectionOrder[oi].section_id === bf.key || db.sectionOrder[oi].section_id === sectionId) {
-            orderInfo = db.sectionOrder[oi]; break;
-          }
-        }
-        if (orderInfo && !orderInfo.is_visible) return;
-        // Find texts from content
-        var blockTexts = [];
-        if (db.content) {
-          for (var ck in db.content) {
-            if (ck === bf.key || ck === sectionId) { blockTexts = db.content[ck] || []; break; }
-          }
-        }
-        // Create new section element
-        var newSec = document.createElement('section');
-        newSec.className = 'section fade-up';
-        newSec.setAttribute('data-section-id', sectionId);
-        newSec.id = sectionId;
-        var secH = '<div class="container">';
-        // Title
-        if (blockTexts.length > 0 && blockTexts[0]) {
-          var titleText = lang === 'am' && blockTexts[0].am ? blockTexts[0].am : (blockTexts[0].ru || blockTexts[0] || '');
-          secH += '<h2 class="section-title" style="text-align:center;margin-bottom:32px"><span data-ru="' + (blockTexts[0].ru||'') + '" data-am="' + (blockTexts[0].am||'') + '">' + titleText + '</span></h2>';
-        }
-        // Subtitle and other texts
-        for (var ti = 1; ti < blockTexts.length; ti++) {
-          var t = blockTexts[ti];
-          if (t) {
-            var tText = lang === 'am' && t.am ? t.am : (t.ru || t || '');
-            secH += '<p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto"><span data-ru="' + (t.ru||'') + '" data-am="' + (t.am||'') + '">' + tText + '</span></p>';
-          }
-        }
-        secH += '</div>';
-        newSec.innerHTML = secH;
-        // Insert before footer
-        if (footer && mainParent) { mainParent.insertBefore(newSec, footer); }
-        else if (mainParent) { mainParent.appendChild(newSec); }
-      });
     }
     
     if (db.blockFeatures && db.blockFeatures.length > 0) {
@@ -3003,6 +3006,22 @@ switchLang = function(l) {
         }
 
         // Dynamic buttons: update CTA buttons in section from DB
+        // Resolve button icon: manual > auto-detect from URL > default
+        function resolveIcon(ic, url) {
+          var defs = ['fas fa-link','fas fa-arrow-right',''];
+          if (ic && defs.indexOf(ic) < 0) return ic;
+          if (url) {
+            if (url.indexOf('t.me/')>=0||url.indexOf('telegram.')>=0) return 'fab fa-telegram';
+            if (url.indexOf('wa.me/')>=0||url.indexOf('whatsapp.')>=0) return 'fab fa-whatsapp';
+            if (url.indexOf('instagram.com')>=0) return 'fab fa-instagram';
+            if (url.indexOf('facebook.com')>=0) return 'fab fa-facebook';
+            if (url.indexOf('tiktok.com')>=0) return 'fab fa-tiktok';
+            if (url.indexOf('youtube.com')>=0) return 'fab fa-youtube';
+            if (url.indexOf('#calc')>=0) return 'fas fa-calculator';
+            if (url.indexOf('tel:')>=0) return 'fas fa-phone';
+          }
+          return ic || 'fas fa-link';
+        }
         if (bf.buttons && bf.buttons.length > 0) {
           var sectionIdH = bf.key.replace(/_/g, '-');
           
@@ -3013,7 +3032,7 @@ switchLang = function(l) {
               var fb = bf.buttons[0];
               if (fb.url) floatEl.setAttribute('href', fb.url);
               var fIcon = floatEl.querySelector('i');
-              if (fIcon && fb.icon) fIcon.className = fb.icon;
+              if (fIcon) fIcon.className = resolveIcon(fb.icon, fb.url);
               var fSpan = floatEl.querySelector('span');
               if (fSpan) {
                 var fText = lang === 'am' && fb.text_am ? fb.text_am : (fb.text_ru || '');
@@ -3027,7 +3046,7 @@ switchLang = function(l) {
                 var cb = bf.buttons[1];
                 if (cb.url) calcFloat.setAttribute('href', cb.url);
                 var cIcon = calcFloat.querySelector('i');
-                if (cIcon && cb.icon) cIcon.className = cb.icon;
+                if (cIcon) cIcon.className = resolveIcon(cb.icon, cb.url);
                 var cSpan = calcFloat.querySelector('span');
                 if (cSpan) {
                   var cText = lang === 'am' && cb.text_am ? cb.text_am : (cb.text_ru || '');
@@ -3043,9 +3062,9 @@ switchLang = function(l) {
                 var dbBtn = bf.buttons[bIdx];
                 var domBtn = ctaBtns[bIdx];
                 if (dbBtn.url) domBtn.setAttribute('href', dbBtn.url);
-                // Update icon
+                // Update icon with priority: manual > URL-based > default
                 var btnIcon = domBtn.querySelector('i');
-                if (btnIcon && dbBtn.icon) btnIcon.className = dbBtn.icon;
+                if (btnIcon) btnIcon.className = resolveIcon(dbBtn.icon, dbBtn.url);
                 // Update text - find span or text node
                 var btnSpan = domBtn.querySelector('span[data-ru]');
                 if (btnSpan) {
