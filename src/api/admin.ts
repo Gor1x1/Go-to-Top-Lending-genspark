@@ -544,8 +544,15 @@ api.get('/referral-codes/check', authMiddleware, async (c) => {
   let serviceDiscounts: any[] = [];
   try {
     const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(row.id).all();
-    freeServices = (fsRes.results || []).filter((s: any) => s.discount_percent === null || s.discount_percent === 0 || s.discount_percent === undefined);
-    serviceDiscounts = (fsRes.results || []).filter((s: any) => s.discount_percent > 0);
+    // discount_percent=0 or null or undefined or >=100 means fully free; otherwise partial discount
+    freeServices = (fsRes.results || []).filter((s: any) => {
+      const dp = Number(s.discount_percent);
+      return dp === 0 || isNaN(dp) || dp >= 100;
+    });
+    serviceDiscounts = (fsRes.results || []).filter((s: any) => {
+      const dp = Number(s.discount_percent);
+      return dp > 0 && dp < 100;
+    });
   } catch {}
   
   return c.json({
@@ -1785,14 +1792,22 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
         }
         // Load free services
         const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
-        refFreeServices = (fsRes.results || []).map((fs: any) => ({
-          name: fs.name_ru || '',
-          name_am: fs.name_am || '',
-          qty: fs.quantity || 1,
-          price: Number(fs.price) || 0,
-          discount_percent: fs.discount_percent,
-          subtotal: 0 // free services are 0 cost
-        }));
+        refFreeServices = (fsRes.results || []).map((fs: any) => {
+          const dp = Number(fs.discount_percent) || 0;
+          const price = Number(fs.price) || 0;
+          const qty = Number(fs.quantity) || 1;
+          // discount_percent=0 or >=100 means fully free; otherwise partial discount
+          const isFree = dp === 0 || dp >= 100;
+          const actualSubtotal = isFree ? 0 : Math.round(price * qty * (100 - dp) / 100);
+          return {
+            name: fs.name_ru || '',
+            name_am: fs.name_am || '',
+            qty: qty,
+            price: price,
+            discount_percent: dp,
+            subtotal: actualSubtotal
+          };
+        });
       }
     } catch {}
   }

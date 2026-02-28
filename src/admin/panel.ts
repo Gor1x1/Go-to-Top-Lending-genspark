@@ -1752,7 +1752,7 @@ function renderReferrals() {
     
     // Add service form
     h += '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
-      '<div style="flex:2;min-width:180px"><select class="input" id="ref_addsvc_' + ref.id + '" style="font-size:0.8rem"><option value="">— Выберите услугу —</option>';
+      '<div style="flex:2;min-width:180px"><select class="input" id="ref_addsvc_' + ref.id + '" multiple size="5" style="font-size:0.8rem;min-height:100px">';
     for (var asi = 0; asi < allCalcServices.length; asi++) {
       var as = allCalcServices[asi];
       h += '<option value="' + as.id + '">' + escHtml(as.name_ru) + ' (' + escHtml(as.tab) + ') — ' + Number(as.price).toLocaleString('ru-RU') + ' ֏</option>';
@@ -1762,7 +1762,7 @@ function renderReferrals() {
       '<div style="flex:0.5;min-width:50px"><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Кол-во</div><input class="input" type="number" id="ref_addqty_' + ref.id + '" value="1" min="1" max="99" style="font-size:0.8rem"></div>' +
       '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addRefService(' + ref.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
     '</div>' +
-    '<div style="font-size:0.7rem;color:#475569;margin-top:4px">Скидка 100% = бесплатно. Выберите услугу из калькулятора.</div>';
+    '<div style="font-size:0.7rem;color:#475569;margin-top:4px">Скидка 100% = бесплатно. Выберите несколько услуг с зажатым Ctrl/Cmd.</div>';
     
     h += '</div></div>';
   }
@@ -1802,13 +1802,24 @@ async function addRefService(refId) {
   var svcSelect = document.getElementById('ref_addsvc_' + refId);
   var discInput = document.getElementById('ref_adddisc_' + refId);
   var qtyInput = document.getElementById('ref_addqty_' + refId);
-  if (!svcSelect || !svcSelect.value) { toast('Выберите услугу', 'error'); return; }
-  await api('/referrals/' + refId + '/services', { method: 'POST', body: JSON.stringify({
-    service_id: parseInt(svcSelect.value),
-    discount_percent: parseInt(discInput.value) || 100,
-    quantity: parseInt(qtyInput.value) || 1
-  }) });
-  toast('Услуга привязана к коду');
+  if (!svcSelect) { toast('Выберите услугу', 'error'); return; }
+  // Support multiple selection
+  var selectedOpts = svcSelect.selectedOptions || [];
+  var selectedIds = [];
+  for (var so = 0; so < selectedOpts.length; so++) {
+    if (selectedOpts[so].value) selectedIds.push(parseInt(selectedOpts[so].value));
+  }
+  if (selectedIds.length === 0) { toast('Выберите хотя бы одну услугу', 'error'); return; }
+  var disc = parseInt(discInput.value) || 100;
+  var qty = parseInt(qtyInput.value) || 1;
+  for (var si = 0; si < selectedIds.length; si++) {
+    await api('/referrals/' + refId + '/services', { method: 'POST', body: JSON.stringify({
+      service_id: selectedIds[si],
+      discount_percent: disc,
+      quantity: qty
+    }) });
+  }
+  toast(selectedIds.length > 1 ? selectedIds.length + ' услуг привязано к коду' : 'Услуга привязана к коду');
   await loadRefServices(); render();
 }
 
@@ -2044,8 +2055,9 @@ function renderLeads() {
             '</div>' : '') +
             // Services/Articles amounts on main card
           '</div>';
-      var discAmt = Number(calcData && calcData.discountAmount || 0);
+      // ALWAYS recalculate discount from services only (never trust stale calcData.discountAmount)
       var discPct = Number(calcData && calcData.discountPercent || 0);
+      var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
       h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
@@ -2126,10 +2138,11 @@ function renderLeads() {
         (leadRefCode ? '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="removeLeadRefCode(' + l.id + ')"><i class="fas fa-times" style="margin-right:4px"></i>Отменить</button>' : '') +
         '</div>';
       if (leadRefCode) {
-        // Show discount breakdown
+        // Show discount breakdown — ALWAYS recalculate from services to ensure correctness
         var refDiscPct = Number(calcData && calcData.discountPercent || 0);
-        var refDiscAmt = Number(calcData && calcData.discountAmount || 0);
-        var refSvcBase = Number(calcData && calcData.servicesSubtotal || svcAmt || 0);
+        var refSvcBase = svcAmt || Number(calcData && calcData.servicesSubtotal || 0);
+        // Recalculate discount from services base (never trust stored discountAmount — may be stale)
+        var refDiscAmt = refDiscPct > 0 ? Math.round(refSvcBase * refDiscPct / 100) : 0;
         var svcAfterDisc = refSvcBase - refDiscAmt;
         h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:6px;padding:10px 12px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:8px;font-size:0.78rem;color:#6ee7b7">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span><i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(leadRefCode) + '» применён</span>' +
@@ -2150,8 +2163,9 @@ function renderLeads() {
       // --- 4. SERVICES — collapsible with total shown when closed ---
       var svcTotal = 0;
       for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
-      var leadDiscAmt2 = Number(calcData && calcData.discountAmount || 0);
       var leadDiscPct2 = Number(calcData && calcData.discountPercent || 0);
+      // Recalculate discount from actual services total
+      var leadDiscAmt2 = leadDiscPct2 > 0 && l.referral_code ? Math.round(svcTotal * leadDiscPct2 / 100) : 0;
       var svcAfterDisc2 = leadDiscAmt2 > 0 ? (svcTotal - leadDiscAmt2) : svcTotal;
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">' +
@@ -2296,7 +2310,7 @@ async function applyLeadRefCode(leadId) {
     }
     // Reload data to update card display
     await loadData();
-    renderLeads();
+    render();
   } catch(e) { console.log('Recalc error:', e); }
 }
 
@@ -2319,7 +2333,7 @@ async function removeLeadRefCode(leadId) {
     }
     toast('Промокод отменён, скидка убрана');
     await loadData();
-    renderLeads();
+    render();
   } catch(e) {
     toast('Промокод убран, обновите страницу');
     await loadData();

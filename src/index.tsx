@@ -502,7 +502,7 @@ app.get('/pdf/:id', async (c) => {
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
-    // Add free services from referral code (price = 0)
+    // Add free / discounted services from referral code
     for (const fs of refFreeServices) {
       rowNum++;
       const fsName = (isAm ? (fs.name_am || fs.name_ru) : (isEn ? fs.name_ru : fs.name_ru)) || '';
@@ -512,6 +512,21 @@ app.get('/pdf/:id', async (c) => {
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (fs.quantity || 1) + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + Number(fs.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#16a34a">0\u00a0\u058f</td></tr>';
+    }
+    // Add services with partial discount from referral code (e.g. -30% on specific service)
+    for (const sd of refServiceDiscounts) {
+      rowNum++;
+      const sdName = (isAm ? (sd.name_am || sd.name_ru) : (isEn ? sd.name_ru : sd.name_ru)) || '';
+      const sdQty = Number(sd.quantity) || 1;
+      const sdPrice = Number(sd.price) || 0;
+      const sdDisc = Number(sd.discount_percent) || 0;
+      const sdSubtotal = Math.round(sdPrice * sdQty * (100 - sdDisc) / 100);
+      const discLabel = '-' + sdDisc + '%';
+      rows += '<tr style="background:#fffbeb"><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#92400E"><i class="fas fa-percentage" style="margin-right:4px"></i>' + sdName + ' <span style="font-size:0.8em;background:#FBBF24;color:#78350F;padding:1px 6px;border-radius:8px;font-weight:600">' + discLabel + '</span></td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + sdQty + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + sdPrice.toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#92400E">' + sdSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
     
     // Article items section
