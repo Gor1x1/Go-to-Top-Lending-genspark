@@ -332,6 +332,8 @@ app.post('/api/generate-pdf', async (c) => {
     const calcDataJson = JSON.stringify({ 
       items, 
       subtotal, 
+      servicesSubtotal: subtotal, // At initial generation, all items are services (no articles yet)
+      articlesSubtotal: 0,
       total: finalTotal, 
       referralCode, 
       discountPercent, 
@@ -467,9 +469,33 @@ app.get('/pdf/:id', async (c) => {
     const companyWebsite = tpl.company_website || '';
     const companyInn = tpl.company_inn || '';
     
+    // Separate items into services and articles
+    const serviceItems = items.filter((i: any) => !i.wb_article);
+    const articleItems = items.filter((i: any) => !!i.wb_article);
+    let svcSubtotal = 0;
+    for (const si of serviceItems) { svcSubtotal += Number(si.subtotal || 0); }
+    let artSubtotal = 0;
+    for (const ai of articleItems) { artSubtotal += Number(ai.subtotal || 0); }
+    
+    const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
+    // Apply referral discount ONLY to services, NOT to WB articles
+    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
+    // Always recalculate from services base to ensure correctness
+    const servicesBase = calcData.servicesSubtotal || svcSubtotal || subtotal;
+    const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(servicesBase) * calcDiscountPercent / 100) : 0;
+    const afterDiscount = calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal);
+    const finalTotal = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
+    const totalFormatted = finalTotal.toLocaleString('ru-RU');
+    
     let rows = '';
     let rowNum = 0;
-    for (const item of items) {
+    
+    // Section header for services (if articles also exist)
+    if (articleItems.length > 0 && serviceItems.length > 0) {
+      rows += '<tr><td colspan="5" style="padding:10px 12px;background:' + accentColor + '0d;font-weight:700;color:' + accentColor + ';font-size:0.9em"><i class="fas fa-calculator" style="margin-right:6px"></i>' + (isEn ? 'Services' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u0443\u0433\u0438') + '</td></tr>';
+    }
+    
+    for (const item of serviceItems) {
       rowNum++;
       rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td>' +
@@ -486,6 +512,30 @@ app.get('/pdf/:id', async (c) => {
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (fs.quantity || 1) + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + Number(fs.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#16a34a">0\u00a0\u058f</td></tr>';
+    }
+    
+    // Article items section
+    if (articleItems.length > 0) {
+      // Services subtotal and discount (before articles)
+      if (serviceItems.length > 0) {
+        rows += '<tr style="background:#f8fafc"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#64748b">' + (isEn ? 'Services subtotal:' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580 \u0565\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0443\u0441\u043b\u0443\u0433:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;white-space:nowrap">' + svcSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      }
+      if (calcDiscountAmount > 0 && serviceItems.length > 0) {
+        const svcAfterDisc = svcSubtotal - calcDiscountAmount;
+        rows += '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:8px 12px;text-align:right;color:' + accentColor + ';font-weight:600;font-size:0.9em"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount' : isAm ? '\u0536\u0565\u0572\u0573' : '\u0421\u043a\u0438\u0434\u043a\u0430') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:8px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:0.9em;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+        rows += '<tr style="background:#f0fdf4"><td colspan="4" style="padding:8px 12px;text-align:right;font-weight:700;color:#059669;font-size:0.9em">' + (isEn ? 'Services after discount:' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580 \u0566\u0565\u0572\u0573\u0578\u057e:' : '\u0423\u0441\u043b\u0443\u0433\u0438 \u0441\u043e \u0441\u043a\u0438\u0434\u043a\u043e\u0439:') + '</td><td style="padding:8px 12px;text-align:right;font-weight:800;color:#059669;font-size:0.95em;white-space:nowrap">' + svcAfterDisc.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      }
+      
+      // Articles header
+      rows += '<tr><td colspan="5" style="padding:10px 12px;background:#FEF3C7;font-weight:700;color:#92400E;font-size:0.9em"><i class="fas fa-box" style="margin-right:6px"></i>' + (isEn ? 'WB Articles' : isAm ? 'WB \u0561\u0580\u057f\u056b\u056f\u0578\u0582\u056c\u0576\u0565\u0580' : '\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b WB') + '</td></tr>';
+      for (const art of articleItems) {
+        rowNum++;
+        rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (art.name || '') + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (art.qty || 1) + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(art.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(art.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      }
+      rows += '<tr style="background:#FEF3C7;opacity:0.8"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#92400E">' + (isEn ? 'Articles subtotal:' : isAm ? '\u0531\u0580\u057f\u056b\u056f\u0578\u0582\u056c\u0576\u0565\u0580 \u0565\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;color:#92400E;white-space:nowrap">' + artSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
     
     const L = isEn
@@ -522,15 +572,6 @@ app.get('/pdf/:id', async (c) => {
     const companyAddress = String(tpl.company_address || '');
     const localeCode = isEn ? 'en-US' : isAm ? 'hy-AM' : 'ru-RU';
     const dateStr = new Date().toLocaleDateString(localeCode);
-    const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    // Apply referral discount to final total — discount applies ONLY to services, not to WB articles
-    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
-    // Use servicesSubtotal if available, otherwise fall back to subtotal (when no articles exist yet)
-    const servicesBase = calcData.servicesSubtotal || subtotal;
-    const calcDiscountAmount = calcData.discountAmount || (calcDiscountPercent > 0 ? Math.round(Number(servicesBase) * calcDiscountPercent / 100) : 0);
-    const afterDiscount = calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal);
-    const finalTotal = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
-    const totalFormatted = finalTotal.toLocaleString('ru-RU');
     const invoiceNum = invoicePrefix + '-' + String(id).padStart(4, '0');
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
@@ -595,7 +636,7 @@ app.get('/pdf/:id', async (c) => {
       + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (refDiscount > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + refDiscount + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em">' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
       + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + (isEn ? 'Subtotal:' : isAm ? '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:') + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
-      + (calcDiscountAmount > 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
+      + (calcDiscountAmount > 0 && articleItems.length === 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + ((calcDiscountAmount > 0 || refundAmount > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0422\u041e\u0413\u041e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'

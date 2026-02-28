@@ -1817,7 +1817,7 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   // Set source to calculator_pdf so PDF route works — update regardless of current source
   await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND source != 'calculator_pdf'").bind(leadId).run();
   await updateLeadArticlesCount(db, Number(leadId));
-  return c.json({ success: true, total_amount: totalAmount, articles_count: articles.length });
+  return c.json({ success: true, total_amount: totalAmount, articles_count: articles.length, calc_data: JSON.parse(calcData) });
 });
 
 // ===== LEAD ARTICLES (WB артикулы привязанные к лидам) =====

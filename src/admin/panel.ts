@@ -2123,9 +2123,25 @@ function renderLeads() {
         '<div style="display:flex;gap:8px;align-items:center">' +
         '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="Введите промокод...">' +
         '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Применить</button>' +
+        (leadRefCode ? '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="removeLeadRefCode(' + l.id + ')"><i class="fas fa-times" style="margin-right:4px"></i>Отменить</button>' : '') +
         '</div>';
       if (leadRefCode) {
-        h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:6px;padding:8px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:6px;font-size:0.78rem;color:#6ee7b7"><i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(leadRefCode) + '» применён</div>';
+        // Show discount breakdown
+        var refDiscPct = Number(calcData && calcData.discountPercent || 0);
+        var refDiscAmt = Number(calcData && calcData.discountAmount || 0);
+        var refSvcBase = Number(calcData && calcData.servicesSubtotal || svcAmt || 0);
+        var svcAfterDisc = refSvcBase - refDiscAmt;
+        h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:6px;padding:10px 12px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:8px;font-size:0.78rem;color:#6ee7b7">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span><i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(leadRefCode) + '» применён</span>' +
+          (refDiscPct > 0 ? '<span class="badge badge-green" style="font-size:0.72rem">-' + refDiscPct + '%</span>' : '') + '</div>';
+        if (refDiscAmt > 0) {
+          h += '<div style="margin-top:6px;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:0.72rem;line-height:1.6">' +
+            '<div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Подитог услуг:</span><span>' + Number(refSvcBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
+            '<div style="display:flex;justify-content:space-between;color:#a78bfa"><span>Скидка ' + refDiscPct + '% на услуги:</span><span style="font-weight:700">-' + Number(refDiscAmt).toLocaleString('ru-RU') + ' ֏</span></div>' +
+            '<div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;margin-top:4px"><span>Услуги со скидкой:</span><span style="color:#10B981">' + Number(svcAfterDisc).toLocaleString('ru-RU') + ' ֏</span></div>' +
+          '</div>';
+        }
+        h += '</div>';
       } else {
         h += '<div id="lead-refcode-info-' + l.id + '"></div>';
       }
@@ -2134,9 +2150,14 @@ function renderLeads() {
       // --- 4. SERVICES — collapsible with total shown when closed ---
       var svcTotal = 0;
       for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
+      var leadDiscAmt2 = Number(calcData && calcData.discountAmount || 0);
+      var leadDiscPct2 = Number(calcData && calcData.discountPercent || 0);
+      var svcAfterDisc2 = leadDiscAmt2 > 0 ? (svcTotal - leadDiscAmt2) : svcTotal;
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">' +
-        '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ') — <span style="color:#8B5CF6">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</span></span>' +
+        '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ') — ' +
+        (leadDiscAmt2 > 0 ? '<span style="text-decoration:line-through;color:#64748b;font-weight:400;margin-right:4px">' + Number(svcTotal).toLocaleString('ru-RU') + '</span><span style="color:#10B981">' + Number(svcAfterDisc2).toLocaleString('ru-RU') + '&nbsp;֏</span> <span style="color:#8B5CF6;font-size:0.72rem;font-weight:400">(-' + leadDiscPct2 + '%)</span>' : '<span style="color:#8B5CF6">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</span>') +
+        '</span>' +
         '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
         '<i id="svc-arrow-' + l.id + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
       h += '<div id="svc-body-' + l.id + '" style="display:none;margin-top:8px">';
@@ -2267,13 +2288,43 @@ async function applyLeadRefCode(leadId) {
   try {
     var recalcRes = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
     if (recalcRes && recalcRes.total_amount !== undefined) {
-      if (lead) lead.total_amount = recalcRes.total_amount;
+      if (lead) {
+        lead.total_amount = recalcRes.total_amount;
+        try { lead.calc_data = JSON.stringify(recalcRes.calc_data || {}); } catch(e) {}
+      }
       toast('Сумма пересчитана: ' + Number(recalcRes.total_amount).toLocaleString('ru-RU') + ' ֏');
     }
     // Reload data to update card display
     await loadData();
     renderLeads();
   } catch(e) { console.log('Recalc error:', e); }
+}
+
+async function removeLeadRefCode(leadId) {
+  if (!confirm('Отменить промокод и убрать скидку для этого лида?')) return;
+  
+  // Clear referral code from lead
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ referral_code: '' }) });
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (lead) lead.referral_code = '';
+  
+  // Recalculate without discount
+  try {
+    var recalcRes = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+    if (recalcRes && recalcRes.total_amount !== undefined) {
+      if (lead) {
+        lead.total_amount = recalcRes.total_amount;
+        try { lead.calc_data = JSON.stringify(recalcRes.calc_data || {}); } catch(e) {}
+      }
+    }
+    toast('Промокод отменён, скидка убрана');
+    await loadData();
+    renderLeads();
+  } catch(e) {
+    toast('Промокод убран, обновите страницу');
+    await loadData();
+    render();
+  }
 }
 
 function getAssigneeName(id) {
