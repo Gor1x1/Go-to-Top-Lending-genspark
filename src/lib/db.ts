@@ -139,6 +139,16 @@ CREATE TABLE IF NOT EXISTS referral_codes (
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS referral_free_services (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  referral_code_id INTEGER NOT NULL,
+  service_id INTEGER NOT NULL,
+  discount_percent INTEGER DEFAULT 0,
+  quantity INTEGER DEFAULT 1,
+  FOREIGN KEY (referral_code_id) REFERENCES referral_codes(id) ON DELETE CASCADE,
+  FOREIGN KEY (service_id) REFERENCES calculator_services(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS leads (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   lead_number INTEGER DEFAULT 0,
@@ -673,6 +683,19 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
     block_id INTEGER,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`).run(); } catch {}
+  // v25: Ensure referral_free_services table exists (for attaching free/discounted services to referral codes)
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS referral_free_services (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    referral_code_id INTEGER NOT NULL,
+    service_id INTEGER NOT NULL,
+    discount_percent INTEGER DEFAULT 0,
+    quantity INTEGER DEFAULT 1,
+    FOREIGN KEY (referral_code_id) REFERENCES referral_codes(id) ON DELETE CASCADE,
+    FOREIGN KEY (service_id) REFERENCES calculator_services(id) ON DELETE CASCADE
+  )`).run(); } catch {}
+  // v25: Ensure leads has referral_code and lang columns
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN referral_code TEXT DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN lang TEXT DEFAULT 'ru'").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

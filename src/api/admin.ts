@@ -531,6 +531,59 @@ api.delete('/referrals/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// Check referral code validity (for lead card)
+api.get('/referral-codes/check', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const code = c.req.query('code') || '';
+  if (!code) return c.json({ valid: false });
+  const row = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(code).first();
+  if (!row) return c.json({ valid: false });
+  
+  // Load attached services (free + discounted)
+  let freeServices: any[] = [];
+  let serviceDiscounts: any[] = [];
+  try {
+    const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(row.id).all();
+    freeServices = (fsRes.results || []).filter((s: any) => s.discount_percent === null || s.discount_percent === 0 || s.discount_percent === undefined);
+    serviceDiscounts = (fsRes.results || []).filter((s: any) => s.discount_percent > 0);
+  } catch {}
+  
+  return c.json({
+    valid: true,
+    id: row.id,
+    code: row.code,
+    discount_percent: row.discount_percent || 0,
+    free_reviews: row.free_reviews || 0,
+    description: row.description || '',
+    free_services: freeServices,
+    service_discounts: serviceDiscounts
+  });
+});
+
+// ===== REFERRAL SERVICE ATTACHMENTS =====
+api.get('/referrals/:id/services', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const refId = c.req.param('id');
+  const res = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refId).all();
+  return c.json({ services: res.results || [] });
+});
+
+api.post('/referrals/:id/services', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const refId = c.req.param('id');
+  const { service_id, discount_percent, quantity } = await c.req.json();
+  await db.prepare('INSERT INTO referral_free_services (referral_code_id, service_id, discount_percent, quantity) VALUES (?,?,?,?)')
+    .bind(refId, service_id, discount_percent || 0, quantity || 1).run();
+  return c.json({ success: true });
+});
+
+api.delete('/referrals/:id/services/:svcId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const svcId = c.req.param('svcId');
+  await db.prepare('DELETE FROM referral_free_services WHERE id = ?').bind(svcId).run();
+  return c.json({ success: true });
+});
+
 // ===== SECTION ORDER =====
 api.get('/section-order', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -1692,8 +1745,8 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   const calcData = JSON.stringify({ items: allItems, subtotal: subtotalAmount, total: totalAmount, refund: refundAmount, referralCode: existingCalcData?.referralCode || '' });
   await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
     .bind(totalAmount, calcData, leadId).run();
-  // Set source to calculator_pdf so PDF route works
-  await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND (source = 'form' OR source = 'manual' OR source = 'popup')").bind(leadId).run();
+  // Set source to calculator_pdf so PDF route works — update regardless of current source
+  await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND source != 'calculator_pdf'").bind(leadId).run();
   await updateLeadArticlesCount(db, Number(leadId));
   return c.json({ success: true, total_amount: totalAmount, articles_count: articles.length });
 });

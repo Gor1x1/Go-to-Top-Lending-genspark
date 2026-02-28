@@ -59,6 +59,10 @@ export function getAdminHTML(): string {
   .sb-block-item { transition: transform 0.15s ease, box-shadow 0.15s ease; }
   .sb-block-item.sortable-ghost { opacity: 0.4; background: #1a2236 !important; }
   .sb-block-item.sortable-chosen { box-shadow: 0 8px 40px rgba(139,92,246,0.35); transform: scale(1.01); z-index: 10; }
+  .section-edit-row.sortable-ghost { opacity: 0.4; background: #1a2236 !important; border-color: #8B5CF6 !important; }
+  .section-edit-row.sortable-chosen { box-shadow: 0 4px 20px rgba(139,92,246,0.3); transform: scale(1.01); z-index: 10; }
+  .calc-drag-handle { cursor: grab !important; touch-action: none; user-select: none; }
+  .calc-drag-handle:active { cursor: grabbing !important; }
   .sb-drag-handle { cursor: grab; padding: 10px 12px; color: #64748b; transition: color 0.2s, background 0.2s; display: flex; align-items: center; justify-content: center; border-radius: 8px; min-width: 40px; min-height: 40px; }
   .sb-drag-handle:hover { color: #8B5CF6; background: rgba(139,92,246,0.15); }
   .sb-drag-handle:active { cursor: grabbing; color: #a78bfa; background: rgba(139,92,246,0.25); transform: scale(1.05); }
@@ -235,7 +239,7 @@ async function doLogin(e) {
       localStorage.setItem('gtt_roles', JSON.stringify(res.rolesConfig));
       startTokenRefresh();
       toast('Добро пожаловать, ' + (res.user.display_name || res.user.username));
-      try { await loadData(); } catch(err) { console.error('loadData error:', err); }
+      try { await loadData(); await loadRefServices(); } catch(err) { console.error('loadData error:', err); }
       render();
     } else {
       toast(res.error || 'Ошибка входа', 'error');
@@ -402,7 +406,13 @@ function navigate(page) {
       else el.classList.remove('active');
     });
     // Render page content asynchronously
-    setTimeout(function() { mainEl.innerHTML = getPageHtml(); }, 10);
+    setTimeout(function() {
+      mainEl.innerHTML = getPageHtml();
+      // Post-render: init SortableJS for calculator service lists
+      setTimeout(function() { initCalcSortables(); }, 50);
+      // Post-render: init SortableJS for site blocks
+      setTimeout(function() { if (typeof sbInitSortable === 'function') sbInitSortable(); }, 50);
+    }, 10);
   } else {
     render();
   }
@@ -1146,7 +1156,8 @@ function renderCalculator() {
 // ===== SORTABLE: drag-and-drop reorder services inside each calculator tab =====
 function initCalcSortables() {
   document.querySelectorAll('.calc-sortable-list').forEach(function(el) {
-    if (el._sortableCalc) return;
+    // Always re-init since DOM is recreated on each render
+    try { if (el._sortableCalc) el._sortableCalc.destroy(); } catch(e) {}
     el._sortableCalc = new Sortable(el, {
       handle: '.calc-drag-handle',
       animation: 200,
@@ -1165,7 +1176,7 @@ function initCalcSortables() {
           if (svc) svc.sort_order = orders[oi].sort_order;
         }
         api('/calc-services-reorder', { method: 'PUT', body: JSON.stringify({ orders: orders }) })
-          .then(function() { toast('Порядок услуг сохранён'); })
+          .then(function() { toast('Порядок услуг сохранён и обновлён на сайте'); })
           .catch(function() { toast('Ошибка сохранения порядка', 'error'); });
       }
     });
@@ -1685,11 +1696,21 @@ async function toggleScript(id, active) {
 
 // ===== REFERRAL CODES =====
 function renderReferrals() {
+  // Get all calculator services for the dropdown
+  var allCalcServices = [];
+  var tabsById = {};
+  (data.calcTabs || []).forEach(function(tab) { tabsById[tab.id] = tab; });
+  (data.calcServices || []).forEach(function(svc) {
+    var tab = tabsById[svc.tab_id] || {};
+    allCalcServices.push({ id: svc.id, name_ru: svc.name_ru, name_am: svc.name_am, price: svc.price, tab: tab.name_ru || '' });
+  });
+  
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Реферальные коды</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Кодовые слова для скидок и бесплатных отзывов. Пользователь вводит код в калькуляторе и получает скидку.</p>' +
+    '<p style="color:#94a3b8;margin-bottom:24px">Промокоды со скидками, бесплатными услугами и отзывами. Можно привязать конкретные услуги из калькулятора.</p>' +
     '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить код</button>';
   
   for (const ref of data.referrals) {
+    var refServices = ref._services || [];
     h += '<div class="card" style="margin-bottom:16px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
         '<div><span class="badge badge-green" style="font-size:0.9rem;padding:6px 14px">' + escHtml(ref.code) + '</span>' +
@@ -1704,11 +1725,46 @@ function renderReferrals() {
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Код (слово)</label><input class="input" value="' + escHtml(ref.code) + '" id="ref_code_' + ref.id + '"></div>' +
-        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Скидка (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Общая скидка (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" value="' + (ref.free_reviews || 0) + '" id="ref_free_' + ref.id + '" min="0"></div>' +
       '</div>' +
-      '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>' +
-    '</div>';
+      '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>';
+    
+    // === Attached services section ===
+    h += '<div style="margin-top:16px;border-top:1px solid #334155;padding-top:12px">' +
+      '<div style="font-size:0.82rem;font-weight:700;color:#a78bfa;margin-bottom:8px"><i class="fas fa-gift" style="margin-right:6px"></i>Привязанные услуги</div>';
+    
+    // Show existing attached services
+    if (refServices.length > 0) {
+      h += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">';
+      for (var rsi = 0; rsi < refServices.length; rsi++) {
+        var rs = refServices[rsi];
+        var rsLabel = rs.discount_percent > 0
+          ? '<span style="color:#fbbf24">-' + rs.discount_percent + '% скидка</span>'
+          : '<span style="color:#10B981">Бесплатно</span>';
+        h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#1a2236;border-radius:6px;font-size:0.8rem">' +
+          '<span><i class="fas fa-check-circle" style="color:#10B981;margin-right:6px"></i>' + escHtml(rs.name_ru || 'Услуга #' + rs.service_id) + ' <span style="color:#64748b">×' + (rs.quantity || 1) + '</span></span>' +
+          '<div style="display:flex;align-items:center;gap:8px">' + rsLabel +
+          '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:2px 4px" onclick="removeRefService(' + ref.id + ',' + rs.id + ')"><i class="fas fa-times"></i></button></div></div>';
+      }
+      h += '</div>';
+    }
+    
+    // Add service form
+    h += '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
+      '<div style="flex:2;min-width:180px"><select class="input" id="ref_addsvc_' + ref.id + '" style="font-size:0.8rem"><option value="">— Выберите услугу —</option>';
+    for (var asi = 0; asi < allCalcServices.length; asi++) {
+      var as = allCalcServices[asi];
+      h += '<option value="' + as.id + '">' + escHtml(as.name_ru) + ' (' + escHtml(as.tab) + ') — ' + Number(as.price).toLocaleString('ru-RU') + ' ֏</option>';
+    }
+    h += '</select></div>' +
+      '<div style="flex:0.5;min-width:60px"><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Скидка %</div><input class="input" type="number" id="ref_adddisc_' + ref.id + '" value="100" min="0" max="100" style="font-size:0.8rem"></div>' +
+      '<div style="flex:0.5;min-width:50px"><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Кол-во</div><input class="input" type="number" id="ref_addqty_' + ref.id + '" value="1" min="1" max="99" style="font-size:0.8rem"></div>' +
+      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addRefService(' + ref.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
+    '</div>' +
+    '<div style="font-size:0.7rem;color:#475569;margin-top:4px">Скидка 100% = бесплатно. Выберите услугу из калькулятора.</div>';
+    
+    h += '</div></div>';
   }
   
   if (!data.referrals.length) {
@@ -1728,7 +1784,38 @@ async function addReferral() {
   const free = parseInt(prompt('Количество бесплатных отзывов (0 = нет):') || '0');
   await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free }) });
   toast('Код добавлен');
-  await loadData(); render();
+  await loadData(); await loadRefServices(); render();
+}
+
+async function loadRefServices() {
+  // Load attached services for each referral code
+  for (var ri = 0; ri < (data.referrals || []).length; ri++) {
+    var ref = data.referrals[ri];
+    try {
+      var res = await api('/referrals/' + ref.id + '/services');
+      ref._services = (res && res.services) || [];
+    } catch { ref._services = []; }
+  }
+}
+
+async function addRefService(refId) {
+  var svcSelect = document.getElementById('ref_addsvc_' + refId);
+  var discInput = document.getElementById('ref_adddisc_' + refId);
+  var qtyInput = document.getElementById('ref_addqty_' + refId);
+  if (!svcSelect || !svcSelect.value) { toast('Выберите услугу', 'error'); return; }
+  await api('/referrals/' + refId + '/services', { method: 'POST', body: JSON.stringify({
+    service_id: parseInt(svcSelect.value),
+    discount_percent: parseInt(discInput.value) || 100,
+    quantity: parseInt(qtyInput.value) || 1
+  }) });
+  toast('Услуга привязана к коду');
+  await loadRefServices(); render();
+}
+
+async function removeRefService(refId, svcLinkId) {
+  await api('/referrals/' + refId + '/services/' + svcLinkId, { method: 'DELETE' });
+  toast('Услуга удалена из кода');
+  await loadRefServices(); render();
 }
 
 async function saveReferral(id) {
@@ -2025,6 +2112,21 @@ function renderLeads() {
         '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
         '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea></div>';
 
+      // --- 3b. REFERRAL CODE ---
+      var leadRefCode = l.referral_code || '';
+      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
+        '<div style="font-size:0.78rem;font-weight:600;color:#10B981;margin-bottom:6px"><i class="fas fa-tag" style="margin-right:4px"></i>Реферальный код:</div>' +
+        '<div style="display:flex;gap:8px;align-items:center">' +
+        '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="Введите промокод...">' +
+        '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Применить</button>' +
+        '</div>';
+      if (leadRefCode) {
+        h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:6px;padding:8px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:6px;font-size:0.78rem;color:#6ee7b7"><i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(leadRefCode) + '» применён</div>';
+      } else {
+        h += '<div id="lead-refcode-info-' + l.id + '"></div>';
+      }
+      h += '</div>';
+
       // --- 4. SERVICES — collapsible with total shown when closed ---
       var svcTotal = 0;
       for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
@@ -2118,6 +2220,44 @@ async function saveLeadNotes(id) {
   var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
   if (lead) lead.notes = el.value;
   toast('Заметка сохранена');
+}
+
+async function applyLeadRefCode(leadId) {
+  var codeInput = document.getElementById('lead-refcode-' + leadId);
+  var infoDiv = document.getElementById('lead-refcode-info-' + leadId);
+  if (!codeInput) return;
+  var code = codeInput.value.trim();
+  if (!code) { toast('Введите промокод', 'error'); return; }
+  
+  // Validate code against referral_codes
+  var res = await api('/referral-codes/check?code=' + encodeURIComponent(code));
+  if (!res || !res.valid) {
+    if (infoDiv) infoDiv.innerHTML = '<div style="padding:8px;background:#2d1f1f;border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.78rem;color:#fca5a5"><i class="fas fa-times-circle" style="margin-right:4px"></i>Код не найден или неактивен</div>';
+    toast('Промокод не найден', 'error');
+    return;
+  }
+  
+  // Save code to lead
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ referral_code: code }) });
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (lead) lead.referral_code = code;
+  
+  // Show discount info
+  var infoHtml = '<div style="padding:8px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:6px;font-size:0.78rem;color:#6ee7b7">' +
+    '<i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(code) + '» применён';
+  if (res.discount_percent) infoHtml += ' | Скидка: <strong>' + res.discount_percent + '%</strong>';
+  if (res.free_reviews) infoHtml += ' | Бесп. отзывы: <strong>' + res.free_reviews + '</strong>';
+  if (res.free_services && res.free_services.length > 0) {
+    infoHtml += '<br>Бесплатные услуги: ';
+    res.free_services.forEach(function(s) { infoHtml += '<span style="background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px;margin:0 2px">' + escHtml(s.name_ru || s.service_name) + '</span>'; });
+  }
+  if (res.service_discounts && res.service_discounts.length > 0) {
+    infoHtml += '<br>Скидки на услуги: ';
+    res.service_discounts.forEach(function(s) { infoHtml += '<span style="background:rgba(251,191,36,0.15);padding:1px 6px;border-radius:4px;margin:0 2px;color:#fbbf24">' + escHtml(s.name_ru || s.service_name) + ' -' + s.discount_percent + '%</span>'; });
+  }
+  infoHtml += '</div>';
+  if (infoDiv) infoDiv.innerHTML = infoHtml;
+  toast('Промокод применён: ' + (res.discount_percent ? res.discount_percent + '% скидка' : 'активен'));
 }
 
 function getAssigneeName(id) {
@@ -9971,14 +10111,33 @@ async function sbLinkCounter(blockId, blockKey, counterId) {
   if (!counterId) return;
   var counter = (data.slotCounters || []).find(function(c) { return c.id === parseInt(counterId); });
   if (!counter) return;
-  // Update counter position to point to this block
+  
+  // First, UNLINK any previously linked counter from this block
+  var blockKeyHyphen = blockKey.replace(/_/g, '-');
+  for (var i = 0; i < (data.slotCounters || []).length; i++) {
+    var sc = data.slotCounters[i];
+    if (sc.id === parseInt(counterId)) continue; // skip the one we're about to link
+    var cpos = sc.position || '';
+    if (cpos === 'in-' + blockKey || cpos === 'after-' + blockKey || cpos === 'before-' + blockKey ||
+        cpos === 'in-' + blockKeyHyphen || cpos === 'after-' + blockKeyHyphen || cpos === 'before-' + blockKeyHyphen) {
+      // Unlink old counter — set position to empty
+      await api('/slot-counter/' + sc.id, { method: 'PUT', body: JSON.stringify({
+        total_slots: sc.total_slots, booked_slots: sc.booked_slots,
+        label_ru: sc.label_ru, label_am: sc.label_am,
+        show_timer: sc.show_timer, position: '',
+        counter_name: sc.counter_name
+      }) });
+    }
+  }
+  
+  // Now link the selected counter to this block
   await api('/slot-counter/' + counterId, { method: 'PUT', body: JSON.stringify({
     total_slots: counter.total_slots, booked_slots: counter.booked_slots,
     label_ru: counter.label_ru, label_am: counter.label_am,
     show_timer: counter.show_timer, position: 'in-' + blockKey,
     counter_name: counter.counter_name
   }) });
-  toast('Счётчик привязан к блоку «' + blockKey + '»!');
+  toast('Счётчик #' + counterId + ' привязан к блоку «' + blockKey + '»!');
   await loadData(); render();
 }
 
@@ -9994,40 +10153,132 @@ async function sbCreateSlotForBlock(blockKey) {
 
 // ── Create new block (modal) ──
 function createSiteBlock() {
-  var newBlock = { block_key: 'block_' + Date.now(), block_type: 'section', title_ru: 'Новый блок', title_am: '', texts_ru: [''], texts_am: [''], images: [], buttons: [], social_links: '[]', is_visible: 1, custom_css: '', custom_html: '' };
-  editingBlock = newBlock;
-  showBlockEditor();
+  // Show template picker modal
+  var modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;padding:20px';
+  modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+  
+  var templates = [
+    { key: 'section', icon: 'fa-align-left', color: '#8B5CF6', label: 'Секция с текстом', desc: 'Заголовок + текст + кнопка. Для акций, описаний, информации.', bg: 'section-dark' },
+    { key: 'promo', icon: 'fa-bullhorn', color: '#F59E0B', label: 'Промо-акция', desc: 'Баннер + яркий заголовок + CTA-кнопка. Для акций и спецпредложений.', bg: 'section' },
+    { key: 'gallery', icon: 'fa-images', color: '#10B981', label: 'Фото-галерея', desc: 'Сетка фото с подписями. Для портфолио, примеров работ.', bg: 'section-dark' },
+    { key: 'reviews', icon: 'fa-star', color: '#F97316', label: 'Отзывы клиентов', desc: 'Карусель скриншотов отзывов. Для доверия и соцдоказательства.', bg: 'section' },
+    { key: 'text_photo', icon: 'fa-columns', color: '#3B82F6', label: 'Текст + Фото', desc: 'Две колонки: текст слева, фото справа. Для рассказа о чём-то.', bg: 'section-dark' },
+    { key: 'cta_banner', icon: 'fa-rocket', color: '#EF4444', label: 'CTA Баннер', desc: 'Полноширинный блок с призывом к действию и кнопкой.', bg: 'section' }
+  ];
+  
+  var bgOptions = [
+    { value: 'section-dark', label: 'Тёмный', color: '#0f172a' },
+    { value: 'section', label: 'Светлый', color: '#1e293b' },
+    { value: 'section-gradient', label: 'Градиент', color: 'linear-gradient(135deg,#1a1a2e,#16213e)' },
+    { value: 'section-accent', label: 'Акцент', color: 'linear-gradient(135deg,#1e0533,#0f172a)' }
+  ];
+  
+  var mh = '<div style="background:#0f172a;border:1px solid #334155;border-radius:16px;max-width:700px;width:100%;max-height:90vh;overflow-y:auto;padding:28px">' +
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 style="font-size:1.3rem;font-weight:800;color:#e2e8f0"><i class="fas fa-magic" style="color:#8B5CF6;margin-right:8px"></i>Создать секцию для сайта</h2><button class="btn btn-outline" style="padding:6px 10px" onclick="this.closest(&apos;div[style*=fixed]&apos;).remove()"><i class="fas fa-times"></i></button></div>';
+  
+  // Template name input
+  mh += '<div style="margin-bottom:16px">' +
+    '<label style="font-size:0.82rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:6px">Название секции (RU)</label>' +
+    '<input class="input" id="newblock_title" value="Новая секция" style="font-size:0.95rem;padding:10px">' +
+    '</div>';
+  
+  // Background style
+  mh += '<div style="margin-bottom:16px"><div style="font-size:0.82rem;color:#94a3b8;font-weight:600;margin-bottom:8px">Фон секции:</div>' +
+    '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+  for (var bi = 0; bi < bgOptions.length; bi++) {
+    var bg = bgOptions[bi];
+    mh += '<label style="cursor:pointer;display:flex;align-items:center;gap:6px;padding:6px 12px;border:2px solid ' + (bi === 0 ? '#8B5CF6' : '#334155') + ';border-radius:8px;font-size:0.8rem;color:#e2e8f0">' +
+      '<input type="radio" name="newblock_bg" value="' + bg.value + '"' + (bi === 0 ? ' checked' : '') + ' style="accent-color:#8B5CF6">' +
+      '<div style="width:20px;height:20px;border-radius:4px;background:' + bg.color + ';border:1px solid #475569"></div>' + bg.label + '</label>';
+  }
+  mh += '</div></div>';
+  
+  // Template grid
+  mh += '<div style="font-size:0.82rem;color:#94a3b8;font-weight:600;margin-bottom:8px">Выберите шаблон:</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px">';
+  for (var ti = 0; ti < templates.length; ti++) {
+    var t = templates[ti];
+    mh += '<div class="card" style="cursor:pointer;padding:14px;border:2px solid transparent;transition:border-color 0.2s" onclick="createBlockFromTemplate(&apos;' + t.key + '&apos;)" onmouseover="this.style.borderColor=&apos;' + t.color + '&apos;" onmouseout="this.style.borderColor=&apos;transparent&apos;">' +
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:6px">' +
+      '<i class="fas ' + t.icon + '" style="font-size:1.5rem;color:' + t.color + '"></i>' +
+      '<span style="font-size:0.92rem;font-weight:700;color:#e2e8f0">' + t.label + '</span></div>' +
+      '<div style="font-size:0.75rem;color:#64748b;line-height:1.4">' + t.desc + '</div></div>';
+  }
+  mh += '</div></div>';
+  
+  modal.innerHTML = mh;
+  document.body.appendChild(modal);
 }
 
-// ── Create client reviews block with carousel ──
-async function createReviewsBlock() {
-  var name = prompt('Название блока отзывов:', 'Отзывы клиентов');
-  if (!name) return;
-  var key = 'reviews_' + Date.now().toString(36);
+async function createBlockFromTemplate(template) {
+  var titleInput = document.getElementById('newblock_title');
+  var title = titleInput ? titleInput.value.trim() : 'Новая секция';
+  if (!title) title = 'Новая секция';
+  
+  var bgRadio = document.querySelector('input[name="newblock_bg"]:checked');
+  var bgClass = bgRadio ? bgRadio.value : 'section-dark';
+  
+  var key = template + '_' + Date.now().toString(36);
+  var blockType = template === 'reviews' ? 'reviews' : 'section';
+  
+  var textsRu = [title];
+  var textsAm = [''];
+  var buttons = [];
+  var customHtml = { bg_class: bgClass };
+  
+  // Configure based on template
+  switch(template) {
+    case 'promo':
+      textsRu = [title, 'Специальное предложение для вас!', 'Только до конца месяца'];
+      buttons = [{ text_ru: 'Узнать подробнее', text_am: '', url: '#', icon: 'fas fa-arrow-right', action_type: 'link' }];
+      customHtml.bg_class = 'section-accent';
+      break;
+    case 'gallery':
+      textsRu = [title, 'Примеры наших работ'];
+      customHtml.photos = []; customHtml.show_photos = true;
+      break;
+    case 'reviews':
+      textsRu = [title, 'Что говорят наши клиенты'];
+      customHtml.photos = []; customHtml.show_photos = true;
+      break;
+    case 'text_photo':
+      textsRu = [title, 'Описание вашего предложения или услуги', 'Подробный текст, который убедит клиентов.'];
+      customHtml.photo_url = '';
+      break;
+    case 'cta_banner':
+      textsRu = [title, 'Готовы начать? Оставьте заявку прямо сейчас!'];
+      buttons = [{ text_ru: 'Оставить заявку', text_am: '', url: '#calculator', icon: 'fas fa-rocket', action_type: 'link' }];
+      customHtml.bg_class = 'section-accent';
+      break;
+    default:
+      textsRu = [title, 'Текст вашей секции'];
+  }
+  
   var blockData = {
-    block_key: key,
-    block_type: 'reviews',
-    title_ru: name,
-    title_am: '',
-    texts_ru: [name, 'Что говорят наши клиенты'],
-    texts_am: [],
-    images: [],
-    buttons: [],
-    social_links: '[]',
-    is_visible: 1,
-    custom_css: '',
-    custom_html: JSON.stringify({ photos: [], show_photos: true })
+    block_key: key, block_type: blockType, title_ru: title, title_am: '',
+    texts_ru: textsRu, texts_am: textsAm.length >= textsRu.length ? textsAm : textsRu.map(function() { return ''; }),
+    images: [], buttons: buttons, social_links: '[]',
+    is_visible: 1, custom_css: '', custom_html: JSON.stringify(customHtml)
   };
+  
   await api('/site-blocks', { method: 'POST', body: JSON.stringify(blockData) });
   
-  // Also add to sectionOrder so it appears on the site
-  var maxOrder = data.sectionOrder.reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0);
-  data.sectionOrder.push({ section_id: key, sort_order: maxOrder + 1, is_visible: 1, label_ru: name, label_am: '' });
-  await saveAllBlocks();
-  // Create content entry
-  await api('/content', { method: 'POST', body: JSON.stringify({ section_key: key, section_name: name, content_json: [{ ru: name, am: '' }, { ru: 'Что говорят наши клиенты', am: '' }] }) });
+  // Create content and section_order entries
+  var content = textsRu.map(function(ru, i) { return { ru: ru, am: '' }; });
+  await api('/content', { method: 'POST', body: JSON.stringify({ section_key: key, section_name: title, content_json: content }) });
   
-  toast('Блок отзывов создан! Загрузите скриншоты отзывов через фото-галерею блока.');
+  // Add to section_order with hyphenated key
+  var keyHyphen = key.replace(/_/g, '-');
+  var maxOrder = 0;
+  try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch {}
+  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: [{ section_id: keyHyphen, sort_order: maxOrder + 1, is_visible: 1, label_ru: title, label_am: '' }] }) });
+  
+  // Close modal
+  var modal = document.querySelector('div[style*="fixed"][style*="z-index:999"]');
+  if (modal) modal.remove();
+  
+  toast('Секция «' + title + '» создана! Теперь добавьте контент, фото и кнопки.');
   await loadData(); render();
 }
 
@@ -10299,7 +10550,7 @@ function render() {
   if (mainEl) {
     mainEl.innerHTML = getPageHtml();
     // Post-render: init SortableJS for calculator service lists
-    initCalcSortables();
+    setTimeout(function() { initCalcSortables(); }, 50);
     // Post-render: auto-trigger dividend form calculations if form is open
     if (showPnlAddForm && pnlEditType === 'dividend') {
       setTimeout(function() { if (typeof calcDividendFromPct === 'function') calcDividendFromPct(); updateDivPayoutSummary(); }, 20);

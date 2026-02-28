@@ -370,7 +370,7 @@ app.get('/pdf/:id', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     const id = c.req.param('id');
-    const lead = await db.prepare('SELECT * FROM leads WHERE id = ? AND source = ?').bind(id, 'calculator_pdf').first();
+    const lead = await db.prepare('SELECT * FROM leads WHERE id = ?').bind(id).first();
     if (!lead) return c.text('PDF not found', 404);
     
     const lang = (lead.lang as string) || 'ru';
@@ -384,6 +384,28 @@ app.get('/pdf/:id', async (c) => {
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
     const refundAmount = Number(lead.refund_amount) || 0;
+    const referralCode = (lead.referral_code as string) || calcData.referralCode || '';
+    
+    // Load referral code details if present (for showing discounts & free services in PDF)
+    let refDiscount = 0;
+    let refFreeServices: any[] = [];
+    let refServiceDiscounts: any[] = [];
+    if (referralCode) {
+      try {
+        const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
+        if (refRow) {
+          refDiscount = Number(refRow.discount_percent) || 0;
+          const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
+          for (const fs of (fsRes.results || [])) {
+            if ((fs.discount_percent as number) === 0 || (fs.discount_percent as number) >= 100) {
+              refFreeServices.push(fs);
+            } else {
+              refServiceDiscounts.push(fs);
+            }
+          }
+        }
+      } catch {}
+    }
     
     let tpl: any = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
     if (!tpl) tpl = {};
@@ -409,6 +431,17 @@ app.get('/pdf/:id', async (c) => {
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+    }
+    // Add free services from referral code (price = 0)
+    for (const fs of refFreeServices) {
+      rowNum++;
+      const fsName = (isAm ? (fs.name_am || fs.name_ru) : (isEn ? fs.name_ru : fs.name_ru)) || '';
+      const freeLabel = isEn ? '(free)' : isAm ? '(\u0561\u0576\u057e\u0573\u0561\u0580)' : '(\u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e)';
+      rows += '<tr style="background:#f0fdf4"><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a"><i class="fas fa-gift" style="margin-right:4px"></i>' + fsName + ' <span style="font-size:0.8em;opacity:0.8">' + freeLabel + '</span></td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (fs.quantity || 1) + '</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + Number(fs.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
+        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#16a34a">0\u00a0\u058f</td></tr>';
     }
     
     const L = isEn
@@ -509,6 +542,7 @@ app.get('/pdf/:id', async (c) => {
       + '<div class="meta"><span><i class="fas fa-calendar-alt" style="margin-right:4px"></i>' + L.date + ' ' + dateStr + '</span><span><i class="fas fa-hashtag" style="margin-right:4px"></i>' + L.id + ' ' + invoiceNum + '</span></div>'
       + (clientName || clientContact ? '<div class="cli"><strong><i class="fas fa-user" style="margin-right:4px;color:' + accentColor + '"></i>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | <i class="fas fa-phone-alt" style="margin-right:4px;color:#10B981"></i>' + clientContact : '') + '</div>' : '')
       + (intro ? '<div class="intro">' + intro + '</div>' : '')
+      + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (refDiscount > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + refDiscount + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em">' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
       + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
       + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>'
@@ -2871,11 +2905,18 @@ switchLang = function(l) {
         }
 
         // Inject photos if photos array has items (no toggle required)
+        // BUT skip if section already has images from HTML template (avoid duplicates)
         if (bf.photos && bf.photos.length > 0) {
           var existingPhotoGal = section.querySelector('.block-photo-gallery');
           if (existingPhotoGal) existingPhotoGal.remove();
           var existingReviewCarousel = section.querySelector('.reviews-carousel-wrap');
           if (existingReviewCarousel) existingReviewCarousel.remove();
+          // Check if section already has images (from HTML, not from our injection)
+          var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.reviews-carousel-wrap img)');
+          var hasNativePhotos = nativeImgs.length > 0 && !existingPhotoGal && !existingReviewCarousel && bf.block_type !== 'reviews';
+          if (hasNativePhotos && bf.show_photos !== true) {
+            // Section has built-in photos; skip gallery injection unless explicitly enabled
+          } else {
           
           var validPhotos = bf.photos.filter(function(p) { return p && p.url; });
           if (validPhotos.length > 0) {
@@ -2924,6 +2965,7 @@ switchLang = function(l) {
               else section.appendChild(photoDiv);
             }
           }
+          } // end else (no native photos or show_photos enabled)
         }
         
         // Inject social links if socials have URLs (no toggle required)
