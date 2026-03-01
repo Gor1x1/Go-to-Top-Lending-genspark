@@ -5481,22 +5481,99 @@ function renderBizOverviewV2(d, sd, fin) {
   // ---- SECTION: Loan Summary (if any loans exist) ----
   var oLoans = (data.loans || []).filter(function(l) { return l.is_active !== 0; });
   if (oLoans.length > 0) {
-    var oTotalDebt = 0, oTotalMonthly = 0;
+    var oTotalDebt = 0, oTotalMonthly = 0, oTotalPrincipal = 0, oTotalInterestCost = 0;
+    var oBankLoans = 0, oOverdrafts = 0, oOtherLoans = 0;
+    var oOverdraftTotal = 0, oOverdraftLimit = 0;
+    var oNearestEnd = '', oNearestName = '';
+    var oWeightedRate = 0, oRateWeightSum = 0;
+    var oTotalPaid = 0;
     for (var oli = 0; oli < oLoans.length; oli++) {
       var ol = oLoans[oli];
-      if (ol.loan_type === 'overdraft') { oTotalDebt += (ol.overdraft_used || 0); }
-      else { oTotalDebt += (ol.remaining_balance || 0); oTotalMonthly += (ol.monthly_payment || 0); }
+      if (ol.loan_type === 'overdraft') {
+        oOverdrafts++;
+        oOverdraftTotal += (ol.overdraft_used || 0);
+        oOverdraftLimit += (ol.overdraft_limit || 0);
+        oTotalDebt += (ol.overdraft_used || 0);
+      } else {
+        var olBal = ol.remaining_balance || 0;
+        var olPrincipal = ol.principal || 0;
+        oTotalDebt += olBal;
+        oTotalMonthly += (ol.monthly_payment || 0);
+        oTotalPrincipal += olPrincipal;
+        oTotalPaid += (olPrincipal - olBal);
+        if (ol.interest_rate > 0) {
+          oWeightedRate += ol.interest_rate * olBal;
+          oRateWeightSum += olBal;
+        }
+        if (ol.loan_type === 'bank') oBankLoans++;
+        else oOtherLoans++;
+        // Nearest end date
+        if (ol.end_date && (!oNearestEnd || ol.end_date < oNearestEnd)) {
+          oNearestEnd = ol.end_date;
+          oNearestName = ol.name || ol.lender || '';
+        }
+      }
     }
+    var oAvgRate = oRateWeightSum > 0 ? (oWeightedRate / oRateWeightSum) : 0;
     var oLoadRev = serviceRev > 0 ? Math.round(oTotalMonthly / serviceRev * 100) : 0;
     var oLoadProfit = netProfit > 0 ? Math.round(oTotalMonthly / netProfit * 100) : 0;
+    var oPayoffMonths = oTotalMonthly > 0 ? Math.ceil(oTotalDebt / oTotalMonthly) : 0;
+    var oDebtToRevRatio = serviceRev > 0 ? (oTotalDebt / (serviceRev * 12) * 100).toFixed(1) : '0';
+    var oYearlyInterest = oTotalMonthly > 0 ? Math.round(oTotalMonthly * 12 - (oTotalPrincipal > 0 ? oTotalDebt : 0)) : 0;
+    if (oYearlyInterest < 0) oYearlyInterest = 0;
+
     h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-university" style="color:#EF4444;margin-right:8px"></i>\u041e\u0431\u0449\u0438\u0439 \u0434\u043e\u043b\u0433 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438</h3>';
-    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">';
-    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #EF4444"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:4px"></i>Общий долг</div><div style="font-size:1.2rem;font-weight:800;color:#EF4444">' + fmtAmt(oTotalDebt) + '</div></div>';
-    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-calendar-alt" style="color:#F59E0B;margin-right:4px"></i>PMT / мес</div><div style="font-size:1.2rem;font-weight:800;color:#F59E0B">' + fmtAmt(oTotalMonthly) + '</div></div>';
-    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid ' + (oLoadRev > 20 ? '#EF4444' : '#22C55E') + '"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Нагрузка/выручка</div><div style="font-size:1.2rem;font-weight:800;color:' + (oLoadRev > 20 ? '#EF4444' : '#22C55E') + '">' + oLoadRev + '%</div></div>';
-    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid ' + (oLoadProfit > 50 ? '#EF4444' : '#F59E0B') + '"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Нагрузка/прибыль</div><div style="font-size:1.2rem;font-weight:800;color:' + (oLoadProfit > 50 ? '#EF4444' : '#F59E0B') + '">' + oLoadProfit + '%</div></div>';
+    h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-university" style="color:#EF4444;margin-right:8px"></i>Общий долг компании</h3>';
+    h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:16px;line-height:1.5">Совокупная долговая нагрузка: сумма остатков по активным кредитам и овердрафтам. PMT — обязательные ежемесячные платежи. Нагрузка показывает, какую долю дохода или прибыли занимают платежи по долгам. <span style="color:#94a3b8">Рекомендуемый порог: до 30% от выручки, до 50% от прибыли.</span></div>';
+    // Top KPI row: core metrics
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:12px">';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #EF4444"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:4px"></i>Общий долг</div><div style="font-size:1.3rem;font-weight:800;color:#EF4444">' + fmtAmt(oTotalDebt) + '</div><div style="font-size:0.58rem;color:#475569;margin-top:3px">Остаток по всем кредитам</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-calendar-alt" style="color:#F59E0B;margin-right:4px"></i>PMT / мес</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B">' + fmtAmt(oTotalMonthly) + '</div><div style="font-size:0.58rem;color:#475569;margin-top:3px">Обязательные платежи</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid ' + (oLoadRev > 30 ? '#EF4444' : oLoadRev > 20 ? '#F59E0B' : '#22C55E') + '"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-chart-pie" style="color:' + (oLoadRev > 30 ? '#EF4444' : oLoadRev > 20 ? '#F59E0B' : '#22C55E') + ';margin-right:4px"></i>PMT / выручка</div><div style="font-size:1.3rem;font-weight:800;color:' + (oLoadRev > 30 ? '#EF4444' : oLoadRev > 20 ? '#F59E0B' : '#22C55E') + '">' + oLoadRev + '%</div><div style="font-size:0.58rem;color:#475569;margin-top:3px">' + (oLoadRev > 30 ? '⚠️ Высокая нагрузка' : oLoadRev > 20 ? '⚡ Умеренная' : '✅ Безопасно') + '</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid ' + (oLoadProfit > 50 ? '#EF4444' : oLoadProfit > 30 ? '#F59E0B' : '#22C55E') + '"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-chart-pie" style="color:' + (oLoadProfit > 50 ? '#EF4444' : oLoadProfit > 30 ? '#F59E0B' : '#22C55E') + ';margin-right:4px"></i>PMT / прибыль</div><div style="font-size:1.3rem;font-weight:800;color:' + (oLoadProfit > 50 ? '#EF4444' : oLoadProfit > 30 ? '#F59E0B' : '#22C55E') + '">' + oLoadProfit + '%</div><div style="font-size:0.58rem;color:#475569;margin-top:3px">' + (oLoadProfit > 50 ? '⚠️ Критично' : oLoadProfit > 30 ? '⚡ Следите' : '✅ Норма') + '</div></div>';
     h += '</div>';
+    // Second row: analytical metrics
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:12px">';
+    h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:3px"><i class="fas fa-percentage" style="color:#a78bfa;margin-right:3px"></i>Ср. ставка</div><div style="font-size:1.1rem;font-weight:800;color:#a78bfa">' + oAvgRate.toFixed(1) + '%</div><div style="font-size:0.55rem;color:#475569;margin-top:2px">Взвешенная по остатку</div></div>';
+    h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:3px"><i class="fas fa-hourglass-half" style="color:#3B82F6;margin-right:3px"></i>До погашения</div><div style="font-size:1.1rem;font-weight:800;color:#3B82F6">' + oPayoffMonths + ' мес</div><div style="font-size:0.55rem;color:#475569;margin-top:2px">При текущих платежах</div></div>';
+    h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:3px"><i class="fas fa-balance-scale-right" style="color:#F97316;margin-right:3px"></i>Долг / год. выручка</div><div style="font-size:1.1rem;font-weight:800;color:#F97316">' + oDebtToRevRatio + '%</div><div style="font-size:0.55rem;color:#475569;margin-top:2px">' + (parseFloat(oDebtToRevRatio) > 50 ? '⚠️ Высокий' : '✅ Приемлемый') + '</div></div>';
+    if (oTotalPrincipal > 0) {
+      var paidPct = Math.round(oTotalPaid / oTotalPrincipal * 100);
+      h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:3px"><i class="fas fa-tasks" style="color:#22C55E;margin-right:3px"></i>Выплачено</div><div style="font-size:1.1rem;font-weight:800;color:#22C55E">' + fmtAmt(oTotalPaid) + '</div><div style="font-size:0.55rem;color:#475569;margin-top:2px">' + paidPct + '% от начального долга</div></div>';
+    }
+    h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:3px"><i class="fas fa-file-invoice-dollar" style="color:#8B5CF6;margin-right:3px"></i>Активных</div><div style="font-size:1.1rem;font-weight:800;color:#8B5CF6">' + oLoans.length + '</div><div style="font-size:0.55rem;color:#475569;margin-top:2px">' + (oBankLoans > 0 ? 'Банк: ' + oBankLoans : '') + (oOverdrafts > 0 ? (oBankLoans > 0 ? ', ' : '') + 'Овердрафт: ' + oOverdrafts : '') + (oOtherLoans > 0 ? ((oBankLoans + oOverdrafts) > 0 ? ', ' : '') + 'Другие: ' + oOtherLoans : '') + '</div></div>';
+    if (oOverdraftTotal > 0) {
+      var odUsedPct = oOverdraftLimit > 0 ? Math.round(oOverdraftTotal / oOverdraftLimit * 100) : 0;
+      h += '<div class="card" style="padding:12px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:3px"><i class="fas fa-credit-card" style="color:#EF4444;margin-right:3px"></i>Овердрафт</div><div style="font-size:1.1rem;font-weight:800;color:#EF4444">' + fmtAmt(oOverdraftTotal) + '</div><div style="font-size:0.55rem;color:#475569;margin-top:2px">Использовано ' + odUsedPct + '% лимита (' + fmtAmt(oOverdraftLimit) + ')</div></div>';
+    }
+    h += '</div>';
+    // Loan-by-loan table
+    if (oLoans.length > 1) {
+      h += '<div class="card" style="padding:0;overflow-x:auto;margin-bottom:12px"><table style="width:100%;border-collapse:collapse;font-size:0.78rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:8px 12px;text-align:left;color:#94a3b8">Кредит</th><th style="padding:8px;text-align:left;color:#94a3b8">Кредитор</th><th style="padding:8px;text-align:right;color:#94a3b8">Остаток</th><th style="padding:8px;text-align:right;color:#94a3b8">PMT/мес</th><th style="padding:8px;text-align:center;color:#94a3b8">Ставка</th><th style="padding:8px;text-align:center;color:#94a3b8">Дата окончания</th></tr></thead><tbody>';
+      for (var olti = 0; olti < oLoans.length; olti++) {
+        var olt = oLoans[olti];
+        var oltBal = olt.loan_type === 'overdraft' ? (olt.overdraft_used || 0) : (olt.remaining_balance || 0);
+        var oltPmt = olt.loan_type === 'overdraft' ? '-' : fmtAmt(olt.monthly_payment || 0);
+        var oltType = olt.loan_type === 'overdraft' ? '<span style="color:#F59E0B;font-size:0.7rem">овердрафт</span>' : (olt.loan_type === 'bank' ? '<span style="color:#3B82F6;font-size:0.7rem">банк</span>' : '<span style="color:#94a3b8;font-size:0.7rem">' + (olt.loan_type || 'другой') + '</span>');
+        h += '<tr style="border-bottom:1px solid #1e293b">';
+        h += '<td style="padding:8px 12px"><span style="font-weight:600;color:#e2e8f0">' + escHtml(olt.name || 'Кредит #' + olt.id) + '</span> ' + oltType + '</td>';
+        h += '<td style="padding:8px;color:#94a3b8">' + escHtml(olt.lender || '-') + '</td>';
+        h += '<td style="padding:8px;text-align:right;font-weight:700;color:#EF4444">' + fmtAmt(oltBal) + '</td>';
+        h += '<td style="padding:8px;text-align:right;color:#F59E0B;font-weight:600">' + oltPmt + '</td>';
+        h += '<td style="padding:8px;text-align:center;color:#a78bfa">' + (olt.interest_rate ? olt.interest_rate + '%' : '-') + '</td>';
+        h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + (olt.end_date || '-') + '</td>';
+        h += '</tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    // Nearest maturity note
+    if (oNearestEnd) {
+      var daysToEnd = Math.ceil((new Date(oNearestEnd).getTime() - new Date().getTime()) / 86400000);
+      if (daysToEnd > 0 && daysToEnd < 180) {
+        h += '<div style="padding:10px 14px;background:rgba(249,115,22,0.1);border:1px solid rgba(249,115,22,0.3);border-radius:8px;font-size:0.78rem;color:#F97316;margin-bottom:12px"><i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>Ближайшее погашение: <strong>' + escHtml(oNearestName) + '</strong> — ' + oNearestEnd + ' (через ' + daysToEnd + ' дн.)</div>';
+      }
+    }
     h += '</div>'; // close debt section wrapper
   }
   h += '<div style="margin-bottom:32px">';
@@ -7966,9 +8043,19 @@ async function savePdfTemplate() {
   var qrEl = document.getElementById('pdf_qr');
   if (qrEl) payload.show_qr = qrEl.checked ? 1 : 0;
   
-  await api('/pdf-template', { method: 'PUT', body: JSON.stringify(payload) });
-  data.pdfTemplate = Object.assign(data.pdfTemplate || {}, payload);
-  toast('\u0428\u0430\u0431\u043b\u043e\u043d PDF \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
+  var result = await api('/pdf-template', { method: 'PUT', body: JSON.stringify(payload) });
+  if (!result || !result.success) {
+    toast('Ошибка сохранения шаблона: ' + (result && result.error ? result.error : 'Сервер не ответил'), 'error');
+    return;
+  }
+  // Use server-returned data if available to ensure data consistency
+  if (result.data) {
+    data.pdfTemplate = result.data;
+  } else {
+    data.pdfTemplate = Object.assign(data.pdfTemplate || {}, payload);
+  }
+  toast('Шаблон PDF сохранён! Изменения отразятся в новых PDF.');
+  render();
 }
 
 // ── Upload logo for PDF template ──

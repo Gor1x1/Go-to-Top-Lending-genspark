@@ -383,7 +383,7 @@ app.post('/api/generate-pdf', async (c) => {
       '.ftr{margin-top:32px;padding-top:16px;border-top:2px solid #e5e7eb;font-size:10px;color:#9ca3af;text-align:center}' +
       '.dlbar{position:sticky;bottom:8px;background:#8B5CF6;color:white;text-align:center;padding:14px;border-radius:12px;margin-top:24px;cursor:pointer;font-weight:700;font-size:16px;box-shadow:0 4px 20px rgba(139,92,246,0.4);text-decoration:none;display:block}' +
       '.dlbar:hover{background:#7C3AED}' +
-      '@media print{.dlbar{display:none!important}body{padding:16px}}' +
+      '@media print{*{visibility:hidden!important}.dlbar{display:none!important}body{padding:16px;visibility:visible!important}body>*{visibility:visible!important}body>*>*{visibility:visible!important}body>*>*>*{visibility:visible!important}body>*>*>*>*{visibility:visible!important}div[style*="position:fixed"],div[style*="position: fixed"],iframe,aside,[class*="plugin"],[class*="extension"],[id*="1688"],[id*="plugin"],[id*="ext-"],.fixed{display:none!important;width:0!important;height:0!important;overflow:hidden!important}}' +
       '@media(max-width:600px){body{padding:16px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}}' +
       '</style></head><body>' +
       '<div class="hdr"><div class="logo">' + (tpl.company_name || 'Go to Top') + '</div><div class="ci">' +
@@ -399,7 +399,8 @@ app.post('/api/generate-pdf', async (c) => {
       '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + Number(total).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr></tbody></table>' +
       (outro ? '<div class="outro">' + outro + '</div>' : '') +
       (footer ? '<div class="ftr">' + footer + '</div>' : '') +
-      '<a class="dlbar" onclick="window.print()">' + L.dl + '</a>' +
+      '<a class="dlbar" onclick="cleanAndPrint()">' + L.dl + '</a>' +
+      '<scr' + 'ipt>function cleanAndPrint(){var b=document.body;var ch=b.children;for(var i=ch.length-1;i>=0;i--){var e=ch[i];if(e.tagName==="SCRIPT"||e.tagName==="STYLE"||e.className==="hdr"||e.className==="ttl"||e.className==="meta"||e.className==="cli"||e.className==="intro"||e.tagName==="TABLE"||e.className==="outro"||e.className==="ftr")continue;if(e.style&&(e.style.position==="fixed"||e.style.position==="absolute")){e.remove()}else if(e.tagName==="IFRAME"||e.tagName==="ASIDE"){e.remove()}}window.print()}</scr' + 'ipt>' +
       '</body></html>';
 
     // Return the lead ID so client can navigate to the PDF page
@@ -635,7 +636,9 @@ app.get('/pdf/:id', async (c) => {
       + '.abtn-dl i{color:' + accentColor + '}'
       + '.abtn-back{background:transparent;color:#6b7280;border:1px solid #d1d5db}'
       + '.abtn-back:hover{color:#1f2937;border-color:#9ca3af}'
-      + '@media print{.actions{display:none!important}body{background:#fff}#pc{padding:16px;box-shadow:none}}'
+      + '@media print{body,body *{visibility:hidden!important}#pc,#pc *{visibility:visible!important}.actions{display:none!important}body{background:#fff;margin:0;padding:0}#pc{padding:16px;box-shadow:none;position:absolute;left:0;top:0;width:100%}'
+      + 'div[style*="position:fixed"],div[style*="position: fixed"],iframe,aside,[class*="plugin"],[class*="extension"],[id*="1688"],[id*="plugin"],[id*="ext-"],.fixed{display:none!important;width:0!important;height:0!important;overflow:hidden!important}'
+      + '}'
       + '@media(max-width:600px){#pc{padding:16px 16px 100px}table{font-size:11px}th,td{padding:8px 6px}.hdr{flex-direction:column;align-items:flex-start}.ttl{font-size:18px}'
       + '.actions{position:fixed;bottom:0;left:0;right:0;background:#fff;border-top:1px solid #e5e7eb;padding:10px 12px;margin:0;box-shadow:0 -2px 12px rgba(0,0,0,0.08);z-index:100;justify-content:center}'
       + '.abtn{padding:10px 14px;font-size:12px}.abtn-back span{display:none}}'
@@ -671,10 +674,11 @@ app.get('/pdf/:id', async (c) => {
       + (footer ? '<div class="ftr">' + footer + '</div>' : '')
       + '<div class="actions">'
       + '<a class="abtn abtn-back" href="/#calculator"><i class="fas fa-arrow-left"></i> <span>' + L.back + '</span></a>'
-      + '<button class="abtn abtn-dl" onclick="window.print()"><i class="fas fa-download"></i> ' + btnDl + '</button>'
+      + '<button class="abtn abtn-dl" onclick="cleanAndPrint()"><i class="fas fa-download"></i> ' + btnDl + '</button>'
       + '<a class="abtn abtn-order" href="' + messengerLink + '" target="_blank"><i class="' + messengerIcon + '"></i> ' + btnOrder + '</a>'
       + '</div>'
       + '</div>'
+      + '<scr' + 'ipt>function cleanAndPrint(){var pc=document.getElementById("pc");if(pc){var all=document.body.querySelectorAll("*");for(var i=all.length-1;i>=0;i--){var e=all[i];if(!pc.contains(e)&&e!==document.body&&e!==document.head&&e.tagName!=="HTML"&&e.tagName!=="SCRIPT"&&e.tagName!=="STYLE"&&e.tagName!=="LINK"&&e.tagName!=="META"){e.style.display="none"}}}window.print()}</scr' + 'ipt>'
       + '</body></html>';
 
     return c.html(pdfHtml);
@@ -2560,14 +2564,9 @@ function getTierPrice(tiers, qty) {
 
 function getTierTotal(tiers, qty) {
   if (qty <= 0) return 0;
-  var total = 0, remaining = qty;
-  for (var i = 0; i < tiers.length && remaining > 0; i++) {
-    var tierRange = tiers[i].max >= 999 ? remaining : (tiers[i].max - tiers[i].min + 1);
-    var inTier = Math.min(remaining, tierRange);
-    total += inTier * tiers[i].price;
-    remaining -= inTier;
-  }
-  return total;
+  // Flat-rate model: entire batch at the tier price matching the quantity
+  var unitPrice = getTierPrice(tiers, qty);
+  return unitPrice * qty;
 }
 
 function ccTiered(svcId, delta) {

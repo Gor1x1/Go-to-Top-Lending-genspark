@@ -1090,7 +1090,9 @@ api.put('/pdf-template', authMiddleware, async (c) => {
   const setClauses = keys.map(k => k + '=?').join(', ');
   const vals = keys.map(k => fieldMap[k]);
   await db.prepare(`UPDATE pdf_templates SET ${setClauses}, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`).bind(...vals).run();
-  return c.json({ success: true });
+  // Return updated record so frontend can verify the save
+  const updated = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
+  return c.json({ success: true, data: updated });
 });
 
 // ===== SLOT COUNTER (multiple) =====
