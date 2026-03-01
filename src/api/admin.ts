@@ -1058,6 +1058,27 @@ api.get('/pdf-template', authMiddleware, async (c) => {
 api.put('/pdf-template', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
+  
+  // Get existing columns in pdf_templates to avoid "no such column" errors
+  let existingCols: Set<string>;
+  try {
+    const pragmaRes = await db.prepare("PRAGMA table_info(pdf_templates)").all();
+    existingCols = new Set((pragmaRes.results || []).map((r: any) => r.name));
+  } catch {
+    existingCols = new Set();
+  }
+  
+  // Auto-create missing label/order_message columns on the fly
+  const labelFields = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
+  for (const lf of labelFields) {
+    for (const lng of ['_ru','_am','_en']) {
+      const col = lf + lng;
+      if (!existingCols.has(col)) {
+        try { await db.prepare(`ALTER TABLE pdf_templates ADD COLUMN ${col} TEXT DEFAULT ''`).run(); existingCols.add(col); } catch {}
+      }
+    }
+  }
+  
   // Build dynamic update — only update fields that are explicitly provided in the request
   // This prevents overwriting existing values (e.g. company_logo_url) with empty defaults
   const fieldMap: Record<string, any> = {};
@@ -1073,16 +1094,15 @@ api.put('/pdf-template', authMiddleware, async (c) => {
     'bank_details_ru','bank_details_am','bank_details_en',
   ];
   for (const f of knownFields) {
-    if (d[f] !== undefined) fieldMap[f] = d[f];
+    if (d[f] !== undefined && existingCols.has(f)) fieldMap[f] = d[f];
   }
   // show_qr is special (boolean → int)
-  if (d.show_qr !== undefined) fieldMap['show_qr'] = d.show_qr ? 1 : 0;
-  // Label fields
-  const labelFields = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
+  if (d.show_qr !== undefined && existingCols.has('show_qr')) fieldMap['show_qr'] = d.show_qr ? 1 : 0;
+  // Label fields (already auto-created above)
   for (const lf of labelFields) {
     for (const lng of ['_ru','_am','_en']) {
       const key = lf + lng;
-      if (d[key] !== undefined) fieldMap[key] = d[key];
+      if (d[key] !== undefined && existingCols.has(key)) fieldMap[key] = d[key];
     }
   }
   const keys = Object.keys(fieldMap);

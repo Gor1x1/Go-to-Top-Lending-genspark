@@ -2786,7 +2786,7 @@ switchLang = function(l) {
             
             if (hasTiers && tiers && tiers.length > 0) {
               var svcId = 'tiered_' + svc.id;
-              var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;');
+              var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
               gh += '<div class="calc-row" data-price="tiered" data-tiers="'+tiersAttr+'" id="row_'+svcId+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang==='am' ? svc.name_am : svc.name_ru) + '</div>';
               gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ֏</div>';
