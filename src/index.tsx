@@ -704,13 +704,47 @@ app.post('/api/referral/check', async (c) => {
     if (!code) return c.json({ valid: false });
     const row = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(code.trim().toUpperCase()).first();
     if (!row) return c.json({ valid: false });
+    
+    // Check max_uses limit: count leads with paid statuses that used this code
+    const maxUses = Number(row.max_uses) || 0;
+    if (maxUses > 0) {
+      const paidCount = await db.prepare(
+        "SELECT COUNT(*) as cnt FROM leads WHERE UPPER(referral_code) = ? AND status IN ('in_progress','checking','done')"
+      ).bind(String(row.code).toUpperCase()).first();
+      const currentPaid = Number(paidCount?.cnt) || 0;
+      if (currentPaid >= maxUses) {
+        return c.json({ 
+          valid: false, 
+          reason: 'limit_reached',
+          message_ru: 'Лимит использований промокода исчерпан',
+          message_am: '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u056b \u0585\u0563\u057f\u0561\u0563\u0578\u0580\u056e\u0574\u0561\u0576 \u057d\u0561\u0570\u0574\u0561\u0576\u0568 \u057d\u057a\u0561\u057c\u057e\u0565\u056c \u0567'
+        });
+      }
+    }
+    
     // Increment uses count
     await db.prepare('UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?').bind(row.id).run();
+    
+    // Get free services for this referral code
+    let freeServices: any[] = [];
+    try {
+      const fsRes = await db.prepare(
+        'SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?'
+      ).bind(row.id).all();
+      freeServices = (fsRes.results || []).map((fs: any) => ({
+        name_ru: fs.name_ru || '',
+        name_am: fs.name_am || '',
+        price: fs.price || 0,
+        discount_percent: fs.discount_percent || 0
+      }));
+    } catch {}
+    
     return c.json({
       valid: true,
       discount_percent: row.discount_percent,
       free_reviews: row.free_reviews,
-      description: row.description
+      description: row.description,
+      free_services: freeServices
     });
   } catch { return c.json({ valid: false }); }
 })
@@ -2403,7 +2437,12 @@ document.getElementById('popupForm').addEventListener('submit', function(e) {
     ? 'Հայտ Go to Top կայքից:\\n\\nԳնումներ: ' + buyouts + '\\nԿարծիքներ: ' + reviews + '\\nԿապ: ' + contact
     : 'Заявка с сайта Go to Top:\\n\\nВыкупов: ' + buyouts + '\\nОтзывов: ' + reviews + '\\nКонтакт: ' + contact;
   var popupTgUrl = window._tgPopupUrl || 'https://t.me/suport_admin_2';
-  window.open(popupTgUrl + '?text=' + encodeURIComponent(msg), '_blank');
+  var isWaPopup = popupTgUrl.includes('wa.me') || popupTgUrl.includes('whatsapp');
+  if (isWaPopup) {
+    window.open(popupTgUrl + (popupTgUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msg), '_blank');
+  } else {
+    window.open(popupTgUrl + '?text=' + encodeURIComponent(msg), '_blank');
+  }
   document.getElementById('popupFormWrap').style.display = 'none';
   document.getElementById('popupSuccess').style.display = 'block';
   setTimeout(hidePopup, 3000);
@@ -2434,7 +2473,12 @@ function submitForm(e) {
   }
   fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, ts: new Date().toISOString()}) }).catch(function(){});
   var tgUrl = window._tgContactUrl || 'https://t.me/suport_admin_2';
-  window.open(tgUrl + '?text=' + encodeURIComponent(msg), '_blank');
+  var isWaContact = tgUrl.includes('wa.me') || tgUrl.includes('whatsapp');
+  if (isWaContact) {
+    window.open(tgUrl + (tgUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msg), '_blank');
+  } else {
+    window.open(tgUrl + '?text=' + encodeURIComponent(msg), '_blank');
+  }
   var btn = e.target.querySelector('button[type=submit]');
   var orig = btn.innerHTML;
   btn.innerHTML = '<i class="fas fa-check"></i> Отправлено!';
@@ -3268,6 +3312,17 @@ async function checkRefCode() {
       result.style.border = '1px solid rgba(16,185,129,0.3)';
       result.style.color = 'var(--success)';
       result.innerHTML = msg;
+      recalcDynamic();
+    } else if (data.reason === 'limit_reached') {
+      // Limit exhausted — show warning, do NOT apply discount
+      _refDiscount = 0;
+      _refFreeReviews = 0;
+      result.style.display = 'block';
+      result.style.background = 'rgba(245,158,11,0.1)';
+      result.style.border = '1px solid rgba(245,158,11,0.3)';
+      result.style.color = '#F59E0B';
+      var limitMsg = lang === 'am' ? (data.message_am || 'Limit reached') : (data.message_ru || '\u041b\u0438\u043c\u0438\u0442 \u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u0438\u0439 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434\u0430 \u0438\u0441\u0447\u0435\u0440\u043f\u0430\u043d');
+      result.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>' + limitMsg;
       recalcDynamic();
     } else {
       _refDiscount = 0;

@@ -1112,6 +1112,13 @@ function renderCalculator() {
           '<button class="btn btn-danger" style="padding:6px 10px;margin-top:14px" onclick="deleteCalcService(' + svc2.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
         '</div>';
       
+      // Toggle tiered pricing button
+      if (!isTiered) {
+        h += '<div style="margin-top:6px"><button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;border-color:rgba(139,92,246,0.3);color:#a78bfa" onclick="enableTieredPricing(' + svc2.id + ')" title="Добавить тарифную шкалу"><i class="fas fa-layer-group" style="margin-right:4px"></i>+ Тарифная шкала</button></div>';
+      } else {
+        h += '<div style="margin-top:6px"><button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;border-color:rgba(239,68,68,0.3);color:#f87171" onclick="disableTieredPricing(' + svc2.id + ')" title="Убрать тарифную шкалу"><i class="fas fa-times" style="margin-right:4px"></i>Убрать шкалу</button></div>';
+      }
+      
       // Tier editor
       if (isTiered && tiers.length > 0) {
         h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
@@ -1353,6 +1360,29 @@ async function deleteCalcService(id) {
   if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u0443 \u0443\u0441\u043b\u0443\u0433\u0443?')) return;
   await api('/calc-services/' + id, { method: 'DELETE' });
   toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
+  await loadData(); render();
+}
+
+async function enableTieredPricing(svcId) {
+  var svc = data.calcServices.find(function(s) { return s.id === svcId; });
+  if (!svc) return;
+  var price = svc.price || 1000;
+  var defaultTiers = [
+    { min: 1, max: 20, price: price },
+    { min: 21, max: 40, price: Math.round(price * 0.85) },
+    { min: 41, max: 999, price: Math.round(price * 0.75) }
+  ];
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'tiered', price_tiers_json: JSON.stringify(defaultTiers) }) });
+  toast('\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430! \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u0442\u0435 \u0446\u0435\u043d\u044b.');
+  await loadData(); render();
+}
+
+async function disableTieredPricing(svcId) {
+  var svc = data.calcServices.find(function(s) { return s.id === svcId; });
+  if (!svc) return;
+  if (!confirm('\u0423\u0431\u0440\u0430\u0442\u044c \u0442\u0430\u0440\u0438\u0444\u043d\u0443\u044e \u0448\u043a\u0430\u043b\u0443? \u0423\u0441\u043b\u0443\u0433\u0430 \u0441\u0442\u0430\u043d\u0435\u0442 \u0441 \u0444\u0438\u043a\u0441. \u0446\u0435\u043d\u043e\u0439.')) return;
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'fixed', price_tiers_json: null }) });
+  toast('\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
   await loadData(); render();
 }
 
@@ -5459,17 +5489,18 @@ function renderBizOverviewV2(d, sd, fin) {
     }
     var oLoadRev = serviceRev > 0 ? Math.round(oTotalMonthly / serviceRev * 100) : 0;
     var oLoadProfit = netProfit > 0 ? Math.round(oTotalMonthly / netProfit * 100) : 0;
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-university" style="color:#EF4444;margin-right:8px"></i>\u041e\u0431\u0449\u0438\u0439 \u0434\u043e\u043b\u0433 \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438</h3>';
     h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin-bottom:16px">';
     h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #EF4444"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-hand-holding-usd" style="color:#EF4444;margin-right:4px"></i>Общий долг</div><div style="font-size:1.2rem;font-weight:800;color:#EF4444">' + fmtAmt(oTotalDebt) + '</div></div>';
     h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-calendar-alt" style="color:#F59E0B;margin-right:4px"></i>PMT / мес</div><div style="font-size:1.2rem;font-weight:800;color:#F59E0B">' + fmtAmt(oTotalMonthly) + '</div></div>';
     h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid ' + (oLoadRev > 20 ? '#EF4444' : '#22C55E') + '"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Нагрузка/выручка</div><div style="font-size:1.2rem;font-weight:800;color:' + (oLoadRev > 20 ? '#EF4444' : '#22C55E') + '">' + oLoadRev + '%</div></div>';
     h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid ' + (oLoadProfit > 50 ? '#EF4444' : '#F59E0B') + '"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Нагрузка/прибыль</div><div style="font-size:1.2rem;font-weight:800;color:' + (oLoadProfit > 50 ? '#EF4444' : '#F59E0B') + '">' + oLoadProfit + '%</div></div>';
     h += '</div>';
+    h += '</div>'; // close debt section wrapper
   }
-
-  // ---- SECTION: KPI Metrics ----
   h += '<div style="margin-bottom:32px">';
-  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-tachometer-alt" style="color:#10B981;margin-right:8px"></i>KPI \u043c\u0435\u0442\u0440\u0438\u043a\u0438</h3>';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-tachometer-alt" style="color:#10B981;margin-right:8px"></i>\u041f\u043e\u043a\u0430\u0437\u0430\u0442\u0435\u043b\u0438 \u044d\u0444\u0444\u0435\u043a\u0442\u0438\u0432\u043d\u043e\u0441\u0442\u0438 \u0431\u0438\u0437\u043d\u0435\u0441\u0430</h3>';
   var kpis = [
     {label:'\u041a\u043e\u043d\u0432\u0435\u0440\u0441\u0438\u044f',val:fmtPct(fin.conversion_rate),color:Number(fin.conversion_rate)>20?'#22C55E':Number(fin.conversion_rate)>10?'#F59E0B':'#EF4444',icon:'fa-percentage',desc:'Завершённые / Все лиды за период'},
     {label:'\u0421\u0440. \u0447\u0435\u043a (\u0443\u0441\u043b\u0443\u0433\u0438)',val:fmtAmt(fin.avg_check),color:'#8B5CF6',icon:'fa-shopping-cart',desc:'Сумма услуг завершённых / кол-во завершённых (без выкупов)'},
@@ -7820,9 +7851,15 @@ function renderPdfTemplate() {
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
   h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">\u041b\u043e\u0433\u043e\u0442\u0438\u043f</label>';
   h += '<div style="display:flex;gap:8px;align-items:center">';
-  if (t.company_logo_url) h += '<img src="' + escHtml(t.company_logo_url) + '" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
-  h += '<input class="input" id="pdf_logo" value="' + escHtml(t.company_logo_url || '') + '" placeholder="https://...logo.png" style="flex:1">';
+  var logoIsBase64 = t.company_logo_url && t.company_logo_url.indexOf('data:') === 0;
+  if (t.company_logo_url) h += '<img id="pdf_logo_preview" src="' + t.company_logo_url + '" style="width:40px;height:40px;object-fit:contain;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
+  // For base64 logos, show a friendly label instead of the huge string
+  var logoDisplayVal = logoIsBase64 ? '\u2705 \u041b\u043e\u0433\u043e\u0442\u0438\u043f \u0437\u0430\u0433\u0440\u0443\u0436\u0435\u043d' : escHtml(t.company_logo_url || '');
+  h += '<input class="input" id="pdf_logo_display" value="' + logoDisplayVal + '" placeholder="https://...logo.png" style="flex:1" readonly>';
+  // Hidden input holds the actual value (base64 or URL)
+  h += '<input type="hidden" id="pdf_logo" value="">';
   h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:4px"></i>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c<input type="file" accept="image/*" style="display:none" onchange="pdfUploadLogo(this)"></label>';
+  if (t.company_logo_url) h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.72rem" onclick="clearPdfLogo()" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u043b\u043e\u0433\u043e\u0442\u0438\u043f"><i class="fas fa-trash"></i></button>';
   h += '</div></div>';
   h += '</div></div>';
   
@@ -7916,11 +7953,15 @@ async function savePdfTemplate() {
     }
   }
   // Shared fields
-  var fields = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_logo': 'company_logo_url', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
+  var fields = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
   var fkeys = Object.keys(fields);
   for (var fi = 0; fi < fkeys.length; fi++) {
     var el = document.getElementById(fkeys[fi]);
     if (el) payload[fields[fkeys[fi]]] = el.value;
+  }
+  // Logo: use the in-memory value (may be base64), don't read from DOM input
+  if (data.pdfTemplate && data.pdfTemplate.company_logo_url) {
+    payload.company_logo_url = data.pdfTemplate.company_logo_url;
   }
   var qrEl = document.getElementById('pdf_qr');
   if (qrEl) payload.show_qr = qrEl.checked ? 1 : 0;
@@ -7943,16 +7984,30 @@ async function pdfUploadLogo(input) {
     var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
     var result = await resp.json();
     if (!result.success) { toast('Ошибка: ' + (result.error || 'unknown'), 'error'); return; }
+    // Prefer data_url (base64) for logo — it embeds directly in the DB
+    // and renders in PDF without needing a separate upload endpoint.
+    // Server-relative URLs like /api/admin/uploads/N break when DB resets.
     var url = result.data_url || result.url;
     var logoInput = document.getElementById('pdf_logo');
     if (logoInput) logoInput.value = url;
     if (!data.pdfTemplate) data.pdfTemplate = {};
     data.pdfTemplate.company_logo_url = url;
-    toast('Логотип загружен!');
+    // Immediately save logo URL to DB so it persists across page reloads
+    await api('/pdf-template', { method: 'PUT', body: JSON.stringify({ company_logo_url: url }) });
+    toast('Логотип загружен и сохранён!');
     render();
   } catch(e) {
     toast('Ошибка загрузки: ' + (e.message || 'network error'), 'error');
   }
+}
+
+async function clearPdfLogo() {
+  if (!confirm('Удалить логотип из шаблона?')) return;
+  if (!data.pdfTemplate) data.pdfTemplate = {};
+  data.pdfTemplate.company_logo_url = '';
+  await api('/pdf-template', { method: 'PUT', body: JSON.stringify({ company_logo_url: '' }) });
+  toast('Логотип удалён');
+  render();
 }
 
 // ===== SLOT COUNTER =====
@@ -9624,6 +9679,17 @@ var sbSaveTimers = {}; // per-block debounce timers
 var sbSaveStatus = 'hidden'; // 'hidden', 'saving', 'saved'
 var sbActiveTab = 'blocks'; // 'blocks', 'calculator', 'telegram', 'slots', 'footer', 'photos'
 
+async function refreshSiteManagement() {
+  toast('Обновление данных...', 'info');
+  try {
+    await loadData();
+    render();
+    toast('Данные обновлены!');
+  } catch(e) {
+    toast('Ошибка обновления: ' + (e.message || 'unknown'), 'error');
+  }
+}
+
 function renderSiteBlocks() {
   var allBlocks = data.siteBlocks || [];
   var contentBlocks = allBlocks; // ALL blocks shown together (calculator included as card)
@@ -9661,6 +9727,7 @@ function renderSiteBlocks() {
     '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">' +
       '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Управление сайтом</h1>' +
       '<p style="color:#64748b;font-size:0.82rem;margin:0">Блоки, счётчики, PDF-шаблон, реферальные коды — всё в одном месте.</p></div>' +
+      '<button class="btn btn-outline" onclick="refreshSiteManagement()" title="Обновить данные" style="padding:8px 16px"><i class="fas fa-sync-alt" style="margin-right:6px"></i>Обновить</button>' +
     '</div>';
 
   // ── Tabs: Blocks / Calculator / Quick Messages (analytics-style) ──
