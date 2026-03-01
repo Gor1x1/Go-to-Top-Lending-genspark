@@ -169,7 +169,16 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       telegram: telegram.results || [],
       scripts: scripts.results || [],
       stats: { content: contentCount?.count||0, services: svcCount?.count||0, messages: msgCount?.count||0, scripts: scriptCount?.count||0, totalLeads: totalLeadsCount?.count||0, newLeads: newLeadsCount?.count||0, todayLeads: todayLeadsCount?.count||0, todayViews: todayViews?.count||0, weekViews: weekViews?.count||0, monthViews: monthViews?.count||0 },
-      referrals: referrals.results || [],
+      referrals: await (async () => {
+        const refs = referrals.results || [];
+        try {
+          const paidCounts = await db.prepare("SELECT UPPER(referral_code) as ref_code, COUNT(*) as cnt FROM leads WHERE referral_code IS NOT NULL AND referral_code != '' AND status IN ('in_progress','checking','done') GROUP BY UPPER(referral_code)").all();
+          const countMap: Record<string, number> = {};
+          for (const r of (paidCounts.results || [])) { countMap[(r.ref_code as string || '').toUpperCase()] = Number(r.cnt || 0); }
+          for (const ref of refs) { (ref as any).paid_uses_count = countMap[((ref as any).code || '').toUpperCase()] || 0; }
+        } catch {}
+        return refs;
+      })(),
       sectionOrder: sectionOrder.results || [],
       leads: { leads: leadsArr, total: totalLeadsCount?.count || leadsArr.length },
       telegramBot: telegramBot.results || [],
@@ -507,13 +516,13 @@ api.get('/referrals', authMiddleware, async (c) => {
   // Enrich with paid_uses_count (leads with in_progress/checking/done status)
   const codes = res.results || [];
   try {
-    const paidCounts = await db.prepare("SELECT referral_code, COUNT(*) as cnt FROM leads WHERE referral_code IS NOT NULL AND referral_code != '' AND status IN ('in_progress','checking','done') GROUP BY referral_code").all();
+    const paidCounts = await db.prepare("SELECT UPPER(referral_code) as ref_code, COUNT(*) as cnt FROM leads WHERE referral_code IS NOT NULL AND referral_code != '' AND status IN ('in_progress','checking','done') GROUP BY UPPER(referral_code)").all();
     const countMap: Record<string, number> = {};
     for (const r of (paidCounts.results || [])) {
-      countMap[r.referral_code as string] = Number(r.cnt || 0);
+      countMap[(r.ref_code as string || '').toUpperCase()] = Number(r.cnt || 0);
     }
     for (const c2 of codes) {
-      (c2 as any).paid_uses_count = countMap[(c2 as any).code] || 0;
+      (c2 as any).paid_uses_count = countMap[((c2 as any).code || '').toUpperCase()] || 0;
     }
   } catch {}
   return c.json(codes);
@@ -1049,22 +1058,26 @@ api.get('/pdf-template', authMiddleware, async (c) => {
 api.put('/pdf-template', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  // Build dynamic update — save all known fields
-  const fieldMap: Record<string, any> = {
-    header_ru: d.header_ru||'', header_am: d.header_am||'', header_en: d.header_en||'Commercial Proposal',
-    footer_ru: d.footer_ru||'', footer_am: d.footer_am||'', footer_en: d.footer_en||'',
-    intro_ru: d.intro_ru||'', intro_am: d.intro_am||'', intro_en: d.intro_en||'',
-    outro_ru: d.outro_ru||'', outro_am: d.outro_am||'', outro_en: d.outro_en||'',
-    company_name: d.company_name||'', company_phone: d.company_phone||'', company_email: d.company_email||'', company_address: d.company_address||'',
-    company_logo_url: d.company_logo_url||'', company_website: d.company_website||'', company_inn: d.company_inn||'',
-    btn_order_ru: d.btn_order_ru||'\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441', btn_order_am: d.btn_order_am||'\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561', btn_order_en: d.btn_order_en||'Order Now',
-    btn_download_ru: d.btn_download_ru||'\u0421\u043a\u0430\u0447\u0430\u0442\u044c', btn_download_am: d.btn_download_am||'\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c', btn_download_en: d.btn_download_en||'Download',
-    order_telegram_url: d.order_telegram_url||'https://t.me/goo_to_top',
-    invoice_prefix: d.invoice_prefix||'INV', show_qr: d.show_qr ? 1 : 0, accent_color: d.accent_color||'#8B5CF6',
-    terms_ru: d.terms_ru||'', terms_am: d.terms_am||'', terms_en: d.terms_en||'',
-    bank_details_ru: d.bank_details_ru||'', bank_details_am: d.bank_details_am||'', bank_details_en: d.bank_details_en||'',
-  };
-  // New label fields — only update if provided in request
+  // Build dynamic update — only update fields that are explicitly provided in the request
+  // This prevents overwriting existing values (e.g. company_logo_url) with empty defaults
+  const fieldMap: Record<string, any> = {};
+  const knownFields = [
+    'header_ru','header_am','header_en','footer_ru','footer_am','footer_en',
+    'intro_ru','intro_am','intro_en','outro_ru','outro_am','outro_en',
+    'company_name','company_phone','company_email','company_address',
+    'company_logo_url','company_website','company_inn',
+    'btn_order_ru','btn_order_am','btn_order_en',
+    'btn_download_ru','btn_download_am','btn_download_en',
+    'order_telegram_url','invoice_prefix','accent_color',
+    'terms_ru','terms_am','terms_en',
+    'bank_details_ru','bank_details_am','bank_details_en',
+  ];
+  for (const f of knownFields) {
+    if (d[f] !== undefined) fieldMap[f] = d[f];
+  }
+  // show_qr is special (boolean → int)
+  if (d.show_qr !== undefined) fieldMap['show_qr'] = d.show_qr ? 1 : 0;
+  // Label fields
   const labelFields = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
   for (const lf of labelFields) {
     for (const lng of ['_ru','_am','_en']) {
@@ -1073,6 +1086,7 @@ api.put('/pdf-template', authMiddleware, async (c) => {
     }
   }
   const keys = Object.keys(fieldMap);
+  if (keys.length === 0) return c.json({ success: true, message: 'No fields to update' });
   const setClauses = keys.map(k => k + '=?').join(', ');
   const vals = keys.map(k => fieldMap[k]);
   await db.prepare(`UPDATE pdf_templates SET ${setClauses}, updated_at=CURRENT_TIMESTAMP WHERE template_key='default'`).bind(...vals).run();

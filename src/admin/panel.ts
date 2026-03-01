@@ -7797,7 +7797,9 @@ function renderPdfTemplate() {
     h += '<div><label style="font-size:0.7rem;color:' + lColor + ';font-weight:600">' + lf.label + '</label><input class="input" id="pdf_' + lfKey + '" value="' + escHtml(t[lfKey] || lfDef) + '" placeholder="' + escHtml(lfDef) + '" style="font-size:0.85rem"></div>';
   }
   h += '</div>';
-  h += '<div style="margin-top:12px"><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fab fa-telegram" style="margin-right:4px"></i>\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430 \u0432 \u043c\u0435\u0441\u0441\u0435\u043d\u0434\u0436\u0435\u0440 (' + lang.toUpperCase() + ')</label><input class="input" id="pdf_order_message' + lSuffix + '" value="' + escHtml(t['order_message' + lSuffix] || (lang==='en' ? 'Hello! I would like to place an order:' : lang==='am' ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')) + '" placeholder="\u0422\u0435\u043a\u0441\u0442 \u043f\u0440\u0438 \u043d\u0430\u0436\u0430\u0442\u0438\u0438 \u043a\u043d\u043e\u043f\u043a\u0438 \u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c"></div>';
+  h += '<div style="margin-top:12px"><label style="font-size:0.75rem;color:' + lColor + ';font-weight:600"><i class="fab fa-telegram" style="margin-right:4px"></i>\u0421\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u0437\u0430\u043a\u0430\u0437\u0430 \u0432 \u043c\u0435\u0441\u0441\u0435\u043d\u0434\u0436\u0435\u0440 (' + lang.toUpperCase() + ')</label><input class="input" id="pdf_order_message' + lSuffix + '" value="' + escHtml(t['order_message' + lSuffix] || (lang==='en' ? 'Hello! I would like to place an order:' : lang==='am' ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:')) + '" placeholder="\u0422\u0435\u043a\u0441\u0442 \u043f\u0440\u0438 \u043d\u0430\u0436\u0430\u0442\u0438\u0438 \u043a\u043d\u043e\u043f\u043a\u0438 \u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c">' +
+    '<div style="margin-top:8px;display:flex;gap:8px;align-items:center"><label style="font-size:0.7rem;color:#FBBF24;font-weight:600;white-space:nowrap"><i class="fas fa-link" style="margin-right:4px"></i>\u0421\u0441\u044b\u043b\u043a\u0430 \u043c\u0435\u0441\u0441\u0435\u043d\u0434\u0436\u0435\u0440\u0430</label><input class="input" id="pdf_order_tg" value="' + escHtml(t.order_telegram_url || 'https://t.me/goo_to_top') + '" placeholder="https://t.me/username \u0438\u043b\u0438 https://wa.me/..." style="flex:1;font-size:0.85rem;border-color:rgba(251,191,36,0.3)"></div>' +
+    '<div style="font-size:0.65rem;color:#475569;margin-top:4px"><i class="fas fa-info-circle" style="margin-right:3px"></i>\u041f\u043e\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 Telegram (t.me/...) \u0438 WhatsApp (wa.me/...). \u041a\u043b\u0438\u0435\u043d\u0442 \u043e\u0442\u043f\u0440\u0430\u0432\u0438\u0442 \u0441\u043e\u043e\u0431\u0449\u0435\u043d\u0438\u0435 \u043f\u043e \u044d\u0442\u043e\u0439 \u0441\u0441\u044b\u043b\u043a\u0435.</div></div>';
   h += '</div>';
   
   // ── 3. Company info (shared across languages) ──
@@ -7822,7 +7824,6 @@ function renderPdfTemplate() {
   h += '<input class="input" id="pdf_logo" value="' + escHtml(t.company_logo_url || '') + '" placeholder="https://...logo.png" style="flex:1">';
   h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:4px"></i>\u0417\u0430\u0433\u0440\u0443\u0437\u0438\u0442\u044c<input type="file" accept="image/*" style="display:none" onchange="pdfUploadLogo(this)"></label>';
   h += '</div></div>';
-  h += '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Telegram URL \u043c\u0435\u043d\u0435\u0434\u0436\u0435\u0440\u0430</label><input class="input" id="pdf_order_tg" value="' + escHtml(t.order_telegram_url || 'https://t.me/goo_to_top') + '" placeholder="https://t.me/your_username"></div>';
   h += '</div></div>';
   
   // ── 4. Invoice Settings ──
@@ -7942,7 +7943,7 @@ async function pdfUploadLogo(input) {
     var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
     var result = await resp.json();
     if (!result.success) { toast('Ошибка: ' + (result.error || 'unknown'), 'error'); return; }
-    var url = result.url || result.data_url;
+    var url = result.data_url || result.url;
     var logoInput = document.getElementById('pdf_logo');
     if (logoInput) logoInput.value = url;
     if (!data.pdfTemplate) data.pdfTemplate = {};
@@ -9660,10 +9661,6 @@ function renderSiteBlocks() {
     '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">' +
       '<div><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:2px"><i class="fas fa-layer-group" style="color:#8B5CF6;margin-right:10px"></i>Управление сайтом</h1>' +
       '<p style="color:#64748b;font-size:0.82rem;margin:0">Блоки, счётчики, PDF-шаблон, реферальные коды — всё в одном месте.</p></div>' +
-      '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
-        '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
-      '</div>' +
     '</div>';
 
   // ── Tabs: Blocks / Calculator / Quick Messages (analytics-style) ──
@@ -9675,13 +9672,13 @@ function renderSiteBlocks() {
   }
   var sbTabs = [
     { id: 'blocks', icon: 'fa-cubes', label: 'Блоки сайта', count: contentBlocks.length },
-    { id: 'pdf_inline', icon: 'fa-file-pdf', label: 'PDF шаблон', count: 0 },
+    { id: 'pdf_inline', icon: 'fa-file-pdf', label: 'PDF шаблон', count: -1 },
     { id: 'referrals_inline', icon: 'fa-gift', label: 'Реферальные коды', count: data.referrals.length }
   ];
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
     var st = sbTabs[sti];
-    h += '<button class="tab-btn' + (sbActiveTab === st.id ? ' active' : '') + '" onclick="sbActiveTab=&apos;' + st.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + st.icon + '" style="margin-right:6px"></i>' + st.label + ' <span style="opacity:0.6;font-size:0.75rem;margin-left:4px">(' + st.count + ')</span></button>';
+    h += '<button class="tab-btn' + (sbActiveTab === st.id ? ' active' : '') + '" onclick="sbActiveTab=&apos;' + st.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + st.icon + '" style="margin-right:6px"></i>' + st.label + (st.count >= 0 ? ' <span style="opacity:0.6;font-size:0.75rem;margin-left:4px">(' + st.count + ')</span>' : '') + '</button>';
   }
   h += '</div>';
 
@@ -9709,6 +9706,10 @@ function renderSiteBlocks() {
   // ── Search + Toolbar (only for blocks/calculator tabs) ──
   h += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">' +
     '<div style="flex:1;min-width:200px;max-width:320px" class="sb-search-box"><i class="fas fa-search"></i><input class="input" placeholder="Поиск по блокам..." value="' + escHtml(sbSearchQuery) + '" oninput="sbSearchQuery=this.value;render()" style="font-size:0.85rem"></div>' +
+    '<div style="display:flex;gap:8px;margin-left:auto">' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
+      '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
+    '</div>' +
   '</div>';
 
   // ── Toolbar: Language + Stats + Expand ──
