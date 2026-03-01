@@ -2120,6 +2120,7 @@ function renderLeads() {
             '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap">' +
               '<span style="font-size:1rem;font-weight:800;color:#a78bfa">#' + (l.lead_number || l.id) + '</span>' +
               '<span class="badge badge-purple">' + (l.source || 'form') + '</span>' +
+              (l.lang ? '<span class="badge" style="background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.15);color:#fb923c' : 'rgba(59,130,246,0.15);color:#60a5fa') + ';font-size:0.7rem;font-weight:700">' + (l.lang === 'am' ? '🇦🇲 AM' : '🇷🇺 RU') + '</span>' : '') +
               (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
               (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '<span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.7rem">Не назначен</span>') +
               (l.articles_count > 0 ? '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.7rem"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + '</span>' : '') +

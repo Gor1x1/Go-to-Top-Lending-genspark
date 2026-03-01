@@ -498,7 +498,8 @@ app.get('/pdf/:id', async (c) => {
     
     for (const item of serviceItems) {
       rowNum++;
-      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td>' +
+      const itemName = isAm ? (item.name_am || item.name || '') : isEn ? (item.name || '') : (item.name_ru || item.name || '');
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + itemName + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
@@ -567,7 +568,7 @@ app.get('/pdf/:id', async (c) => {
       num: '\u2116',
       terms: tpl['terms' + lSuffix] ? (isEn ? 'Terms & Conditions' : isAm ? '\u054a\u0561\u0575\u0574\u0561\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u043e\u0432\u0438\u044f') : '',
       bank: isEn ? 'Bank Details' : isAm ? '\u0532\u0561\u0576\u056f\u0561\u0575\u056b\u0576 \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580' : '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b',
-      inn: isEn ? 'Reg. No.' : isAm ? '\u0540\u0544' : '\u0418\u041d\u041d'
+      inn: isEn ? 'Reg. No.' : isAm ? '\u0540\u054e\u0540\u0540' : '\u0418\u041d\u041d'
     };
 
     const btnOrder = String(tpl['btn_order' + lSuffix] || (isEn ? 'Order Now' : isAm ? '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561' : '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
@@ -3563,15 +3564,17 @@ async function checkRefCode() {
       if (qty <= 0) return;
       var nameEl = row.querySelector('.calc-label');
       var name = nameEl ? nameEl.textContent.trim() : '';
+      var nameRu = nameEl ? (nameEl.getAttribute('data-ru') || name) : name;
+      var nameAm = nameEl ? (nameEl.getAttribute('data-am') || name) : name;
       var dp = row.getAttribute('data-price');
       if (dp === 'buyout') {
-        items.push({ name: name, price: getBuyoutPrice(qty), qty: qty, subtotal: getBuyoutTotal(qty) });
+        items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: getBuyoutPrice(qty), qty: qty, subtotal: getBuyoutTotal(qty) });
       } else if (dp === 'tiered') {
-        try { var t = JSON.parse(row.getAttribute('data-tiers')); items.push({ name: name, price: getTierPrice(t,qty), qty: qty, subtotal: getTierTotal(t,qty) }); }
-        catch(e) { var pe=row.querySelector('.calc-price'); var pp=pe?parseInt(pe.textContent.replace(/[^0-9]/g,''))||0:0; items.push({name:name,price:pp,qty:qty,subtotal:pp*qty}); }
+        try { var t = JSON.parse(row.getAttribute('data-tiers')); items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: getTierPrice(t,qty), qty: qty, subtotal: getTierTotal(t,qty) }); }
+        catch(e) { var pe=row.querySelector('.calc-price'); var pp=pe?parseInt(pe.textContent.replace(/[^0-9]/g,''))||0:0; items.push({name:name,name_ru:nameRu,name_am:nameAm,price:pp,qty:qty,subtotal:pp*qty}); }
       } else {
         var p = parseInt(dp) || 0;
-        items.push({ name: name, price: p, qty: qty, subtotal: p * qty });
+        items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: p, qty: qty, subtotal: p * qty });
       }
     });
 
