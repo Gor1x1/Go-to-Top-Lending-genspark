@@ -1953,8 +1953,31 @@ async function seedSections() {
 // ===== SETTINGS =====
 function renderSettings() {
   var isMainAdmin = currentUser && currentUser.role === 'main_admin';
-  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:24px">Настройки</h1>' +
-    '<div class="card" style="max-width:500px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-lock" style="color:#8B5CF6;margin-right:8px"></i>Смена пароля</h3>' +
+  var adminUser = isMainAdmin ? ensureArray(data.users).find(function(u) { return u.role === 'main_admin'; }) : null;
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:24px">Настройки</h1>';
+
+  // ===== ADMIN PROFILE (only for main_admin) =====
+  if (isMainAdmin && adminUser) {
+    h += '<div class="card" style="max-width:600px;margin-bottom:20px;border:1px solid rgba(139,92,246,0.3)">' +
+      '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-user-shield" style="color:#8B5CF6;margin-right:8px"></i>Профиль главного администратора</h3>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">' +
+        '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Имя</label><input class="input" id="adminProfileName" value="' + escHtml(adminUser.display_name || '') + '"></div>' +
+        '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Логин</label><input class="input" id="adminProfileLogin" value="' + escHtml(adminUser.username || '') + '"></div>' +
+      '</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">' +
+        '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Телефон</label><input class="input" id="adminProfilePhone" value="' + escHtml(adminUser.phone || '') + '"></div>' +
+        '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px">Telegram</label><input class="input" id="adminProfileTelegram" value="' + escHtml(adminUser.telegram_link || '') + '" placeholder="@username или ссылка"></div>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;align-items:center">' +
+        '<button class="btn btn-primary" onclick="saveAdminProfile()"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить профиль</button>' +
+        '<span id="adminProfileResult" style="font-size:0.82rem"></span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  // ===== CHANGE PASSWORD =====
+  h += '<div class="card" style="max-width:500px;margin-bottom:20px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-lock" style="color:#8B5CF6;margin-right:8px"></i>Смена пароля</h3>' +
+      '<p style="color:#94a3b8;font-size:0.8rem;margin-bottom:14px">Для смены пароля необходимо ввести текущий пароль.</p>' +
       '<div style="margin-bottom:12px"><label style="font-size:0.85rem;color:#94a3b8;display:block;margin-bottom:6px">Текущий пароль</label><input class="input" type="password" id="setPwdCurrent"></div>' +
       '<div style="margin-bottom:12px"><label style="font-size:0.85rem;color:#94a3b8;display:block;margin-bottom:6px">Новый пароль</label><input class="input" type="password" id="setPwdNew"></div>' +
       '<div style="margin-bottom:16px"><label style="font-size:0.85rem;color:#94a3b8;display:block;margin-bottom:6px">Подтвердите новый пароль</label><input class="input" type="password" id="setPwdConfirm"></div>' +
@@ -2071,8 +2094,32 @@ async function changePassword() {
   const cf = document.getElementById('setPwdConfirm').value;
   if (!cur || !nw) { toast('Заполните все поля', 'error'); return; }
   if (nw !== cf) { toast('Пароли не совпадают', 'error'); return; }
+  if (nw.length < 4) { toast('Пароль слишком короткий (мин. 4 символа)', 'error'); return; }
   const res = await api('/change-password', { method: 'POST', body: JSON.stringify({ current_password: cur, new_password: nw }) });
-  if (res && res.success) { toast('Пароль изменён'); } else { toast(res?.error || 'Ошибка', 'error'); }
+  if (res && res.success) { 
+    toast('Пароль изменён');
+    document.getElementById('setPwdCurrent').value = '';
+    document.getElementById('setPwdNew').value = '';
+    document.getElementById('setPwdConfirm').value = '';
+  } else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function saveAdminProfile() {
+  var name = (document.getElementById('adminProfileName')?.value || '').trim();
+  var login = (document.getElementById('adminProfileLogin')?.value || '').trim();
+  var phone = (document.getElementById('adminProfilePhone')?.value || '').trim();
+  var tg = (document.getElementById('adminProfileTelegram')?.value || '').trim();
+  if (!name) { toast('Имя не может быть пустым', 'error'); return; }
+  if (!login || login.length < 2) { toast('Логин минимум 2 символа', 'error'); return; }
+  var res = await api('/admin-profile', { method: 'PUT', body: JSON.stringify({ display_name: name, username: login, phone: phone, telegram_link: tg }) });
+  if (res && res.success) {
+    toast('Профиль сохранён');
+    // Refresh user data
+    data.users = ensureArray(await api('/users'));
+    var resultEl = document.getElementById('adminProfileResult');
+    if (resultEl) resultEl.innerHTML = '<span style="color:#10B981"><i class="fas fa-check"></i> Сохранено</span>';
+    setTimeout(function() { if (resultEl) resultEl.innerHTML = ''; }, 3000);
+  } else { toast(res?.error || 'Ошибка сохранения', 'error'); }
 }
 
 async function loadDataCounts() {
@@ -9086,6 +9133,13 @@ function renderEmployees() {
 
     // === ACTIONS PANEL ===
     if (isAdmin) {
+      // Hide edit/credentials buttons for main_admin — admin profile is managed in Settings
+      var isTargetMainAdmin = u.role === 'main_admin';
+      if (isTargetMainAdmin) {
+        h += '<div style="padding:10px 20px 14px;border-top:1px solid #1e293b;text-align:center;background:linear-gradient(180deg,transparent,rgba(15,23,42,0.5))">';
+        h += '<span style="font-size:0.78rem;color:#64748b"><i class="fas fa-shield-alt" style="margin-right:4px;color:#8B5CF6"></i>Управление профилем — в разделе <a href="#" onclick="navigate(&apos;settings&apos;);return false" style="color:#a78bfa;text-decoration:underline">Настройки</a></span>';
+        h += '</div>';
+      } else {
       h += '<div style="padding:10px 20px 16px;border-top:1px solid #1e293b;display:flex;gap:6px;flex-wrap:wrap;background:linear-gradient(180deg,transparent,rgba(15,23,42,0.5))">';
       h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.8rem;flex:1;border-radius:10px" onclick="editEmployee(' + u.id + ')"><i class="fas fa-edit" style="margin-right:5px"></i>Ред.</button>';
       h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.8rem;flex:1;border-radius:10px" onclick="showChangePassForm(' + u.id + ')"><i class="fas fa-key" style="margin-right:5px"></i>Учётные</button>';
@@ -9112,6 +9166,7 @@ function renderEmployees() {
         h += '<button class="btn btn-outline" style="padding:9px 16px;border-radius:10px" onclick="_changePassUserId=0;render()"><i class="fas fa-times"></i></button>';
         h += '</div></div>';
       }
+      } // end if !isTargetMainAdmin
     }
     h += '</div>'; // card end
   }

@@ -83,10 +83,33 @@ api.post('/change-password', authMiddleware, async (c) => {
   if (!user) return c.json({ error: 'User not found' }, 404);
   
   const valid = await verifyPassword(current_password, user.password_hash as string);
-  if (!valid) return c.json({ error: 'Wrong current password' }, 400);
+  if (!valid) return c.json({ error: 'Неверный текущий пароль' }, 400);
+  
+  if (!new_password || new_password.length < 4) return c.json({ error: 'Пароль минимум 4 символа' }, 400);
   
   const newHash = await hashPassword(new_password);
-  await db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(newHash, userId).run();
+  await db.prepare('UPDATE users SET password_hash = ?, password_plain = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(newHash, new_password, userId).run();
+  return c.json({ success: true });
+});
+
+// ===== ADMIN PROFILE (main_admin only, self-edit) =====
+api.put('/admin-profile', authMiddleware, async (c) => {
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') return c.json({ error: 'Только главный администратор' }, 403);
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const { display_name, username, phone, telegram_link } = body;
+  
+  if (!display_name || !username) return c.json({ error: 'Имя и логин обязательны' }, 400);
+  if (username.length < 2) return c.json({ error: 'Логин минимум 2 символа' }, 400);
+  
+  // Check username uniqueness
+  const existing = await db.prepare('SELECT id FROM users WHERE username = ? AND id != ?').bind(username, caller.sub).first();
+  if (existing) return c.json({ error: 'Логин уже занят другим пользователем' }, 400);
+  
+  await db.prepare('UPDATE users SET display_name = ?, username = ?, phone = ?, telegram_link = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .bind(display_name, username, phone || null, telegram_link || null, caller.sub).run();
+  
   return c.json({ success: true });
 });
 
@@ -1246,6 +1269,13 @@ api.put('/users/:id', authMiddleware, async (c) => {
   const caller = c.get('user');
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can edit users' }, 403);
   const id = c.req.param('id');
+  
+  // Protect main_admin from being edited via employee panel — use /admin-profile instead
+  const targetUser = await db.prepare('SELECT role FROM users WHERE id = ?').bind(id).first();
+  if (targetUser && targetUser.role === 'main_admin') {
+    return c.json({ error: 'Профиль главного администратора редактируется только в разделе Настройки' }, 403);
+  }
+  
   const d = await c.req.json();
   // Protect: can't change role to main_admin if one already exists (and it's not this user)
   if (d.role === 'main_admin') {
@@ -1296,6 +1326,13 @@ api.post('/users/:id/reset-password', authMiddleware, async (c) => {
   const caller = c.get('user');
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can reset passwords' }, 403);
   const id = c.req.param('id');
+  
+  // Protect main_admin credentials — password change only via Settings > Change Password (requires old password)
+  const targetUser = await db.prepare('SELECT role FROM users WHERE id = ?').bind(id).first();
+  if (targetUser && targetUser.role === 'main_admin') {
+    return c.json({ error: 'Пароль главного администратора можно сменить только в разделе Настройки (с подтверждением старого пароля)' }, 403);
+  }
+  
   const body = await c.req.json().catch(() => ({}));
   const wantNewPass = !!body.new_password;
   const wantNewUser = !!body.new_username;
