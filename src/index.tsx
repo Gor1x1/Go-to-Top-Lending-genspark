@@ -323,7 +323,8 @@ app.post('/api/generate-pdf', async (c) => {
 
     let rows = '';
     for (const item of items) {
-      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + (item.name || '') + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      const iName = isAm ? (item.name_am || item.name || '') : (item.name_ru || item.name || '');
+      rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + iName + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
 
     // Save lead with unique ID (using pre-fetched lastLead)
@@ -492,13 +493,33 @@ app.get('/pdf/:id', async (c) => {
     let rowNum = 0;
     
     // Section header for services (if articles also exist)
+    // Load service name translations for fallback (when items were saved without name_am/name_ru)
+    let svcNameMap: Record<string, { name_ru: string; name_am: string }> = {};
+    try {
+      const allSvcs = await db.prepare('SELECT name_ru, name_am FROM calculator_services').all();
+      for (const s of (allSvcs.results || [])) {
+        if (s.name_ru) svcNameMap[String(s.name_ru)] = { name_ru: String(s.name_ru), name_am: String(s.name_am || s.name_ru) };
+        if (s.name_am) svcNameMap[String(s.name_am)] = { name_ru: String(s.name_ru || s.name_am), name_am: String(s.name_am) };
+      }
+    } catch {}
+    // Also add hardcoded buyout name translations
+    svcNameMap['\u0412\u044b\u043a\u0443\u043f + \u0437\u0430\u0431\u043e\u0440 \u0438\u0437 \u041f\u0412\u0417'] = { name_ru: '\u0412\u044b\u043a\u0443\u043f + \u0437\u0430\u0431\u043e\u0440 \u0438\u0437 \u041f\u0412\u0417', name_am: '\u0533\u0576\u0578\u0582\u0574 + \u057d\u057f\u0561\u0581\u0578\u0582\u0574 \u054a\u054e\u0536-\u056b\u0581' };
+    
     if (articleItems.length > 0 && serviceItems.length > 0) {
       rows += '<tr><td colspan="5" style="padding:10px 12px;background:' + accentColor + '0d;font-weight:700;color:' + accentColor + ';font-size:0.9em"><i class="fas fa-calculator" style="margin-right:6px"></i>' + (isEn ? 'Services' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u0443\u0433\u0438') + '</td></tr>';
     }
     
     for (const item of serviceItems) {
       rowNum++;
-      const itemName = isAm ? (item.name_am || item.name || '') : isEn ? (item.name || '') : (item.name_ru || item.name || '');
+      // Resolve name: use name_am/name_ru from item, or fallback to DB lookup by item.name
+      let itemName = '';
+      if (isAm) {
+        itemName = item.name_am || (svcNameMap[item.name] && svcNameMap[item.name].name_am) || item.name || '';
+      } else if (isEn) {
+        itemName = item.name || '';
+      } else {
+        itemName = item.name_ru || (svcNameMap[item.name] && svcNameMap[item.name].name_ru) || item.name || '';
+      }
       rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + itemName + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (item.qty || 1) + '</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
