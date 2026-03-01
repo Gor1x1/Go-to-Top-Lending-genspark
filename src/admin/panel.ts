@@ -1963,32 +1963,97 @@ function renderSettings() {
   
   // DATA RESET — only for main_admin
   if (isMainAdmin) {
-    h += '<div class="card" style="max-width:700px;margin-top:24px;border:1px solid rgba(239,68,68,0.3)">' +
+    h += '<div class="card" style="max-width:800px;margin-top:24px;border:1px solid rgba(239,68,68,0.3)">' +
       '<h3 style="font-weight:700;margin-bottom:8px;color:#f87171"><i class="fas fa-exclamation-triangle" style="margin-right:8px"></i>Сброс данных</h3>' +
-      '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px;line-height:1.5">Очистка операционных данных перед запуском в продакшн. Конфигурация (услуги, тексты, шаблоны, промокоды, пользователи) <b style="color:#10B981">сохраняется</b>. Удаляются только рабочие данные.</p>' +
-      '<div id="resetCountsArea" style="margin-bottom:16px"><button class="btn" style="background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.82rem" onclick="loadDataCounts()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Показать текущие данные</button></div>' +
-      '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">' +
-        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
-          '<input type="checkbox" id="resetLeads" style="margin-top:3px">' +
-          '<div><span style="font-weight:600;color:#e2e8f0">Лиды и инвойсы</span><br><span style="font-size:0.78rem;color:#94a3b8">Заявки, комментарии, артикулы WB. Нумерация INV сбросится на 1.</span></div>' +
+      '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px;line-height:1.5">Очистка операционных данных перед запуском. Выберите категории для удаления.</p>' +
+
+      // — data counts preview area —
+      '<div id="resetCountsArea" style="margin-bottom:20px"><button class="btn" style="background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.82rem" onclick="loadDataCounts()"><i class="fas fa-database" style="margin-right:4px"></i>Показать текущие данные перед сбросом</button></div>' +
+
+      // — Category 1: Leads —
+      '<div style="border:1px solid #334155;border-radius:10px;margin-bottom:14px;overflow:hidden">' +
+        '<label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(239,68,68,0.06);cursor:pointer;margin:0">' +
+          '<input type="checkbox" id="resetLeads" style="width:18px;height:18px;accent-color:#EF4444">' +
+          '<div style="flex:1"><span style="font-weight:700;color:#f87171;font-size:0.95rem">Лиды и инвойсы</span></div>' +
         '</label>' +
-        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
-          '<input type="checkbox" id="resetAnalytics" style="margin-top:3px">' +
-          '<div><span style="font-weight:600;color:#e2e8f0">Аналитика</span><br><span style="font-size:0.78rem;color:#94a3b8">Просмотры страниц, логи активности сотрудников.</span></div>' +
-        '</label>' +
-        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
-          '<input type="checkbox" id="resetFinance" style="margin-top:3px">' +
-          '<div><span style="font-weight:600;color:#e2e8f0">Финансы</span><br><span style="font-size:0.78rem;color:#94a3b8">Кредиты, платежи, расходы, дивиденды, налоги, основные средства, снепшоты P&L.</span></div>' +
-        '</label>' +
-        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
-          '<input type="checkbox" id="resetRefUsage" style="margin-top:3px">' +
-          '<div><span style="font-weight:600;color:#e2e8f0">Счётчики промокодов</span><br><span style="font-size:0.78rem;color:#94a3b8">Сбросить uses_count на 0. Сами коды и настройки сохранятся.</span></div>' +
-        '</label>' +
+        '<div style="padding:10px 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.8rem">' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Все заявки (leads)</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Комментарии к лидам</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">WB артикулы лидов</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Нумерация INV &rarr; с 1</span></div>' +
+          '<div style="grid-column:1/-1;margin-top:6px;padding-top:6px;border-top:1px solid #1e293b"><span style="color:#10B981">&#10003;</span> <span style="color:#64748b">Калькулятор, услуги, цены, промокоды, тексты, PDF-шаблон</span></div>' +
+        '</div>' +
       '</div>' +
-      '<div style="border-top:1px solid rgba(239,68,68,0.2);padding-top:16px">' +
-        '<p style="color:#f87171;font-size:0.82rem;font-weight:600;margin-bottom:12px">⚠️ Это действие необратимо! Для подтверждения введите код:</p>' +
+
+      // — Category 2: Analytics —
+      '<div style="border:1px solid #334155;border-radius:10px;margin-bottom:14px;overflow:hidden">' +
+        '<label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(245,158,11,0.06);cursor:pointer;margin:0">' +
+          '<input type="checkbox" id="resetAnalytics" style="width:18px;height:18px;accent-color:#F59E0B">' +
+          '<div style="flex:1"><span style="font-weight:700;color:#FBBF24;font-size:0.95rem">Аналитика</span></div>' +
+        '</label>' +
+        '<div style="padding:10px 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.8rem">' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Просмотры страниц (page_views)</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Логи активности</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Сессии сотрудников</span></div>' +
+          '<div style="grid-column:1/-1;margin-top:6px;padding-top:6px;border-top:1px solid #1e293b"><span style="color:#10B981">&#10003;</span> <span style="color:#64748b">Настройки, пользователи, конфигурация</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      // — Category 3: Finance —
+      '<div style="border:1px solid #334155;border-radius:10px;margin-bottom:14px;overflow:hidden">' +
+        '<label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(59,130,246,0.06);cursor:pointer;margin:0">' +
+          '<input type="checkbox" id="resetFinance" style="width:18px;height:18px;accent-color:#3B82F6">' +
+          '<div style="flex:1"><span style="font-weight:700;color:#60A5FA;font-size:0.95rem">Финансы</span></div>' +
+        '</label>' +
+        '<div style="padding:10px 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.8rem">' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Кредиты и платежи</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Расходы и бонусы</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Дивиденды</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Налоги и правила</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Основные средства</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">P&amp;L снепшоты периодов</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">Прочие доходы/расходы</span></div>' +
+          '<div style="grid-column:1/-1;margin-top:6px;padding-top:6px;border-top:1px solid #1e293b"><span style="color:#10B981">&#10003;</span> <span style="color:#64748b">Категории расходов, роли, типы частот</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      // — Category 4: Promo counters —
+      '<div style="border:1px solid #334155;border-radius:10px;margin-bottom:14px;overflow:hidden">' +
+        '<label style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:rgba(139,92,246,0.06);cursor:pointer;margin:0">' +
+          '<input type="checkbox" id="resetRefUsage" style="width:18px;height:18px;accent-color:#8B5CF6">' +
+          '<div style="flex:1"><span style="font-weight:700;color:#A78BFA;font-size:0.95rem">Счётчики промокодов</span></div>' +
+        '</label>' +
+        '<div style="padding:10px 16px 14px;display:grid;grid-template-columns:1fr 1fr;gap:6px 16px;font-size:0.8rem">' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">uses_count &rarr; 0</span></div>' +
+          '<div><span style="color:#EF4444">&#10005;</span> <span style="color:#94a3b8">paid_uses_count &rarr; 0</span></div>' +
+          '<div style="grid-column:1/-1;margin-top:6px;padding-top:6px;border-top:1px solid #1e293b"><span style="color:#10B981">&#10003;</span> <span style="color:#64748b">Сами промокоды, скидки, привязанные услуги</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      // — Protected data —
+      '<div style="background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.25);border-radius:10px;padding:14px 16px;margin-bottom:20px">' +
+        '<div style="font-weight:700;color:#10B981;margin-bottom:8px;font-size:0.9rem"><i class="fas fa-shield-alt" style="margin-right:6px"></i>Защищено от удаления (никогда не сбрасывается)</div>' +
+        '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px 16px;font-size:0.8rem">' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Калькулятор: вкладки</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Калькулятор: услуги</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Калькулятор: цены</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Тексты сайта (RU/AM)</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">PDF шаблон</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Промокоды (настройки)</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Telegram кнопки</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Пользователи / Роли</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Блоки сайта / Фото</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Скрипты</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Футер / Слоты</span></div>' +
+          '<div><span style="color:#10B981">&#10003;</span> <span style="color:#94a3b8">Категории расходов</span></div>' +
+        '</div>' +
+      '</div>' +
+
+      // — Confirm —
+      '<div style="border-top:2px solid rgba(239,68,68,0.3);padding-top:16px">' +
+        '<p style="color:#f87171;font-size:0.85rem;font-weight:700;margin-bottom:12px"><i class="fas fa-lock" style="margin-right:6px"></i>Действие необратимо! Код подтверждения: <code style="background:#1e293b;padding:2px 8px;border-radius:4px;color:#FBBF24;letter-spacing:2px">RESET-CONFIRM</code></p>' +
         '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
-          '<input class="input" id="resetConfirmCode" placeholder="RESET-CONFIRM" style="max-width:220px;font-family:monospace;letter-spacing:1px">' +
+          '<input class="input" id="resetConfirmCode" placeholder="Введите код..." style="max-width:220px;font-family:monospace;letter-spacing:1px">' +
           '<button class="btn" style="background:#EF4444;color:white;font-weight:700" onclick="executeDataReset()"><i class="fas fa-trash-alt" style="margin-right:6px"></i>Выполнить сброс</button>' +
         '</div>' +
         '<div id="resetResult" style="margin-top:12px"></div>' +
@@ -2018,10 +2083,12 @@ async function loadDataCounts() {
   var l = res.leads || {};
   var a = res.analytics || {};
   var f = res.finance || {};
-  area.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' +
-    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8">Лиды</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + (l.leads||0) + '</div><div style="font-size:0.7rem;color:#64748b">+' + (l.comments||0) + ' ком. / ' + (l.articles||0) + ' арт.</div></div>' +
-    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8">Просмотры</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + (a.page_views||0) + '</div><div style="font-size:0.7rem;color:#64748b">' + (a.activity_logs||0) + ' лог записей</div></div>' +
-    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8">Финансы</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + ((f.loans||0) + (f.expenses||0) + (f.dividends||0)) + '</div><div style="font-size:0.7rem;color:#64748b">' + (f.loans||0) + ' кр. / ' + (f.expenses||0) + ' расх. / ' + (f.snapshots||0) + ' P&L</div></div>' +
+  var r = res.referrals || {};
+  area.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px">' +
+    '<div style="background:rgba(239,68,68,0.08);padding:10px 14px;border-radius:8px;border:1px solid rgba(239,68,68,0.15)"><div style="font-size:0.7rem;color:#f87171">Лиды</div><div style="font-size:1.3rem;font-weight:800;color:#f87171">' + (l.leads||0) + '</div><div style="font-size:0.68rem;color:#64748b">' + (l.comments||0) + ' комм. / ' + (l.articles||0) + ' арт.</div></div>' +
+    '<div style="background:rgba(245,158,11,0.08);padding:10px 14px;border-radius:8px;border:1px solid rgba(245,158,11,0.15)"><div style="font-size:0.7rem;color:#FBBF24">Просмотры</div><div style="font-size:1.3rem;font-weight:800;color:#FBBF24">' + (a.page_views||0) + '</div><div style="font-size:0.68rem;color:#64748b">' + (a.activity_logs||0) + ' лог / ' + (a.sessions||0) + ' сесс.</div></div>' +
+    '<div style="background:rgba(59,130,246,0.08);padding:10px 14px;border-radius:8px;border:1px solid rgba(59,130,246,0.15)"><div style="font-size:0.7rem;color:#60A5FA">Финансы</div><div style="font-size:1.3rem;font-weight:800;color:#60A5FA">' + ((f.loans||0)+(f.expenses||0)+(f.dividends||0)+(f.tax_payments||0)+(f.assets||0)) + '</div><div style="font-size:0.68rem;color:#64748b">' + (f.loans||0) + ' кр. / ' + (f.expenses||0) + ' расх. / ' + (f.snapshots||0) + ' P&L</div></div>' +
+    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px;border:1px solid rgba(139,92,246,0.15)"><div style="font-size:0.7rem;color:#A78BFA">Промокоды</div><div style="font-size:1.3rem;font-weight:800;color:#A78BFA">' + (r.total_uses||0) + '</div><div style="font-size:0.68rem;color:#64748b">общих использ.</div></div>' +
   '</div>';
 }
 
@@ -2042,13 +2109,14 @@ async function executeDataReset() {
     return;
   }
   
-  // Double confirm
-  var names = [];
-  if (targets.includes('leads')) names.push('Лиды');
-  if (targets.includes('analytics')) names.push('Аналитика');
-  if (targets.includes('finance')) names.push('Финансы');
-  if (targets.includes('referrals_usage')) names.push('Промокоды (счётчики)');
-  if (!confirm('ВНИМАНИЕ! Вы удалите данные из разделов:\n\n• ' + names.join('\n• ') + '\n\nЭто действие НЕОБРАТИМО.\nПродолжить?')) return;
+  // Build detailed confirmation message without \\n (template literal safe)
+  var msg = 'ВНИМАНИЕ! Будут УДАЛЕНЫ данные:';
+  if (targets.includes('leads')) msg += ' | Лиды, комментарии, артикулы WB';
+  if (targets.includes('analytics')) msg += ' | Просмотры, логи, сессии';
+  if (targets.includes('finance')) msg += ' | Кредиты, расходы, дивиденды, налоги, P&L';
+  if (targets.includes('referrals_usage')) msg += ' | Счётчики промокодов';
+  msg += ' | Это действие НЕОБРАТИМО. Продолжить?';
+  if (!confirm(msg)) return;
   
   var resultDiv = document.getElementById('resetResult');
   resultDiv.innerHTML = '<span style="color:#FBBF24"><i class="fas fa-spinner fa-spin"></i> Выполняется сброс...</span>';
@@ -2060,12 +2128,9 @@ async function executeDataReset() {
       res.results.map(function(r) { return '<div style="color:#10B981;font-size:0.85rem;margin-bottom:4px">' + r + '</div>'; }).join('') +
       '</div>';
     toast('Сброс выполнен успешно', 'success');
-    // Reload data
+    // Reset checkboxes
     document.getElementById('resetConfirmCode').value = '';
-    document.getElementById('resetLeads').checked = false;
-    document.getElementById('resetAnalytics').checked = false;
-    document.getElementById('resetFinance').checked = false;
-    document.getElementById('resetRefUsage').checked = false;
+    ['resetLeads','resetAnalytics','resetFinance','resetRefUsage'].forEach(function(id) { var el = document.getElementById(id); if (el) el.checked = false; });
     // Refresh counts
     setTimeout(loadDataCounts, 500);
     // Reload leads data
@@ -2076,7 +2141,7 @@ async function executeDataReset() {
           data.leads = bulk.leads || { leads: [], total: 0 };
           data.referrals = bulk.referrals || [];
         }
-      } catch {}
+      } catch(e) {}
     }, 1000);
   } else {
     resultDiv.innerHTML = '<div style="color:#f87171;font-size:0.85rem">' + (res?.error || 'Ошибка при сбросе') + '</div>';

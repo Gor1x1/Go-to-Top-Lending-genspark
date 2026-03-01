@@ -4210,24 +4210,30 @@ api.get('/data-counts', authMiddleware, async (c) => {
   
   const db = c.env.DB;
   try {
-    const [leads, comments, articles, pageViews, activityLogs, loans, expenses, dividends, snapshots, taxPayments, assets] = await Promise.all([
+    const [leads, comments, articles, pageViews, activityLogs, sessions, loans, expenses, dividends, snapshots, taxPayments, assets, otherIE, bonuses, taxRules, refUses] = await Promise.all([
       db.prepare('SELECT COUNT(*) as cnt FROM leads').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM lead_comments').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM lead_articles').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM page_views').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM activity_log').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM activity_sessions').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM loans').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM expenses').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM dividends').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM period_snapshots').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM tax_payments').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM assets').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM other_income_expenses').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM employee_bonuses').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM tax_rules').first(),
+      db.prepare('SELECT COALESCE(SUM(uses_count),0) as cnt FROM referral_codes').first(),
     ]);
     
     return c.json({
       leads: { leads: leads?.cnt || 0, comments: comments?.cnt || 0, articles: articles?.cnt || 0 },
-      analytics: { page_views: pageViews?.cnt || 0, activity_logs: activityLogs?.cnt || 0 },
-      finance: { loans: loans?.cnt || 0, expenses: expenses?.cnt || 0, dividends: dividends?.cnt || 0, snapshots: snapshots?.cnt || 0, tax_payments: taxPayments?.cnt || 0, assets: assets?.cnt || 0 },
+      analytics: { page_views: pageViews?.cnt || 0, activity_logs: activityLogs?.cnt || 0, sessions: sessions?.cnt || 0 },
+      finance: { loans: loans?.cnt || 0, expenses: expenses?.cnt || 0, dividends: dividends?.cnt || 0, snapshots: snapshots?.cnt || 0, tax_payments: taxPayments?.cnt || 0, assets: assets?.cnt || 0, other_ie: otherIE?.cnt || 0, bonuses: bonuses?.cnt || 0, tax_rules: taxRules?.cnt || 0 },
+      referrals: { total_uses: refUses?.cnt || 0 },
     });
   } catch (err: any) {
     return c.json({ error: err?.message || 'unknown' }, 500);
