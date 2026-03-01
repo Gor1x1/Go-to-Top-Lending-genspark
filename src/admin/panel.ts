@@ -1711,22 +1711,44 @@ function renderReferrals() {
   // ── Inline form for adding new referral code ──
   h += '<div class="card" style="margin-bottom:24px;border:1px dashed rgba(139,92,246,0.4);background:rgba(139,92,246,0.03)">' +
     '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa;font-size:0.95rem"><i class="fas fa-plus-circle" style="margin-right:8px"></i>Добавить новый код</h3>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Кодовое слово</label><input class="input" id="new_ref_code" placeholder="PROMO2026" style="text-transform:uppercase"></div>' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Скидка (%)</label><input class="input" type="number" id="new_ref_disc" value="0" min="0" max="100"></div>' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" id="new_ref_free" value="0" min="0"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Лимит (0 = ∞)</label><input class="input" type="number" id="new_ref_max" value="0" min="0" placeholder="0 = без лимита"></div>' +
       '<div style="display:flex;align-items:end"><button class="btn btn-primary" style="width:100%;padding:10px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Создать</button></div>' +
     '</div>' +
     '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание (для кого этот код)</label><input class="input" id="new_ref_desc" placeholder="Блогер Иван, партнёр, VIP-клиент..."></div>' +
   '</div>';
   
+  // ── Overall promo analytics summary ──
+  var totalRefUses = 0, totalRefPaid = 0, totalRefActive = 0, totalRefInactive = 0;
+  data.referrals.forEach(function(r) {
+    totalRefUses += Number(r.uses_count || 0);
+    totalRefPaid += Number(r.paid_uses_count || 0);
+    if (r.is_active) totalRefActive++; else totalRefInactive++;
+  });
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px">';
+  h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #8B5CF6"><div style="font-size:0.72rem;color:#94a3b8">Всего кодов</div><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">' + data.referrals.length + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #10B981"><div style="font-size:0.72rem;color:#94a3b8">Активных</div><div style="font-size:1.5rem;font-weight:800;color:#10B981">' + totalRefActive + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #EF4444"><div style="font-size:0.72rem;color:#94a3b8">Выключенных</div><div style="font-size:1.5rem;font-weight:800;color:#EF4444">' + totalRefInactive + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8">Всего использ.</div><div style="font-size:1.5rem;font-weight:800;color:#F59E0B">' + totalRefUses + '</div></div>';
+  h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #3B82F6"><div style="font-size:0.72rem;color:#94a3b8">Оплач. лидов</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6">' + totalRefPaid + '</div><div style="font-size:0.58rem;color:#475569">в работе+проверка+готов</div></div>';
+  h += '</div>';
+
   for (const ref of data.referrals) {
     var refServices = ref._services || [];
+    var paidCount = Number(ref.paid_uses_count || 0);
+    var maxUses = Number(ref.max_uses || 0);
+    var usagePct = maxUses > 0 ? Math.min(100, Math.round(paidCount / maxUses * 100)) : 0;
+    var usageColor = maxUses > 0 && paidCount >= maxUses ? '#EF4444' : '#10B981';
     h += '<div class="card" style="margin-bottom:16px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
         '<div><span class="badge badge-green" style="font-size:0.9rem;padding:6px 14px">' + escHtml(ref.code) + '</span>' +
           (ref.is_active ? ' <span class="badge badge-green">Активен</span>' : ' <span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171">Выкл</span>') +
-          ' <span style="color:#64748b;font-size:0.8rem;margin-left:8px">Использований: ' + (ref.uses_count || 0) + '</span>' +
+          ' <span style="color:#64748b;font-size:0.8rem;margin-left:8px">Всего: ' + (ref.uses_count || 0) + '</span>' +
+          ' <span style="color:' + usageColor + ';font-size:0.8rem;font-weight:600;margin-left:8px">Оплач.: ' + paidCount + (maxUses > 0 ? '/' + maxUses : '') + '</span>' +
+          (maxUses > 0 ? ' <span style="font-size:0.7rem;color:#94a3b8;margin-left:4px">(' + usagePct + '% лимита)</span>' : '') +
         '</div>' +
         '<div style="display:flex;gap:8px">' +
           '<button class="btn btn-success" style="padding:6px 12px;font-size:0.8rem" onclick="saveReferral(' + ref.id + ')"><i class="fas fa-save"></i></button>' +
@@ -1734,10 +1756,12 @@ function renderReferrals() {
           '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deleteReferral(' + ref.id + ')"><i class="fas fa-trash"></i></button>' +
         '</div>' +
       '</div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+      (maxUses > 0 ? '<div style="margin-bottom:12px;background:#1e293b;border-radius:4px;overflow:hidden;height:6px"><div style="height:100%;background:' + usageColor + ';width:' + usagePct + '%;transition:width 0.3s"></div></div>' : '') +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Код (слово)</label><input class="input" value="' + escHtml(ref.code) + '" id="ref_code_' + ref.id + '"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Общая скидка (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" value="' + (ref.free_reviews || 0) + '" id="ref_free_' + ref.id + '" min="0"></div>' +
+        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Лимит использований (0=∞)</label><input class="input" type="number" value="' + (ref.max_uses || 0) + '" id="ref_max_' + ref.id + '" min="0"></div>' +
       '</div>' +
       '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>';
     
@@ -1792,18 +1816,21 @@ async function addReferral() {
   var descEl = document.getElementById('new_ref_desc');
   var discEl = document.getElementById('new_ref_disc');
   var freeEl = document.getElementById('new_ref_free');
+  var maxEl = document.getElementById('new_ref_max');
   var code = (codeEl?.value || '').trim();
   if (!code) { toast('Введите кодовое слово', 'error'); codeEl?.focus(); return; }
   var desc = (descEl?.value || '').trim();
   var disc = parseInt(discEl?.value || '0') || 0;
   var free = parseInt(freeEl?.value || '0') || 0;
-  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free }) });
+  var maxUses = parseInt(maxEl?.value || '0') || 0;
+  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free, max_uses: maxUses }) });
   toast('Код "' + code.toUpperCase() + '" добавлен');
   // Clear form fields
   if (codeEl) codeEl.value = '';
   if (descEl) descEl.value = '';
   if (discEl) discEl.value = '0';
   if (freeEl) freeEl.value = '0';
+  if (maxEl) maxEl.value = '0';
   await loadData(); await loadRefServices(); render();
 }
 
@@ -1857,6 +1884,7 @@ async function saveReferral(id) {
     description: document.getElementById('ref_desc_' + id).value,
     discount_percent: parseInt(document.getElementById('ref_disc_' + id).value) || 0,
     free_reviews: parseInt(document.getElementById('ref_free_' + id).value) || 0,
+    max_uses: parseInt(document.getElementById('ref_max_' + id)?.value) || 0,
     is_active: ref.is_active
   }) });
   toast('Код сохранён');
@@ -6109,9 +6137,6 @@ function renderBizFunnelV2(d, sd, fin) {
     var avgCheckPromo = withPromoDone > 0 ? Math.round(withPromoSvc / withPromoDone) : 0;
     var avgCheckNoPromo = withoutPromoDone > 0 ? Math.round(withoutPromoSvc / withoutPromoDone) : 0;
 
-    h += '<div style="margin-bottom:32px">';
-    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exchange-alt" style="color:#FBBF24;margin-right:8px"></i>Эффективность промокодов: конверсия и средний чек</h3>';
-    h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:12px">Сравнение поведения лидов с промокодом и без — помогает оценить ROI скидочной программы.</div>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">';
     // Card: With promo
     h += '<div class="card" style="padding:20px;border-left:3px solid #FBBF24;background:rgba(251,191,36,0.04)">';
@@ -6149,7 +6174,6 @@ function renderBizFunnelV2(d, sd, fin) {
     var promoROI = discCostAll > 0 ? ((promoRevenueGain / discCostAll - 1) * 100).toFixed(0) : '∞';
     h += '<div style="color:#e2e8f0"><span style="color:#94a3b8">ROI скидок:</span> <span style="color:' + (Number(promoROI) > 0 || promoROI === '∞' ? '#22C55E' : '#EF4444') + ';font-weight:700">' + promoROI + '%</span> <span style="color:#475569;font-size:0.68rem">(выручка промо / стоимость скидок)</span></div>';
     h += '</div></div>';
-    h += '</div>';
     } // end else (allPCKeys.length > 0)
     h += '</div>';
   }
@@ -6353,42 +6377,46 @@ function renderBizPeriodsV2(d, sd, fin) {
       mExp = mExpSal + mExpComm + mExpMkt;
       mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
-    } else if (isCurrent) {
-      // Live data from fin (global analytics for current period)
-      mDone = Number(sd.done && sd.done.count)||0;
-      mInProg = (Number(sd.in_progress && sd.in_progress.count)||0) + (Number(sd.contacted && sd.contacted.count)||0);
-      mRejected = Number(sd.rejected && sd.rejected.count)||0;
-      mChecking = Number(sd.checking && sd.checking.count)||0;
-      mSvc = Number(fin.services)||0;
-      mArt = Number(fin.articles)||0;
-      mRefunds = Number(fin.refunds)||0;
-      mExpSal = (Number(fin.salaries)||0) + (Number(fin.bonuses)||0) + (Number(fin.fines)||0);
-      mExpComm = Number(fin.commercial_expenses)||0;
-      mExpMkt = Number(fin.marketing_expenses)||0;
-      mExp = Number(fin.total_expenses)||0;
-      mTurnover = mSvc + mArt;
-      mProfit = mSvc - mExp + mAdjTotal;
-    } else if (isPast && mData) {
-      // Historical from monthly_data query (only for past non-locked months)
+    } else if ((isCurrent || isPast) && mData) {
+      // ALWAYS use monthly_data for both current and past months — this data
+      // is grouped by actual created_at month, not affected by date picker
       mDone = Number(mData.done_count)||0;
-      mInProg = Number(mData.in_progress_count)||0;
+      mInProg = (Number(mData.in_progress_count)||0) + (Number(mData.contacted_count)||0);
       mRejected = Number(mData.rejected_count)||0;
       mChecking = Number(mData.checking_count)||0;
       mSvc = Number(mData.services)||0;
       mArt = Number(mData.articles)||0;
       mRefunds = Number(mData.refunds)||0;
       // Try to get expenses from salSummaryCache (loaded async)
-      var cachedSal = salSummaryCache[mKey];
-      if (cachedSal) {
-        mExpSal = Number(cachedSal.expense_salaries) || 0;
-        mExpComm = Number(cachedSal.commercial_expenses) || 0;
-        mExpMkt = Number(cachedSal.marketing_expenses) || 0;
-        mExp = mExpSal + mExpComm + mExpMkt;
+      if (isCurrent) {
+        // For current month, prefer live expense data if available
+        mExpSal = (Number(fin.salaries)||0) + (Number(fin.bonuses)||0) + (Number(fin.fines)||0);
+        mExpComm = Number(fin.commercial_expenses)||0;
+        mExpMkt = Number(fin.marketing_expenses)||0;
+        mExp = Number(fin.total_expenses)||0;
       } else {
-        mExp = 0;
+        var cachedSal = salSummaryCache[mKey];
+        if (cachedSal) {
+          mExpSal = Number(cachedSal.expense_salaries) || 0;
+          mExpComm = Number(cachedSal.commercial_expenses) || 0;
+          mExpMkt = Number(cachedSal.marketing_expenses) || 0;
+          mExp = mExpSal + mExpComm + mExpMkt;
+        } else {
+          mExp = 0;
+        }
       }
       mTurnover = mSvc + mArt;
       mProfit = mSvc - mExp + mAdjTotal;
+    } else if (isCurrent) {
+      // Fallback: current month but no mData (first day, no leads yet)
+      mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
+      mSvc = 0; mArt = 0; mRefunds = 0;
+      mExpSal = (Number(fin.salaries)||0) + (Number(fin.bonuses)||0) + (Number(fin.fines)||0);
+      mExpComm = Number(fin.commercial_expenses)||0;
+      mExpMkt = Number(fin.marketing_expenses)||0;
+      mExp = Number(fin.total_expenses)||0;
+      mTurnover = 0;
+      mProfit = -mExp + mAdjTotal;
     } else {
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
       mSvc = 0; mArt = 0; mRefunds = 0; mExp = 0; mTurnover = 0; mProfit = 0;
@@ -6433,9 +6461,13 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? '-' + fmtAmt(Math.abs(mRefunds)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
-    // Monthly discount from promo codes
-    var mDiscData = (d.monthly_discounts || {})[mKey];
-    var mDiscAmt = mDiscData ? Number(mDiscData.discount_total || 0) : 0;
+    // Monthly discount from promo codes — use monthly_data.discounts (per-month, independent of date picker)
+    var mDiscAmt = mData ? Number(mData.discounts || 0) : 0;
+    // Fallback to monthly_discounts for locked/snapshot months
+    if (mDiscAmt === 0) {
+      var mDiscData = (d.monthly_discounts || {})[mKey];
+      mDiscAmt = mDiscData ? Number(mDiscData.discount_total || 0) : 0;
+    }
     yearTotals.discounts += mDiscAmt;
     h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (mDiscAmt > 0 ? '-' + fmtAmt(mDiscAmt) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (mExp ? '-' + fmtAmt(Math.abs(mExp)) : '\u2014') + '</td>';

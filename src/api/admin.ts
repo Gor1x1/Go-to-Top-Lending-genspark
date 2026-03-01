@@ -504,23 +504,35 @@ api.get('/stats', authMiddleware, async (c) => {
 api.get('/referrals', authMiddleware, async (c) => {
   const db = c.env.DB;
   const res = await db.prepare('SELECT * FROM referral_codes ORDER BY created_at DESC').all();
-  return c.json(res.results);
+  // Enrich with paid_uses_count (leads with in_progress/checking/done status)
+  const codes = res.results || [];
+  try {
+    const paidCounts = await db.prepare("SELECT referral_code, COUNT(*) as cnt FROM leads WHERE referral_code IS NOT NULL AND referral_code != '' AND status IN ('in_progress','checking','done') GROUP BY referral_code").all();
+    const countMap: Record<string, number> = {};
+    for (const r of (paidCounts.results || [])) {
+      countMap[r.referral_code as string] = Number(r.cnt || 0);
+    }
+    for (const c2 of codes) {
+      (c2 as any).paid_uses_count = countMap[(c2 as any).code] || 0;
+    }
+  } catch {}
+  return c.json(codes);
 });
 
 api.post('/referrals', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const { code, description, discount_percent, free_reviews } = await c.req.json();
-  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, free_reviews) VALUES (?,?,?,?)')
-    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0).run();
+  const { code, description, discount_percent, free_reviews, max_uses } = await c.req.json();
+  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, free_reviews, max_uses) VALUES (?,?,?,?,?)')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, max_uses || 0).run();
   return c.json({ success: true });
 });
 
 api.put('/referrals/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
-  const { code, description, discount_percent, free_reviews, is_active } = await c.req.json();
-  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, free_reviews=?, is_active=? WHERE id=?')
-    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, is_active ?? 1, id).run();
+  const { code, description, discount_percent, free_reviews, is_active, max_uses } = await c.req.json();
+  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, free_reviews=?, is_active=?, max_uses=? WHERE id=?')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, is_active ?? 1, max_uses || 0, id).run();
   return c.json({ success: true });
 });
 
@@ -2553,14 +2565,16 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
 
     // 10. Referral stats — COMPREHENSIVE referral & discount analytics
+    // IMPORTANT: Promo code analytics only counts leads with PAID statuses (in_progress, checking, done)
+    const paidStatuses = ['in_progress', 'checking', 'done'];
     let refResults: any[] = [];
     let totalDiscountCost = 0;
     let totalDiscountLeads = 0;
-    let servicesBeforeDiscount = 0; // What services would cost WITHOUT discounts
+    let servicesBeforeDiscount = 0;
     const promoCodeCosts: Record<string, { count: number; discount_total: number; revenue: number; services_total: number; code_details?: any; leads: any[] }> = {};
     try {
       const dfNoAlias = dateFilter.replace(/l\./g, '');
-      const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL" + dfNoAlias + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
+      const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL AND status IN ('in_progress','checking','done')" + dfNoAlias + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
       refResults = refRes.results || [];
     } catch {}
 
@@ -2576,10 +2590,12 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       }
     } catch {}
 
-    // Build per-code detailed costs from all leads
+    // Build per-code detailed costs from all leads — ONLY paid statuses
     for (const lead of (allLeads.results || [])) {
       const rc = lead.referral_code as string;
       if (!rc) continue;
+      const leadStatus = lead.status as string || '';
+      if (!paidStatuses.includes(leadStatus)) continue; // Only in_progress, checking, done
       if (!promoCodeCosts[rc]) promoCodeCosts[rc] = { count: 0, discount_total: 0, revenue: 0, services_total: 0, leads: [] };
       promoCodeCosts[rc].count++;
       promoCodeCosts[rc].revenue += Number(lead.total_amount || 0);
@@ -2648,11 +2664,13 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         });
       }
     } catch {}
-    // Monthly discount breakdown
+    // Monthly discount breakdown — only paid statuses
     const monthlyDiscounts: Record<string, { discount_total: number; leads_count: number; services_before: number }> = {};
     for (const lead of (allLeads.results || [])) {
       const rc = lead.referral_code as string;
       if (!rc) continue;
+      const leadStatus2 = lead.status as string || '';
+      if (!paidStatuses.includes(leadStatus2)) continue; // Only in_progress, checking, done
       try {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
         let da = Number(cd.discountAmount || 0);
@@ -2744,6 +2762,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     } catch {}
 
     // 15. Monthly data for yearly chart — detailed breakdown by status + financials
+    // Uses ACTUAL month of lead creation — independent of date picker filter
     let monthlyData: any[] = [];
     try {
       const yr = monthParam ? monthParam.substring(0, 4) : String(new Date().getFullYear());
@@ -2752,7 +2771,8 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         COALESCE(SUM(total_amount),0) as amount, 
         SUM(CASE WHEN status='done' THEN 1 ELSE 0 END) as done_count,
         SUM(CASE WHEN status='done' THEN total_amount ELSE 0 END) as done_amount,
-        SUM(CASE WHEN status='in_progress' OR status='contacted' THEN 1 ELSE 0 END) as in_progress_count,
+        SUM(CASE WHEN status='in_progress' THEN 1 ELSE 0 END) as in_progress_count,
+        SUM(CASE WHEN status='contacted' THEN 1 ELSE 0 END) as contacted_count,
         SUM(CASE WHEN status='rejected' THEN 1 ELSE 0 END) as rejected_count,
         SUM(CASE WHEN status='checking' THEN 1 ELSE 0 END) as checking_count,
         COALESCE(SUM(refund_amount),0) as refunds
@@ -2762,28 +2782,54 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       const mDataArr = mRes.results || [];
       for (const md of mDataArr) {
         const mk = md.month as string;
-        // Services from calc_data for this month's done leads
-        const svcRes = await db.prepare(`SELECT COALESCE(SUM(total_amount),0) as svc_total FROM leads 
-          WHERE strftime('%Y-%m', created_at) = ? AND status = 'done'`).bind(mk).first().catch(() => ({svc_total:0}));
-        // Articles total from lead_articles for this month
+        // Articles total from lead_articles for this month — turnover statuses only
         const artRes = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art_total 
           FROM lead_articles la JOIN leads l ON la.lead_id = l.id 
-          WHERE strftime('%Y-%m', l.created_at) = ?`).bind(mk).first().catch(() => ({art_total:0}));
-        // Services = look at calc_data items without wb_article for done leads
+          WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(mk).first().catch(() => ({art_total:0}));
+        // Services = calc_data items without wb_article for turnover leads (in_progress + checking + done)
         const svcItemsRes = await db.prepare(`SELECT l.calc_data FROM leads l 
-          WHERE strftime('%Y-%m', l.created_at) = ? AND l.status = 'done'`).bind(mk).all().catch(() => ({results:[]}));
+          WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(mk).all().catch(() => ({results:[]}));
         let svcTotal = 0;
         for (const row of (svcItemsRes.results || [])) {
           try {
             const cd = JSON.parse(row.calc_data as string || '{}');
-            const items = cd.items || cd.services || [];
-            for (const it of items) {
-              if (!it.wb_article) svcTotal += (Number(it.price) || 0) * (Number(it.qty) || Number(it.quantity) || 1);
+            // Use servicesSubtotal if available (from recalc), otherwise sum items
+            if (cd.servicesSubtotal) {
+              svcTotal += Number(cd.servicesSubtotal);
+            } else {
+              const items = cd.items || cd.services || [];
+              for (const it of items) {
+                if (!it.wb_article) svcTotal += Number(it.subtotal) || ((Number(it.price) || 0) * (Number(it.qty) || Number(it.quantity) || 1));
+              }
             }
+          } catch {}
+        }
+        // Discount total for this month — only from turnover leads
+        const monthDiscRes = await db.prepare(`SELECT calc_data, referral_code FROM leads 
+          WHERE strftime('%Y-%m', created_at) = ? AND referral_code IS NOT NULL AND referral_code != '' 
+          AND status IN ('in_progress','checking','done')`).bind(mk).all().catch(() => ({results:[]}));
+        let monthDiscTotal = 0;
+        for (const mdr of (monthDiscRes.results || [])) {
+          try {
+            const cd = JSON.parse(mdr.calc_data as string || '{}');
+            let da = Number(cd.discountAmount || 0);
+            if (da === 0 && mdr.referral_code) {
+              const ri = refCodesLookup[(mdr.referral_code as string).toUpperCase()];
+              if (ri && ri.discount_percent > 0) {
+                let ss = Number(cd.servicesSubtotal || 0);
+                if (ss === 0 && cd.items) {
+                  for (const it of cd.items) { if (!it.wb_article) ss += Number(it.subtotal || 0); }
+                }
+                if (ss === 0) ss = Number(cd.subtotal || 0);
+                if (ss > 0) da = Math.round(ss * ri.discount_percent / 100);
+              }
+            }
+            monthDiscTotal += da;
           } catch {}
         }
         (md as any).services = svcTotal;
         (md as any).articles = Number((artRes as any)?.art_total) || 0;
+        (md as any).discounts = monthDiscTotal;
       }
       monthlyData = mDataArr;
     } catch {}

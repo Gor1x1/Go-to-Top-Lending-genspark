@@ -802,6 +802,10 @@ async function runSeeds(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_ru TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_am TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN bank_details_en TEXT DEFAULT ''").run(); } catch {}
+
+  // Referral codes: max_uses (0 = unlimited), paid_uses_count (counted from in_progress/checking/done leads)
+  try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN max_uses INTEGER DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN paid_uses_count INTEGER DEFAULT 0").run(); } catch {}
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====
