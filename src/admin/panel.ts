@@ -1952,13 +1952,52 @@ async function seedSections() {
 
 // ===== SETTINGS =====
 function renderSettings() {
-  return '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:24px">Настройки</h1>' +
+  var isMainAdmin = currentUser && currentUser.role === 'main_admin';
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:24px">Настройки</h1>' +
     '<div class="card" style="max-width:500px"><h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-lock" style="color:#8B5CF6;margin-right:8px"></i>Смена пароля</h3>' +
       '<div style="margin-bottom:12px"><label style="font-size:0.85rem;color:#94a3b8;display:block;margin-bottom:6px">Текущий пароль</label><input class="input" type="password" id="setPwdCurrent"></div>' +
       '<div style="margin-bottom:12px"><label style="font-size:0.85rem;color:#94a3b8;display:block;margin-bottom:6px">Новый пароль</label><input class="input" type="password" id="setPwdNew"></div>' +
       '<div style="margin-bottom:16px"><label style="font-size:0.85rem;color:#94a3b8;display:block;margin-bottom:6px">Подтвердите новый пароль</label><input class="input" type="password" id="setPwdConfirm"></div>' +
       '<button class="btn btn-primary" onclick="changePassword()"><i class="fas fa-key" style="margin-right:6px"></i>Сменить пароль</button>' +
-    '</div></div>';
+    '</div>';
+  
+  // DATA RESET — only for main_admin
+  if (isMainAdmin) {
+    h += '<div class="card" style="max-width:700px;margin-top:24px;border:1px solid rgba(239,68,68,0.3)">' +
+      '<h3 style="font-weight:700;margin-bottom:8px;color:#f87171"><i class="fas fa-exclamation-triangle" style="margin-right:8px"></i>Сброс данных</h3>' +
+      '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px;line-height:1.5">Очистка операционных данных перед запуском в продакшн. Конфигурация (услуги, тексты, шаблоны, промокоды, пользователи) <b style="color:#10B981">сохраняется</b>. Удаляются только рабочие данные.</p>' +
+      '<div id="resetCountsArea" style="margin-bottom:16px"><button class="btn" style="background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.82rem" onclick="loadDataCounts()"><i class="fas fa-sync-alt" style="margin-right:4px"></i>Показать текущие данные</button></div>' +
+      '<div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">' +
+        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
+          '<input type="checkbox" id="resetLeads" style="margin-top:3px">' +
+          '<div><span style="font-weight:600;color:#e2e8f0">Лиды и инвойсы</span><br><span style="font-size:0.78rem;color:#94a3b8">Заявки, комментарии, артикулы WB. Нумерация INV сбросится на 1.</span></div>' +
+        '</label>' +
+        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
+          '<input type="checkbox" id="resetAnalytics" style="margin-top:3px">' +
+          '<div><span style="font-weight:600;color:#e2e8f0">Аналитика</span><br><span style="font-size:0.78rem;color:#94a3b8">Просмотры страниц, логи активности сотрудников.</span></div>' +
+        '</label>' +
+        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
+          '<input type="checkbox" id="resetFinance" style="margin-top:3px">' +
+          '<div><span style="font-weight:600;color:#e2e8f0">Финансы</span><br><span style="font-size:0.78rem;color:#94a3b8">Кредиты, платежи, расходы, дивиденды, налоги, основные средства, снепшоты P&L.</span></div>' +
+        '</label>' +
+        '<label style="display:flex;align-items:flex-start;gap:10px;padding:12px;background:rgba(139,92,246,0.05);border-radius:8px;cursor:pointer">' +
+          '<input type="checkbox" id="resetRefUsage" style="margin-top:3px">' +
+          '<div><span style="font-weight:600;color:#e2e8f0">Счётчики промокодов</span><br><span style="font-size:0.78rem;color:#94a3b8">Сбросить uses_count на 0. Сами коды и настройки сохранятся.</span></div>' +
+        '</label>' +
+      '</div>' +
+      '<div style="border-top:1px solid rgba(239,68,68,0.2);padding-top:16px">' +
+        '<p style="color:#f87171;font-size:0.82rem;font-weight:600;margin-bottom:12px">⚠️ Это действие необратимо! Для подтверждения введите код:</p>' +
+        '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">' +
+          '<input class="input" id="resetConfirmCode" placeholder="RESET-CONFIRM" style="max-width:220px;font-family:monospace;letter-spacing:1px">' +
+          '<button class="btn" style="background:#EF4444;color:white;font-weight:700" onclick="executeDataReset()"><i class="fas fa-trash-alt" style="margin-right:6px"></i>Выполнить сброс</button>' +
+        '</div>' +
+        '<div id="resetResult" style="margin-top:12px"></div>' +
+      '</div>' +
+    '</div>';
+  }
+  
+  h += '</div>';
+  return h;
 }
 
 async function changePassword() {
@@ -1969,6 +2008,80 @@ async function changePassword() {
   if (nw !== cf) { toast('Пароли не совпадают', 'error'); return; }
   const res = await api('/change-password', { method: 'POST', body: JSON.stringify({ current_password: cur, new_password: nw }) });
   if (res && res.success) { toast('Пароль изменён'); } else { toast(res?.error || 'Ошибка', 'error'); }
+}
+
+async function loadDataCounts() {
+  var area = document.getElementById('resetCountsArea');
+  area.innerHTML = '<span style="color:#94a3b8;font-size:0.82rem"><i class="fas fa-spinner fa-spin"></i> Загрузка...</span>';
+  var res = await api('/data-counts');
+  if (!res || res.error) { area.innerHTML = '<span style="color:#f87171">Ошибка: ' + (res?.error || 'нет данных') + '</span>'; return; }
+  var l = res.leads || {};
+  var a = res.analytics || {};
+  var f = res.finance || {};
+  area.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">' +
+    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8">Лиды</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + (l.leads||0) + '</div><div style="font-size:0.7rem;color:#64748b">+' + (l.comments||0) + ' ком. / ' + (l.articles||0) + ' арт.</div></div>' +
+    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8">Просмотры</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + (a.page_views||0) + '</div><div style="font-size:0.7rem;color:#64748b">' + (a.activity_logs||0) + ' лог записей</div></div>' +
+    '<div style="background:rgba(139,92,246,0.08);padding:10px 14px;border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8">Финансы</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + ((f.loans||0) + (f.expenses||0) + (f.dividends||0)) + '</div><div style="font-size:0.7rem;color:#64748b">' + (f.loans||0) + ' кр. / ' + (f.expenses||0) + ' расх. / ' + (f.snapshots||0) + ' P&L</div></div>' +
+  '</div>';
+}
+
+async function executeDataReset() {
+  var code = document.getElementById('resetConfirmCode').value.trim();
+  if (code !== 'RESET-CONFIRM') {
+    toast('Введите код подтверждения: RESET-CONFIRM', 'error');
+    return;
+  }
+  var targets = [];
+  if (document.getElementById('resetLeads').checked) targets.push('leads');
+  if (document.getElementById('resetAnalytics').checked) targets.push('analytics');
+  if (document.getElementById('resetFinance').checked) targets.push('finance');
+  if (document.getElementById('resetRefUsage').checked) targets.push('referrals_usage');
+  
+  if (targets.length === 0) {
+    toast('Выберите хотя бы одну категорию для сброса', 'error');
+    return;
+  }
+  
+  // Double confirm
+  var names = [];
+  if (targets.includes('leads')) names.push('Лиды');
+  if (targets.includes('analytics')) names.push('Аналитика');
+  if (targets.includes('finance')) names.push('Финансы');
+  if (targets.includes('referrals_usage')) names.push('Промокоды (счётчики)');
+  if (!confirm('ВНИМАНИЕ! Вы удалите данные из разделов:\n\n• ' + names.join('\n• ') + '\n\nЭто действие НЕОБРАТИМО.\nПродолжить?')) return;
+  
+  var resultDiv = document.getElementById('resetResult');
+  resultDiv.innerHTML = '<span style="color:#FBBF24"><i class="fas fa-spinner fa-spin"></i> Выполняется сброс...</span>';
+  
+  var res = await api('/data-reset', { method: 'POST', body: JSON.stringify({ targets: targets, confirm_code: code }) });
+  
+  if (res && res.success) {
+    resultDiv.innerHTML = '<div style="background:rgba(16,185,129,0.1);padding:12px;border-radius:8px;border:1px solid rgba(16,185,129,0.3)">' +
+      res.results.map(function(r) { return '<div style="color:#10B981;font-size:0.85rem;margin-bottom:4px">' + r + '</div>'; }).join('') +
+      '</div>';
+    toast('Сброс выполнен успешно', 'success');
+    // Reload data
+    document.getElementById('resetConfirmCode').value = '';
+    document.getElementById('resetLeads').checked = false;
+    document.getElementById('resetAnalytics').checked = false;
+    document.getElementById('resetFinance').checked = false;
+    document.getElementById('resetRefUsage').checked = false;
+    // Refresh counts
+    setTimeout(loadDataCounts, 500);
+    // Reload leads data
+    setTimeout(async function() {
+      try {
+        var bulk = await api('/bulk-data');
+        if (bulk) {
+          data.leads = bulk.leads || { leads: [], total: 0 };
+          data.referrals = bulk.referrals || [];
+        }
+      } catch {}
+    }, 1000);
+  } else {
+    resultDiv.innerHTML = '<div style="color:#f87171;font-size:0.85rem">' + (res?.error || 'Ошибка при сбросе') + '</div>';
+    toast(res?.error || 'Ошибка при сбросе', 'error');
+  }
 }
 
 // ===== LEADS / CRM =====

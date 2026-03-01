@@ -4098,4 +4098,140 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
   }
 });
 
+// ===== DATA RESET (main_admin only) =====
+// Professional "soft reset" — clears operational data while preserving configuration
+api.post('/data-reset', authMiddleware, async (c) => {
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') {
+    return c.json({ error: 'Только главный администратор может выполнить сброс данных' }, 403);
+  }
+  
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const targets = body.targets || []; // array of: 'leads', 'analytics', 'finance', 'referrals_usage'
+  const confirmCode = body.confirm_code || '';
+  
+  // Safety: require explicit confirmation code
+  if (confirmCode !== 'RESET-CONFIRM') {
+    return c.json({ error: 'Для подтверждения сброса введите код: RESET-CONFIRM' }, 400);
+  }
+  
+  const results: string[] = [];
+  
+  try {
+    // 1. LEADS RESET — clears all leads, comments, articles, resets invoice counter
+    if (targets.includes('leads')) {
+      await db.prepare('DELETE FROM lead_comments').run();
+      await db.prepare('DELETE FROM lead_articles').run();
+      await db.prepare('DELETE FROM leads').run();
+      // Reset auto-increment so next lead_number starts from 1
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'leads'").run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'lead_comments'").run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'lead_articles'").run(); } catch {}
+      results.push('✅ Лиды: удалено всё (заявки, комментарии, артикулы). Нумерация сброшена на 1.');
+    }
+    
+    // 2. ANALYTICS RESET — clears page views, activity logs
+    if (targets.includes('analytics')) {
+      await db.prepare('DELETE FROM page_views').run();
+      await db.prepare('DELETE FROM activity_log').run();
+      await db.prepare('DELETE FROM activity_sessions').run();
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'page_views'").run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'activity_log'").run(); } catch {}
+      results.push('✅ Аналитика: просмотры страниц, логи активности очищены.');
+    }
+    
+    // 3. FINANCE RESET — clears financial data (loans, payments, dividends, expenses, period snapshots, taxes)
+    if (targets.includes('finance')) {
+      await db.prepare('DELETE FROM loan_payments').run();
+      await db.prepare('DELETE FROM loans').run();
+      await db.prepare('DELETE FROM dividends').run();
+      await db.prepare('DELETE FROM other_income_expenses').run();
+      await db.prepare('DELETE FROM expenses').run();
+      await db.prepare('DELETE FROM employee_bonuses').run();
+      await db.prepare('DELETE FROM tax_payments').run();
+      await db.prepare('DELETE FROM tax_rules').run();
+      await db.prepare('DELETE FROM assets').run();
+      await db.prepare('DELETE FROM period_snapshots').run();
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('loans','loan_payments','dividends','other_income_expenses','expenses','employee_bonuses','tax_payments','tax_rules','assets','period_snapshots')").run(); } catch {}
+      results.push('✅ Финансы: кредиты, расходы, дивиденды, налоги, снепшоты периодов очищены.');
+    }
+    
+    // 4. REFERRALS USAGE RESET — resets uses_count but keeps codes & settings
+    if (targets.includes('referrals_usage')) {
+      await db.prepare('UPDATE referral_codes SET uses_count = 0, paid_uses_count = 0').run();
+      results.push('✅ Промокоды: счётчик использований сброшен (коды и настройки сохранены).');
+    }
+    
+    // 5. FULL RESET — everything above
+    if (targets.includes('full')) {
+      // Leads
+      await db.prepare('DELETE FROM lead_comments').run();
+      await db.prepare('DELETE FROM lead_articles').run();
+      await db.prepare('DELETE FROM leads').run();
+      // Analytics
+      await db.prepare('DELETE FROM page_views').run();
+      await db.prepare('DELETE FROM activity_log').run();
+      await db.prepare('DELETE FROM activity_sessions').run();
+      // Finance
+      await db.prepare('DELETE FROM loan_payments').run();
+      await db.prepare('DELETE FROM loans').run();
+      await db.prepare('DELETE FROM dividends').run();
+      await db.prepare('DELETE FROM other_income_expenses').run();
+      await db.prepare('DELETE FROM expenses').run();
+      await db.prepare('DELETE FROM employee_bonuses').run();
+      await db.prepare('DELETE FROM tax_payments').run();
+      await db.prepare('DELETE FROM tax_rules').run();
+      await db.prepare('DELETE FROM assets').run();
+      await db.prepare('DELETE FROM period_snapshots').run();
+      // Referrals usage
+      await db.prepare('UPDATE referral_codes SET uses_count = 0, paid_uses_count = 0').run();
+      // Reset all auto-increments
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('leads','lead_comments','lead_articles','page_views','activity_log','activity_sessions','loans','loan_payments','dividends','other_income_expenses','expenses','employee_bonuses','tax_payments','tax_rules','assets','period_snapshots')").run(); } catch {}
+      results.push('✅ ПОЛНЫЙ СБРОС: все операционные данные очищены. Конфигурация сохранена.');
+    }
+    
+    if (results.length === 0) {
+      return c.json({ error: 'Не выбрано ни одной категории для сброса' }, 400);
+    }
+    
+    return c.json({ success: true, results });
+  } catch (err: any) {
+    return c.json({ error: 'Ошибка сброса: ' + (err?.message || 'unknown') }, 500);
+  }
+});
+
+// Get current data counts for reset preview
+api.get('/data-counts', authMiddleware, async (c) => {
+  const caller = c.get('user');
+  if (caller.role !== 'main_admin') {
+    return c.json({ error: 'Только главный администратор' }, 403);
+  }
+  
+  const db = c.env.DB;
+  try {
+    const [leads, comments, articles, pageViews, activityLogs, loans, expenses, dividends, snapshots, taxPayments, assets] = await Promise.all([
+      db.prepare('SELECT COUNT(*) as cnt FROM leads').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM lead_comments').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM lead_articles').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM page_views').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM activity_log').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM loans').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM expenses').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM dividends').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM period_snapshots').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM tax_payments').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM assets').first(),
+    ]);
+    
+    return c.json({
+      leads: { leads: leads?.cnt || 0, comments: comments?.cnt || 0, articles: articles?.cnt || 0 },
+      analytics: { page_views: pageViews?.cnt || 0, activity_logs: activityLogs?.cnt || 0 },
+      finance: { loans: loans?.cnt || 0, expenses: expenses?.cnt || 0, dividends: dividends?.cnt || 0, snapshots: snapshots?.cnt || 0, tax_payments: taxPayments?.cnt || 0, assets: assets?.cnt || 0 },
+    });
+  } catch (err: any) {
+    return c.json({ error: err?.message || 'unknown' }, 500);
+  }
+});
+
 export default api
