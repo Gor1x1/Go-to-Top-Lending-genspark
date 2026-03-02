@@ -580,7 +580,6 @@ function renderBlocks() {
     h += '<div style="display:flex;align-items:center;gap:6px" onclick="event.stopPropagation()">';
     h += '<button class="btn ' + (sec.is_visible ? 'btn-success' : 'btn-danger') + '" style="padding:5px 10px;font-size:0.75rem" onclick="toggleSectionVis(' + i + ')" title="' + (sec.is_visible ? 'Скрыть' : 'Показать') + '">' +
       '<i class="fas ' + (sec.is_visible ? 'fa-eye' : 'fa-eye-slash') + '"></i></button>';
-    h += '<button class="btn btn-outline" style="padding:5px 10px;font-size:0.75rem" onclick="duplicateBlock(' + i + ')" title="Копировать блок"><i class="fas fa-copy"></i></button>';
     h += '<button class="btn btn-danger" style="padding:5px 10px;font-size:0.75rem" onclick="deleteBlock(' + i + ')" title="Удалить блок"><i class="fas fa-trash"></i></button>';
     h += '</div>';
 
@@ -8585,7 +8584,7 @@ function renderPhotos() {
   var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-images" style="color:#8B5CF6;margin-right:10px"></i>Фото блоки</h1>' +
     '<p style="color:#94a3b8;margin-bottom:12px">Создавайте фото-блоки с описаниями и размещайте их на сайте. Загружайте фото с устройства или вставляйте URL.</p>' +
     '<div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:0.85rem;color:#c4b5fd">' +
-    '<i class="fas fa-lightbulb" style="color:#F59E0B;margin-right:8px"></i><strong>Совет:</strong> Для блока «Отзывы клиентов» — загрузите 3+ фото, они отобразятся горизонтальной каруселью с прокруткой (особенно удобно на телефонах). Имя блока станет заголовком на сайте.</div>' +
+    '<i class="fas fa-lightbulb" style="color:#F59E0B;margin-right:8px"></i><strong>Совет:</strong> Для блока «Отзывы клиентов» — загрузите фото, они отобразятся по одному в карусели с навигацией, описаниями и подсказкой листать. Добавьте подпись к каждому фото — это повышает доверие.</div>' +
     '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addPhotoBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить фото-блок</button>' +
     '<button class="btn btn-outline" style="margin-bottom:20px;margin-left:10px;border-color:rgba(245,158,11,0.4);color:#F59E0B" onclick="addReviewsBlock()"><i class="fas fa-star" style="margin-right:6px"></i>Создать блок «Отзывы»</button>';
 
@@ -8651,7 +8650,6 @@ function renderPhotos() {
     h += '</div>';
 
     h += '<button class="btn btn-success" onclick="savePhotoBlock('+b.id+')" style="margin-right:8px"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>' +
-      '<button class="btn btn-outline" onclick="dupPhotoBlock('+b.id+')" style="font-size:0.82rem"><i class="fas fa-copy" style="margin-right:4px"></i>Дублировать</button>' +
       '</div>';
   }
 
@@ -10339,8 +10337,41 @@ function renderSiteBlocks() {
           h += '</div>';
           // Collapsible: full settings
           h += '<details style="margin-top:6px"><summary style="font-size:0.70rem;color:#64748b;cursor:pointer;user-select:none"><i class="fas fa-cog" style="margin-right:4px"></i>Настройки кнопки (URL, иконка, действие, шаблон)</summary>';
-          h += '<div style="margin-top:8px;display:grid;grid-template-columns:80px 1fr 140px;gap:8px;align-items:end">';
-          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Иконка</div><input class="input" id="sb_btnicon_' + b.id + '_' + bti + '" value="' + escHtml(btn.icon || 'fas fa-arrow-right') + '" placeholder="fas fa-..." style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '<div style="margin-top:8px;display:grid;grid-template-columns:160px 1fr 140px;gap:8px;align-items:end">';
+          // Icon picker dropdown
+          var iconOptions = [
+            {v:'fab fa-telegram',l:'Telegram',c:'#26A5E4'},
+            {v:'fab fa-whatsapp',l:'WhatsApp',c:'#25D366'},
+            {v:'fab fa-instagram',l:'Instagram',c:'#E4405F'},
+            {v:'fab fa-facebook',l:'Facebook',c:'#1877F2'},
+            {v:'fab fa-tiktok',l:'TikTok',c:'#000'},
+            {v:'fab fa-youtube',l:'YouTube',c:'#FF0000'},
+            {v:'fab fa-viber',l:'Viber',c:'#7360F2'},
+            {v:'fab fa-vk',l:'VK',c:'#4680C2'},
+            {v:'fas fa-calculator',l:'Калькулятор',c:'#8B5CF6'},
+            {v:'fas fa-rocket',l:'Ракета',c:'#F59E0B'},
+            {v:'fas fa-arrow-right',l:'Стрелка',c:'#94a3b8'},
+            {v:'fas fa-phone',l:'Телефон',c:'#10B981'},
+            {v:'fas fa-envelope',l:'Email',c:'#F59E0B'},
+            {v:'fas fa-link',l:'Ссылка',c:'#64748b'},
+            {v:'fas fa-shopping-cart',l:'Корзина',c:'#8B5CF6'},
+            {v:'fas fa-star',l:'Звезда',c:'#F59E0B'},
+            {v:'fas fa-gift',l:'Подарок',c:'#EC4899'},
+            {v:'fas fa-fire',l:'Огонь',c:'#EF4444'},
+            {v:'fas fa-bolt',l:'Молния',c:'#F59E0B'},
+            {v:'fas fa-heart',l:'Сердце',c:'#EC4899'}
+          ];
+          var currentIcon = btn.icon || 'fas fa-arrow-right';
+          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="' + escHtml(displayIcon) + '" style="margin-right:4px;color:#8B5CF6"></i>Иконка</div><select class="input" id="sb_btnicon_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+          for (var ici = 0; ici < iconOptions.length; ici++) {
+            h += '<option value="' + iconOptions[ici].v + '"' + (currentIcon === iconOptions[ici].v ? ' selected' : '') + '>' + iconOptions[ici].l + '</option>';
+          }
+          // If current icon is custom (not in list), add it
+          var iconInList = iconOptions.some(function(io) { return io.v === currentIcon; });
+          if (!iconInList && currentIcon) {
+            h += '<option value="' + escHtml(currentIcon) + '" selected>' + escHtml(currentIcon) + '</option>';
+          }
+          h += '</select></div>';
           h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>URL</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/..." style="font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')"></div>';
           h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Действие</div><select class="input" id="sb_btnact_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
             '<option value="telegram"' + (btn.action_type === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
@@ -10471,7 +10502,7 @@ function renderSiteBlocks() {
           if (isReviewsBlock) {
             h += '<div style="padding:8px 12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:8px">' +
               '<i class="fas fa-star" style="color:#F59E0B;font-size:0.85rem"></i>' +
-              '<span style="font-size:0.75rem;color:#F59E0B">Блок отзывов: фото отображаются как адаптивная сетка с возможностью увеличения. Загрузите скриншоты отзывов — они автоматически появятся в красивом формате.</span>' +
+              '<span style="font-size:0.75rem;color:#F59E0B">Блок отзывов: фото отображаются по одному в карусели со стрелками, точками и подсказкой листать. Добавьте подпись (описание) к каждому фото — например: «С момента старта прошло 12 дней — вот такие результаты».</span>' +
             '</div>';
           }
           
@@ -11271,6 +11302,29 @@ async function createBlockFromTemplate(template) {
       break;
     default:
       textsRu = [title, 'Текст вашей секции'];
+  }
+  
+  // ── AUTO-COPY from similar existing block ──
+  // Find existing blocks with the same block_type and copy useful data (buttons, settings)
+  var existingBlocks = (data.siteBlocks || []);
+  var similarBlock = null;
+  for (var sbi = 0; sbi < existingBlocks.length; sbi++) {
+    var eb = existingBlocks[sbi];
+    if (eb.block_type === blockType && eb.block_key !== key) {
+      similarBlock = eb;
+      break;
+    }
+  }
+  if (similarBlock) {
+    // Copy buttons from similar block if we don't have custom ones
+    if (buttons.length === 0 && similarBlock.buttons && similarBlock.buttons.length > 0) {
+      buttons = JSON.parse(JSON.stringify(similarBlock.buttons));
+    }
+    // Copy social links
+    if (similarBlock.social_links && typeof similarBlock.social_links === 'string') {
+      try { var sl = JSON.parse(similarBlock.social_links); if (sl.length > 0) customHtml.social_links = sl; } catch {}
+    }
+    console.log('[Admin] Auto-copied data from similar block:', similarBlock.block_key);
   }
   
   var blockData = {

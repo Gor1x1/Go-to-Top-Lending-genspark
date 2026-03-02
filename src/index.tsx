@@ -1193,43 +1193,6 @@ img{max-width:100%;height:auto}
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
 .fade-up.visible{opacity:1;transform:translateY(0)}
 
-/* ===== WB BANNER ===== */
-.wb-banner{padding:20px 0;background:var(--bg-surface);border-bottom:1px solid var(--border)}
-.wb-banner-inner{display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center}
-.wb-banner-left{display:flex;align-items:center;gap:16px;padding:20px 28px;background:linear-gradient(135deg,#ff3366,#8B5CF6);border-radius:var(--r);position:relative;overflow:hidden}
-.wb-banner-left .wb-logo{font-weight:900;font-size:1.3rem;color:#fff}
-.wb-banner-left .wb-text{font-weight:800;font-size:1.1rem;color:#fff;text-transform:uppercase;line-height:1.3}
-.wb-banner-left .wb-excl{position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:3rem;font-weight:900;color:rgba(255,255,255,0.3)}
-.wb-banner-right{display:flex;align-items:center;gap:16px;padding:16px 28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r)}
-.wb-banner-right .wb-r-icon{font-size:1.4rem}
-.wb-banner-right .wb-r-text{font-weight:700;font-size:0.92rem;text-transform:uppercase;line-height:1.4}
-.wb-banner-right .btn{margin-left:auto;white-space:nowrap;font-size:0.82rem;padding:10px 20px}
-
-/* ===== ABOUT SECTION ===== */
-.about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:center}
-.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border)}
-.about-img img{width:100%;height:auto;display:block}
-.about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
-.about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
-
-/* ===== BUYOUT SERVICE DETAIL ===== */
-.buyout-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px}
-.buyout-detail-header{margin-bottom:32px}
-.buyout-detail-header h2{font-size:2rem;font-weight:800;margin-bottom:12px}
-.buyout-detail-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.buyout-detail-header .subtitle{font-weight:700;font-size:1.1rem;margin-bottom:8px}
-.buyout-detail-header p{color:var(--text-sec);font-size:0.92rem;line-height:1.7}
-.buyout-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px}
-.buyout-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;transition:var(--t)}
-.buyout-card:hover{border-color:rgba(139,92,246,0.3)}
-.buyout-card h4{font-size:1rem;font-weight:700;margin-bottom:12px;text-transform:uppercase;color:var(--accent)}
-.buyout-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7}
-.buyout-card ul{list-style:none;margin-top:12px;counter-reset:buyout-step}
-.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec);counter-increment:buyout-step}
-.buyout-card ul li::before{content:counter(buyout-step);color:var(--purple);margin-right:8px;font-weight:700}
-.buyout-cta{text-align:right;margin-top:24px}
-
 /* ===== STATS BAR ===== */
 .stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
@@ -1281,24 +1244,37 @@ img{max-width:100%;height:auto}
 /* ===== REVIEWS DETAIL ===== */
 .reviews-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;margin-top:32px}
 .reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:32px}
-/* Reviews photo gallery — professional grid */
-.rv-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:16px}
-.rv-gallery .rv-item{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 4px 24px rgba(0,0,0,0.15);cursor:pointer;transition:transform 0.25s,box-shadow 0.25s}
-.rv-gallery .rv-item:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(139,92,246,0.2)}
-.rv-gallery .rv-item img{width:100%;height:auto;min-height:180px;max-height:420px;object-fit:contain;display:block;background:#0a0a1a}
-.rv-gallery .rv-item .rv-overlay{position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.7));opacity:0;transition:opacity 0.25s;display:flex;align-items:center;justify-content:space-between}
-.rv-gallery .rv-item:hover .rv-overlay{opacity:1}
-.rv-gallery .rv-item .rv-badge{position:absolute;top:10px;right:10px;background:rgba(139,92,246,0.85);color:#fff;font-size:0.68rem;padding:3px 8px;border-radius:20px;font-weight:600;backdrop-filter:blur(4px)}
-.rv-show-more{display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:14px;border:2px dashed var(--border);background:rgba(139,92,246,0.04);cursor:pointer;transition:background 0.2s,border-color 0.2s;flex-direction:column;gap:8px}
-.rv-show-more:hover{background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.4)}
+
+/* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
+.rv-carousel{position:relative;max-width:420px;margin:0 auto;overflow:hidden;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
+.rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
+.rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
+.rv-carousel .rv-slide img{width:100%;height:auto;min-height:280px;max-height:520px;object-fit:contain;display:block;background:#0a0a1a}
+.rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
+.rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
+.rv-carousel .rv-caption-text::before{content:'\201c';color:var(--purple,#8B5CF6);font-size:1.4rem;font-weight:700;margin-right:4px;line-height:0}
+.rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
+.rv-carousel .rv-nav-btn{position:absolute;top:50%;transform:translateY(-70%);width:44px;height:44px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:3;transition:transform 0.2s,background 0.2s}
+.rv-carousel .rv-nav-btn:hover{background:var(--purple,#8B5CF6);transform:translateY(-70%) scale(1.1)}
+.rv-carousel .rv-nav-btn.rv-prev{left:10px}
+.rv-carousel .rv-nav-btn.rv-next{right:10px}
+.rv-dots{display:flex;justify-content:center;gap:8px;margin-top:16px}
+.rv-dots .rv-dot{width:10px;height:10px;border-radius:50%;background:rgba(139,92,246,0.25);cursor:pointer;transition:all 0.3s}
+.rv-dots .rv-dot.active{background:var(--purple,#8B5CF6);transform:scale(1.3);box-shadow:0 0 8px rgba(139,92,246,0.5)}
+.rv-swipe-hint{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:0.82rem;color:var(--text-muted,#666);animation:rvSwipeHint 2.5s ease-in-out infinite}
+@keyframes rvSwipeHint{0%,100%{opacity:0.6;transform:translateX(0)}50%{opacity:1;transform:translateX(6px)}}
 @media(max-width:768px){
-  .rv-gallery{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
-  .rv-gallery .rv-item img{max-height:320px}
+  .rv-carousel{max-width:92vw;border-radius:16px}
+  .rv-carousel .rv-slide img{min-height:220px;max-height:440px}
+  .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
 }
 @media(max-width:480px){
-  .rv-gallery{grid-template-columns:repeat(2,1fr);gap:10px}
-  .rv-gallery .rv-item img{max-height:260px}
-  .rv-gallery .rv-item .rv-badge{font-size:0.6rem;padding:2px 6px;top:6px;right:6px}
+  .rv-carousel{max-width:96vw;border-radius:14px}
+  .rv-carousel .rv-slide img{min-height:180px;max-height:380px}
+  .rv-carousel .rv-caption{padding:12px 16px}
+  .rv-carousel .rv-caption-text{font-size:0.85rem}
+  .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
+  .rv-dots .rv-dot{width:8px;height:8px}
 }
 .review-point{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;transition:var(--t)}
 .review-point:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-3px)}
@@ -2409,7 +2385,7 @@ function toggleFaq(el) {
 function openLightbox(elOrUrl) { var src = typeof elOrUrl === 'string' ? elOrUrl : elOrUrl.querySelector('img').src; document.getElementById('lightboxImg').src = src; document.getElementById('lightbox').classList.add('show'); }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
 
-// Reviews carousel scroll helper
+// Reviews carousel scroll helper (legacy — kept for photo_blocks)
 function rcScroll(carId, dir) {
   var el = document.getElementById(carId);
   if (!el) return;
@@ -2421,7 +2397,6 @@ function rcScroll(carId, dir) {
   if (newIdx < 0) newIdx = 0;
   if (newIdx >= cards.length) newIdx = cards.length - 1;
   el.scrollTo({ left: newIdx * cardW, behavior: 'smooth' });
-  // Directly update dots and counter (don't rely only on scroll event)
   var dots = document.querySelectorAll('#' + carId + '_dots .rc-dot');
   for (var d = 0; d < dots.length; d++) {
     dots[d].style.background = d === newIdx ? '#8B5CF6' : 'rgba(139,92,246,0.3)';
@@ -2444,6 +2419,38 @@ function rcScrollTo(carId, idx) {
   }
   var cnt = document.getElementById(carId + '_counter');
   if (cnt) cnt.textContent = (idx + 1);
+}
+
+/* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
+var _rvState = {};
+function rvSlide(carId, dir) {
+  var state = _rvState[carId] || { idx: 0, total: 0 };
+  var track = document.getElementById(carId + '_track');
+  if (!track) return;
+  var slides = track.querySelectorAll('.rv-slide');
+  state.total = slides.length;
+  state.idx = state.idx + dir;
+  if (state.idx < 0) state.idx = state.total - 1;
+  if (state.idx >= state.total) state.idx = 0;
+  _rvState[carId] = state;
+  track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
+  // Update dots
+  var dots = document.querySelectorAll('#' + carId + '_dots .rv-dot');
+  for (var d = 0; d < dots.length; d++) {
+    if (d === state.idx) { dots[d].classList.add('active'); } else { dots[d].classList.remove('active'); }
+  }
+}
+function rvGoTo(carId, idx) {
+  var track = document.getElementById(carId + '_track');
+  if (!track) return;
+  var slides = track.querySelectorAll('.rv-slide');
+  if (idx < 0 || idx >= slides.length) return;
+  _rvState[carId] = { idx: idx, total: slides.length };
+  track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+  var dots = document.querySelectorAll('#' + carId + '_dots .rv-dot');
+  for (var d = 0; d < dots.length; d++) {
+    if (d === idx) { dots[d].classList.add('active'); } else { dots[d].classList.remove('active'); }
+  }
 }
 
 /* ===== TIMED POPUP (5 sec) — BULLETPROOF ===== */
@@ -3164,61 +3171,111 @@ switchLang = function(l) {
         if (bf.photos && bf.photos.length > 0) {
           var existingPhotoGal = section.querySelector('.block-photo-gallery');
           if (existingPhotoGal) existingPhotoGal.remove();
-          var existingReviewGallery = section.querySelector('.rv-gallery');
+          var existingReviewGallery = section.querySelector('.rv-gallery, .rv-carousel');
           if (existingReviewGallery) existingReviewGallery.remove();
           var existingReviewCarousel = section.querySelector('.reviews-carousel-wrap');
           if (existingReviewCarousel) existingReviewCarousel.remove();
           // Check if section already has images (from HTML, not from our injection)
-          var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.rv-gallery img):not(.reviews-carousel-wrap img)');
+          var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.rv-carousel img):not(.reviews-carousel-wrap img)');
           var hasNativePhotos = nativeImgs.length > 0 && !existingPhotoGal && !existingReviewCarousel && bf.block_type !== 'reviews';
+          // Also check if the photos from DB match the native HTML images (to avoid duplicating e.g. warehouse photos)
+          if (hasNativePhotos && bf.show_photos !== true) {
+            // Check if ALL photos from DB already exist in the DOM
+            var allPhotosAlreadyInDom = true;
+            var validCheck = bf.photos.filter(function(p) { return p && p.url; });
+            for (var vci = 0; vci < validCheck.length; vci++) {
+              var found = false;
+              for (var ni = 0; ni < nativeImgs.length; ni++) {
+                if (nativeImgs[ni].src && nativeImgs[ni].src.indexOf(validCheck[vci].url) >= 0) { found = true; break; }
+              }
+              if (!found) { allPhotosAlreadyInDom = false; break; }
+            }
+            if (allPhotosAlreadyInDom) {
+              // All photos from DB are already visible in HTML — skip injection
+            } else {
+              // Some photos are new (user uploaded via admin) — show them
+              bf.show_photos = true;
+            }
+          }
           if (hasNativePhotos && bf.show_photos !== true) {
             // Section has built-in photos; skip gallery injection unless explicitly enabled
           } else {
           
           var validPhotos = bf.photos.filter(function(p) { return p && p.url; });
           if (validPhotos.length > 0) {
-            // Reviews: beautiful responsive masonry grid with lightbox
+            // Reviews: single-photo carousel with swipe cues and descriptions
             if (bf.block_type === 'reviews') {
-              var galleryWrap = document.createElement('div');
-              galleryWrap.className = 'rv-gallery';
-              var INITIAL_SHOW = 6; // Show first N, rest behind "Show more"
-              var gH = '';
+              var carouselWrap = document.createElement('div');
+              carouselWrap.className = 'rv-carousel';
+              var carId = 'rvCar_' + (bf.key || 'reviews');
+              var cH = '<div class="rv-track" id="' + carId + '_track">';
               validPhotos.forEach(function(p, pi) {
-                var hidden = pi >= INITIAL_SHOW ? ' style="display:none" data-rv-hidden="1"' : '';
-                gH += '<div class="rv-item"' + hidden + ' onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                var captionText = p.caption || '';
+                if (!captionText) {
+                  // Default trust-building descriptions
+                  var defaultCaptions = [
+                    '\u0421 \u043c\u043e\u043c\u0435\u043d\u0442\u0430 \u0441\u0442\u0430\u0440\u0442\u0430 \u043f\u0440\u043e\u0448\u043b\u043e 12 \u0434\u043d\u0435\u0439 \u2014 \u0432\u043e\u0442 \u0442\u0430\u043a\u0438\u0435 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u044b',
+                    '\u0420\u0435\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u043a\u043b\u0438\u0435\u043d\u0442\u0430 \u2014 \u0440\u043e\u0441\u0442 \u0437\u0430\u043a\u0430\u0437\u043e\u0432 \u0438 \u043e\u0440\u0433\u0430\u043d\u0438\u043a\u0438',
+                    '\u041e\u0442 \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u0432\u044b\u043a\u0443\u043f\u0430 \u0434\u043e \u0422\u041e\u041f-10 \u0437\u0430 2 \u043d\u0435\u0434\u0435\u043b\u0438',
+                    '\u041a\u043b\u0438\u0435\u043d\u0442 \u0443\u0432\u0435\u043b\u0438\u0447\u0438\u043b \u043f\u0440\u043e\u0434\u0430\u0436\u0438 \u0432 3 \u0440\u0430\u0437\u0430 \u0437\u0430 \u043c\u0435\u0441\u044f\u0446',
+                    '\u0411\u0435\u0437\u043e\u043f\u0430\u0441\u043d\u044b\u0435 \u0432\u044b\u043a\u0443\u043f\u044b \u2014 \u043d\u0438 \u043e\u0434\u043d\u043e\u0439 \u0431\u043b\u043e\u043a\u0438\u0440\u043e\u0432\u043a\u0438',
+                    '\u041f\u043e\u0434\u043d\u044f\u043b\u0438 \u043a\u0430\u0440\u0442\u043e\u0447\u043a\u0443 \u0441 0 \u0434\u043e 500+ \u0437\u0430\u043a\u0430\u0437\u043e\u0432 \u0432 \u043c\u0435\u0441\u044f\u0446'
+                  ];
+                  captionText = defaultCaptions[pi % defaultCaptions.length];
+                }
+                cH += '<div class="rv-slide">' +
                   '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
-                  '<img src="' + p.url + '" alt="' + (p.caption || '\u041e\u0442\u0437\u044b\u0432 \u043a\u043b\u0438\u0435\u043d\u0442\u0430') + '" loading="lazy">' +
-                  '<div class="rv-overlay">' +
-                    '<span style="color:#fff;font-size:0.82rem">' + (p.caption || '') + '</span>' +
-                    '<i class="fas fa-search-plus" style="color:#fff;font-size:1rem"></i>' +
-                  '</div>' +
+                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="' + (pi === 0 ? 'eager' : 'lazy') + '" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                  '<div class="rv-caption"><div class="rv-caption-text">' + captionText + '</div></div>' +
                 '</div>';
               });
-              // "Show more" tile if more than INITIAL_SHOW
-              if (validPhotos.length > INITIAL_SHOW) {
-                var remaining = validPhotos.length - INITIAL_SHOW;
-                gH += '<div class="rv-show-more" onclick="document.querySelectorAll(&apos;[data-rv-hidden]&apos;).forEach(function(e){e.style.display=&apos;&apos;;e.removeAttribute(&apos;data-rv-hidden&apos;)});this.remove()">' +
-                  '<i class="fas fa-plus-circle" style="font-size:2rem;color:var(--purple,#8B5CF6)"></i>' +
-                  '<span style="font-size:0.95rem;font-weight:700;color:var(--text-primary,#fff)">\u0415\u0449\u0451 ' + remaining + ' \u043e\u0442\u0437\u044b\u0432\u043e\u0432</span>' +
-                  '<span style="font-size:0.75rem;color:var(--text-muted,#666)">\u041d\u0430\u0436\u043c\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c</span>' +
-                '</div>';
+              cH += '</div>';
+              // Navigation arrows
+              if (validPhotos.length > 1) {
+                cH += '<button class="rv-nav-btn rv-prev" onclick="rvSlide(&apos;' + carId + '&apos;,-1)" aria-label="Prev"><i class="fas fa-chevron-left"></i></button>';
+                cH += '<button class="rv-nav-btn rv-next" onclick="rvSlide(&apos;' + carId + '&apos;,1)" aria-label="Next"><i class="fas fa-chevron-right"></i></button>';
               }
-              galleryWrap.innerHTML = gH;
-              // Counter badge
+              carouselWrap.innerHTML = cH;
+              // Dots + swipe hint container
+              var dotsDiv = document.createElement('div');
+              var dotsH = '<div class="rv-dots" id="' + carId + '_dots">';
+              for (var di = 0; di < validPhotos.length; di++) {
+                dotsH += '<div class="rv-dot' + (di === 0 ? ' active' : '') + '" onclick="rvGoTo(&apos;' + carId + '&apos;,' + di + ')"></div>';
+              }
+              dotsH += '</div>';
+              if (validPhotos.length > 1) {
+                dotsH += '<div class="rv-swipe-hint"><i class="fas fa-hand-pointer" style="color:var(--purple,#8B5CF6)"></i> <span data-ru="\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430" data-am="\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u043b\u0578\u0582">' + (lang === 'am' ? '\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u043b\u0578\u0582' : '\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430') + '</span> <i class="fas fa-arrow-right" style="font-size:0.75rem;animation:rvSwipeHint 2s ease-in-out infinite"></i></div>';
+              }
+              dotsDiv.innerHTML = dotsH;
+              // Counter
               var counterDiv = document.createElement('div');
-              counterDiv.style.cssText = 'text-align:center;margin-top:16px;font-size:0.85rem;color:var(--text-muted,#666)';
-              counterDiv.innerHTML = '<i class="fas fa-images" style="margin-right:6px;color:var(--purple,#8B5CF6)"></i>' + validPhotos.length + ' \u0441\u043a\u0440\u0438\u043d\u0448\u043e\u0442\u043e\u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0445 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u043e\u0432';
-              // Replace the placeholder or append
+              counterDiv.style.cssText = 'text-align:center;margin-top:14px;font-size:0.85rem;color:var(--text-muted,#666)';
+              counterDiv.innerHTML = '<i class="fas fa-images" style="margin-right:6px;color:var(--purple,#8B5CF6)"></i>' + validPhotos.length + ' ' + (lang === 'am' ? '\u057d\u0584\u0580\u056b\u0576\u0577\u0578\u0569' : '\u0441\u043a\u0440\u0438\u043d\u0448\u043e\u0442\u043e\u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0445 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u043e\u0432');
+              // Place into DOM
               var placeholder = section.querySelector('#reviewsCarouselArea');
               if (placeholder) {
                 placeholder.innerHTML = '';
-                placeholder.appendChild(galleryWrap);
+                placeholder.appendChild(carouselWrap);
+                placeholder.appendChild(dotsDiv);
                 placeholder.appendChild(counterDiv);
               } else {
                 var container = section.querySelector('.container');
-                if (container) { container.appendChild(galleryWrap); container.appendChild(counterDiv); }
-                else { section.appendChild(galleryWrap); section.appendChild(counterDiv); }
+                if (container) { container.appendChild(carouselWrap); container.appendChild(dotsDiv); container.appendChild(counterDiv); }
+                else { section.appendChild(carouselWrap); section.appendChild(dotsDiv); section.appendChild(counterDiv); }
               }
+              // Touch swipe support
+              (function(cid) {
+                var track = document.getElementById(cid + '_track');
+                if (!track) return;
+                var startX = 0, isDragging = false;
+                track.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; isDragging = true; }, {passive:true});
+                track.addEventListener('touchend', function(e) {
+                  if (!isDragging) return;
+                  isDragging = false;
+                  var diff = e.changedTouches[0].clientX - startX;
+                  if (Math.abs(diff) > 40) { rvSlide(cid, diff < 0 ? 1 : -1); }
+                }, {passive:true});
+              })(carId);
             } else {
               // Default grid view for regular blocks
               var photoDiv = document.createElement('div');
@@ -3369,52 +3426,48 @@ switchLang = function(l) {
               }
             }
           } else {
-            // For regular sections, update existing CTA buttons OR create new ones
-            var ctaBtns = section.querySelectorAll('a.btn-primary, a.cta-btn, a[data-btn-idx], .section-cta a.btn');
-            if (ctaBtns.length > 0) {
-              for (var bIdx = 0; bIdx < Math.min(ctaBtns.length, bf.buttons.length); bIdx++) {
-                var dbBtn = bf.buttons[bIdx];
-                var domBtn = ctaBtns[bIdx];
-                if (dbBtn.url) domBtn.setAttribute('href', dbBtn.url);
-                if (dbBtn.action_type === 'whatsapp' && dbBtn.url && dbBtn.url.indexOf('wa.me') >= 0) {
-                  domBtn.setAttribute('target', '_blank');
-                }
-                // Update icon with priority: manual > URL-based > default
-                var btnIcon = domBtn.querySelector('i');
-                if (btnIcon) btnIcon.className = resolveIcon(dbBtn.icon, dbBtn.url);
-                // Update text - find span or text node
-                var btnSpan = domBtn.querySelector('span[data-ru]');
-                if (btnSpan) {
-                  var bText = lang === 'am' && dbBtn.text_am ? dbBtn.text_am : (dbBtn.text_ru || '');
-                  if (bText) { btnSpan.textContent = bText; btnSpan.setAttribute('data-ru', dbBtn.text_ru || ''); btnSpan.setAttribute('data-am', dbBtn.text_am || ''); }
-                }
+            // For regular sections, CLEAR existing section-cta and create buttons from DB
+            // This prevents duplicate buttons (DOM buttons + injected buttons)
+            var ctaContainer = section.querySelector('#reviewsCtaArea') || section.querySelector('.section-cta');
+            if (!ctaContainer) {
+              // Check if there are existing CTA buttons to convert
+              var existBtns = section.querySelectorAll('a.btn-primary, a.cta-btn, a[data-btn-idx]');
+              if (existBtns.length > 0) {
+                // Wrap existing buttons in a section-cta container, then replace
+                ctaContainer = existBtns[0].parentNode;
               }
+            }
+            if (ctaContainer && ctaContainer.classList && (ctaContainer.classList.contains('section-cta') || ctaContainer.id === 'reviewsCtaArea')) {
+              // Clear old buttons from the CTA container and rebuild from DB
+              ctaContainer.innerHTML = '';
             } else {
-              // No buttons in DOM — create them dynamically
-              var ctaContainer = section.querySelector('.section-cta') || section.querySelector('#reviewsCtaArea');
-              if (!ctaContainer) {
-                ctaContainer = document.createElement('div');
-                ctaContainer.className = 'section-cta';
-                ctaContainer.style.cssText = 'margin-top:24px';
-                var innerCont = section.querySelector('.container');
-                if (innerCont) innerCont.appendChild(ctaContainer);
-                else section.appendChild(ctaContainer);
+              // Create new container
+              ctaContainer = document.createElement('div');
+              ctaContainer.className = 'section-cta';
+              ctaContainer.style.cssText = 'margin-top:24px';
+              var innerCont = section.querySelector('.container');
+              if (innerCont) innerCont.appendChild(ctaContainer);
+              else section.appendChild(ctaContainer);
+            }
+            // Also remove any orphaned buttons OUTSIDE of section-cta containers 
+            // (buttons that were duplicated at the bottom)
+            var orphanBtns = section.querySelectorAll('.container > a.btn-primary, .container > a.btn-tg, .container > a.cta-btn');
+            orphanBtns.forEach(function(ob) { ob.remove(); });
+            
+            for (var bIdx2 = 0; bIdx2 < bf.buttons.length; bIdx2++) {
+              var dbBtn2 = bf.buttons[bIdx2];
+              if (!dbBtn2.text_ru && !dbBtn2.text_am) continue;
+              var newBtn = document.createElement('a');
+              newBtn.href = dbBtn2.url || '#';
+              newBtn.className = 'btn btn-tg';
+              if (dbBtn2.action_type === 'whatsapp' || (dbBtn2.url && dbBtn2.url.indexOf('wa.me') >= 0)) {
+                newBtn.className = 'btn btn-primary';
+                newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
               }
-              for (var bIdx2 = 0; bIdx2 < bf.buttons.length; bIdx2++) {
-                var dbBtn2 = bf.buttons[bIdx2];
-                if (!dbBtn2.text_ru && !dbBtn2.text_am) continue;
-                var newBtn = document.createElement('a');
-                newBtn.href = dbBtn2.url || '#';
-                newBtn.className = 'btn btn-tg';
-                if (dbBtn2.action_type === 'whatsapp' || (dbBtn2.url && dbBtn2.url.indexOf('wa.me') >= 0)) {
-                  newBtn.className = 'btn btn-primary';
-                  newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
-                }
-                newBtn.setAttribute('target', '_blank');
-                var btnText2 = lang === 'am' && dbBtn2.text_am ? dbBtn2.text_am : (dbBtn2.text_ru || '');
-                newBtn.innerHTML = '<i class="' + resolveIcon(dbBtn2.icon, dbBtn2.url) + '"></i> <span data-ru="' + (dbBtn2.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtn2.text_am||'').replace(/"/g,'&quot;') + '">' + btnText2 + '</span>';
-                ctaContainer.appendChild(newBtn);
-              }
+              newBtn.setAttribute('target', '_blank');
+              var btnText2 = lang === 'am' && dbBtn2.text_am ? dbBtn2.text_am : (dbBtn2.text_ru || '');
+              newBtn.innerHTML = '<i class="' + resolveIcon(dbBtn2.icon, dbBtn2.url) + '"></i> <span data-ru="' + (dbBtn2.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtn2.text_am||'').replace(/"/g,'&quot;') + '">' + btnText2 + '</span>';
+              ctaContainer.appendChild(newBtn);
             }
           }
         }
@@ -3424,11 +3477,35 @@ switchLang = function(l) {
     
     // Clear reviews placeholder if no photos were injected
     var reviewsPlaceholder = document.getElementById('reviewsCarouselArea');
-    if (reviewsPlaceholder && !reviewsPlaceholder.querySelector('.rv-gallery') && !reviewsPlaceholder.querySelector('.reviews-carousel-wrap')) {
+    if (reviewsPlaceholder && !reviewsPlaceholder.querySelector('.rv-carousel') && !reviewsPlaceholder.querySelector('.reviews-carousel-wrap')) {
       reviewsPlaceholder.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)"><i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i><span data-ru="\u041e\u0442\u0437\u044b\u0432\u044b \u0441\u043a\u043e\u0440\u043e \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f" data-am="\u053f\u0561\u0580\u056e\u056b\u0584\u0576\u0565\u0580\u0568 \u0577\u0578\u0582\u057f\u0578\u057e \u056f\u0570\u0561\u0575\u057f\u0576\u057e\u0565\u0576">' + (lang === 'am' ? '\u053f\u0561\u0580\u056e\u056b\u0584\u0576\u0565\u0580\u0568 \u0577\u0578\u0582\u057f\u0578\u057e \u056f\u0570\u0561\u0575\u057f\u0576\u057e\u0565\u0576' : '\u041e\u0442\u0437\u044b\u0432\u044b \u0441\u043a\u043e\u0440\u043e \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f') + '</span></div>';
     }
     
-    console.log('[DB] All dynamic data applied v3');
+    // ===== HIDE SECTIONS DELETED IN ADMIN =====
+    // If sectionOrder data exists, hide any sections not listed (they were deleted/removed in admin)
+    if (db.sectionOrder && db.sectionOrder.length > 0) {
+      var knownSections = {};
+      db.sectionOrder.forEach(function(s) {
+        knownSections[s.section_id] = true;
+        var alt = s.section_id.indexOf('-') >= 0 ? s.section_id.replace(/-/g, '_') : s.section_id.replace(/_/g, '-');
+        knownSections[alt] = true;
+      });
+      // Also keep system sections
+      knownSections['nav'] = true;
+      knownSections['footer'] = true;
+      knownSections['floating_tg'] = true;
+      knownSections['floating-tg'] = true;
+      knownSections['popup'] = true;
+      document.querySelectorAll('[data-section-id]').forEach(function(sec) {
+        var sid = sec.getAttribute('data-section-id');
+        if (!knownSections[sid] && sec.style.display !== 'none') {
+          sec.style.display = 'none';
+          console.log('[DB] Hidden deleted section:', sid);
+        }
+      });
+    }
+    
+    console.log('[DB] All dynamic data applied v4');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
   }
