@@ -1285,10 +1285,10 @@ img{max-width:100%;height:auto}
 .reviews-carousel-wrap div[id^="reviewsCar"]{-ms-overflow-style:none;scrollbar-width:none}
 .reviews-carousel-wrap .rc-card{flex:0 0 280px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.2s}
 .reviews-carousel-wrap .rc-card:active{transform:scale(0.97)}
-.reviews-carousel-wrap .rc-card img{width:100%;height:360px;object-fit:cover;display:block}
+.reviews-carousel-wrap .rc-card img{width:100%;height:360px;object-fit:contain;display:block;background:#111}
 .reviews-carousel-wrap .rc-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:2;transition:opacity 0.2s}
-.reviews-carousel-wrap .rc-dots{display:flex;justify-content:center;gap:6px;margin-top:14px}
-.reviews-carousel-wrap .rc-dot{width:8px;height:8px;border-radius:50%;transition:background 0.3s,transform 0.3s}
+.reviews-carousel-wrap .rc-dots{display:flex;justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap}
+.reviews-carousel-wrap .rc-dot{width:10px;height:10px;border-radius:50%;transition:background 0.3s,transform 0.3s;cursor:pointer}
 @media(max-width:768px){
   .reviews-carousel-wrap .rc-card{flex:0 0 calc(85vw - 32px);max-width:320px}
   .reviews-carousel-wrap .rc-card img{height:min(55vh,440px)}
@@ -2036,7 +2036,7 @@ img{max-width:100%;height:auto}
 <section class="section" id="client-reviews" data-section-id="client-reviews">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Реальные кейсы" data-am="Իրական դեdelays">Реальные кейсы</span></div>
+    <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Реальные кейсы" data-am="Իրական արdelays">Реальные кейсы</span></div>
     <h2 class="section-title" data-ru="Отзывы наших клиентов" data-am="Մեர հաdelays կարdelays">Отзывы наших клиентов</h2>
     <p class="section-sub" data-ru="Результаты говорят сами за себя — вот что получают наши клиенты" data-am="Արdelays խdelays delays — delays delays">Результаты говорят сами за себя — вот что получают наши клиенты</p>
   </div>
@@ -2044,8 +2044,16 @@ img{max-width:100%;height:auto}
     <!-- Photos injected dynamically from admin panel via blockFeatures -->
     <div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)">
       <i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i>
-      <span data-ru="Фото отзывов загружаются..." data-am="Կարdelays delaysload...">Фото отзывов загружаются...</span>
+      <span data-ru="Фото отзывов загружаются..." data-am="Կարծdelays բdelays...">Фото отзывов загружаются...</span>
     </div>
+  </div>
+  <!-- Dynamic CTA buttons injected here -->
+  <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:24px"></div>
+  <!-- Motivational text under reviews -->
+  <div class="reviews-bottom-text fade-up" style="text-align:center;margin-top:28px;padding:20px 16px;max-width:720px;margin-left:auto;margin-right:auto">
+    <p style="font-size:1.02rem;line-height:1.75;color:var(--text-secondary,#aaa);margin-bottom:0">
+      <span data-ru="Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке." data-am="Ամեն սdelays — delays delays delays: Մdelays delays — delays delays: Անdelays delays, delays delays ու delays delays ТОП-ум: Ձdelays delays delays delays delays:">Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке.</span>
+    </p>
   </div>
 </div>
 </section>
@@ -2406,7 +2414,34 @@ function rcScroll(carId, dir) {
   var cards = el.querySelectorAll('.rc-card');
   if (!cards.length) return;
   var cardW = cards[0].offsetWidth + 16;
-  el.scrollBy({ left: dir * cardW, behavior: 'smooth' });
+  var currentIdx = Math.round(el.scrollLeft / cardW);
+  var newIdx = currentIdx + dir;
+  if (newIdx < 0) newIdx = 0;
+  if (newIdx >= cards.length) newIdx = cards.length - 1;
+  el.scrollTo({ left: newIdx * cardW, behavior: 'smooth' });
+  // Directly update dots and counter (don't rely only on scroll event)
+  var dots = document.querySelectorAll('#' + carId + '_dots .rc-dot');
+  for (var d = 0; d < dots.length; d++) {
+    dots[d].style.background = d === newIdx ? '#8B5CF6' : 'rgba(139,92,246,0.3)';
+    dots[d].style.transform = d === newIdx ? 'scale(1.3)' : 'scale(1)';
+  }
+  var cnt = document.getElementById(carId + '_counter');
+  if (cnt) cnt.textContent = (newIdx + 1);
+}
+function rcScrollTo(carId, idx) {
+  var el = document.getElementById(carId);
+  if (!el) return;
+  var cards = el.querySelectorAll('.rc-card');
+  if (!cards.length || idx >= cards.length) return;
+  var cardW = cards[0].offsetWidth + 16;
+  el.scrollTo({ left: idx * cardW, behavior: 'smooth' });
+  var dots = document.querySelectorAll('#' + carId + '_dots .rc-dot');
+  for (var d = 0; d < dots.length; d++) {
+    dots[d].style.background = d === idx ? '#8B5CF6' : 'rgba(139,92,246,0.3)';
+    dots[d].style.transform = d === idx ? 'scale(1.3)' : 'scale(1)';
+  }
+  var cnt = document.getElementById(carId + '_counter');
+  if (cnt) cnt.textContent = (idx + 1);
 }
 
 /* ===== TIMED POPUP (5 sec) — BULLETPROOF ===== */
@@ -3031,6 +3066,16 @@ switchLang = function(l) {
             if (ck === bf.key || ck === sectionId) { blockTexts = db.content[ck] || []; break; }
           }
         }
+        // Only create section if it has at least some content (title text or photos)
+        var hasContent = false;
+        if (blockTexts.length > 0) {
+          for (var tci = 0; tci < blockTexts.length; tci++) {
+            var tc = blockTexts[tci];
+            if (tc && (tc.ru || tc.am || (typeof tc === 'string' && tc.trim()))) { hasContent = true; break; }
+          }
+        }
+        if (bf.photos && bf.photos.length > 0) hasContent = true;
+        if (!hasContent) return; // Don't create empty sections
         // Create section element
         var newSec = document.createElement('section');
         newSec.className = 'section fade-up';
@@ -3152,7 +3197,7 @@ switchLang = function(l) {
                 cH += '<button class="rc-nav" style="right:4px" onclick="rcScroll(&apos;' + carId + '&apos;,1)"><i class="fas fa-chevron-right"></i></button>';
                 // Dot indicators with active tracking
                 cH += '<div class="rc-dots" id="' + carId + '_dots">';
-                validPhotos.forEach(function(_,di) { cH += '<div class="rc-dot" style="background:' + (di===0?'#8B5CF6':'rgba(139,92,246,0.3)') + (di===0?';transform:scale(1.3)':'') + '"></div>'; });
+                validPhotos.forEach(function(_,di) { cH += '<div class="rc-dot" onclick="rcScrollTo(&apos;' + carId + '&apos;,' + di + ')" style="background:' + (di===0?'#8B5CF6':'rgba(139,92,246,0.3)') + (di===0?';transform:scale(1.3)':'') + '"></div>'; });
                 cH += '</div>';
               }
               carouselWrap.innerHTML = cH;
@@ -3260,13 +3305,13 @@ switchLang = function(l) {
           }
         }
         
-        // Inject slot counters if show_slots is on — filter by position matching this block
-        if (bf.show_slots && db.slotCounters && db.slotCounters.length > 0) {
+        // Inject slot counters — show if show_slots is on OR if any counter is positioned in this block
+        if (db.slotCounters && db.slotCounters.length > 0) {
           var bfKey = bf.key;
           var bfKeyHyphen = bfKey.replace(/_/g, '-');
           db.slotCounters.forEach(function(sc) {
             if (!sc.show_timer) return;
-            // Only show counters linked to THIS block (position matches)
+            // Show counters linked to THIS block (position matches)
             var cpos = sc.position || '';
             if (cpos !== 'in-' + bfKey && cpos !== 'after-' + bfKey && cpos !== 'before-' + bfKey &&
                 cpos !== 'in-' + bfKeyHyphen && cpos !== 'after-' + bfKeyHyphen && cpos !== 'before-' + bfKeyHyphen) return;
@@ -3338,13 +3383,16 @@ switchLang = function(l) {
               }
             }
           } else {
-            // For regular sections, update existing CTA buttons
-            var ctaBtns = section.querySelectorAll('a.btn-primary, a.cta-btn, a[data-btn-idx]');
+            // For regular sections, update existing CTA buttons OR create new ones
+            var ctaBtns = section.querySelectorAll('a.btn-primary, a.cta-btn, a[data-btn-idx], .section-cta a.btn');
             if (ctaBtns.length > 0) {
               for (var bIdx = 0; bIdx < Math.min(ctaBtns.length, bf.buttons.length); bIdx++) {
                 var dbBtn = bf.buttons[bIdx];
                 var domBtn = ctaBtns[bIdx];
                 if (dbBtn.url) domBtn.setAttribute('href', dbBtn.url);
+                if (dbBtn.action_type === 'whatsapp' && dbBtn.url && dbBtn.url.indexOf('wa.me') >= 0) {
+                  domBtn.setAttribute('target', '_blank');
+                }
                 // Update icon with priority: manual > URL-based > default
                 var btnIcon = domBtn.querySelector('i');
                 if (btnIcon) btnIcon.className = resolveIcon(dbBtn.icon, dbBtn.url);
@@ -3354,6 +3402,32 @@ switchLang = function(l) {
                   var bText = lang === 'am' && dbBtn.text_am ? dbBtn.text_am : (dbBtn.text_ru || '');
                   if (bText) { btnSpan.textContent = bText; btnSpan.setAttribute('data-ru', dbBtn.text_ru || ''); btnSpan.setAttribute('data-am', dbBtn.text_am || ''); }
                 }
+              }
+            } else {
+              // No buttons in DOM — create them dynamically
+              var ctaContainer = section.querySelector('.section-cta') || section.querySelector('#reviewsCtaArea');
+              if (!ctaContainer) {
+                ctaContainer = document.createElement('div');
+                ctaContainer.className = 'section-cta';
+                ctaContainer.style.cssText = 'margin-top:24px';
+                var innerCont = section.querySelector('.container');
+                if (innerCont) innerCont.appendChild(ctaContainer);
+                else section.appendChild(ctaContainer);
+              }
+              for (var bIdx2 = 0; bIdx2 < bf.buttons.length; bIdx2++) {
+                var dbBtn2 = bf.buttons[bIdx2];
+                if (!dbBtn2.text_ru && !dbBtn2.text_am) continue;
+                var newBtn = document.createElement('a');
+                newBtn.href = dbBtn2.url || '#';
+                newBtn.className = 'btn btn-tg';
+                if (dbBtn2.action_type === 'whatsapp' || (dbBtn2.url && dbBtn2.url.indexOf('wa.me') >= 0)) {
+                  newBtn.className = 'btn btn-primary';
+                  newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
+                }
+                newBtn.setAttribute('target', '_blank');
+                var btnText2 = lang === 'am' && dbBtn2.text_am ? dbBtn2.text_am : (dbBtn2.text_ru || '');
+                newBtn.innerHTML = '<i class="' + resolveIcon(dbBtn2.icon, dbBtn2.url) + '"></i> <span data-ru="' + (dbBtn2.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtn2.text_am||'').replace(/"/g,'&quot;') + '">' + btnText2 + '</span>';
+                ctaContainer.appendChild(newBtn);
               }
             }
           }
