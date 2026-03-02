@@ -78,9 +78,11 @@ export function getAdminHTML(): string {
   .sb-save-indicator.saving { background: #1e40af; color: #93c5fd; opacity: 1; }
   .sb-save-indicator.saved { background: #065f46; color: #6ee7b7; opacity: 1; }
   .sb-save-indicator.hidden { opacity: 0; transform: translateX(-50%) translateY(10px); }
-  .sb-text-pair { background: #1a2236; border: 1px solid #293548; border-radius: 10px; padding: 14px; margin-bottom: 10px; transition: border-color 0.2s; position: relative; }
+  .sb-text-pair { background: #1a2236; border: 1px solid #293548; border-radius: 10px; padding: 14px; margin-bottom: 10px; transition: border-color 0.2s, opacity 0.2s; position: relative; cursor: grab; }
   .sb-text-pair:hover { border-color: #475569; }
   .sb-text-pair:focus-within { border-color: #8B5CF6; box-shadow: 0 0 0 2px rgba(139,92,246,0.1); }
+  .sb-text-pair.dragging { opacity: 0.4; border-color: #8B5CF6; }
+  .sb-text-pair.drag-over { border-color: #8B5CF6; box-shadow: 0 0 0 2px rgba(139,92,246,0.3); }
   .sb-text-pair-num { position: absolute; top: -8px; left: 12px; background: #1e293b; padding: 0 6px; font-size: 0.65rem; font-weight: 700; color: #64748b; border-radius: 4px; }
   .sb-search-box { position: relative; }
   .sb-search-box input { padding-left: 36px !important; }
@@ -614,8 +616,12 @@ function renderBlocks() {
       for (var ti = 0; ti < items.length; ti++) {
         var item = items[ti];
         h += '<div class="section-edit-row" style="margin-bottom:6px;padding:10px 12px">' +
-          '<div style="display:grid;grid-template-columns:28px 1fr 1fr 28px;gap:8px;align-items:start">' +
-            '<span style="color:#475569;font-size:0.75rem;padding-top:8px;text-align:center">' + (ti+1) + '</span>' +
+          '<div style="display:grid;grid-template-columns:44px 1fr 1fr 28px;gap:8px;align-items:start">' +
+            '<div style="display:flex;flex-direction:column;align-items:center;gap:2px;padding-top:4px">' +
+              (ti > 0 ? '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px;font-size:0.7rem" onclick="moveTextItem(&apos;' + sec.section_id + '&apos;,' + ti + ',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>' : '<span style="width:16px;height:16px"></span>') +
+              '<span style="color:#475569;font-size:0.75rem;text-align:center">' + (ti+1) + '</span>' +
+              (ti < items.length - 1 ? '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px;font-size:0.7rem" onclick="moveTextItem(&apos;' + sec.section_id + '&apos;,' + ti + ',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>' : '<span style="width:16px;height:16px"></span>') +
+            '</div>' +
             '<div><label style="font-size:0.65rem;color:#8B5CF6;font-weight:600">RU</label>' +
               '<textarea class="input" style="min-height:36px;margin-top:2px;font-size:0.85rem;padding:6px 10px" data-section="' + sec.section_id + '" data-idx="' + ti + '" data-lang="ru">' + escHtml(item.ru) + '</textarea></div>' +
             '<div><label style="font-size:0.65rem;color:#F59E0B;font-weight:600">AM</label>' +
@@ -10913,6 +10919,108 @@ function sbRemoveTextPair(blockId, idx) {
   if (b.images && idx < b.images.length) b.images.splice(idx, 1);
   render();
   sbAutoSave(blockId);
+}
+
+// ── Move text pair up/down ──
+function sbMoveText(blockId, idx, direction) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= (b.texts_ru || []).length) return;
+  // Swap texts_ru
+  if (b.texts_ru && b.texts_ru.length > newIdx) {
+    var tmpRu = b.texts_ru[idx];
+    b.texts_ru[idx] = b.texts_ru[newIdx];
+    b.texts_ru[newIdx] = tmpRu;
+  }
+  // Swap texts_am
+  if (b.texts_am && b.texts_am.length > newIdx) {
+    var tmpAm = b.texts_am[idx];
+    b.texts_am[idx] = b.texts_am[newIdx];
+    b.texts_am[newIdx] = tmpAm;
+  }
+  // Swap images (icons for ticker)
+  if (b.images && b.images.length > newIdx) {
+    var tmpImg = b.images[idx];
+    b.images[idx] = b.images[newIdx];
+    b.images[newIdx] = tmpImg;
+  }
+  render();
+  sbAutoSave(blockId);
+}
+
+// ── Drag and drop for text pairs and buttons ──
+var _sbDragType = '';
+var _sbDragBlockId = 0;
+var _sbDragIdx = 0;
+
+function sbDragStart(e, type, blockId, idx) {
+  _sbDragType = type;
+  _sbDragBlockId = blockId;
+  _sbDragIdx = idx;
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', type + ':' + blockId + ':' + idx);
+  if (e.target && e.target.style) e.target.style.opacity = '0.5';
+}
+
+function sbDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  // Visual feedback: highlight drop target
+  var pair = e.target.closest('.sb-text-pair') || e.target.closest('[draggable]');
+  if (pair) pair.style.borderColor = '#8B5CF6';
+}
+
+function sbDrop(e, type, blockId, targetIdx) {
+  e.preventDefault();
+  // Reset visual
+  var pair = e.target.closest('.sb-text-pair') || e.target.closest('[draggable]');
+  if (pair) pair.style.borderColor = '';
+  
+  // Only handle drops of same type and block
+  if (_sbDragType !== type || _sbDragBlockId !== blockId) return;
+  var fromIdx = _sbDragIdx;
+  if (fromIdx === targetIdx) return;
+  
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  
+  if (type === 'text') {
+    // Reorder texts
+    function moveItem(arr, from, to) {
+      if (!arr || arr.length <= from) return;
+      var item = arr.splice(from, 1)[0];
+      arr.splice(to, 0, item);
+    }
+    moveItem(b.texts_ru, fromIdx, targetIdx);
+    moveItem(b.texts_am, fromIdx, targetIdx);
+    moveItem(b.images, fromIdx, targetIdx);
+  } else if (type === 'btn') {
+    // Reorder buttons
+    if (b.buttons && b.buttons.length > fromIdx) {
+      var btn = b.buttons.splice(fromIdx, 1)[0];
+      b.buttons.splice(targetIdx, 0, btn);
+    }
+  }
+  
+  render();
+  sbAutoSave(blockId);
+}
+
+// ── Section-level text move (for section editor, not block editor) ──
+function moveTextItem(sectionId, idx, direction) {
+  var content = (data.blockContents || []).find(function(x) { return x.block_key === sectionId; });
+  if (!content) return;
+  var texts = [];
+  try { texts = JSON.parse(content.texts_json || '[]'); } catch(e) { return; }
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= texts.length) return;
+  var tmp = texts[idx];
+  texts[idx] = texts[newIdx];
+  texts[newIdx] = tmp;
+  content.texts_json = JSON.stringify(texts);
+  render();
+  toast('Порядок текстов изменён — нажмите Сохранить');
 }
 
 // ── Add button ──

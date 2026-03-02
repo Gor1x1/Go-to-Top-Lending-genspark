@@ -1252,8 +1252,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 /* Photo block review cards — no bottom gap */
 .pb-card{margin-bottom:0}
 .pb-carousel{margin-bottom:0;padding-bottom:0}
-.pb-card-size img{width:100%;height:auto;max-height:500px;object-fit:contain;background:var(--bg-card,#1a1a2e)}
-@media(max-width:480px){.pb-card-size img{max-height:400px}}
+.pb-card-size img{width:100%;height:400px;object-fit:cover}
+@media(max-width:480px){.pb-card-size img{height:340px}}
 
 /* ===== STATS BAR ===== */
 .stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -1279,7 +1279,7 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 /* ===== ABOUT SECTION ===== */
 .about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:center}
 .about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border)}
-.about-img img{width:100%;height:auto;display:block}
+.about-img img{width:100%;height:auto;min-height:280px;object-fit:cover;display:block}
 .about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
 .about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
@@ -1311,7 +1311,7 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .rv-carousel{position:relative;width:100%;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
-.rv-carousel .rv-slide img{width:100%;height:auto;min-height:0;max-height:80vh;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
+.rv-carousel .rv-slide img{width:100%;height:70vh;min-height:300px;max-height:80vh;object-fit:cover;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
 .rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
@@ -1331,12 +1331,12 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .lightbox .lb-next{right:16px}
 .lightbox .lb-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;border:none;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;z-index:10001}
 @media(max-width:768px){
-  .rv-carousel .rv-slide img{min-height:0;max-height:70vh}
+  .rv-carousel .rv-slide img{height:60vh;min-height:280px;max-height:70vh}
   .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
   .lightbox .lb-nav{width:40px;height:40px;font-size:1rem}
 }
 @media(max-width:480px){
-  .rv-carousel .rv-slide img{min-height:0;max-height:60vh}
+  .rv-carousel .rv-slide img{height:55vh;min-height:250px;max-height:60vh}
   .rv-carousel .rv-caption{padding:12px 16px}
   .rv-carousel .rv-caption-text{font-size:0.85rem}
   .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
@@ -3726,11 +3726,11 @@ switchLang = function(l) {
               // Default grid view for regular blocks
               var photoDiv = document.createElement('div');
               photoDiv.className = 'block-photo-gallery';
-              photoDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;padding:16px 0;margin-top:12px';
+              photoDiv.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;padding:16px 0;margin-top:12px';
               var phH = '';
               validPhotos.forEach(function(p) {
                 phH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-                  '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:180px;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
+                  '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:320px;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
                   (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
                 '</div>';
               });
@@ -4290,7 +4290,7 @@ async function checkRefCode() {
         for (var i = 0; i < validPhotos.length; i++) {
           var p = validPhotos[i];
           html += '<div class="pb-card pb-card-size" style="flex:0 0 340px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;display:flex;flex-direction:column" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;max-height:500px;object-fit:contain;flex-shrink:0;background:var(--bg-card,#1a1a2e)" loading="lazy">' +
+            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:400px;object-fit:cover;flex-shrink:0" loading="lazy">' +
             (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + p.caption + '</div>' : '') +
           '</div>';
         }
@@ -4315,7 +4315,7 @@ async function checkRefCode() {
         for (var gi = 0; gi < validPhotos.length; gi++) {
           var gp = validPhotos[gi];
           html += '<div class="pb-card" style="border-radius:var(--r,16px);overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer" onclick="openLightbox(&apos;' + (gp.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:auto;max-height:500px;object-fit:contain;background:var(--bg-card,#1a1a2e)" loading="lazy">' +
+            '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:360px;object-fit:cover" loading="lazy">' +
             (gp.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + gp.caption + '</div>' : '') +
           '</div>';
         }
