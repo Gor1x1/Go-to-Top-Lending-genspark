@@ -8583,8 +8583,11 @@ function renderPhotos() {
   }
 
   var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-images" style="color:#8B5CF6;margin-right:10px"></i>Фото блоки</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Создавайте фото-блоки с описаниями и размещайте их на сайте. Загружайте фото с устройства или вставляйте URL.</p>' +
-    '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addPhotoBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить фото-блок</button>';
+    '<p style="color:#94a3b8;margin-bottom:12px">Создавайте фото-блоки с описаниями и размещайте их на сайте. Загружайте фото с устройства или вставляйте URL.</p>' +
+    '<div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:12px;padding:14px 18px;margin-bottom:20px;font-size:0.85rem;color:#c4b5fd">' +
+    '<i class="fas fa-lightbulb" style="color:#F59E0B;margin-right:8px"></i><strong>Совет:</strong> Для блока «Отзывы клиентов» — загрузите 3+ фото, они отобразятся горизонтальной каруселью с прокруткой (особенно удобно на телефонах). Имя блока станет заголовком на сайте.</div>' +
+    '<button class="btn btn-primary" style="margin-bottom:20px" onclick="addPhotoBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>Добавить фото-блок</button>' +
+    '<button class="btn btn-outline" style="margin-bottom:20px;margin-left:10px;border-color:rgba(245,158,11,0.4);color:#F59E0B" onclick="addReviewsBlock()"><i class="fas fa-star" style="margin-right:6px"></i>Создать блок «Отзывы»</button>';
 
   for (var bi = 0; bi < blocks.length; bi++) {
     var b = blocks[bi];
@@ -8744,6 +8747,12 @@ async function dupPhotoBlock(id) {
 async function addPhotoBlock() {
   await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: 'Фото блок ' + ((data.photoBlocks||[]).length+1), position: 'after-services', is_visible: 1, photos_json: '[]' }) });
   toast('Блок создан');
+  await loadData(); render();
+}
+
+async function addReviewsBlock() {
+  await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: 'Отзывы наших клиентов', description_ru: 'Реальные отзывы от наших клиентов', description_am: '', position: 'before-contact', is_visible: 1, photos_json: '[]' }) });
+  toast('Блок отзывов создан! Загрузите фотографии отзывов');
   await loadData(); render();
 }
 
