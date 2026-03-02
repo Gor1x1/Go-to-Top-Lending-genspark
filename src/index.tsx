@@ -1097,10 +1097,10 @@ img{max-width:100%;height:auto}
 .calc-float{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 22px;background:linear-gradient(135deg,#10B981,#059669);color:white;border-radius:50px;box-shadow:0 8px 30px rgba(16,185,129,0.4);transition:var(--t);font-weight:600;font-size:0.88rem;cursor:pointer}
 .calc-float:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 40px rgba(16,185,129,0.5)}
 .calc-float i{font-size:1.1rem}
-.lightbox{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center;padding:40px;cursor:pointer;-webkit-tap-highlight-color:transparent;overflow-y:auto}
+.lightbox{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center;padding:40px;cursor:pointer;-webkit-tap-highlight-color:transparent;overflow-y:auto;-webkit-overflow-scrolling:touch}
 .lightbox.show{display:flex}
-.lightbox img{max-width:92%;max-height:90vh;border-radius:var(--r);object-fit:contain;-webkit-user-drag:none;user-select:none}
-@media(max-width:768px){.lightbox{padding:12px}.lightbox img{max-width:98%;max-height:85vh;border-radius:8px}}
+.lightbox img{max-width:92%;max-height:90vh;border-radius:var(--r);object-fit:contain;-webkit-user-drag:none;user-select:none;touch-action:pinch-zoom}
+@media(max-width:768px){.lightbox{padding:12px;align-items:flex-start;padding-top:60px}.lightbox img{max-width:98%;max-height:none;border-radius:8px;margin-bottom:60px}}
 
 /* ===== CTA BUTTONS AFTER SECTIONS ===== */
 .section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
@@ -2035,13 +2035,7 @@ img{max-width:100%;height:auto}
       <span data-ru="Фото отзывов загружаются..." data-am="Կարծիքների լուսանկարները բեռնվում են...">Фото отзывов загружаются...</span>
     </div>
   </div>
-  <!-- Motivational text under reviews -->
-  <div class="reviews-bottom-text fade-up" style="text-align:center;margin-top:28px;padding:20px 16px;max-width:720px;margin-left:auto;margin-right:auto">
-    <p style="font-size:1.02rem;line-height:1.75;color:var(--text-secondary,#aaa);margin-bottom:0">
-      <span data-ru="Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке." data-am="Ամեն սքրինշոթ — մեր հաճախորդների իրական վիճակագրությունն է: Մենք չենք խոստանում — մենք ցույց ենք տալիս արդյունքները: Անվտանգ գնումներ իրական մարդկանցով, պատվերների աճ և օրգանական դիրքեր ՏՕՊ-ում: Ձեր ապրանքը կարող է լինել հաջորդը այս ցուցակում:">Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке.</span>
-    </p>
-  </div>
-  <!-- Dynamic CTA buttons injected here (below text) -->
+  <!-- Dynamic CTA buttons injected here -->
   <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:20px;text-align:center"></div>
 </div>
 </section>
@@ -2423,13 +2417,17 @@ function openLightbox(elOrUrl) {
   if (_lbPhotos.length === 0) { _lbPhotos = [src]; _lbIdx = 0; }
   document.getElementById('lightboxImg').src = src;
   document.getElementById('lightbox').classList.add('show');
+  document.body.style.overflow = 'hidden'; // Prevent background scroll
   // Show/hide nav buttons
   var prevBtn = document.querySelector('.lb-prev');
   var nextBtn = document.querySelector('.lb-next');
   if (prevBtn) prevBtn.style.display = _lbPhotos.length > 1 ? 'flex' : 'none';
   if (nextBtn) nextBtn.style.display = _lbPhotos.length > 1 ? 'flex' : 'none';
 }
-function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+function closeLightbox() { 
+  document.getElementById('lightbox').classList.remove('show'); 
+  document.body.style.overflow = ''; // Restore scroll
+}
 function lbNav(dir) {
   if (_lbPhotos.length <= 1) return;
   _lbIdx += dir;
@@ -2452,9 +2450,20 @@ document.addEventListener('keydown', function(e) {
 (function() {
   var lb = document.getElementById('lightbox');
   if (!lb) return;
-  var lbStartX = 0;
-  lb.addEventListener('touchstart', function(e) { lbStartX = e.touches[0].clientX; }, {passive:true});
+  var lbStartX = 0, lbStartY = 0, lbIsSwipe = false;
+  lb.addEventListener('touchstart', function(e) { 
+    lbStartX = e.touches[0].clientX; 
+    lbStartY = e.touches[0].clientY;
+    lbIsSwipe = false;
+  }, {passive:true});
+  lb.addEventListener('touchmove', function(e) {
+    var dx = Math.abs(e.touches[0].clientX - lbStartX);
+    var dy = Math.abs(e.touches[0].clientY - lbStartY);
+    // If horizontal movement dominates, it's a swipe (not a scroll)
+    if (dx > dy && dx > 15) lbIsSwipe = true;
+  }, {passive:true});
   lb.addEventListener('touchend', function(e) {
+    if (!lbIsSwipe) return; // Was a vertical scroll, not a swipe
     var diff = e.changedTouches[0].clientX - lbStartX;
     if (Math.abs(diff) > 50) { lbNav(diff < 0 ? 1 : -1); }
   }, {passive:true});
@@ -2504,10 +2513,13 @@ function rvSlide(carId, dir) {
   if (!track) return;
   var slides = track.querySelectorAll('.rv-slide');
   state.total = slides.length;
+  if (state.total === 0) return;
   state.idx = state.idx + dir;
   if (state.idx < 0) state.idx = state.total - 1;
   if (state.idx >= state.total) state.idx = 0;
   _rvState[carId] = state;
+  // Ensure transition is applied for smooth animation
+  track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
   track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
   // Update dots
   var dots = document.querySelectorAll('#' + carId + '_dots .rv-dot');
@@ -2521,6 +2533,7 @@ function rvGoTo(carId, idx) {
   var slides = track.querySelectorAll('.rv-slide');
   if (idx < 0 || idx >= slides.length) return;
   _rvState[carId] = { idx: idx, total: slides.length };
+  track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
   track.style.transform = 'translateX(-' + (idx * 100) + '%)';
   var dots = document.querySelectorAll('#' + carId + '_dots .rv-dot');
   for (var d = 0; d < dots.length; d++) {
@@ -3334,45 +3347,92 @@ switchLang = function(l) {
                 else { section.appendChild(carouselWrap); section.appendChild(dotsDiv); }
               }
               // Touch swipe support with drag feedback
-              (function(cid) {
+              // Initialize state for this carousel
+              _rvState[carId] = { idx: 0, total: validPhotos.length };
+              (function(cid, totalSlides) {
                 var track = document.getElementById(cid + '_track');
                 if (!track) return;
-                var startX = 0, currentX = 0, isDragging = false, startTime = 0;
                 var carousel = track.parentElement;
-                track.addEventListener('touchstart', function(e) {
-                  startX = e.touches[0].clientX;
-                  currentX = startX;
-                  isDragging = true;
-                  startTime = Date.now();
+                var touchData = { startX: 0, startY: 0, currentX: 0, dragging: false, startTime: 0, moved: false };
+                
+                function onTouchStart(e) {
+                  if (e.touches.length !== 1) return; // ignore multi-touch
+                  touchData.startX = e.touches[0].clientX;
+                  touchData.startY = e.touches[0].clientY;
+                  touchData.currentX = touchData.startX;
+                  touchData.dragging = true;
+                  touchData.moved = false;
+                  touchData.startTime = Date.now();
                   track.style.transition = 'none';
-                }, {passive:true});
-                track.addEventListener('touchmove', function(e) {
-                  if (!isDragging) return;
-                  currentX = e.touches[0].clientX;
-                  var diff = currentX - startX;
-                  var state = _rvState[cid] || { idx: 0, total: 0 };
+                }
+                
+                function onTouchMove(e) {
+                  if (!touchData.dragging || e.touches.length !== 1) return;
+                  var tx = e.touches[0].clientX;
+                  var ty = e.touches[0].clientY;
+                  var dx = tx - touchData.startX;
+                  var dy = ty - touchData.startY;
+                  // If scrolling more vertically, allow page scroll and stop carousel drag
+                  if (!touchData.moved && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+                    touchData.dragging = false;
+                    // Snap back to current position
+                    var st = _rvState[cid] || { idx: 0, total: totalSlides };
+                    track.style.transition = 'transform 0.3s ease';
+                    track.style.transform = 'translateX(-' + (st.idx * 100) + '%)';
+                    return;
+                  }
+                  touchData.currentX = tx;
+                  if (Math.abs(dx) > 8) {
+                    touchData.moved = true;
+                    e.preventDefault(); // prevent page scroll when swiping horizontally
+                  }
+                  var state = _rvState[cid] || { idx: 0, total: totalSlides };
                   var baseOffset = -(state.idx * 100);
-                  var movePercent = (diff / (carousel ? carousel.offsetWidth : 400)) * 100;
+                  var w = carousel ? carousel.offsetWidth : 400;
+                  var movePercent = (dx / w) * 100;
+                  // Add resistance at edges
+                  if ((state.idx === 0 && dx > 0) || (state.idx === state.total - 1 && dx < 0)) {
+                    movePercent = movePercent * 0.3;
+                  }
                   track.style.transform = 'translateX(' + (baseOffset + movePercent) + '%)';
-                  if (Math.abs(diff) > 10) { e.preventDefault(); }
-                }, {passive:false});
-                track.addEventListener('touchend', function(e) {
-                  if (!isDragging) return;
-                  isDragging = false;
-                  track.style.transition = 'transform 0.45s cubic-bezier(.4,0,.2,1)';
-                  var diff = e.changedTouches[0].clientX - startX;
-                  var elapsed = Date.now() - startTime;
-                  // Swipe threshold: 40px or fast flick (>0.3px/ms)
+                }
+                
+                function onTouchEnd(e) {
+                  if (!touchData.dragging) return;
+                  touchData.dragging = false;
+                  track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
+                  var endX = e.changedTouches[0].clientX;
+                  var diff = endX - touchData.startX;
+                  var elapsed = Date.now() - touchData.startTime;
                   var velocity = Math.abs(diff) / Math.max(elapsed, 1);
+                  // Swipe threshold: 40px distance OR velocity > 0.3px/ms
                   if (Math.abs(diff) > 40 || (velocity > 0.3 && Math.abs(diff) > 15)) {
                     rvSlide(cid, diff < 0 ? 1 : -1);
                   } else {
-                    // Snap back
-                    var state = _rvState[cid] || { idx: 0, total: 0 };
+                    // Snap back to current slide
+                    var state = _rvState[cid] || { idx: 0, total: totalSlides };
                     track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
                   }
+                  // Hide swipe hint after first successful swipe
+                  if (touchData.moved) {
+                    var hint = document.querySelector('.rv-swipe-hint');
+                    if (hint) hint.style.display = 'none';
+                  }
+                }
+                
+                // Use {passive:false} on touchmove to allow preventDefault
+                // Use {passive:true} on touchstart/touchend for performance
+                track.addEventListener('touchstart', onTouchStart, {passive:true});
+                track.addEventListener('touchmove', onTouchMove, {passive:false});
+                track.addEventListener('touchend', onTouchEnd, {passive:true});
+                track.addEventListener('touchcancel', function() {
+                  if (!touchData.dragging) return;
+                  touchData.dragging = false;
+                  var state = _rvState[cid] || { idx: 0, total: totalSlides };
+                  track.style.transition = 'transform 0.3s ease';
+                  track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
                 }, {passive:true});
-              })(carId);
+              })(carId, validPhotos.length);
             } else {
               // Default grid view for regular blocks
               var photoDiv = document.createElement('div');
@@ -3527,49 +3587,74 @@ switchLang = function(l) {
               }
             }
           } else {
-            // For regular sections, CLEAR existing section-cta and create buttons from DB
-            // This prevents duplicate buttons (DOM buttons + injected buttons)
-            var ctaContainer = section.querySelector('#reviewsCtaArea') || section.querySelector('.section-cta');
-            if (!ctaContainer) {
-              // Check if there are existing CTA buttons to convert
-              var existBtns = section.querySelectorAll('a.btn-primary, a.cta-btn, a[data-btn-idx]');
-              if (existBtns.length > 0) {
-                // Wrap existing buttons in a section-cta container, then replace
-                ctaContainer = existBtns[0].parentNode;
-              }
-            }
-            if (ctaContainer && ctaContainer.classList && (ctaContainer.classList.contains('section-cta') || ctaContainer.id === 'reviewsCtaArea')) {
-              // Clear old buttons from the CTA container and rebuild from DB
-              ctaContainer.innerHTML = '';
-            } else {
-              // Create new container
-              ctaContainer = document.createElement('div');
-              ctaContainer.className = 'section-cta';
-              ctaContainer.style.cssText = 'margin-top:24px';
-              var innerCont = section.querySelector('.container');
-              if (innerCont) innerCont.appendChild(ctaContainer);
-              else section.appendChild(ctaContainer);
-            }
-            // Also remove any orphaned buttons OUTSIDE of section-cta containers 
-            // (buttons that were duplicated at the bottom)
-            var orphanBtns = section.querySelectorAll('.container > a.btn-primary, .container > a.btn-tg, .container > a.cta-btn');
-            orphanBtns.forEach(function(ob) { ob.remove(); });
+            // For regular sections: UPDATE existing buttons IN-PLACE only
+            // NEVER create new containers or buttons — only update what already exists in HTML
+            // This prevents duplicate buttons from appearing after async DB load
             
-            for (var bIdx2 = 0; bIdx2 < bf.buttons.length; bIdx2++) {
-              var dbBtn2 = bf.buttons[bIdx2];
-              if (!dbBtn2.text_ru && !dbBtn2.text_am) continue;
-              var newBtn = document.createElement('a');
-              newBtn.href = dbBtn2.url || '#';
-              newBtn.className = 'btn btn-tg';
-              if (dbBtn2.action_type === 'whatsapp' || (dbBtn2.url && dbBtn2.url.indexOf('wa.me') >= 0)) {
-                newBtn.className = 'btn btn-primary';
-                newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
-              }
-              newBtn.setAttribute('target', '_blank');
-              var btnText2 = lang === 'am' && dbBtn2.text_am ? dbBtn2.text_am : (dbBtn2.text_ru || '');
-              newBtn.innerHTML = '<i class="' + resolveIcon(dbBtn2.icon, dbBtn2.url) + '"></i> <span data-ru="' + (dbBtn2.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtn2.text_am||'').replace(/"/g,'&quot;') + '">' + btnText2 + '</span>';
-              ctaContainer.appendChild(newBtn);
+            // Mark section as already processed to prevent double-processing
+            if (section.getAttribute('data-btns-applied') === '1') return;
+            section.setAttribute('data-btns-applied', '1');
+            
+            // 1. Find the dedicated CTA container (if any)
+            var ctaContainer = section.querySelector('#reviewsCtaArea') || section.querySelector('.section-cta') || section.querySelector('.hero-buttons');
+            
+            // 2. Find ALL button links in the section (in ANY container)
+            var allBtns = section.querySelectorAll('a.btn, a.btn-primary, a.btn-tg, a.btn-success, a.btn-warning, a.btn-outline');
+            var existingBtns = [];
+            for (var eb = 0; eb < allBtns.length; eb++) {
+              var btn = allBtns[eb];
+              // Skip nav items, popup buttons, footer, stats
+              if (btn.closest('.nav-links') || btn.closest('.popup-card') || btn.closest('.hero-stats') || btn.closest('.stat') || btn.closest('footer') || btn.closest('.tg-float') || btn.closest('.calc-float')) continue;
+              existingBtns.push(btn);
             }
+            
+            // 3. If the CTA container is empty (e.g. reviewsCtaArea) and we have NO other buttons, CREATE buttons
+            var ctaIsEmpty = ctaContainer && ctaContainer.children.length === 0 && ctaContainer.id === 'reviewsCtaArea';
+            
+            if (existingBtns.length === 0 && ctaIsEmpty) {
+              // Empty CTA area (like reviews) — safe to inject buttons
+              for (var bNew = 0; bNew < bf.buttons.length; bNew++) {
+                var dbBtnNew = bf.buttons[bNew];
+                if (!dbBtnNew.text_ru && !dbBtnNew.text_am) continue;
+                var btnTextNew = lang === 'am' && dbBtnNew.text_am ? dbBtnNew.text_am : (dbBtnNew.text_ru || '');
+                var btnIconNew = resolveIcon(dbBtnNew.icon, dbBtnNew.url);
+                var newBtn = document.createElement('a');
+                newBtn.href = dbBtnNew.url || '#';
+                newBtn.className = 'btn btn-tg';
+                if (dbBtnNew.action_type === 'whatsapp' || (dbBtnNew.url && dbBtnNew.url.indexOf('wa.me') >= 0)) {
+                  newBtn.className = 'btn btn-primary';
+                  newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
+                }
+                newBtn.setAttribute('target', '_blank');
+                newBtn.innerHTML = '<i class="' + btnIconNew + '"></i> <span data-ru="' + (dbBtnNew.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtnNew.text_am||'').replace(/"/g,'&quot;') + '">' + btnTextNew + '</span>';
+                ctaContainer.appendChild(newBtn);
+              }
+            } else if (existingBtns.length > 0) {
+              // 4. UPDATE existing buttons with DB data (URL, text, icon) — NO new elements created
+              var dbBtnIdx = 0;
+              for (var bIdx2 = 0; bIdx2 < bf.buttons.length && dbBtnIdx < existingBtns.length; bIdx2++) {
+                var dbBtn2 = bf.buttons[bIdx2];
+                if (!dbBtn2.text_ru && !dbBtn2.text_am) continue;
+                var btnText2 = lang === 'am' && dbBtn2.text_am ? dbBtn2.text_am : (dbBtn2.text_ru || '');
+                var btnIcon2 = resolveIcon(dbBtn2.icon, dbBtn2.url);
+                var eBtn = existingBtns[dbBtnIdx];
+                if (dbBtn2.url) eBtn.href = dbBtn2.url;
+                eBtn.setAttribute('target', '_blank');
+                var eIcon = eBtn.querySelector('i');
+                if (eIcon) eIcon.className = btnIcon2;
+                var eSpan = eBtn.querySelector('span');
+                if (eSpan) {
+                  eSpan.textContent = btnText2;
+                  eSpan.setAttribute('data-ru', dbBtn2.text_ru || '');
+                  eSpan.setAttribute('data-am', dbBtn2.text_am || '');
+                } else {
+                  eBtn.innerHTML = '<i class="' + btnIcon2 + '"></i> <span data-ru="' + (dbBtn2.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtn2.text_am||'').replace(/"/g,'&quot;') + '">' + btnText2 + '</span>';
+                }
+                dbBtnIdx++;
+              }
+            }
+            // NOTE: We intentionally do NOT create new button containers or hide surplus buttons
+            // The HTML template is the source of truth for button count and layout
           }
         }
       });

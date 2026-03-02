@@ -10268,7 +10268,17 @@ function renderSiteBlocks() {
             var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
 
             h += '<div class="sb-text-pair">';
-            h += '<div class="sb-text-pair-num">' + fieldLabel + '</div>';
+            h += '<div class="sb-text-pair-num" style="display:flex;align-items:center;justify-content:space-between;gap:8px">';
+            h += '<span>' + fieldLabel + '</span>';
+            h += '<select class="input" style="width:auto;font-size:0.65rem;padding:2px 6px;background:#1a2236;border:1px solid #293548;color:#64748b;border-radius:4px" onchange="sbSetTextRole(' + b.id + ',' + ti + ',this.value)" title="Тип текста">';
+            var roleOptions = ['title','subtitle','text','note'];
+            var roleLabels = ['Заголовок','Подзаголовок','Текст','Примечание'];
+            var defaultRole = ti === 0 ? 'title' : (ti === 1 ? 'subtitle' : 'text');
+            for (var ri = 0; ri < roleOptions.length; ri++) {
+              h += '<option value="' + roleOptions[ri] + '"' + (roleOptions[ri] === defaultRole ? ' selected' : '') + '>' + roleLabels[ri] + '</option>';
+            }
+            h += '</select>';
+            h += '</div>';
             h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
             if (showRu) {
               h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
@@ -10672,12 +10682,31 @@ function renderSiteBlocks() {
 
 // ── Semantic field labels based on block key and position ──
 function sbGetFieldLabel(blockKey, idx, total) {
-  var num = '#' + (idx + 1);
-  if (total <= 1) return 'Текст';
-  if (idx === 0 && total >= 2) return 'Заголовок';
-  if (idx === 1 && total >= 3) return 'Подзаголовок';
-  if (idx === total - 1 && total >= 4) return 'Итог / Примечание';
-  return num;
+  // Flexible labels based on block context and text index
+  // Each text pair gets a clear semantic label
+  var roleIcons = {
+    0: '<i class="fas fa-heading" style="margin-right:4px;color:#a78bfa"></i>',
+    1: '<i class="fas fa-font" style="margin-right:4px;color:#60a5fa"></i>',
+    2: '<i class="fas fa-paragraph" style="margin-right:4px;color:#34d399"></i>',
+    3: '<i class="fas fa-align-left" style="margin-right:4px;color:#f59e0b"></i>'
+  };
+  var icon = roleIcons[Math.min(idx, 3)] || '<i class="fas fa-align-left" style="margin-right:4px;color:#94a3b8"></i>';
+  
+  if (total <= 1) return icon + 'Текст';
+  if (idx === 0) return icon + 'Заголовок <span style="color:#475569;font-size:0.7rem">(H2)</span>';
+  if (idx === 1 && total >= 2) return icon + 'Подзаголовок <span style="color:#475569;font-size:0.7rem">(описание)</span>';
+  if (idx === 2 && total >= 3) return icon + 'Основной текст';
+  if (idx === total - 1 && total >= 4) return icon + 'Итог / Примечание';
+  return icon + 'Текст #' + (idx + 1);
+}
+
+// Set text role for a text pair (currently visual-only indicator, saved for future use)
+function sbSetTextRole(blockId, textIdx, role) {
+  // For now this is a visual indicator to help the admin understand the text structure
+  // The role info is cosmetic — the actual rendering uses position-based logic
+  console.log('[Admin] Text role set:', blockId, textIdx, role);
+  // Trigger auto-save to persist any changes
+  sbAutoSave(blockId);
 }
 
 // ── Init SortableJS on block list ──
