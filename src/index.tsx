@@ -992,7 +992,7 @@ img{max-width:100%;height:auto}
 .ticker-item{display:flex;align-items:center;gap:10px;padding:0 40px;font-size:0.88rem;color:var(--text-sec);flex-shrink:0}
 .ticker-item i{color:var(--purple)}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
+.section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease;overflow:hidden}
 .section.section-revealed{opacity:1;transform:translateY(0)}
 .section-dark{background:var(--bg-surface)}
 .section-header{text-align:center;margin-bottom:40px}
@@ -1239,18 +1239,24 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .fade-up.visible{opacity:1;transform:translateY(0)}
 /* Hero, nav, ticker always visible immediately */
 #hero.section,.hero-section{opacity:1;transform:none}
-.ticker,.stats-bar,.wb-banner{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
-.ticker.section-revealed,.stats-bar.section-revealed,.wb-banner.section-revealed{opacity:1;transform:translateY(0)}
+.ticker,.stats-bar,.wb-banner,.slot-counter-bar{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
+.ticker.section-revealed,.stats-bar.section-revealed,.wb-banner.section-revealed,.slot-counter-bar.section-revealed{opacity:1;transform:translateY(0)}
 /* Reviews gallery - tighter layout when no carousel */
 .reviews-gallery-area:empty,.reviews-gallery-area:has(> div:only-child:empty){display:none}
 #reviewsCarouselArea{transition:opacity 0.4s ease}
+/* Reviews section — tight bottom gap */
+#client-reviews .section-cta{margin-top:12px;margin-bottom:0;padding-bottom:0}
+#client-reviews .rv-dots{margin-bottom:0}
+/* Photo block review cards — no bottom gap */
+.pb-card{margin-bottom:0}
+.pb-carousel{margin-bottom:0;padding-bottom:0}
 
 /* ===== STATS BAR ===== */
 .stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
 .stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
 .stat-card .stat-big{font-size:2.8rem;font-weight:900;color:var(--purple);line-height:1}
 .stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
-.slot-counter-bar{padding:0;background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(139,92,246,0.05));border-bottom:1px solid var(--border);width:100%;overflow:hidden}
+.slot-counter-bar{padding:0;background:linear-gradient(135deg,rgba(16,185,129,0.05),rgba(139,92,246,0.05));border-bottom:1px solid var(--border);width:100%;overflow:hidden;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.4}}
 
 
@@ -1301,7 +1307,7 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .rv-carousel{position:relative;width:100%;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
-.rv-carousel .rv-slide img{width:100%;height:auto;min-height:340px;max-height:80vh;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
+.rv-carousel .rv-slide img{width:100%;height:auto;min-height:0;max-height:80vh;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
 .rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
@@ -1321,12 +1327,12 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .lightbox .lb-next{right:16px}
 .lightbox .lb-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;border:none;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;z-index:10001}
 @media(max-width:768px){
-  .rv-carousel .rv-slide img{min-height:240px;max-height:70vh}
+  .rv-carousel .rv-slide img{min-height:0;max-height:70vh}
   .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
   .lightbox .lb-nav{width:40px;height:40px;font-size:1rem}
 }
 @media(max-width:480px){
-  .rv-carousel .rv-slide img{min-height:200px;max-height:60vh}
+  .rv-carousel .rv-slide img{min-height:0;max-height:60vh}
   .rv-carousel .rv-caption{padding:12px 16px}
   .rv-carousel .rv-caption-text{font-size:0.85rem}
   .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
@@ -1396,6 +1402,13 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
   .popup-card .pf-row{grid-template-columns:1fr}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
+  /* About photo full-width on mobile */
+  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px)}
+  .about-img img{width:100%;height:auto;min-height:220px;object-fit:cover}
+  /* Prevent inner horizontal scroll from blocking vertical page scroll */
+  .rv-carousel{touch-action:pan-x pinch-zoom}
+  .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
+  .cmp-table-wrap{touch-action:pan-y pan-x}
 }
 @media(max-width:480px){
   .hero h1{font-size:1.5rem}
@@ -3324,7 +3337,7 @@ switchLang = function(l) {
           var scLabel = lang === 'am' && scLabelAm ? scLabelAm : scLabelRu;
           
           var scEl = document.createElement('div');
-          scEl.className = 'slot-counter-bar fade-up';
+          scEl.className = 'slot-counter-bar';
           scEl.setAttribute('data-section-id', scSectionId);
           scEl.id = scSectionId;
           scEl.innerHTML = '<div class="container">' +
@@ -3618,6 +3631,7 @@ switchLang = function(l) {
                   touchData.currentX = touchData.startX;
                   touchData.dragging = true;
                   touchData.moved = false;
+                  touchData.direction = ''; // 'h' or 'v' — locks after first significant move
                   touchData.startTime = Date.now();
                   track.style.transition = 'none';
                 }
@@ -3628,20 +3642,26 @@ switchLang = function(l) {
                   var ty = e.touches[0].clientY;
                   var dx = tx - touchData.startX;
                   var dy = ty - touchData.startY;
-                  // If scrolling more vertically, allow page scroll and stop carousel drag
-                  if (!touchData.moved && Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+                  // Lock direction after 8px movement
+                  if (!touchData.direction) {
+                    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                      touchData.direction = Math.abs(dy) > Math.abs(dx) ? 'v' : 'h';
+                    } else {
+                      return; // not enough movement to determine direction
+                    }
+                  }
+                  // If vertical scroll, release touch
+                  if (touchData.direction === 'v') {
                     touchData.dragging = false;
-                    // Snap back to current position
                     var st = _rvState[cid] || { idx: 0, total: totalSlides };
                     track.style.transition = 'transform 0.3s ease';
                     track.style.transform = 'translateX(-' + (st.idx * 100) + '%)';
                     return;
                   }
+                  // Horizontal swipe — prevent page scroll
                   touchData.currentX = tx;
-                  if (Math.abs(dx) > 8) {
-                    touchData.moved = true;
-                    e.preventDefault(); // prevent page scroll when swiping horizontally
-                  }
+                  touchData.moved = true;
+                  e.preventDefault();
                   var state = _rvState[cid] || { idx: 0, total: totalSlides };
                   var baseOffset = -(state.idx * 100);
                   var w = carousel ? carousel.offsetWidth : 400;
@@ -3654,9 +3674,15 @@ switchLang = function(l) {
                 }
                 
                 function onTouchEnd(e) {
-                  if (!touchData.dragging) return;
+                  if (!touchData.dragging && !touchData.moved) return;
                   touchData.dragging = false;
                   track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
+                  if (!touchData.moved) {
+                    // No horizontal move — just snap to current
+                    var snapState = _rvState[cid] || { idx: 0, total: totalSlides };
+                    track.style.transform = 'translateX(-' + (snapState.idx * 100) + '%)';
+                    return;
+                  }
                   var endX = e.changedTouches[0].clientX;
                   var diff = endX - touchData.startX;
                   var elapsed = Date.now() - touchData.startTime;
@@ -3670,10 +3696,10 @@ switchLang = function(l) {
                     track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
                   }
                   // Hide swipe hint after first successful swipe
-                  if (touchData.moved) {
-                    var hint = document.querySelector('.rv-swipe-hint');
-                    if (hint) hint.style.display = 'none';
-                  }
+                  var hint = document.querySelector('.rv-swipe-hint');
+                  if (hint) hint.style.display = 'none';
+                  // Reset direction for next touch
+                  touchData.direction = '';
                 }
                 
                 // Use {passive:false} on touchmove to allow preventDefault
@@ -4041,7 +4067,7 @@ switchLang = function(l) {
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
     // Fallback: reveal all sections immediately if data loading fails
-    document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.ticker').forEach(function(s) {
+    document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(s) {
       s.classList.add('section-revealed');
     });
   }
@@ -4049,7 +4075,7 @@ switchLang = function(l) {
 
 // Safety fallback: if sections still hidden after 5s (e.g. slow network), reveal everything
 setTimeout(function() {
-  document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
+  document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.slot-counter-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
     s.classList.add('section-revealed');
   });
 }, 5000);
@@ -4240,7 +4266,7 @@ async function checkRefCode() {
         for (var i = 0; i < validPhotos.length; i++) {
           var p = validPhotos[i];
           html += '<div class="pb-card pb-card-size" style="flex:0 0 280px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:400px;object-fit:cover" loading="lazy">' +
+            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;max-height:500px;object-fit:cover" loading="lazy">' +
             (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + p.caption + '</div>' : '') +
           '</div>';
         }
