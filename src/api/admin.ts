@@ -1681,6 +1681,33 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     }
   }
   
+  // Seed default slot counter if none exist
+  const existingSlots = await db.prepare('SELECT COUNT(*) as cnt FROM slot_counter').first().catch(() => ({cnt: 0}));
+  if (!(existingSlots as any)?.cnt) {
+    await db.prepare('INSERT INTO slot_counter (counter_name, total_slots, booked_slots, label_ru, label_am, show_timer, reset_day, position) VALUES (?,?,?,?,?,?,?,?)')
+      .bind('main', 100, 80, 'Свободных мест на этой неделе', 'Ազdelays this week', 1, 'monday', 'after-hero').run();
+  }
+  
+  // Deduplicate section_order: remove duplicate entries where hyphen/underscore variants coexist
+  try {
+    const allOrder = await db.prepare('SELECT id, section_id FROM section_order ORDER BY sort_order').all();
+    const seenNorm: Record<string, number> = {};
+    const dupeIds: number[] = [];
+    for (const row of (allOrder.results || [])) {
+      const norm = (row.section_id as string).replace(/_/g, '-');
+      if (seenNorm[norm]) {
+        dupeIds.push(row.id as number);
+      } else {
+        seenNorm[norm] = row.id as number;
+      }
+    }
+    if (dupeIds.length > 0) {
+      for (const did of dupeIds) {
+        await db.prepare('DELETE FROM section_order WHERE id = ?').bind(did).run();
+      }
+    }
+  } catch(e) { /* ignore dedup errors */ }
+  
   return c.json({ success: true, imported: sortIdx, tg_messages: tgSortIdx });
 });
 

@@ -142,7 +142,17 @@ app.get('/api/site-data', async (c) => {
       services: svcsRes.results,
       telegram,
       scripts,
-      sectionOrder: sectionOrderRes.results,
+      sectionOrder: (function() {
+        // Deduplicate sectionOrder: keep only one entry per normalized ID (hyphen version wins)
+        var seen = {};
+        var deduped = [];
+        for (var _i = 0; _i < sectionOrderRes.results.length; _i++) {
+          var _s = sectionOrderRes.results[_i] as any;
+          var norm = (_s.section_id || '').replace(/_/g, '-');
+          if (!seen[norm]) { seen[norm] = true; deduped.push(_s); }
+        }
+        return deduped;
+      })(),
       slotCounters: slotCountersRes.results,
       photoBlocks: photoBlocksRes.results,
       tickerItems: tickerItems.length > 0 ? tickerItems : null,
@@ -859,14 +869,27 @@ app.post('/api/admin/seed-from-site', async (c) => {
     }
   }
   
+  // Seed slot counter (default from HTML template)
+  const existingSlot = await db.prepare('SELECT id FROM slot_counter LIMIT 1').first();
+  if (!existingSlot) {
+    await db.prepare('INSERT INTO slot_counter (counter_name, total_slots, booked_slots, label_ru, label_am, show_timer, reset_day, position) VALUES (?,?,?,?,?,?,?,?)')
+      .bind('main', 100, 80, 'Свободных мест на этой неделе', 'Delays there this week hamara', 1, 'monday', 'after-hero').run();
+  }
+  
   return c.json({ success: true, message: 'Seeded successfully' });
 })
 
 app.get('/', (c) => {
+  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
+  c.header('Pragma', 'no-cache');
+  c.header('Expires', '0');
   return c.html(html`<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
 <meta name="description" content="Go to Top — продвижение карточек на Wildberries под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
@@ -2587,7 +2610,7 @@ function showPopup() {
   if (_popupShown) return;
   _popupShown = true;
   var ov = document.getElementById('popupOverlay');
-  if (!ov) { console.log('[Popup] No overlay element found'); return; }
+  if (!ov) { console.log('[Popup] No overlay element found, retrying...'); _popupShown = false; setTimeout(showPopup, 1000); return; }
   var card = ov.querySelector('.popup-card');
   if (!card) { console.log('[Popup] No card element found'); return; }
   var isMobile = window.innerWidth <= 640;
@@ -2596,20 +2619,30 @@ function showPopup() {
   card.removeAttribute('style');
   ov.removeAttribute('style');
   
-  // Show overlay with inline styles to override any CSS
-  ov.classList.add('show');
-  ov.style.cssText = 'display:flex !important;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:100000;overflow-y:auto;visibility:visible;opacity:1;';
+  // FORCE show overlay with inline styles to override ANY CSS/cache/extension
+  ov.className = 'popup-overlay show';
+  ov.style.setProperty('display', 'flex', 'important');
+  ov.style.setProperty('position', 'fixed', 'important');
+  ov.style.setProperty('top', '0', 'important');
+  ov.style.setProperty('left', '0', 'important');
+  ov.style.setProperty('width', '100vw', 'important');
+  ov.style.setProperty('height', '100vh', 'important');
+  ov.style.setProperty('background', 'rgba(0,0,0,0.85)', 'important');
+  ov.style.setProperty('z-index', '100000', 'important');
+  ov.style.setProperty('overflow-y', 'auto', 'important');
+  ov.style.setProperty('visibility', 'visible', 'important');
+  ov.style.setProperty('opacity', '1', 'important');
   
   if (isMobile) {
-    ov.style.justifyContent = 'center';
-    ov.style.alignItems = 'flex-end';
-    ov.style.padding = '0';
-    card.style.cssText = 'max-width:100%;width:100%;margin:0;border-radius:20px 20px 0 0;max-height:90vh;overflow-y:auto;padding:28px 16px;opacity:1;visibility:visible;display:block;animation:slideUpMobile 0.4s ease forwards;';
+    ov.style.setProperty('justify-content', 'center', 'important');
+    ov.style.setProperty('align-items', 'flex-end', 'important');
+    ov.style.setProperty('padding', '0', 'important');
+    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:90vh !important;overflow-y:auto !important;padding:28px 16px !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;';
   } else {
-    ov.style.justifyContent = 'center';
-    ov.style.alignItems = 'center';
-    ov.style.padding = '20px';
-    card.style.cssText = 'opacity:1;visibility:visible;display:block;';
+    ov.style.setProperty('justify-content', 'center', 'important');
+    ov.style.setProperty('align-items', 'center', 'important');
+    ov.style.setProperty('padding', '20px', 'important');
+    card.style.cssText = 'opacity:1 !important;visibility:visible !important;display:block !important;';
   }
   
   // Ensure form is visible (reset from previous success state)
@@ -2650,8 +2683,11 @@ if (_popupOv) {
 }
 
 /* Show after 5 seconds — ALWAYS, no sessionStorage check, no popupDismissed */
+/* Use multiple timers as safety net in case one fails */
 setTimeout(showPopup, 5000);
-console.log('[Popup] Timer set, will fire in 5s');
+setTimeout(function() { if (!_popupShown) showPopup(); }, 6000);
+setTimeout(function() { if (!_popupShown) showPopup(); }, 8000);
+console.log('[Popup] Timer set, will fire in 5s (with retry at 6s, 8s)');
 
 /* Form submit */
 document.getElementById('popupForm').addEventListener('submit', function(e) {
@@ -2972,6 +3008,67 @@ switchLang = function(l) {
       console.log('[DB] Texts applied');
     }
     
+    // ===== 1b. INJECT EXTRA TEXTS FROM db.content INTO EXISTING SECTIONS =====
+    // Only inject NEW texts that don't match ANY existing data-ru element in the section
+    if (db.content) {
+      // Iterate over ALL content keys, not just blockFeatures
+      var contentKeys = Object.keys(db.content);
+      contentKeys.forEach(function(contentKey) {
+        var sectionId = contentKey.replace(/_/g, '-');
+        var section = document.querySelector('[data-section-id="' + sectionId + '"]');
+        if (!section) return;
+        var contentTexts = db.content[contentKey];
+        if (!contentTexts || contentTexts.length === 0) return;
+        // Collect ALL existing data-ru values in this section
+        var existingRuValues = {};
+        section.querySelectorAll('[data-ru]').forEach(function(el) {
+          var v = (el.getAttribute('data-ru') || '').trim();
+          if (v) existingRuValues[v] = true;
+        });
+        // Find texts in db.content that DON'T match any existing element
+        var container = section.querySelector('.container');
+        if (!container) return;
+        // Find insertion point — insert AFTER major content (photos, carousel) but BEFORE CTA
+        var insertRef = null;
+        var ctaCandidates = container.querySelectorAll('.section-cta, #reviewsCtaArea');
+        for (var cai = 0; cai < ctaCandidates.length; cai++) {
+          if (ctaCandidates[cai].parentNode === container) { insertRef = ctaCandidates[cai]; break; }
+        }
+        // If no CTA, try inserting before footer-like elements
+        if (!insertRef) {
+          var fallbacks = container.querySelectorAll('.block-socials, .block-slot-counter');
+          for (var fbi = 0; fbi < fallbacks.length; fbi++) {
+            if (fallbacks[fbi].parentNode === container) { insertRef = fallbacks[fbi]; break; }
+          }
+        }
+        var injected = 0;
+        for (var eti = 0; eti < contentTexts.length; eti++) {
+          var et = contentTexts[eti];
+          if (!et || (!et.ru && !et.am)) continue;
+          var ruVal = (et.ru || '').trim();
+          // Skip if this text already exists in the section
+          if (ruVal && existingRuValues[ruVal]) continue;
+          // Skip if already injected as extra-text
+          var exists = false;
+          section.querySelectorAll('.extra-text').forEach(function(ex) {
+            if ((ex.getAttribute('data-ru') || '').trim() === ruVal) exists = true;
+          });
+          if (exists) continue;
+          var etText = lang === 'am' && et.am ? et.am : (et.ru || '');
+          var etEl = document.createElement('p');
+          etEl.className = 'extra-text section-sub fade-up';
+          etEl.setAttribute('data-ru', et.ru || '');
+          etEl.setAttribute('data-am', et.am || '');
+          etEl.style.cssText = 'text-align:center;color:var(--text-sec);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto;font-size:0.95rem;line-height:1.7';
+          etEl.textContent = etText;
+          if (insertRef) { container.insertBefore(etEl, insertRef); }
+          else { container.appendChild(etEl); }
+          injected++;
+        }
+        if (injected > 0) console.log('[DB] Extra texts injected in', sectionId, ':', injected, 'new');
+      });
+    }
+    
     // ===== 2. REBUILD CALCULATOR FROM DB =====
     if (hasCalc) {
       var calcWrap = document.querySelector('.calc-wrap');
@@ -3190,35 +3287,45 @@ switchLang = function(l) {
     if (db.blockFeatures && db.blockFeatures.length > 0) {
       var footer5 = document.querySelector('footer');
       var mainParent5 = footer5 ? footer5.parentElement : document.querySelector('main') || document.body;
+      // Build a set of existing section IDs in the DOM (both hyphen and underscore)
+      var _existingSectionIds = {};
+      document.querySelectorAll('[data-section-id]').forEach(function(el) {
+        var sid = el.getAttribute('data-section-id') || '';
+        _existingSectionIds[sid] = true;
+        _existingSectionIds[sid.replace(/-/g, '_')] = true;
+        _existingSectionIds[sid.replace(/_/g, '-')] = true;
+      });
       db.blockFeatures.forEach(function(bf) {
-        if (bf.key === 'floating_tg' || bf.block_type === 'floating' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup') return;
+        if (bf.key === 'floating_tg' || bf.key === 'footer' || bf.block_type === 'floating' || bf.block_type === 'footer' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup') return;
         var sectionId = bf.key.replace(/_/g, '-');
-        var existing = document.querySelector('[data-section-id="' + sectionId + '"]');
-        if (existing) return; // already in HTML
+        // Check BOTH formats to prevent duplicate creation
+        if (_existingSectionIds[sectionId] || _existingSectionIds[bf.key]) return;
         // Check visibility from sectionOrder
         if (db.sectionOrder) {
           for (var oi = 0; oi < db.sectionOrder.length; oi++) {
             var so = db.sectionOrder[oi];
-            if ((so.section_id === bf.key || so.section_id === sectionId) && !so.is_visible) return;
+            var soNorm = (so.section_id || '').replace(/_/g, '-');
+            if ((soNorm === sectionId) && !so.is_visible) return;
           }
         }
         // Find texts from content
         var blockTexts = [];
         if (db.content) {
           for (var ck in db.content) {
-            if (ck === bf.key || ck === sectionId) { blockTexts = db.content[ck] || []; break; }
+            var ckNorm = ck.replace(/_/g, '-');
+            if (ckNorm === sectionId) { blockTexts = db.content[ck] || []; break; }
           }
         }
         // Only create section if it has at least some content (title text or photos)
-        var hasContent = false;
+        var hasContent5 = false;
         if (blockTexts.length > 0) {
           for (var tci = 0; tci < blockTexts.length; tci++) {
             var tc = blockTexts[tci];
-            if (tc && (tc.ru || tc.am || (typeof tc === 'string' && tc.trim()))) { hasContent = true; break; }
+            if (tc && (tc.ru || tc.am || (typeof tc === 'string' && tc.trim()))) { hasContent5 = true; break; }
           }
         }
-        if (bf.photos && bf.photos.length > 0) hasContent = true;
-        if (!hasContent) return; // Don't create empty sections
+        if (bf.photos && bf.photos.length > 0) hasContent5 = true;
+        if (!hasContent5) return; // Don't create empty sections
         // Create section element
         var newSec = document.createElement('section');
         newSec.className = 'section fade-up';
@@ -3240,17 +3347,21 @@ switchLang = function(l) {
         newSec.innerHTML = secH;
         if (footer5 && mainParent5) { mainParent5.insertBefore(newSec, footer5); }
         else if (mainParent5) { mainParent5.appendChild(newSec); }
+        // Register so we don't create duplicates
+        _existingSectionIds[sectionId] = true;
+        _existingSectionIds[bf.key] = true;
         console.log('[DB] Created missing section:', sectionId);
       });
     }
     
     // ===== 5b. REORDER ALL SECTIONS (including newly created ones) =====
     if (db.sectionOrder && db.sectionOrder.length > 0) {
-      // Build orderMap with BOTH underscore and hyphen key lookups
+      // Build orderMap with normalized (hyphen) key lookups
       var orderMap = {};
       db.sectionOrder.forEach(function(s) {
+        var norm = (s.section_id || '').replace(/_/g, '-');
+        orderMap[norm] = s;
         orderMap[s.section_id] = s;
-        // Also map the alternate format (hyphen <-> underscore)
         var alt = s.section_id.indexOf('-') >= 0 ? s.section_id.replace(/-/g, '_') : s.section_id.replace(/_/g, '-');
         if (!orderMap[alt]) orderMap[alt] = s;
       });
@@ -3259,9 +3370,36 @@ switchLang = function(l) {
       var parent = allSections.length > 0 ? allSections[0].parentNode : null;
       if (parent) {
         var sectionArr = Array.from(allSections);
+        // Deduplicate: if two sections have same normalized ID, remove the empty/smaller one
+        var _seenNorm = {};
+        var _toRemove = [];
+        sectionArr.forEach(function(sec) {
+          var sid = sec.getAttribute('data-section-id') || '';
+          var norm = sid.replace(/_/g, '-');
+          if (_seenNorm[norm]) {
+            // Duplicate — keep the one with more content
+            var prev = _seenNorm[norm];
+            var prevLen = (prev.innerHTML || '').length;
+            var curLen = (sec.innerHTML || '').length;
+            if (curLen > prevLen) {
+              _toRemove.push(prev);
+              _seenNorm[norm] = sec;
+            } else {
+              _toRemove.push(sec);
+            }
+          } else {
+            _seenNorm[norm] = sec;
+          }
+        });
+        _toRemove.forEach(function(el) { el.remove(); });
+        // Re-query after dedup
+        sectionArr = Array.from(document.querySelectorAll('[data-section-id]'));
+        var activeCount = 0;
         sectionArr.sort(function(a, b) {
-          var oa = orderMap[a.getAttribute('data-section-id')];
-          var ob = orderMap[b.getAttribute('data-section-id')];
+          var aidN = (a.getAttribute('data-section-id') || '').replace(/_/g, '-');
+          var bidN = (b.getAttribute('data-section-id') || '').replace(/_/g, '-');
+          var oa = orderMap[aidN] || orderMap[a.getAttribute('data-section-id')];
+          var ob = orderMap[bidN] || orderMap[b.getAttribute('data-section-id')];
           var sa = oa ? oa.sort_order : 999;
           var sb = ob ? ob.sort_order : 999;
           return sa - sb;
@@ -3269,15 +3407,18 @@ switchLang = function(l) {
         var footer = document.querySelector('footer');
         sectionArr.forEach(function(section) {
           var sid = section.getAttribute('data-section-id');
-          var info = orderMap[sid];
+          var sidNorm = (sid || '').replace(/_/g, '-');
+          var info = orderMap[sidNorm] || orderMap[sid];
           if (info && !info.is_visible) {
             section.style.display = 'none';
+          } else {
+            activeCount++;
           }
           if (footer) {
             parent.insertBefore(section, footer);
           }
         });
-        console.log('[DB] Sections reordered:', db.sectionOrder.length, 'total sections:', sectionArr.length);
+        console.log('[DB] Sections reordered:', db.sectionOrder.length, 'total sections:', sectionArr.length, 'active:', activeCount);
       }
     }
     
@@ -3733,9 +3874,10 @@ switchLang = function(l) {
     if (db.sectionOrder && db.sectionOrder.length > 0) {
       var knownSections = {};
       db.sectionOrder.forEach(function(s) {
+        var norm = (s.section_id || '').replace(/_/g, '-');
+        knownSections[norm] = true;
         knownSections[s.section_id] = true;
-        var alt = s.section_id.indexOf('-') >= 0 ? s.section_id.replace(/-/g, '_') : s.section_id.replace(/_/g, '-');
-        knownSections[alt] = true;
+        knownSections[s.section_id.replace(/-/g, '_')] = true;
       });
       // Also keep system sections
       knownSections['nav'] = true;
@@ -3743,16 +3885,33 @@ switchLang = function(l) {
       knownSections['floating_tg'] = true;
       knownSections['floating-tg'] = true;
       knownSections['popup'] = true;
+      // Keep dynamically created slot counters and photo blocks
       document.querySelectorAll('[data-section-id]').forEach(function(sec) {
-        var sid = sec.getAttribute('data-section-id');
-        if (!knownSections[sid] && sec.style.display !== 'none') {
+        var sid = sec.getAttribute('data-section-id') || '';
+        var sidNorm = sid.replace(/_/g, '-');
+        if (sid.indexOf('slot-counter-') === 0 || sid.indexOf('photo-block-') === 0) return; // skip dynamic sections
+        if (!knownSections[sid] && !knownSections[sidNorm] && sec.style.display !== 'none') {
           sec.style.display = 'none';
           console.log('[DB] Hidden deleted section:', sid);
         }
       });
     }
     
-    console.log('[DB] All dynamic data applied v4');
+    // ===== REMOVE EMPTY GAP SECTIONS =====
+    // Clean up any sections that ended up empty (no visible content) to prevent gaps before footer
+    document.querySelectorAll('section.section[data-section-id]').forEach(function(sec) {
+      if (sec.style.display === 'none') return;
+      var textContent = (sec.textContent || '').trim();
+      var hasImages = sec.querySelector('img');
+      var hasForm = sec.querySelector('form, input, select, textarea');
+      var hasCards = sec.querySelector('.svc-card, .faq-item, .guarantee-card, .wh-grid, .process-grid, .calc-wrap, .contact-grid, .buyout-grid, .compare-box, .rv-carousel, .block-photo-gallery, .reviews-carousel-wrap, .block-socials, .block-slot-counter');
+      if (!textContent && !hasImages && !hasForm && !hasCards) {
+        sec.style.display = 'none';
+        console.log('[DB] Removed empty section:', sec.getAttribute('data-section-id'));
+      }
+    });
+    
+    console.log('[DB] All dynamic data applied v5');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
   }

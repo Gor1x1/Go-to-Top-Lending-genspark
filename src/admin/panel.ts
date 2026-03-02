@@ -61,6 +61,8 @@ export function getAdminHTML(): string {
   .sb-block-item.sortable-chosen { box-shadow: 0 8px 40px rgba(139,92,246,0.35); transform: scale(1.01); z-index: 10; }
   .section-edit-row.sortable-ghost { opacity: 0.4; background: #1a2236 !important; border-color: #8B5CF6 !important; }
   .section-edit-row.sortable-chosen { box-shadow: 0 4px 20px rgba(139,92,246,0.3); transform: scale(1.01); z-index: 10; }
+  .sb-photo-item.sortable-ghost { opacity: 0.4; background: #0f172a !important; border-color: #8B5CF6 !important; }
+  .sb-photo-item.sortable-chosen { box-shadow: 0 4px 20px rgba(139,92,246,0.3); transform: scale(1.01); z-index: 10; }
   .calc-drag-handle { cursor: grab !important; touch-action: none; user-select: none; }
   .calc-drag-handle:active { cursor: grabbing !important; }
   .sb-drag-handle { cursor: grab; padding: 10px 12px; color: #64748b; transition: color 0.2s, background 0.2s; display: flex; align-items: center; justify-content: center; border-radius: 8px; min-width: 40px; min-height: 40px; }
@@ -10528,12 +10530,13 @@ function renderSiteBlocks() {
 
           // Additional photos gallery
           if (blockPhotos.length > 0) {
-            h += '<div style="font-size:0.72rem;color:#94a3b8;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-th" style="margin-right:4px"></i>Галерея (' + blockPhotos.length + ')</div>';
+            h += '<div style="font-size:0.72rem;color:#94a3b8;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-th" style="margin-right:4px"></i>Галерея (' + blockPhotos.length + ') <span style="font-weight:400;color:#64748b;font-size:0.65rem;margin-left:8px"><i class="fas fa-grip-vertical"></i> перетащите для сортировки</span></div>';
           }
-          h += '<div style="margin-bottom:6px">';
+          h += '<div id="sb_photo_list_' + b.id + '" style="margin-bottom:6px">';
           for (var phi = 0; phi < blockPhotos.length; phi++) {
             var ph = blockPhotos[phi];
-            h += '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;flex-wrap:wrap">';
+            h += '<div class="sb-photo-item" data-photo-idx="' + phi + '" style="display:flex;gap:8px;margin-bottom:6px;align-items:center;padding:6px 8px;background:#1a2236;border-radius:8px;border:1px solid #293548;flex-wrap:wrap;cursor:grab">';
+            h += '<i class="fas fa-grip-vertical sb-photo-drag" style="color:#475569;cursor:grab;font-size:0.85rem;padding:4px"></i>';
             if (ph.url) h += '<img src="' + escHtml(ph.url) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
             h += '<input class="input" id="sb_photo_' + b.id + '_' + phi + '" value="' + escHtml(ph.url || '') + '" placeholder="URL фото" style="flex:1;font-size:0.78rem;color:#60a5fa;min-width:150px" onchange="sbAutoSave(' + b.id + ')">';
             h += '<label class="btn btn-outline" style="padding:4px 10px;font-size:0.68rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:3px"></i>Загр.<input type="file" accept="image/*" style="display:none" onchange="sbUploadPhoto(this,' + b.id + ',&apos;gallery&apos;,' + phi + ')"></label>';
@@ -10675,7 +10678,7 @@ function renderSiteBlocks() {
   h += '</div>'; // end wrapper
 
   // ── Post-render: init SortableJS ──
-  setTimeout(function() { sbInitSortable(); }, 50);
+  setTimeout(function() { sbInitSortable(); sbInitPhotoSortables(); }, 50);
 
   return h;
 }
@@ -10725,6 +10728,63 @@ function sbInitSortable() {
       sbReorderAfterDrag();
     }
   });
+}
+
+// ── Init SortableJS on ALL photo galleries in blocks ──
+var _photoSortables = [];
+function sbInitPhotoSortables() {
+  // Destroy old instances
+  _photoSortables.forEach(function(s) { try { s.destroy(); } catch(e) {} });
+  _photoSortables = [];
+  // Find all photo list containers
+  document.querySelectorAll('[id^="sb_photo_list_"]').forEach(function(el) {
+    var blockId = parseInt(el.id.replace('sb_photo_list_', ''));
+    if (isNaN(blockId)) return;
+    var inst = new Sortable(el, {
+      handle: '.sb-photo-drag',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      onEnd: function(evt) {
+        if (evt.oldIndex === evt.newIndex) return;
+        sbReorderPhotos(blockId, el);
+      }
+    });
+    _photoSortables.push(inst);
+  });
+}
+
+// ── Reorder photos after drag-and-drop ──
+function sbReorderPhotos(blockId, container) {
+  var items = container.querySelectorAll('.sb-photo-item');
+  var block = null;
+  for (var i = 0; i < (data.siteBlocks || []).length; i++) {
+    if (data.siteBlocks[i].id === blockId) { block = data.siteBlocks[i]; break; }
+  }
+  if (!block) return;
+  var photos = [];
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch(e) { photos = []; }
+  if (!photos.length) return;
+  // Build new order from DOM
+  var newPhotos = [];
+  items.forEach(function(item) {
+    var oldIdx = parseInt(item.getAttribute('data-photo-idx'));
+    if (!isNaN(oldIdx) && photos[oldIdx]) {
+      newPhotos.push(photos[oldIdx]);
+    }
+  });
+  // Update block data
+  block.photos_json = JSON.stringify(newPhotos);
+  // Re-assign indices and input IDs
+  items.forEach(function(item, newIdx) {
+    item.setAttribute('data-photo-idx', newIdx);
+    var urlInput = item.querySelector('input[id^="sb_photo_' + blockId + '_"]');
+    if (urlInput) urlInput.id = 'sb_photo_' + blockId + '_' + newIdx;
+    var capInput = item.querySelector('input[id^="sb_photocap_' + blockId + '_"]');
+    if (capInput) capInput.id = 'sb_photocap_' + blockId + '_' + newIdx;
+  });
+  toast('Порядок фото обновлён');
+  sbAutoSave(blockId);
 }
 
 // ── Reorder after drag-and-drop ──
