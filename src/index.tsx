@@ -104,7 +104,12 @@ app.get('/api/site-data', async (c) => {
       const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
-        try { socials = JSON.parse(blk.social_links as string || '[]'); } catch { socials = []; }
+        try { 
+          let parsed = JSON.parse(blk.social_links as string || '[]'); 
+          // Handle double-encoded JSON strings
+          if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch { parsed = []; } }
+          socials = Array.isArray(parsed) ? parsed : [];
+        } catch { socials = []; }
         let blockOpts: any = {};
         try { blockOpts = JSON.parse(blk.custom_html as string || '{}'); } catch { blockOpts = {}; }
         let blockPhotos: any[] = [];
@@ -1092,9 +1097,9 @@ img{max-width:100%;height:auto}
 .calc-float{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;align-items:center;gap:10px;padding:14px 22px;background:linear-gradient(135deg,#10B981,#059669);color:white;border-radius:50px;box-shadow:0 8px 30px rgba(16,185,129,0.4);transition:var(--t);font-weight:600;font-size:0.88rem;cursor:pointer}
 .calc-float:hover{transform:translateY(-3px) scale(1.03);box-shadow:0 12px 40px rgba(16,185,129,0.5)}
 .calc-float i{font-size:1.1rem}
-.lightbox{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center;padding:40px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.lightbox{display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.95);z-index:9999;align-items:center;justify-content:center;padding:40px;cursor:pointer;-webkit-tap-highlight-color:transparent;overflow-y:auto}
 .lightbox.show{display:flex}
-.lightbox img{max-width:92%;max-height:90vh;border-radius:var(--r);object-fit:contain}
+.lightbox img{max-width:92%;max-height:90vh;border-radius:var(--r);object-fit:contain;-webkit-user-drag:none;user-select:none}
 @media(max-width:768px){.lightbox{padding:12px}.lightbox img{max-width:98%;max-height:85vh;border-radius:8px}}
 
 /* ===== CTA BUTTONS AFTER SECTIONS ===== */
@@ -1246,16 +1251,15 @@ img{max-width:100%;height:auto}
 .reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:32px}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
-.rv-carousel{position:relative;max-width:420px;margin:0 auto;overflow:hidden;border-radius:20px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
+.rv-carousel{position:relative;width:100%;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
-.rv-carousel .rv-slide img{width:100%;height:auto;min-height:280px;max-height:520px;object-fit:contain;display:block;background:#0a0a1a}
+.rv-carousel .rv-slide img{width:100%;height:auto;min-height:340px;max-height:80vh;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
-.rv-carousel .rv-caption-text::before{content:'\201c';color:var(--purple,#8B5CF6);font-size:1.4rem;font-weight:700;margin-right:4px;line-height:0}
 .rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
-.rv-carousel .rv-nav-btn{position:absolute;top:50%;transform:translateY(-70%);width:44px;height:44px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:3;transition:transform 0.2s,background 0.2s}
-.rv-carousel .rv-nav-btn:hover{background:var(--purple,#8B5CF6);transform:translateY(-70%) scale(1.1)}
+.rv-carousel .rv-nav-btn{position:absolute;top:45%;transform:translateY(-50%);width:44px;height:44px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:3;transition:transform 0.2s,background 0.2s}
+.rv-carousel .rv-nav-btn:hover{background:var(--purple,#8B5CF6);transform:translateY(-50%) scale(1.1)}
 .rv-carousel .rv-nav-btn.rv-prev{left:10px}
 .rv-carousel .rv-nav-btn.rv-next{right:10px}
 .rv-dots{display:flex;justify-content:center;gap:8px;margin-top:16px}
@@ -1263,18 +1267,24 @@ img{max-width:100%;height:auto}
 .rv-dots .rv-dot.active{background:var(--purple,#8B5CF6);transform:scale(1.3);box-shadow:0 0 8px rgba(139,92,246,0.5)}
 .rv-swipe-hint{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:12px;font-size:0.82rem;color:var(--text-muted,#666);animation:rvSwipeHint 2.5s ease-in-out infinite}
 @keyframes rvSwipeHint{0%,100%{opacity:0.6;transform:translateX(0)}50%{opacity:1;transform:translateX(6px)}}
+/* Lightbox navigation */
+.lightbox .lb-nav{position:absolute;top:50%;transform:translateY(-50%);width:50px;height:50px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1.3rem;display:flex;align-items:center;justify-content:center;z-index:10001;transition:transform 0.2s}
+.lightbox .lb-nav:hover{transform:translateY(-50%) scale(1.15)}
+.lightbox .lb-prev{left:16px}
+.lightbox .lb-next{right:16px}
+.lightbox .lb-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;border:none;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;z-index:10001}
 @media(max-width:768px){
-  .rv-carousel{max-width:92vw;border-radius:16px}
-  .rv-carousel .rv-slide img{min-height:220px;max-height:440px}
+  .rv-carousel .rv-slide img{min-height:240px;max-height:70vh}
   .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
+  .lightbox .lb-nav{width:40px;height:40px;font-size:1rem}
 }
 @media(max-width:480px){
-  .rv-carousel{max-width:96vw;border-radius:14px}
-  .rv-carousel .rv-slide img{min-height:180px;max-height:380px}
+  .rv-carousel .rv-slide img{min-height:200px;max-height:60vh}
   .rv-carousel .rv-caption{padding:12px 16px}
   .rv-carousel .rv-caption-text{font-size:0.85rem}
   .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
   .rv-dots .rv-dot{width:8px;height:8px}
+  .lightbox .lb-nav{width:36px;height:36px;font-size:0.9rem}
 }
 .review-point{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;transition:var(--t)}
 .review-point:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-3px)}
@@ -2025,14 +2035,14 @@ img{max-width:100%;height:auto}
       <span data-ru="Фото отзывов загружаются..." data-am="Կարծիքների լուսանկարները բեռնվում են...">Фото отзывов загружаются...</span>
     </div>
   </div>
-  <!-- Dynamic CTA buttons injected here -->
-  <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:32px;text-align:center"></div>
   <!-- Motivational text under reviews -->
   <div class="reviews-bottom-text fade-up" style="text-align:center;margin-top:28px;padding:20px 16px;max-width:720px;margin-left:auto;margin-right:auto">
     <p style="font-size:1.02rem;line-height:1.75;color:var(--text-secondary,#aaa);margin-bottom:0">
       <span data-ru="Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке." data-am="Ամեն սքրինշոթ — մեր հաճախորդների իրական վիճակագրությունն է: Մենք չենք խոստանում — մենք ցույց ենք տալիս արդյունքները: Անվտանգ գնումներ իրական մարդկանցով, պատվերների աճ և օրգանական դիրքեր ՏՕՊ-ում: Ձեր ապրանքը կարող է լինել հաջորդը այս ցուցակում:">Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке.</span>
     </p>
   </div>
+  <!-- Dynamic CTA buttons injected here (below text) -->
+  <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:20px;text-align:center"></div>
 </div>
 </section>
 
@@ -2168,8 +2178,11 @@ img{max-width:100%;height:auto}
 </a>
 
 <!-- LIGHTBOX -->
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+<div class="lightbox" id="lightbox" onclick="lbClickHandler(event)">
+  <button class="lb-close" onclick="closeLightbox()"><i class="fas fa-times"></i></button>
+  <button class="lb-nav lb-prev" onclick="event.stopPropagation();lbNav(-1)"><i class="fas fa-chevron-left"></i></button>
   <img id="lightboxImg" src="" alt="">
+  <button class="lb-nav lb-next" onclick="event.stopPropagation();lbNav(1)"><i class="fas fa-chevron-right"></i></button>
 </div>
 
 <!-- ===== POPUP (5 sec) ===== -->
@@ -2381,9 +2394,71 @@ function toggleFaq(el) {
   if (!was) item.classList.add('active');
 }
 
-/* ===== LIGHTBOX ===== */
-function openLightbox(elOrUrl) { var src = typeof elOrUrl === 'string' ? elOrUrl : elOrUrl.querySelector('img').src; document.getElementById('lightboxImg').src = src; document.getElementById('lightbox').classList.add('show'); }
+/* ===== LIGHTBOX WITH NAVIGATION ===== */
+var _lbPhotos = [];
+var _lbIdx = 0;
+function openLightbox(elOrUrl) {
+  var src = typeof elOrUrl === 'string' ? elOrUrl : elOrUrl.querySelector('img').src;
+  // Collect all photos from the current carousel or gallery for navigation
+  _lbPhotos = [];
+  _lbIdx = 0;
+  // Try to get photos from the reviews carousel
+  var rvTrack = document.querySelector('.rv-track');
+  if (rvTrack) {
+    var slides = rvTrack.querySelectorAll('.rv-slide img');
+    for (var si = 0; si < slides.length; si++) {
+      _lbPhotos.push(slides[si].src);
+      if (slides[si].src === src || slides[si].src.indexOf(src) >= 0 || src.indexOf(slides[si].getAttribute('src')) >= 0) _lbIdx = si;
+    }
+  }
+  // If no carousel photos found, try photo blocks
+  if (_lbPhotos.length === 0) {
+    var pbCards = document.querySelectorAll('.pb-card img');
+    for (var pi = 0; pi < pbCards.length; pi++) {
+      _lbPhotos.push(pbCards[pi].src);
+      if (pbCards[pi].src === src) _lbIdx = pi;
+    }
+  }
+  // Fallback: single photo
+  if (_lbPhotos.length === 0) { _lbPhotos = [src]; _lbIdx = 0; }
+  document.getElementById('lightboxImg').src = src;
+  document.getElementById('lightbox').classList.add('show');
+  // Show/hide nav buttons
+  var prevBtn = document.querySelector('.lb-prev');
+  var nextBtn = document.querySelector('.lb-next');
+  if (prevBtn) prevBtn.style.display = _lbPhotos.length > 1 ? 'flex' : 'none';
+  if (nextBtn) nextBtn.style.display = _lbPhotos.length > 1 ? 'flex' : 'none';
+}
 function closeLightbox() { document.getElementById('lightbox').classList.remove('show'); }
+function lbNav(dir) {
+  if (_lbPhotos.length <= 1) return;
+  _lbIdx += dir;
+  if (_lbIdx < 0) _lbIdx = _lbPhotos.length - 1;
+  if (_lbIdx >= _lbPhotos.length) _lbIdx = 0;
+  document.getElementById('lightboxImg').src = _lbPhotos[_lbIdx];
+}
+function lbClickHandler(e) {
+  // Close only if clicking the backdrop (not the image or buttons)
+  if (e.target.id === 'lightbox') closeLightbox();
+}
+// Lightbox keyboard + touch
+document.addEventListener('keydown', function(e) {
+  var lb = document.getElementById('lightbox');
+  if (!lb || !lb.classList.contains('show')) return;
+  if (e.key === 'Escape') closeLightbox();
+  if (e.key === 'ArrowLeft') lbNav(-1);
+  if (e.key === 'ArrowRight') lbNav(1);
+});
+(function() {
+  var lb = document.getElementById('lightbox');
+  if (!lb) return;
+  var lbStartX = 0;
+  lb.addEventListener('touchstart', function(e) { lbStartX = e.touches[0].clientX; }, {passive:true});
+  lb.addEventListener('touchend', function(e) {
+    var diff = e.changedTouches[0].clientX - lbStartX;
+    if (Math.abs(diff) > 50) { lbNav(diff < 0 ? 1 : -1); }
+  }, {passive:true});
+})();
 
 // Reviews carousel scroll helper (legacy — kept for photo_blocks)
 function rcScroll(carId, dir) {
@@ -3226,7 +3301,7 @@ switchLang = function(l) {
                 cH += '<div class="rv-slide">' +
                   '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
                   '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="' + (pi === 0 ? 'eager' : 'lazy') + '" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-                  '<div class="rv-caption"><div class="rv-caption-text">' + captionText + '</div></div>' +
+                  '<div class="rv-caption"><div class="rv-caption-text"><i class="fas fa-quote-left" style="font-size:0.7em;margin-right:6px;opacity:0.5;vertical-align:top"></i>' + captionText + '</div></div>' +
                 '</div>';
               });
               cH += '</div>';
@@ -3247,33 +3322,55 @@ switchLang = function(l) {
                 dotsH += '<div class="rv-swipe-hint"><i class="fas fa-hand-pointer" style="color:var(--purple,#8B5CF6)"></i> <span data-ru="\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430" data-am="\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u043b\u0578\u0582">' + (lang === 'am' ? '\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u043b\u0578\u0582' : '\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430') + '</span> <i class="fas fa-arrow-right" style="font-size:0.75rem;animation:rvSwipeHint 2s ease-in-out infinite"></i></div>';
               }
               dotsDiv.innerHTML = dotsH;
-              // Counter
-              var counterDiv = document.createElement('div');
-              counterDiv.style.cssText = 'text-align:center;margin-top:14px;font-size:0.85rem;color:var(--text-muted,#666)';
-              counterDiv.innerHTML = '<i class="fas fa-images" style="margin-right:6px;color:var(--purple,#8B5CF6)"></i>' + validPhotos.length + ' ' + (lang === 'am' ? '\u057d\u0584\u0580\u056b\u0576\u0577\u0578\u0569' : '\u0441\u043a\u0440\u0438\u043d\u0448\u043e\u0442\u043e\u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0445 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u043e\u0432');
-              // Place into DOM
+              // Place into DOM (NO counter text — removed per user request)
               var placeholder = section.querySelector('#reviewsCarouselArea');
               if (placeholder) {
                 placeholder.innerHTML = '';
                 placeholder.appendChild(carouselWrap);
                 placeholder.appendChild(dotsDiv);
-                placeholder.appendChild(counterDiv);
               } else {
                 var container = section.querySelector('.container');
-                if (container) { container.appendChild(carouselWrap); container.appendChild(dotsDiv); container.appendChild(counterDiv); }
-                else { section.appendChild(carouselWrap); section.appendChild(dotsDiv); section.appendChild(counterDiv); }
+                if (container) { container.appendChild(carouselWrap); container.appendChild(dotsDiv); }
+                else { section.appendChild(carouselWrap); section.appendChild(dotsDiv); }
               }
-              // Touch swipe support
+              // Touch swipe support with drag feedback
               (function(cid) {
                 var track = document.getElementById(cid + '_track');
                 if (!track) return;
-                var startX = 0, isDragging = false;
-                track.addEventListener('touchstart', function(e) { startX = e.touches[0].clientX; isDragging = true; }, {passive:true});
+                var startX = 0, currentX = 0, isDragging = false, startTime = 0;
+                var carousel = track.parentElement;
+                track.addEventListener('touchstart', function(e) {
+                  startX = e.touches[0].clientX;
+                  currentX = startX;
+                  isDragging = true;
+                  startTime = Date.now();
+                  track.style.transition = 'none';
+                }, {passive:true});
+                track.addEventListener('touchmove', function(e) {
+                  if (!isDragging) return;
+                  currentX = e.touches[0].clientX;
+                  var diff = currentX - startX;
+                  var state = _rvState[cid] || { idx: 0, total: 0 };
+                  var baseOffset = -(state.idx * 100);
+                  var movePercent = (diff / (carousel ? carousel.offsetWidth : 400)) * 100;
+                  track.style.transform = 'translateX(' + (baseOffset + movePercent) + '%)';
+                  if (Math.abs(diff) > 10) { e.preventDefault(); }
+                }, {passive:false});
                 track.addEventListener('touchend', function(e) {
                   if (!isDragging) return;
                   isDragging = false;
+                  track.style.transition = 'transform 0.45s cubic-bezier(.4,0,.2,1)';
                   var diff = e.changedTouches[0].clientX - startX;
-                  if (Math.abs(diff) > 40) { rvSlide(cid, diff < 0 ? 1 : -1); }
+                  var elapsed = Date.now() - startTime;
+                  // Swipe threshold: 40px or fast flick (>0.3px/ms)
+                  var velocity = Math.abs(diff) / Math.max(elapsed, 1);
+                  if (Math.abs(diff) > 40 || (velocity > 0.3 && Math.abs(diff) > 15)) {
+                    rvSlide(cid, diff < 0 ? 1 : -1);
+                  } else {
+                    // Snap back
+                    var state = _rvState[cid] || { idx: 0, total: 0 };
+                    track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
+                  }
                 }, {passive:true});
               })(carId);
             } else {
@@ -3298,7 +3395,11 @@ switchLang = function(l) {
         }
         
         // Inject social links if socials have URLs (no toggle required)
-        if (bf.social_links && bf.social_links.length > 0 && bf.social_links.some(function(s) { return !!s.url; })) {
+        // Guard: social_links might be a string instead of array (DB parsing issue)
+        var socLinks = bf.social_links;
+        if (typeof socLinks === 'string') { try { socLinks = JSON.parse(socLinks); } catch(e) { socLinks = []; } }
+        if (!Array.isArray(socLinks)) socLinks = [];
+        if (socLinks.length > 0 && socLinks.some(function(s) { return !!s.url; })) {
           // Remove existing social container if any
           var existing = section.querySelector('.block-socials');
           if (existing) existing.remove();
@@ -3322,7 +3423,7 @@ switchLang = function(l) {
           
           // Icons row
           socH += '<div style="display:flex;gap:' + socGap + 'px;justify-content:' + (justifyMap[socAlign] || 'center') + ';align-items:flex-start;flex-wrap:wrap">';
-          bf.social_links.forEach(function(s) {
+          socLinks.forEach(function(s) {
             if (!s.url) return;
             var icon = socialIcons[s.type] || 'fas fa-link';
             var color = s.bg_color || socialColors[s.type] || '#8B5CF6';

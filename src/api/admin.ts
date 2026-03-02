@@ -1440,7 +1440,17 @@ api.put('/site-blocks/:id', authMiddleware, async (c) => {
   if (d.custom_html !== undefined) { fields.push('custom_html=?'); vals.push(d.custom_html); }
   if (d.is_visible !== undefined) { fields.push('is_visible=?'); vals.push(d.is_visible ? 1 : 0); }
   if (d.sort_order !== undefined) { fields.push('sort_order=?'); vals.push(d.sort_order); }
-  if (d.social_links !== undefined) { fields.push('social_links=?'); vals.push(typeof d.social_links === 'string' ? d.social_links : JSON.stringify(d.social_links)); }
+  if (d.social_links !== undefined) { 
+    fields.push('social_links=?'); 
+    // Prevent double-encoding: if it's already a string, validate it's proper JSON array
+    let slVal = d.social_links;
+    if (typeof slVal === 'string') {
+      try { const parsed = JSON.parse(slVal); slVal = JSON.stringify(Array.isArray(parsed) ? parsed : []); } catch { slVal = '[]'; }
+    } else {
+      slVal = JSON.stringify(Array.isArray(slVal) ? slVal : []);
+    }
+    vals.push(slVal);
+  }
   if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
