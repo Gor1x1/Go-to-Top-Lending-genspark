@@ -1144,6 +1144,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 /* ===== CTA BUTTONS AFTER SECTIONS ===== */
 .section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
+.slot-counter-bar .section-cta{margin-top:0;padding-top:0;border-top:none;padding-bottom:16px}
+.slot-counter-bar .section-cta:empty{display:none}
 .section-cta .btn{font-size:0.9rem;padding:12px 24px}
 .section-cta .btn i{margin-right:6px}
 .btn-success{background:linear-gradient(135deg,#10B981,#059669);color:white;box-shadow:0 4px 15px rgba(16,185,129,0.3)}
@@ -3353,7 +3355,9 @@ switchLang = function(l) {
               '<div style="width:200px;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden">' +
                 '<div style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;transition:width 1s ease;width:' + scPct + '%"></div>' +
               '</div>' +
-            '</div></div>';
+            '</div>' +
+            '<div class="section-cta" style="padding-bottom:16px"></div>' +
+          '</div>';
           
           // Insert before footer
           if (footer5) mainParent5.insertBefore(scEl, footer5);
@@ -3410,6 +3414,7 @@ switchLang = function(l) {
             secH += '<p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto"><span data-ru="' + (t.ru||'') + '" data-am="' + (t.am||'') + '">' + tText + '</span></p>';
           }
         }
+        secH += '<div class="section-cta"></div>';
         secH += '</div>';
         newSec.innerHTML = secH;
         if (footer5 && mainParent5) { mainParent5.insertBefore(newSec, footer5); }
@@ -3864,11 +3869,21 @@ switchLang = function(l) {
               existingBtns.push(btn);
             }
             
-            // 3. If the CTA container is empty (e.g. reviewsCtaArea) and we have NO other buttons, CREATE buttons
-            var ctaIsEmpty = ctaContainer && ctaContainer.children.length === 0 && ctaContainer.id === 'reviewsCtaArea';
+            // 3. If no CTA container exists at all, CREATE one inside the section
+            if (!ctaContainer && existingBtns.length === 0) {
+              var containerEl = section.querySelector('.container');
+              if (containerEl) {
+                ctaContainer = document.createElement('div');
+                ctaContainer.className = 'section-cta';
+                containerEl.appendChild(ctaContainer);
+              }
+            }
+            
+            var ctaIsEmpty = ctaContainer && ctaContainer.children.length === 0;
             
             if (existingBtns.length === 0 && ctaIsEmpty) {
-              // Empty CTA area (like reviews) — safe to inject buttons
+              // Empty CTA area — safe to inject buttons
+              var _injectedCount = 0;
               for (var bNew = 0; bNew < bf.buttons.length; bNew++) {
                 var dbBtnNew = bf.buttons[bNew];
                 if (!dbBtnNew.text_ru && !dbBtnNew.text_am) continue;
@@ -3884,7 +3899,9 @@ switchLang = function(l) {
                 newBtn.setAttribute('target', '_blank');
                 newBtn.innerHTML = '<i class="' + btnIconNew + '"></i> <span data-ru="' + (dbBtnNew.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtnNew.text_am||'').replace(/"/g,'&quot;') + '">' + btnTextNew + '</span>';
                 ctaContainer.appendChild(newBtn);
+                _injectedCount++;
               }
+              if (_injectedCount > 0) console.log('[DB] Injected', _injectedCount, 'buttons into section:', sectionIdH);
             } else if (existingBtns.length > 0) {
               // 4. UPDATE existing buttons with DB data (URL, text, icon) — NO new elements created
               var dbBtnIdx = 0;
@@ -3990,6 +4007,7 @@ switchLang = function(l) {
       var hasImages = sec.querySelector('img');
       var hasForm = sec.querySelector('form, input, select, textarea');
       var hasCards = sec.querySelector('.svc-card, .faq-item, .guarantee-card, .wh-grid, .process-grid, .calc-wrap, .contact-grid, .buyout-grid, .compare-box, .rv-carousel, .block-photo-gallery, .reviews-carousel-wrap, .block-socials, .block-slot-counter, .about-grid, .hero-grid, .compare-row, .wb-banner-card, .ticker-track, .stats-grid');
+      var hasButtons = sec.querySelector('.section-cta a.btn, .section-cta a.btn-tg, a.btn-primary');
       var isPlaceholder = false;
       if (textContent) {
         var lc = textContent.toLowerCase();
@@ -4001,7 +4019,7 @@ switchLang = function(l) {
           isPlaceholder = true;
         }
       }
-      if ((!textContent || isPlaceholder) && !hasImages && !hasForm && !hasCards) {
+      if ((!textContent || isPlaceholder) && !hasImages && !hasForm && !hasCards && !hasButtons) {
         sec.style.display = 'none';
         sec.style.setProperty('margin', '0', 'important');
         sec.style.setProperty('padding', '0', 'important');
