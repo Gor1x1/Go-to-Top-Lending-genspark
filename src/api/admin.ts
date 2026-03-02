@@ -1170,6 +1170,12 @@ api.delete('/slot-counter/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+api.delete('/slot-counter-all', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  await db.prepare('DELETE FROM slot_counter').run();
+  return c.json({ success: true, message: 'All slot counters deleted' });
+});
+
 // ===== FOOTER SETTINGS =====
 api.get('/footer', authMiddleware, async (c) => {
   const db = c.env.DB;

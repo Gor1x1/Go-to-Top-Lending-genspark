@@ -1570,24 +1570,6 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 </div>
 </div>
 
-<!-- ===== SLOT COUNTER ===== -->
-<div class="slot-counter-bar fade-up" data-section-id="slot-counter" id="slotCounterSection" style="display:none">
-<div class="container">
-  <div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0">
-    <div style="display:flex;align-items:center;gap:12px">
-      <div style="width:14px;height:14px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>
-      <span id="slotLabel" data-ru="Свободных мест на этой неделе" data-am="Այս շաբաթի ազատ տեղեր" style="font-size:1rem;font-weight:600;color:var(--text-secondary)">Свободных мест на этой неделе</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px">
-      <span id="slotFreeCount" style="font-size:2.2rem;font-weight:900;color:var(--purple)">—</span>
-      <span style="font-size:0.85rem;color:var(--text-muted)">/ <span id="slotTotalCount">—</span></span>
-    </div>
-    <div id="slotProgress" style="width:200px;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden">
-      <div id="slotProgressBar" style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;transition:width 1s ease;width:0%"></div>
-    </div>
-  </div>
-</div>
-</div>
 
 <!-- ===== ABOUT ===== -->
 <section class="section" id="about" data-section-id="about">
@@ -3957,24 +3939,37 @@ switchLang = function(l) {
       }
     });
     
-    // ===== FINAL CLEANUP: Remove ALL invisible elements before footer =====
+    // ===== FINAL CLEANUP: Remove ALL elements between contact and footer =====
     var _ft = document.querySelector('footer');
     if (_ft) {
-      // Walk backwards from footer and physically REMOVE hidden elements
+      // AGGRESSIVE: Remove every hidden/empty sibling before footer
       var prev = _ft.previousElementSibling;
       while (prev) {
         var _prev2 = prev.previousElementSibling;
+        var sid = prev.getAttribute('data-section-id') || prev.id || '';
         var isHidden = prev.style.display === 'none' || 
-                       getComputedStyle(prev).display === 'none' ||
                        (prev.offsetHeight === 0 && prev.offsetWidth === 0);
-        if (isHidden) {
+        // Remove if hidden OR if it's a slot-counter placeholder
+        if (isHidden || sid === 'slot-counter' || sid.indexOf('slotCounter') === 0) {
           prev.remove();
-          console.log('[DB] Removed hidden element before footer:', prev.id || prev.getAttribute('data-section-id') || prev.tagName);
-        } else {
-          break; // Stop at first visible element
+          console.log('[DB] Removed element before footer:', sid || prev.tagName);
+          prev = _prev2;
+          continue;
         }
-        prev = _prev2;
+        // Check if element is actually empty (no real content)
+        var hasRealContent = (prev.textContent || '').trim().length > 5 || 
+                             prev.querySelector('img, form, input, canvas, video');
+        if (!hasRealContent) {
+          prev.remove();
+          console.log('[DB] Removed empty element before footer:', sid || prev.tagName);
+          prev = _prev2;
+          continue;
+        }
+        break; // Stop at first real visible element
       }
+      // Set margin/padding on footer to 0 to prevent gap
+      _ft.style.marginTop = '0';
+      _ft.style.paddingTop = '48px';
     }
     
     console.log('[DB] All dynamic data applied v5');
@@ -4042,8 +4037,9 @@ async function checkRefCode() {
     var counters = data.counters || [];
     if (!counters.length) return;
     // Remove old static slot counter section
+    // Remove legacy static slot counter section (if any)
     var oldSection = document.getElementById('slotCounterSection');
-    if (oldSection) oldSection.style.display = 'none';
+    if (oldSection) oldSection.remove();
 
     counters.forEach(function(d, idx) {
       if (!d.show_timer) return;
