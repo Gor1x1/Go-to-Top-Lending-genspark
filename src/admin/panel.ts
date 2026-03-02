@@ -10174,7 +10174,6 @@ function renderSiteBlocks() {
       // Quick actions
       h += '<div style="display:flex;gap:3px" onclick="event.stopPropagation()">';
       h += '<button class="btn ' + (b.is_visible ? 'btn-outline' : 'btn-danger') + '" style="padding:4px 8px;font-size:0.72rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')" title="' + (b.is_visible ? 'Скрыть блок' : 'Показать блок') + '">' + (b.is_visible ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>';
-      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem" onclick="dupSiteBlock(' + b.id + ')" title="Создать копию"><i class="fas fa-copy"></i></button>';
       h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem;color:#f87171;border-color:rgba(248,113,113,0.3)" onclick="delSiteBlock(' + b.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
       h += '</div>';
 
@@ -10462,7 +10461,7 @@ function renderSiteBlocks() {
           if (isReviewsBlock) dimHint = '280×360px (вертикальный скриншот отзыва)';
           
           h += '<div style="margin-bottom:16px">';
-          h += '<details' + (blockPhotos.length > 0 || opts.photo_url || isReviewsBlock ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>' + (isReviewsBlock ? 'Скриншоты отзывов (карусель)' : 'Фото блока') + ' <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
+          h += '<details' + (blockPhotos.length > 0 || opts.photo_url || isReviewsBlock ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>' + (isReviewsBlock ? 'Скриншоты отзывов (сетка)' : 'Фото блока') + ' <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
           
           // Photo size recommendation
           h += '<div style="padding:6px 10px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:6px">' +
@@ -10472,7 +10471,7 @@ function renderSiteBlocks() {
           if (isReviewsBlock) {
             h += '<div style="padding:8px 12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:8px">' +
               '<i class="fas fa-star" style="color:#F59E0B;font-size:0.85rem"></i>' +
-              '<span style="font-size:0.75rem;color:#F59E0B">Блок отзывов: фото отображаются как горизонтальная карусель с навигацией. Загрузите скриншоты отзывов — они автоматически будут в формате слайдера.</span>' +
+              '<span style="font-size:0.75rem;color:#F59E0B">Блок отзывов: фото отображаются как адаптивная сетка с возможностью увеличения. Загрузите скриншоты отзывов — они автоматически появятся в красивом формате.</span>' +
             '</div>';
           }
           
@@ -10609,7 +10608,6 @@ function renderSiteBlocks() {
         
         h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center">' +
           '<div style="display:flex;gap:6px">' +
-            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbCopyBlockData(' + b.id + ')" title="Скопировать JSON блока"><i class="fas fa-clipboard"></i></button>' +
             '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbPreviewBlock(&apos;' + b.block_key + '&apos;)" title="Предпросмотр блока на сайте"><i class="fas fa-external-link-alt"></i></button>' +
             '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbResetBlock(' + b.id + ')" title="Сбросить до оригинала"><i class="fas fa-undo"></i></button>' +
           '</div>' +
@@ -11174,7 +11172,7 @@ function createSiteBlock() {
     { key: 'section', icon: 'fa-align-left', color: '#8B5CF6', label: 'Секция с текстом', desc: 'Заголовок + текст + кнопка. Для акций, описаний, информации.', bg: 'section-dark' },
     { key: 'promo', icon: 'fa-bullhorn', color: '#F59E0B', label: 'Промо-акция', desc: 'Баннер + яркий заголовок + CTA-кнопка. Для акций и спецпредложений.', bg: 'section' },
     { key: 'gallery', icon: 'fa-images', color: '#10B981', label: 'Фото-галерея', desc: 'Сетка фото с подписями. Для портфолио, примеров работ.', bg: 'section-dark' },
-    { key: 'reviews', icon: 'fa-star', color: '#F97316', label: 'Отзывы клиентов', desc: 'Карусель скриншотов отзывов. Для доверия и соцдоказательства.', bg: 'section' },
+    { key: 'reviews', icon: 'fa-star', color: '#F97316', label: 'Отзывы клиентов', desc: 'Сетка скриншотов отзывов с увеличением. Для доверия и соцдоказательства.', bg: 'section' },
     { key: 'text_photo', icon: 'fa-columns', color: '#3B82F6', label: 'Текст + Фото', desc: 'Две колонки: текст слева, фото справа. Для рассказа о чём-то.', bg: 'section-dark' },
     { key: 'cta_banner', icon: 'fa-rocket', color: '#EF4444', label: 'CTA Баннер', desc: 'Полноширинный блок с призывом к действию и кнопкой.', bg: 'section' }
   ];
@@ -11190,9 +11188,15 @@ function createSiteBlock() {
     '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px"><h2 style="font-size:1.3rem;font-weight:800;color:#e2e8f0"><i class="fas fa-magic" style="color:#8B5CF6;margin-right:8px"></i>Создать секцию для сайта</h2><button class="btn btn-outline" style="padding:6px 10px" onclick="this.closest(&apos;div[style*=fixed]&apos;).remove()"><i class="fas fa-times"></i></button></div>';
   
   // Template name input
-  mh += '<div style="margin-bottom:16px">' +
-    '<label style="font-size:0.82rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:6px">Название секции (RU)</label>' +
+  mh += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+    '<div>' +
+    '<label style="font-size:0.82rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:6px"><i class="fas fa-heading" style="color:#8B5CF6;margin-right:4px"></i>Название (RU)</label>' +
     '<input class="input" id="newblock_title" value="Новая секция" style="font-size:0.95rem;padding:10px">' +
+    '</div>' +
+    '<div>' +
+    '<label style="font-size:0.82rem;color:#94a3b8;font-weight:600;display:block;margin-bottom:6px"><i class="fas fa-heading" style="color:#F59E0B;margin-right:4px"></i>Название (AM)</label>' +
+    '<input class="input" id="newblock_title_am" value="" placeholder="Армянский заголовок" style="font-size:0.95rem;padding:10px">' +
+    '</div>' +
     '</div>';
   
   // Background style
@@ -11225,7 +11229,9 @@ function createSiteBlock() {
 
 async function createBlockFromTemplate(template) {
   var titleInput = document.getElementById('newblock_title');
+  var titleAmInput = document.getElementById('newblock_title_am');
   var title = titleInput ? titleInput.value.trim() : 'Новая секция';
+  var titleAm = titleAmInput ? titleAmInput.value.trim() : '';
   if (!title) title = 'Новая секция';
   
   var bgRadio = document.querySelector('input[name="newblock_bg"]:checked');
@@ -11268,7 +11274,7 @@ async function createBlockFromTemplate(template) {
   }
   
   var blockData = {
-    block_key: key, block_type: blockType, title_ru: title, title_am: '',
+    block_key: key, block_type: blockType, title_ru: title, title_am: titleAm,
     texts_ru: textsRu, texts_am: textsAm.length >= textsRu.length ? textsAm : textsRu.map(function() { return ''; }),
     images: [], buttons: buttons, social_links: '[]',
     is_visible: 1, custom_css: '', custom_html: JSON.stringify(customHtml)
@@ -11284,7 +11290,7 @@ async function createBlockFromTemplate(template) {
   var keyHyphen = key.replace(/_/g, '-');
   var maxOrder = 0;
   try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch {}
-  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: [{ section_id: keyHyphen, sort_order: maxOrder + 1, is_visible: 1, label_ru: title, label_am: '' }] }) });
+  await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: [{ section_id: keyHyphen, sort_order: maxOrder + 1, is_visible: 1, label_ru: title, label_am: titleAm }] }) });
   
   // Close modal
   var modal = document.querySelector('div[style*="fixed"][style*="z-index:999"]');

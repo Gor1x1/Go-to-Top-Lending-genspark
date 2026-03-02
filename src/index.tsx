@@ -1281,22 +1281,24 @@ img{max-width:100%;height:auto}
 /* ===== REVIEWS DETAIL ===== */
 .reviews-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;margin-top:32px}
 .reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:32px}
-.reviews-carousel-wrap div[id^="reviewsCar"]::-webkit-scrollbar{display:none}
-.reviews-carousel-wrap div[id^="reviewsCar"]{-ms-overflow-style:none;scrollbar-width:none}
-.reviews-carousel-wrap .rc-card{flex:0 0 280px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;transition:transform 0.2s}
-.reviews-carousel-wrap .rc-card:active{transform:scale(0.97)}
-.reviews-carousel-wrap .rc-card img{width:100%;height:360px;object-fit:contain;display:block;background:#111}
-.reviews-carousel-wrap .rc-nav{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,0.3);z-index:2;transition:opacity 0.2s}
-.reviews-carousel-wrap .rc-dots{display:flex;justify-content:center;gap:8px;margin-top:14px;flex-wrap:wrap}
-.reviews-carousel-wrap .rc-dot{width:10px;height:10px;border-radius:50%;transition:background 0.3s,transform 0.3s;cursor:pointer}
+/* Reviews photo gallery — professional grid */
+.rv-gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px;margin-top:16px}
+.rv-gallery .rv-item{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 4px 24px rgba(0,0,0,0.15);cursor:pointer;transition:transform 0.25s,box-shadow 0.25s}
+.rv-gallery .rv-item:hover{transform:translateY(-4px);box-shadow:0 12px 40px rgba(139,92,246,0.2)}
+.rv-gallery .rv-item img{width:100%;height:auto;min-height:180px;max-height:420px;object-fit:contain;display:block;background:#0a0a1a}
+.rv-gallery .rv-item .rv-overlay{position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:linear-gradient(transparent,rgba(0,0,0,0.7));opacity:0;transition:opacity 0.25s;display:flex;align-items:center;justify-content:space-between}
+.rv-gallery .rv-item:hover .rv-overlay{opacity:1}
+.rv-gallery .rv-item .rv-badge{position:absolute;top:10px;right:10px;background:rgba(139,92,246,0.85);color:#fff;font-size:0.68rem;padding:3px 8px;border-radius:20px;font-weight:600;backdrop-filter:blur(4px)}
+.rv-show-more{display:flex;align-items:center;justify-content:center;min-height:200px;border-radius:14px;border:2px dashed var(--border);background:rgba(139,92,246,0.04);cursor:pointer;transition:background 0.2s,border-color 0.2s;flex-direction:column;gap:8px}
+.rv-show-more:hover{background:rgba(139,92,246,0.08);border-color:rgba(139,92,246,0.4)}
 @media(max-width:768px){
-  .reviews-carousel-wrap .rc-card{flex:0 0 calc(85vw - 32px);max-width:320px}
-  .reviews-carousel-wrap .rc-card img{height:min(55vh,440px)}
-  .reviews-carousel-wrap .rc-nav{width:34px;height:34px;font-size:0.85rem}
+  .rv-gallery{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+  .rv-gallery .rv-item img{max-height:320px}
 }
 @media(max-width:480px){
-  .reviews-carousel-wrap .rc-card{flex:0 0 calc(90vw - 24px);max-width:340px}
-  .reviews-carousel-wrap .rc-card img{height:min(50vh,400px)}
+  .rv-gallery{grid-template-columns:repeat(2,1fr);gap:10px}
+  .rv-gallery .rv-item img{max-height:260px}
+  .rv-gallery .rv-item .rv-badge{font-size:0.6rem;padding:2px 6px;top:6px;right:6px}
 }
 .review-point{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:24px;text-align:center;transition:var(--t)}
 .review-point:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-3px)}
@@ -2036,23 +2038,23 @@ img{max-width:100%;height:auto}
 <section class="section" id="client-reviews" data-section-id="client-reviews">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Реальные кейсы" data-am="Իրական արdelays">Реальные кейсы</span></div>
-    <h2 class="section-title" data-ru="Отзывы наших клиентов" data-am="Մեர հաdelays կարdelays">Отзывы наших клиентов</h2>
-    <p class="section-sub" data-ru="Результаты говорят сами за себя — вот что получают наши клиенты" data-am="Արdelays խdelays delays — delays delays">Результаты говорят сами за себя — вот что получают наши клиенты</p>
+    <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Реальные кейсы" data-am="Իրական դեպքեր">Реальные кейсы</span></div>
+    <h2 class="section-title" data-ru="Отзывы наших клиентов" data-am="Մեր հաճախորդների կարծիքները">Отзывы наших клиентов</h2>
+    <p class="section-sub" data-ru="Результаты говорят сами за себя — вот что получают наши клиенты" data-am="Արդյունքները խոսում են ինքնիրենք — ահա թե ինչ են ստանում մեր հաճախորդները">Результаты говорят сами за себя — вот что получают наши клиенты</p>
   </div>
-  <div class="reviews-carousel-placeholder fade-up" id="reviewsCarouselArea" style="min-height:100px">
-    <!-- Photos injected dynamically from admin panel via blockFeatures -->
+  <div class="reviews-gallery-area fade-up" id="reviewsCarouselArea" style="min-height:100px">
+    <!-- Photos injected dynamically from admin panel via blockFeatures as beautiful grid -->
     <div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)">
       <i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i>
-      <span data-ru="Фото отзывов загружаются..." data-am="Կարծdelays բdelays...">Фото отзывов загружаются...</span>
+      <span data-ru="Фото отзывов загружаются..." data-am="Կարծիքների լուսանկարները բեռնվում են...">Фото отзывов загружаются...</span>
     </div>
   </div>
   <!-- Dynamic CTA buttons injected here -->
-  <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:24px"></div>
+  <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:32px;text-align:center"></div>
   <!-- Motivational text under reviews -->
   <div class="reviews-bottom-text fade-up" style="text-align:center;margin-top:28px;padding:20px 16px;max-width:720px;margin-left:auto;margin-right:auto">
     <p style="font-size:1.02rem;line-height:1.75;color:var(--text-secondary,#aaa);margin-bottom:0">
-      <span data-ru="Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке." data-am="Ամեն սdelays — delays delays delays: Մdelays delays — delays delays: Անdelays delays, delays delays ու delays delays ТОП-ум: Ձdelays delays delays delays delays:">Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке.</span>
+      <span data-ru="Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке." data-am="Ամեն սքրինշոթ — մեր հաճախորդների իրական վիճակագրությունն է: Մենք չենք խոստանում — մենք ցույց ենք տալիս արդյունքները: Անվտանգ գնումներ իրական մարդկանցով, պատվերների աճ և օրգանական դիրքեր ՏՕՊ-ում: Ձեր ապրանքը կարող է լինել հաջորդը այս ցուցակում:">Каждый скриншот — это реальная статистика наших клиентов. Мы не обещаем — мы показываем результаты. Безопасные выкупы живыми людьми, рост заказов и органические позиции в ТОП. Ваш товар может быть следующим в этом списке.</span>
     </p>
   </div>
 </div>
@@ -3162,10 +3164,12 @@ switchLang = function(l) {
         if (bf.photos && bf.photos.length > 0) {
           var existingPhotoGal = section.querySelector('.block-photo-gallery');
           if (existingPhotoGal) existingPhotoGal.remove();
+          var existingReviewGallery = section.querySelector('.rv-gallery');
+          if (existingReviewGallery) existingReviewGallery.remove();
           var existingReviewCarousel = section.querySelector('.reviews-carousel-wrap');
           if (existingReviewCarousel) existingReviewCarousel.remove();
           // Check if section already has images (from HTML, not from our injection)
-          var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.reviews-carousel-wrap img)');
+          var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.rv-gallery img):not(.reviews-carousel-wrap img)');
           var hasNativePhotos = nativeImgs.length > 0 && !existingPhotoGal && !existingReviewCarousel && bf.block_type !== 'reviews';
           if (hasNativePhotos && bf.show_photos !== true) {
             // Section has built-in photos; skip gallery injection unless explicitly enabled
@@ -3173,66 +3177,48 @@ switchLang = function(l) {
           
           var validPhotos = bf.photos.filter(function(p) { return p && p.url; });
           if (validPhotos.length > 0) {
-            // Reviews carousel mode for block_type = 'reviews'
+            // Reviews: beautiful responsive masonry grid with lightbox
             if (bf.block_type === 'reviews') {
-              var carouselWrap = document.createElement('div');
-              carouselWrap.className = 'reviews-carousel-wrap';
-              var carId = 'reviewsCar_' + bf.key;
-              carouselWrap.style.cssText = 'position:relative;padding:20px 0;margin-top:12px;overflow:hidden';
-              var cH = '<div id="' + carId + '" style="display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding:8px 4px">';
-              validPhotos.forEach(function(p,pi) {
-                cH += '<div class="rc-card" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-                  '<img src="' + p.url + '" alt="' + (p.caption||'Отзыв клиента') + '" loading="lazy">' +
-                  (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
+              var galleryWrap = document.createElement('div');
+              galleryWrap.className = 'rv-gallery';
+              var INITIAL_SHOW = 6; // Show first N, rest behind "Show more"
+              var gH = '';
+              validPhotos.forEach(function(p, pi) {
+                var hidden = pi >= INITIAL_SHOW ? ' style="display:none" data-rv-hidden="1"' : '';
+                gH += '<div class="rv-item"' + hidden + ' onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                  '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
+                  '<img src="' + p.url + '" alt="' + (p.caption || '\u041e\u0442\u0437\u044b\u0432 \u043a\u043b\u0438\u0435\u043d\u0442\u0430') + '" loading="lazy">' +
+                  '<div class="rv-overlay">' +
+                    '<span style="color:#fff;font-size:0.82rem">' + (p.caption || '') + '</span>' +
+                    '<i class="fas fa-search-plus" style="color:#fff;font-size:1rem"></i>' +
+                  '</div>' +
                 '</div>';
               });
-              cH += '</div>';
-              // Counter text
-              if (validPhotos.length > 1) {
-                cH += '<div style="text-align:center;margin-top:8px;font-size:0.78rem;color:var(--text-muted,#666)"><span id="' + carId + '_counter">1</span> / ' + validPhotos.length + '</div>';
+              // "Show more" tile if more than INITIAL_SHOW
+              if (validPhotos.length > INITIAL_SHOW) {
+                var remaining = validPhotos.length - INITIAL_SHOW;
+                gH += '<div class="rv-show-more" onclick="document.querySelectorAll(&apos;[data-rv-hidden]&apos;).forEach(function(e){e.style.display=&apos;&apos;;e.removeAttribute(&apos;data-rv-hidden&apos;)});this.remove()">' +
+                  '<i class="fas fa-plus-circle" style="font-size:2rem;color:var(--purple,#8B5CF6)"></i>' +
+                  '<span style="font-size:0.95rem;font-weight:700;color:var(--text-primary,#fff)">\u0415\u0449\u0451 ' + remaining + ' \u043e\u0442\u0437\u044b\u0432\u043e\u0432</span>' +
+                  '<span style="font-size:0.75rem;color:var(--text-muted,#666)">\u041d\u0430\u0436\u043c\u0438\u0442\u0435, \u0447\u0442\u043e\u0431\u044b \u043f\u043e\u043a\u0430\u0437\u0430\u0442\u044c</span>' +
+                '</div>';
               }
-              // Navigation arrows (hidden on very small screens, swipe is primary)
-              if (validPhotos.length > 1) {
-                cH += '<button class="rc-nav" style="left:4px" onclick="rcScroll(&apos;' + carId + '&apos;,-1)"><i class="fas fa-chevron-left"></i></button>';
-                cH += '<button class="rc-nav" style="right:4px" onclick="rcScroll(&apos;' + carId + '&apos;,1)"><i class="fas fa-chevron-right"></i></button>';
-                // Dot indicators with active tracking
-                cH += '<div class="rc-dots" id="' + carId + '_dots">';
-                validPhotos.forEach(function(_,di) { cH += '<div class="rc-dot" onclick="rcScrollTo(&apos;' + carId + '&apos;,' + di + ')" style="background:' + (di===0?'#8B5CF6':'rgba(139,92,246,0.3)') + (di===0?';transform:scale(1.3)':'') + '"></div>'; });
-                cH += '</div>';
-              }
-              carouselWrap.innerHTML = cH;
+              galleryWrap.innerHTML = gH;
+              // Counter badge
+              var counterDiv = document.createElement('div');
+              counterDiv.style.cssText = 'text-align:center;margin-top:16px;font-size:0.85rem;color:var(--text-muted,#666)';
+              counterDiv.innerHTML = '<i class="fas fa-images" style="margin-right:6px;color:var(--purple,#8B5CF6)"></i>' + validPhotos.length + ' \u0441\u043a\u0440\u0438\u043d\u0448\u043e\u0442\u043e\u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u044b\u0445 \u0440\u0435\u0437\u0443\u043b\u044c\u0442\u0430\u0442\u043e\u0432';
               // Replace the placeholder or append
               var placeholder = section.querySelector('#reviewsCarouselArea');
               if (placeholder) {
                 placeholder.innerHTML = '';
-                placeholder.appendChild(carouselWrap);
+                placeholder.appendChild(galleryWrap);
+                placeholder.appendChild(counterDiv);
               } else {
                 var container = section.querySelector('.container');
-                if (container) container.appendChild(carouselWrap);
-                else section.appendChild(carouselWrap);
+                if (container) { container.appendChild(galleryWrap); container.appendChild(counterDiv); }
+                else { section.appendChild(galleryWrap); section.appendChild(counterDiv); }
               }
-              // Setup scroll tracking for dots and counter
-              (function(cid, total) {
-                setTimeout(function() {
-                  var el = document.getElementById(cid);
-                  if (!el) return;
-                  el.addEventListener('scroll', function() {
-                    var cards = el.querySelectorAll('.rc-card');
-                    if (!cards.length) return;
-                    var cardW = cards[0].offsetWidth + 16;
-                    var idx = Math.round(el.scrollLeft / cardW);
-                    if (idx < 0) idx = 0;
-                    if (idx >= total) idx = total - 1;
-                    var dots = document.querySelectorAll('#' + cid + '_dots .rc-dot');
-                    for (var d = 0; d < dots.length; d++) {
-                      dots[d].style.background = d === idx ? '#8B5CF6' : 'rgba(139,92,246,0.3)';
-                      dots[d].style.transform = d === idx ? 'scale(1.3)' : 'scale(1)';
-                    }
-                    var cnt = document.getElementById(cid + '_counter');
-                    if (cnt) cnt.textContent = (idx + 1);
-                  }, { passive: true });
-                }, 100);
-              })(carId, validPhotos.length);
             } else {
               // Default grid view for regular blocks
               var photoDiv = document.createElement('div');
@@ -3438,8 +3424,8 @@ switchLang = function(l) {
     
     // Clear reviews placeholder if no photos were injected
     var reviewsPlaceholder = document.getElementById('reviewsCarouselArea');
-    if (reviewsPlaceholder && !reviewsPlaceholder.querySelector('.reviews-carousel-wrap')) {
-      reviewsPlaceholder.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)"><i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i><span data-ru="Отзывы скоро появятся" data-am="Կարdelays շուտdelays կdelays">' + (lang === 'am' ? 'Կարdelays շուտdelays' : 'Отзывы скоро появятся') + '</span></div>';
+    if (reviewsPlaceholder && !reviewsPlaceholder.querySelector('.rv-gallery') && !reviewsPlaceholder.querySelector('.reviews-carousel-wrap')) {
+      reviewsPlaceholder.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)"><i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i><span data-ru="\u041e\u0442\u0437\u044b\u0432\u044b \u0441\u043a\u043e\u0440\u043e \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f" data-am="\u053f\u0561\u0580\u056e\u056b\u0584\u0576\u0565\u0580\u0568 \u0577\u0578\u0582\u057f\u0578\u057e \u056f\u0570\u0561\u0575\u057f\u0576\u057e\u0565\u0576">' + (lang === 'am' ? '\u053f\u0561\u0580\u056e\u056b\u0584\u0576\u0565\u0580\u0568 \u0577\u0578\u0582\u057f\u0578\u057e \u056f\u0570\u0561\u0575\u057f\u0576\u057e\u0565\u0576' : '\u041e\u0442\u0437\u044b\u0432\u044b \u0441\u043a\u043e\u0440\u043e \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f') + '</span></div>';
     }
     
     console.log('[DB] All dynamic data applied v3');

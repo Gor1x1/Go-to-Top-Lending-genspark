@@ -1500,7 +1500,7 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     'comparison': [{text_ru: 'Убедитесь сами — начните сейчас', text_am: 'Համozvek — sksel hima', icon: 'fas fa-rocket'}],
     'important': [{text_ru: 'Уточнить условия', text_am: 'Shtkel paymannere', icon: 'fab fa-telegram'}],
     'faq': [{text_ru: 'Остались вопросы? Напишите нам', text_am: 'Hartser uneq? Greq mez', icon: 'fas fa-comment-dots'}],
-    'client_reviews': [],
+    'client_reviews': [{text_ru: 'Начать сейчас', text_am: 'Սկսել հիմա', icon: 'fab fa-whatsapp'}],
     'contact': [{text_ru: 'Отправить заявку', text_am: 'Ughарkel hayty', icon: 'fas fa-paper-plane'}],
     'floating_tg': [{text_ru: 'Написать нам', text_am: 'Гrel mez', icon: 'fab fa-telegram'}],
     'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Ստandsanal hashvark Telegram-ov', icon: 'fab fa-telegram'}]
@@ -1527,6 +1527,13 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     dbTgMessages[row.button_key as string] = row;
     // Also index by label for matching
     dbTgMessages['label:' + (row.button_label_ru as string)] = row;
+  }
+  
+  // Load existing site_blocks BEFORE clearing — to preserve photos, buttons, custom settings
+  const existingBlocksRes = await db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all();
+  const existingBlockMap: Record<string, any> = {};
+  for (const eblk of (existingBlocksRes.results || [])) {
+    existingBlockMap[eblk.block_key as string] = eblk;
   }
   
   // Clear existing site_blocks
@@ -1609,8 +1616,9 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     }
     
     // Auto-detect photos for known blocks (from original HTML structure)
+    // IMPORTANT: Preserve existing photos from database if block already existed
     let customHtml: Record<string, any> = {};
-    const photoMap: Record<string, { photo_url: string, photos: any[] }> = {
+    const photoMap: Record<string, { photo_url: string, photos: any[], show_photos?: boolean }> = {
       'hero': { photo_url: '/static/img/founder.jpg', photos: [] },
       'about': { photo_url: '/static/img/about-hero2.jpg', photos: [] },
       'warehouse': { photo_url: '', photos: [
@@ -1619,7 +1627,26 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
       ]},
       'client_reviews': { photo_url: '', photos: [], show_photos: true },
     };
-    if (photoMap[key]) {
+    
+    // Try to preserve existing block data (photos, buttons, custom settings) from DB
+    const existingBlock = existingBlockMap[key];
+    if (existingBlock) {
+      try {
+        const existOpts = JSON.parse(existingBlock.custom_html as string || '{}');
+        if (existOpts.photos && existOpts.photos.length > 0) {
+          customHtml = existOpts; // Preserve ALL existing custom_html (photos, settings, etc.)
+        } else if (photoMap[key]) {
+          customHtml = photoMap[key];
+        }
+        // Preserve existing buttons if the block had user-customized ones
+        const existBtns = JSON.parse(existingBlock.buttons as string || '[]');
+        if (existBtns.length > 0 && buttons.length === 0) {
+          buttons.push(...existBtns);
+        }
+      } catch(e) {
+        if (photoMap[key]) customHtml = photoMap[key];
+      }
+    } else if (photoMap[key]) {
       customHtml = photoMap[key];
     }
     
