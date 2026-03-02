@@ -1104,7 +1104,8 @@ img{max-width:100%;height:auto}
 .contact-card i.fab{font-size:2rem;color:var(--purple);margin-bottom:12px}
 .contact-card h4{font-size:1rem;font-weight:600;margin-bottom:4px}
 .contact-card p{font-size:0.82rem;color:var(--text-muted);line-height:1.5}
-.footer{padding:48px 0 24px;border-top:1px solid var(--border)}
+.footer{padding:48px 0 24px;border-top:1px solid var(--border);margin-top:0}
+section[style*="display: none"],section[style*="display:none"],div[style*="display: none"],div[style*="display:none"]{margin:0!important;padding:0!important;height:0!important;overflow:hidden!important;min-height:0!important;border:0!important}
 .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:48px;margin-bottom:40px}
 .footer-brand p{color:var(--text-muted);font-size:0.88rem;margin-top:12px;line-height:1.7}
 .footer-col h4{font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:16px}
@@ -2090,7 +2091,7 @@ img{max-width:100%;height:auto}
     <h2 class="section-title" data-ru="Отзывы наших клиентов" data-am="Մեր հաճախորդների կարծիքները">Отзывы наших клиентов</h2>
     <p class="section-sub" data-ru="Результаты говорят сами за себя — вот что получают наши клиенты" data-am="Արդյունքները խոսում են ինքնիրենք — ահա թե ինչ են ստանում մեր հաճախորդները">Результаты говорят сами за себя — вот что получают наши клиенты</p>
   </div>
-  <div class="reviews-gallery-area fade-up" id="reviewsCarouselArea" style="min-height:100px">
+  <div class="reviews-gallery-area fade-up" id="reviewsCarouselArea">
     <!-- Photos injected dynamically from admin panel via blockFeatures as beautiful grid -->
     <div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)">
       <i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i>
@@ -3898,18 +3899,83 @@ switchLang = function(l) {
     }
     
     // ===== REMOVE EMPTY GAP SECTIONS =====
-    // Clean up any sections that ended up empty (no visible content) to prevent gaps before footer
-    document.querySelectorAll('section.section[data-section-id]').forEach(function(sec) {
+    // Build a set of blockFeature keys for cross-reference
+    var _bfKeySet = {};
+    if (db.blockFeatures) {
+      db.blockFeatures.forEach(function(b) {
+        _bfKeySet[b.key] = true;
+        _bfKeySet[b.key.replace(/_/g, '-')] = true;
+        _bfKeySet[b.key.replace(/-/g, '_')] = true;
+      });
+    }
+    document.querySelectorAll('section[data-section-id], div.slot-counter-bar[data-section-id]').forEach(function(sec) {
       if (sec.style.display === 'none') return;
+      var sid = sec.getAttribute('data-section-id') || '';
+      var sidNorm = sid.replace(/_/g, '-');
+      var sidAlt = sid.replace(/-/g, '_');
+      // Skip system sections
+      if (['nav','footer','floating-tg','floating_tg','popup'].indexOf(sidNorm) >= 0) return;
+      if (sid.indexOf('slot-counter-') === 0 || sid.indexOf('slotCounter') === 0) return;
+      
+      // Check 1: Section exists in sectionOrder but NOT in blockFeatures → template/orphan
+      var inBF = _bfKeySet[sid] || _bfKeySet[sidNorm] || _bfKeySet[sidAlt];
+      if (!inBF) {
+        // Not in blockFeatures — hide it (it's an orphaned template section)
+        sec.style.display = 'none';
+        sec.style.setProperty('margin', '0', 'important');
+        sec.style.setProperty('padding', '0', 'important');
+        sec.style.setProperty('height', '0', 'important');
+        sec.style.setProperty('overflow', 'hidden');
+        sec.style.setProperty('min-height', '0', 'important');
+        console.log('[DB] Hidden orphan section (no blockFeature):', sid);
+        return;
+      }
+      
+      // Check 2: Has only placeholder/template content
       var textContent = (sec.textContent || '').trim();
       var hasImages = sec.querySelector('img');
       var hasForm = sec.querySelector('form, input, select, textarea');
-      var hasCards = sec.querySelector('.svc-card, .faq-item, .guarantee-card, .wh-grid, .process-grid, .calc-wrap, .contact-grid, .buyout-grid, .compare-box, .rv-carousel, .block-photo-gallery, .reviews-carousel-wrap, .block-socials, .block-slot-counter');
-      if (!textContent && !hasImages && !hasForm && !hasCards) {
+      var hasCards = sec.querySelector('.svc-card, .faq-item, .guarantee-card, .wh-grid, .process-grid, .calc-wrap, .contact-grid, .buyout-grid, .compare-box, .rv-carousel, .block-photo-gallery, .reviews-carousel-wrap, .block-socials, .block-slot-counter, .about-grid, .hero-grid, .compare-row, .wb-banner-card, .ticker-track, .stats-grid');
+      var isPlaceholder = false;
+      if (textContent) {
+        var lc = textContent.toLowerCase();
+        if (lc === 'новая секция' || lc === 'текст вашей секции' || 
+            (lc.indexOf('новая секция') >= 0 && lc.indexOf('текст вашей секции') >= 0) ||
+            (lc.indexOf('новая секция') >= 0 && lc.indexOf('описание вашего') >= 0) ||
+            (lc.indexOf('новая секция') >= 0 && lc.indexOf('специальное предложение') >= 0) ||
+            (lc.indexOf('новая секция') >= 0 && lc.indexOf('примеры наших работ') >= 0)) {
+          isPlaceholder = true;
+        }
+      }
+      if ((!textContent || isPlaceholder) && !hasImages && !hasForm && !hasCards) {
         sec.style.display = 'none';
-        console.log('[DB] Removed empty section:', sec.getAttribute('data-section-id'));
+        sec.style.setProperty('margin', '0', 'important');
+        sec.style.setProperty('padding', '0', 'important');
+        sec.style.setProperty('height', '0', 'important');
+        sec.style.setProperty('min-height', '0', 'important');
+        console.log('[DB] Hidden empty/placeholder section:', sid);
       }
     });
+    
+    // ===== FINAL CLEANUP: Remove ALL invisible elements before footer =====
+    var _ft = document.querySelector('footer');
+    if (_ft) {
+      // Walk backwards from footer and physically REMOVE hidden elements
+      var prev = _ft.previousElementSibling;
+      while (prev) {
+        var _prev2 = prev.previousElementSibling;
+        var isHidden = prev.style.display === 'none' || 
+                       getComputedStyle(prev).display === 'none' ||
+                       (prev.offsetHeight === 0 && prev.offsetWidth === 0);
+        if (isHidden) {
+          prev.remove();
+          console.log('[DB] Removed hidden element before footer:', prev.id || prev.getAttribute('data-section-id') || prev.tagName);
+        } else {
+          break; // Stop at first visible element
+        }
+        prev = _prev2;
+      }
+    }
     
     console.log('[DB] All dynamic data applied v5');
   } catch(e) {
@@ -3982,6 +4048,8 @@ async function checkRefCode() {
     counters.forEach(function(d, idx) {
       if (!d.show_timer) return;
       var sid = 'slotCounter_' + (d.id || idx);
+      // Prevent duplicate — skip if already exists
+      if (document.getElementById(sid)) return;
       // Create new counter element
       var el = document.createElement('div');
       el.id = sid;
@@ -4002,15 +4070,51 @@ async function checkRefCode() {
           '</div>' +
         '</div></div>';
 
-      // Position counter
+      // Position counter — support both 'after-X' and 'in-X' patterns
       var pos = d.position || 'after-hero';
       var target = null;
-      if (pos === 'in-header') { target = document.querySelector('header, nav'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
-      else if (pos === 'after-hero') { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
-      else if (pos === 'before-calc') { target = document.getElementById('calculator'); if (target) target.parentNode.insertBefore(el, target); }
-      else if (pos === 'before-contact') { target = document.getElementById('contact') || document.querySelector('.contact'); if (target) target.parentNode.insertBefore(el, target); }
-      else if (pos === 'after-ticker') { target = document.querySelector('.ticker'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
-      else { /* default: append before footer */ var ft = document.querySelector('footer'); if (ft) ft.parentNode.insertBefore(el, ft); }
+      var inserted = false;
+      // Handle 'in-BLOCK' positions — inject INSIDE the section's container
+      var inMatch = pos.match(/^in-(.+)$/);
+      if (inMatch) {
+        var blockId = inMatch[1];
+        // Normalize: try both underscore and hyphen versions
+        var blockIdAlt = blockId.indexOf('_') >= 0 ? blockId.replace(/_/g, '-') : blockId.replace(/-/g, '_');
+        var blockSec = document.querySelector('[data-section-id="' + blockId + '"]') || document.querySelector('[data-section-id="' + blockIdAlt + '"]') || document.getElementById(blockId) || document.getElementById(blockIdAlt);
+        if (blockSec) {
+          var blockContainer = blockSec.querySelector('.container') || blockSec;
+          blockContainer.appendChild(el);
+          inserted = true;
+        }
+      }
+      // Handle 'after-BLOCK' positions
+      if (!inserted) {
+        var afterMatch = pos.match(/^after-(.+)$/);
+        if (afterMatch) {
+          var afterId = afterMatch[1];
+          var afterIdAlt = afterId.indexOf('_') >= 0 ? afterId.replace(/_/g, '-') : afterId.replace(/-/g, '_');
+          target = document.querySelector('[data-section-id="' + afterId + '"]') || document.querySelector('[data-section-id="' + afterIdAlt + '"]') || document.getElementById(afterId) || document.getElementById(afterIdAlt);
+          if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; }
+        }
+      }
+      // Handle 'before-BLOCK' positions
+      if (!inserted) {
+        var beforeMatch = pos.match(/^before-(.+)$/);
+        if (beforeMatch) {
+          var beforeId = beforeMatch[1];
+          var beforeIdAlt = beforeId.indexOf('_') >= 0 ? beforeId.replace(/_/g, '-') : beforeId.replace(/-/g, '_');
+          target = document.querySelector('[data-section-id="' + beforeId + '"]') || document.querySelector('[data-section-id="' + beforeIdAlt + '"]') || document.getElementById(beforeId) || document.getElementById(beforeIdAlt);
+          if (target) { target.parentNode.insertBefore(el, target); inserted = true; }
+        }
+      }
+      // Legacy named positions
+      if (!inserted) {
+        if (pos === 'in-header') { target = document.querySelector('header, nav'); if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; } }
+        else if (pos === 'after-hero') { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; } }
+        else if (pos === 'after-ticker') { target = document.querySelector('.ticker'); if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; } }
+      }
+      // Default fallback: after hero (NOT before footer — that creates gaps)
+      if (!inserted) { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
     });
   }).catch(function(){});
 })();
@@ -4034,7 +4138,7 @@ async function checkRefCode() {
 
     // Rebuild contacts column
     var contacts = [];
-    try { contacts = JSON.parse(f.contacts_json || '[]'); } catch {}
+    try { contacts = JSON.parse(f.contacts_json || '[]'); } catch(e) {}
     if (contacts.length > 0) {
       var cols = footer.querySelectorAll('.footer-col');
       var contactCol = cols.length >= 2 ? cols[cols.length - 1] : null;
@@ -4051,7 +4155,7 @@ async function checkRefCode() {
 
     // Rebuild socials
     var socials = [];
-    try { socials = JSON.parse(f.socials_json || '[]'); } catch {}
+    try { socials = JSON.parse(f.socials_json || '[]'); } catch(e) {}
     if (socials.length > 0) {
       var bottom = footer.querySelector('.footer-bottom');
       if (bottom) {
@@ -4114,7 +4218,7 @@ async function checkRefCode() {
 
     blocks.forEach(function(b) {
       var photos = [];
-      try { photos = JSON.parse(b.photos_json || '[]'); } catch { photos = []; }
+      try { photos = JSON.parse(b.photos_json || '[]'); } catch(e) { photos = []; }
       var validPhotos = photos.filter(function(p){ return p && p.url; });
       if (!validPhotos.length) return;
 

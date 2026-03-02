@@ -511,7 +511,16 @@ function getBlockPhotos(sectionId) {
   return (data.photoBlocks || []).filter(function(p) { return p.position === sectionId || p.position === 'in-' + sectionId; });
 }
 function getBlockCounters(sectionId) {
-  return (data.slotCounters || []).filter(function(c) { return c.position === sectionId || c.position === 'after-' + sectionId || c.position === 'before-' + sectionId || c.position === 'in-' + sectionId; });
+  var sidNorm = (sectionId || '').replace(/_/g, '-');
+  var sidAlt = (sectionId || '').replace(/-/g, '_');
+  return (data.slotCounters || []).filter(function(c) {
+    var p = c.position || '';
+    var pNorm = p.replace(/_/g, '-');
+    return p === sectionId || p === sidNorm || p === sidAlt ||
+      pNorm === 'after-' + sidNorm || pNorm === 'before-' + sidNorm || pNorm === 'in-' + sidNorm ||
+      p === 'after-' + sectionId || p === 'before-' + sectionId || p === 'in-' + sectionId ||
+      p === 'after-' + sidAlt || p === 'before-' + sidAlt || p === 'in-' + sidAlt;
+  });
 }
 // Which sections typically have photos
 var photoSections = ['hero', 'about', 'services', 'warehouse', 'wb-banner', 'wb-official'];
@@ -551,7 +560,7 @@ function renderBlocks() {
     var photos = getBlockPhotos(sec.section_id);
     var counters = getBlockCounters(sec.section_id);
     var items = [];
-    if (content) { try { items = JSON.parse(content.content_json); } catch { items = []; } }
+    if (content) { try { items = JSON.parse(content.content_json); } catch(e) { items = []; } }
     var hasPhotos = photos.length > 0 || photoSections.indexOf(sec.section_id) >= 0;
     var isExpanded = sec._expanded || false;
 
@@ -634,7 +643,7 @@ function renderBlocks() {
       for (var phi = 0; phi < photos.length; phi++) {
         var pb = photos[phi];
         var pbPhotos = [];
-        try { pbPhotos = JSON.parse(pb.photos_json || '[]'); } catch { pbPhotos = []; }
+        try { pbPhotos = JSON.parse(pb.photos_json || '[]'); } catch(e) { pbPhotos = []; }
         h += '<div style="padding:10px;background:#1e293b;border-radius:8px;margin-bottom:6px">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">' +
           '<span style="font-size:0.82rem;font-weight:600;color:#e2e8f0">' + escHtml(pb.block_name) + ' <span style="color:#64748b;font-size:0.75rem">(' + pbPhotos.length + ' фото)</span></span>' +
@@ -688,7 +697,7 @@ function addTextItem(sectionKey) {
   var content = data.content.find(function(c) { return c.section_key === sectionKey; });
   if (!content) return;
   var items = [];
-  try { items = JSON.parse(content.content_json); } catch { items = []; }
+  try { items = JSON.parse(content.content_json); } catch(e) { items = []; }
   items.push({ ru: '', am: '' });
   content.content_json = JSON.stringify(items);
   // Keep block expanded
@@ -702,7 +711,7 @@ function removeTextItem(sectionKey, idx) {
   var content = data.content.find(function(c) { return c.section_key === sectionKey; });
   if (!content) return;
   var items = [];
-  try { items = JSON.parse(content.content_json); } catch { items = []; }
+  try { items = JSON.parse(content.content_json); } catch(e) { items = []; }
   items.splice(idx, 1);
   content.content_json = JSON.stringify(items);
   var sec = data.sectionOrder.find(function(s) { return s.section_id === sectionKey; });
@@ -715,7 +724,7 @@ async function saveBlockTexts(sectionKey) {
   var content = data.content.find(function(c) { return c.section_key === sectionKey; });
   if (!content) return;
   var items = [];
-  try { items = JSON.parse(content.content_json); } catch { items = []; }
+  try { items = JSON.parse(content.content_json); } catch(e) { items = []; }
   document.querySelectorAll('[data-section="' + sectionKey + '"]').forEach(function(el) {
     var idx = parseInt(el.dataset.idx);
     var lang = el.dataset.lang;
@@ -915,7 +924,7 @@ async function submitCreateBlock() {
     // Find source content
     var srcContent = data.content.find(function(c) { return c.section_key === copyFrom; });
     var srcItems = [];
-    if (srcContent) { try { srcItems = JSON.parse(srcContent.content_json); } catch { srcItems = []; } }
+    if (srcContent) { try { srcItems = JSON.parse(srcContent.content_json); } catch(e) { srcItems = []; } }
 
     // Create copy
     await api('/content', { method: 'POST', body: JSON.stringify({ section_key: newId, section_name: newName, content_json: srcItems }) });
@@ -973,7 +982,7 @@ async function duplicateBlock(idx) {
   // Copy content
   var srcContent = data.content.find(function(c) { return c.section_key === sec.section_id; });
   var srcItems = [];
-  if (srcContent) { try { srcItems = JSON.parse(srcContent.content_json); } catch { srcItems = []; } }
+  if (srcContent) { try { srcItems = JSON.parse(srcContent.content_json); } catch(e) { srcItems = []; } }
   await api('/content', { method: 'POST', body: JSON.stringify({ section_key: newId, section_name: newName, content_json: srcItems }) });
 
   // Insert after source
@@ -1872,7 +1881,7 @@ async function loadRefServices() {
     try {
       var res = await api('/referrals/' + ref.id + '/services');
       ref._services = (res && res.services) || [];
-    } catch { ref._services = []; }
+    } catch(e) { ref._services = []; }
   }
 }
 
@@ -3505,7 +3514,7 @@ async function loadPnlData() {
   }
   pnlLoading = false;
   // After P&L computed, re-fetch tax payments (auto-calc amounts are now written to DB)
-  try { var tpRes = await api('/tax-payments', { _silent: true }); if (tpRes && tpRes.payments) data.taxPayments = tpRes.payments; } catch {}
+  try { var tpRes = await api('/tax-payments', { _silent: true }); if (tpRes && tpRes.payments) data.taxPayments = tpRes.payments; } catch(e) {}
   render();
 }
 async function saveFiscalYearStart(val) {
@@ -6695,11 +6704,11 @@ function renderBizPeriodsV2(d, sd, fin) {
     var mAdjs = [];
     var mAdjTotal = 0;
     var mExpSal = 0, mExpComm = 0, mExpMkt = 0; // Split expenses for edit form
-    if (mSnap) { try { var cd5 = JSON.parse(mSnap.custom_data || '{}'); mAdjs = cd5.adjustments || []; if (!mAdjs.length && cd5.adjustment) { mAdjs = [{amount: Math.abs(cd5.adjustment), type: cd5.adjustment_type || 'inflow', comment: cd5.adjustment_comment || ''}]; } for (var aj = 0; aj < mAdjs.length; aj++) { var a5 = mAdjs[aj]; mAdjTotal += a5.type === 'outflow' ? -Math.abs(a5.amount) : Math.abs(a5.amount); } } catch {} }
+    if (mSnap) { try { var cd5 = JSON.parse(mSnap.custom_data || '{}'); mAdjs = cd5.adjustments || []; if (!mAdjs.length && cd5.adjustment) { mAdjs = [{amount: Math.abs(cd5.adjustment), type: cd5.adjustment_type || 'inflow', comment: cd5.adjustment_comment || ''}]; } for (var aj = 0; aj < mAdjs.length; aj++) { var a5 = mAdjs[aj]; mAdjTotal += a5.type === 'outflow' ? -Math.abs(a5.amount) : Math.abs(a5.amount); } } catch(e) {} }
     if (isLocked) {
       // From snapshot
       mDone = Number(mSnap.leads_done)||0;
-      var snapCD = {}; try { snapCD = JSON.parse(mSnap.custom_data || '{}'); } catch {}
+      var snapCD = {}; try { snapCD = JSON.parse(mSnap.custom_data || '{}'); } catch(e) {}
       mInProg = Number(snapCD.in_progress_count)||0;
       mRejected = Number(snapCD.rejected_count)||0;
       mChecking = Number(snapCD.checking_count)||0;
@@ -6816,11 +6825,11 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:center">';
     // Check custom status from snapshot — is_locked ALWAYS takes priority
     var customStatus = '';
-    if (mSnap) { try { var cd8 = JSON.parse(mSnap.custom_data || '{}'); customStatus = cd8.status || ''; } catch {} }
+    if (mSnap) { try { var cd8 = JSON.parse(mSnap.custom_data || '{}'); customStatus = cd8.status || ''; } catch(e) {} }
     if (isLocked) h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
     else if (customStatus === 'locked') h += '<span style="color:#22C55E;font-size:0.68rem"><i class="fas fa-lock"></i> Закрыт</span>';
     else if (customStatus === 'checking') h += '<span style="color:#3B82F6;font-size:0.68rem"><i class="fas fa-search"></i> Проверка</span>';
-    else if (customStatus === 'custom') { var customLabel2 = ''; try { customLabel2 = JSON.parse(mSnap.custom_data || '{}').status_label || ''; } catch {} h += '<span style="color:#a78bfa;font-size:0.68rem">' + (customLabel2 || 'Другое') + '</span>'; }
+    else if (customStatus === 'custom') { var customLabel2 = ''; try { customLabel2 = JSON.parse(mSnap.custom_data || '{}').status_label || ''; } catch(e) {} h += '<span style="color:#a78bfa;font-size:0.68rem">' + (customLabel2 || 'Другое') + '</span>'; }
     else if (isCurrent) h += '<span style="color:#F59E0B;font-size:0.68rem"><i class="fas fa-sync-alt fa-spin" style="font-size:0.5rem;margin-right:3px"></i>Текущий</span>';
     else if (isPast) h += '<span style="color:#F59E0B;font-size:0.68rem">Открыт</span>';
     else h += '<span style="color:#334155;font-size:0.68rem">\u2014</span>';
@@ -6837,7 +6846,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       // Parse existing adjustments and status from snapshot custom_data
       var existingAdjs = [];
       var snapStatus = '';
-      if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; snapStatus = cd4.status || ''; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch {} }
+      if (mSnap) { try { var cd4 = JSON.parse(mSnap.custom_data || '{}'); existingAdjs = cd4.adjustments || []; snapStatus = cd4.status || ''; if (!existingAdjs.length && cd4.adjustment) { existingAdjs = [{amount: Math.abs(cd4.adjustment), type: cd4.adjustment_type || 'inflow', comment: cd4.adjustment_comment || ''}]; } } catch(e) {} }
       // is_locked in DB always overrides custom_data.status
       if (isLocked) { snapStatus = 'locked'; }
       else if (!snapStatus) { snapStatus = isCurrent ? 'current' : isPast ? 'open' : ''; }
@@ -6996,7 +7005,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         var qmArt = Number(qmSnap.revenue_articles)||0;
         var qmExp = Math.abs(Number(qmSnap.expense_salaries)||0)+Math.abs(Number(qmSnap.expense_commercial)||0)+Math.abs(Number(qmSnap.expense_marketing)||0);
         var qmAdj = 0;
-        try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch {}
+        try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch(e) {}
         qSvc += qmSvc;
         qArt += qmArt;
         qRef += Number(qmSnap.refunds)||0;
@@ -7004,7 +7013,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         qTurnover += qmSvc + qmArt;
         qProfit += qmSvc - qmExp + qmAdj;
         qDone += Number(qmSnap.leads_done)||0;
-        try { var qmCD2 = JSON.parse(qmSnap.custom_data || '{}'); qInProg += Number(qmCD2.in_progress_count)||0; qRejected += Number(qmCD2.rejected_count)||0; qChecking += Number(qmCD2.checking_count)||0; } catch {}
+        try { var qmCD2 = JSON.parse(qmSnap.custom_data || '{}'); qInProg += Number(qmCD2.in_progress_count)||0; qRejected += Number(qmCD2.rejected_count)||0; qChecking += Number(qmCD2.checking_count)||0; } catch(e) {}
       }
     }
     // Use quarter snapshot if locked
@@ -7148,8 +7157,8 @@ function renderBizPeriodsV2(d, sd, fin) {
     if (snap1) {
       // Parse custom_data for extra metrics
       var cd1 = {}; var cd2 = {};
-      try { cd1 = JSON.parse(snap1.custom_data || '{}'); } catch {}
-      if (snap2) { try { cd2 = JSON.parse(snap2.custom_data || '{}'); } catch {} }
+      try { cd1 = JSON.parse(snap1.custom_data || '{}'); } catch(e) {}
+      if (snap2) { try { cd2 = JSON.parse(snap2.custom_data || '{}'); } catch(e) {} }
       // All expense values must be POSITIVE (absolute) — guard against corrupted snapshots
       var snap1ExpSal = Math.abs(Number(snap1.expense_salaries)||0);
       var snap1ExpComm = Math.abs(Number(snap1.expense_commercial)||0);
@@ -7750,7 +7759,7 @@ async function saveEditedMonth(monthKey, snapshotId) {
   var existingAdjs = [];
   var snapshots = data.periodSnapshots || [];
   var mSnap2 = snapshots.find(function(s){return s.period_type==='month' && s.period_key===monthKey;});
-  if (mSnap2) { try { var cd6 = JSON.parse(mSnap2.custom_data || '{}'); existingAdjs = cd6.adjustments || []; if (!existingAdjs.length && cd6.adjustment) { existingAdjs = [{amount: Math.abs(cd6.adjustment), type: cd6.adjustment_type || 'inflow', comment: cd6.adjustment_comment || ''}]; } } catch {} }
+  if (mSnap2) { try { var cd6 = JSON.parse(mSnap2.custom_data || '{}'); existingAdjs = cd6.adjustments || []; if (!existingAdjs.length && cd6.adjustment) { existingAdjs = [{amount: Math.abs(cd6.adjustment), type: cd6.adjustment_type || 'inflow', comment: cd6.adjustment_comment || ''}]; } } catch(e) {} }
   // Add new adjustment if amount > 0
   if (adjAmount > 0) {
     existingAdjs.push({amount: Math.abs(adjAmount), type: adjType, comment: adjComment});
@@ -7827,7 +7836,7 @@ async function deleteAdjustment(monthKey, snapshotId, adjIndex) {
   var mSnap3 = snapshots.find(function(s){return s.period_type==='month' && s.period_key===monthKey;});
   if (!mSnap3) return;
   var adjs = [];
-  try { var cd7 = JSON.parse(mSnap3.custom_data || '{}'); adjs = cd7.adjustments || []; if (!adjs.length && cd7.adjustment) { adjs = [{amount: Math.abs(cd7.adjustment), type: cd7.adjustment_type || 'inflow', comment: cd7.adjustment_comment || ''}]; } } catch {}
+  try { var cd7 = JSON.parse(mSnap3.custom_data || '{}'); adjs = cd7.adjustments || []; if (!adjs.length && cd7.adjustment) { adjs = [{amount: Math.abs(cd7.adjustment), type: cd7.adjustment_type || 'inflow', comment: cd7.adjustment_comment || ''}]; } } catch(e) {}
   adjs.splice(adjIndex, 1);
   // Recalculate totals
   var totalAdj2 = 0;
@@ -7844,7 +7853,7 @@ async function deleteAdjustment(monthKey, snapshotId, adjIndex) {
   });
   if (res && res.success) {
     toast('Корректировка удалена');
-    try { var snRes3 = await api('/period-snapshots'); data.periodSnapshots = (snRes3 && snRes3.snapshots) || []; } catch {}
+    try { var snRes3 = await api('/period-snapshots'); data.periodSnapshots = (snRes3 && snRes3.snapshots) || []; } catch(e) {}
     render();
   } else { toast(res?.error || 'Ошибка', 'error'); }
 }
@@ -8436,9 +8445,9 @@ async function deleteSlotCounter(id) {
 function renderFooter() {
   var f = data.footer || {};
   var contacts = [];
-  try { contacts = JSON.parse(f.contacts_json || '[]'); } catch { contacts = []; }
+  try { contacts = JSON.parse(f.contacts_json || '[]'); } catch(e) { contacts = []; }
   var socials = [];
-  try { socials = JSON.parse(f.socials_json || '[]'); } catch { socials = []; }
+  try { socials = JSON.parse(f.socials_json || '[]'); } catch(e) { socials = []; }
 
   var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Футер сайта</h1>' +
     '<p style="color:#94a3b8;margin-bottom:24px">Редактирование контактов, соцсетей и содержимого подвала</p>';
@@ -8499,8 +8508,8 @@ function renderFooter() {
 var _footerContacts = [];
 var _footerSocials = [];
 function initFooterData() {
-  try { _footerContacts = JSON.parse(data.footer.contacts_json || '[]'); } catch { _footerContacts = []; }
-  try { _footerSocials = JSON.parse(data.footer.socials_json || '[]'); } catch { _footerSocials = []; }
+  try { _footerContacts = JSON.parse(data.footer.contacts_json || '[]'); } catch(e) { _footerContacts = []; }
+  try { _footerSocials = JSON.parse(data.footer.socials_json || '[]'); } catch(e) { _footerSocials = []; }
 }
 
 function addFooterContact() {
@@ -8593,7 +8602,7 @@ function renderPhotos() {
   for (var bi = 0; bi < blocks.length; bi++) {
     var b = blocks[bi];
     var photos = [];
-    try { photos = JSON.parse(b.photos_json || '[]'); } catch { photos = []; }
+    try { photos = JSON.parse(b.photos_json || '[]'); } catch(e) { photos = []; }
     h += '<div class="card" style="margin-bottom:20px">' +
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
       '<h3 style="font-weight:700"><i class="fas fa-images" style="color:#8B5CF6;margin-right:8px"></i>' + escHtml(b.block_name || 'Блок #'+(bi+1)) + ' <span style="font-size:0.75rem;color:#64748b;font-weight:400">(' + photos.length + ' фото)</span></h3>' +
@@ -8671,7 +8680,7 @@ async function pbUploadPhotos(input, blockId) {
   var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
   if (!block) return;
   var photos = [];
-  try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch(e) { photos = []; }
   var uploaded = 0;
 
   for (var fi = 0; fi < files.length; fi++) {
@@ -8713,7 +8722,7 @@ async function pbReplacePhoto(input, blockId, photoIdx) {
       var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
       if (!block) return;
       var photos = [];
-      try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+      try { photos = JSON.parse(block.photos_json || '[]'); } catch(e) { photos = []; }
       if (photoIdx < photos.length) {
         photos[photoIdx].url = result.url || result.data_url;
         block.photos_json = JSON.stringify(photos);
@@ -8767,7 +8776,7 @@ function addPhotoToBlock(blockId) {
   var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
   if (!block) return;
   var photos = [];
-  try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch(e) { photos = []; }
   photos.push({ url: '', caption: '' });
   block.photos_json = JSON.stringify(photos);
   render();
@@ -8777,7 +8786,7 @@ function removePhotoFromBlock(blockId, photoIdx) {
   var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
   if (!block) return;
   var photos = [];
-  try { photos = JSON.parse(block.photos_json || '[]'); } catch { photos = []; }
+  try { photos = JSON.parse(block.photos_json || '[]'); } catch(e) { photos = []; }
   photos.splice(photoIdx, 1);
   block.photos_json = JSON.stringify(photos);
   render();
@@ -9498,7 +9507,7 @@ async function loadUserPermsForMatrix() {
       var res = await api('/permissions/' + uid);
       var perms = (res && res.permissions) || [];
       window['_userPermsMatrix_' + uid] = perms;
-    } catch {}
+    } catch(e) {}
   }
   render();
 }
@@ -9539,7 +9548,7 @@ function renderAccessMatrix(users, roles, allSections, sl, rl, isAdmin) {
   for (var ri = 0; ri < roles.length; ri++) {
     var r = roles[ri];
     var rSections = [];
-    try { rSections = JSON.parse(r.default_sections || '[]'); } catch {}
+    try { rSections = JSON.parse(r.default_sections || '[]'); } catch(e) {}
     h += '<tr style="border-bottom:1px solid #1e293b;background:' + (ri % 2 === 0 ? '#131b2e' : '#0f172a') + '">';
     h += '<td style="padding:8px 16px;position:sticky;left:0;background:inherit;z-index:1"><div style="display:flex;align-items:center;gap:8px"><span style="width:10px;height:10px;border-radius:50%;background:' + escHtml(r.color || '#8B5CF6') + ';flex-shrink:0"></span><span style="font-weight:600;color:#e2e8f0">' + escHtml(r.role_name) + '</span>';
     if (r.is_system) h += '<span style="font-size:0.6rem;color:#64748b;background:#1e293b;padding:1px 4px;border-radius:3px">sys</span>';
@@ -9559,7 +9568,7 @@ function renderAccessMatrix(users, roles, allSections, sl, rl, isAdmin) {
     var u = users[ui];
     var userRole = roles.find(function(r){ return r.role_key === u.role; });
     var defaultSections = [];
-    try { defaultSections = userRole ? JSON.parse(userRole.default_sections || '[]') : []; } catch {}
+    try { defaultSections = userRole ? JSON.parse(userRole.default_sections || '[]') : []; } catch(e) {}
     // Check if user has custom permissions stored
     var userPermsKey = '_userPermsMatrix_' + u.id;
     var userCustomPerms = window[userPermsKey] || null;
@@ -9605,7 +9614,7 @@ function renderRolesTab(roles, sl, isAdmin) {
     for (var i = 0; i < roles.length; i++) {
       var r = roles[i];
       var sections = [];
-      try { sections = JSON.parse(r.default_sections || '[]'); } catch { sections = []; }
+      try { sections = JSON.parse(r.default_sections || '[]'); } catch(e) { sections = []; }
       var sectionNames = sections.map(function(s) { return sl[s] || s; }).join(', ');
       // Count users with this role
       var usersWithRole = (ensureArray(data.users)).filter(function(u) { return u.role === r.role_key; });
@@ -9691,7 +9700,7 @@ async function selectPermUser(uid, skipFetch) {
   // Get role defaults for comparison
   var userCompRole = (data.companyRoles || []).find(function(r3){ return r3.role_key === u?.role; });
   var roleDefaults = [];
-  try { roleDefaults = userCompRole ? JSON.parse(userCompRole.default_sections || '[]') : []; } catch {}
+  try { roleDefaults = userCompRole ? JSON.parse(userCompRole.default_sections || '[]') : []; } catch(e) {}
   
   // Highlight selected user
   document.querySelectorAll('.perm-user-item').forEach(function(el) { el.style.borderLeftColor = el.dataset.uid == uid ? '#8B5CF6' : 'transparent'; el.style.background = el.dataset.uid == uid ? 'rgba(139,92,246,0.1)' : ''; });
@@ -9749,7 +9758,7 @@ function applyRoleDefaults() {
   if (!selectedPermUserId) return;
   var u = ensureArray(data.users).find(function(x) { return x.id === selectedPermUserId; });
   var compRole = (data.companyRoles || []).find(function(r) { return r.role_key === u?.role; });
-  try { selectedPermSections = compRole ? JSON.parse(compRole.default_sections || '[]') : ['dashboard']; } catch { selectedPermSections = ['dashboard']; }
+  try { selectedPermSections = compRole ? JSON.parse(compRole.default_sections || '[]') : ['dashboard']; } catch(e) { selectedPermSections = ['dashboard']; }
   selectPermUser(selectedPermUserId, true);
 }
 
@@ -9906,7 +9915,7 @@ function showCompanyRoleModal(roleId) {
   var sl = rolesConfig?.section_labels || {};
   var allSections = rolesConfig?.sections || [];
   var existingSections = [];
-  if (r) { try { existingSections = JSON.parse(r.default_sections || '[]'); } catch { existingSections = []; } }
+  if (r) { try { existingSections = JSON.parse(r.default_sections || '[]'); } catch(e) { existingSections = []; } }
   else { existingSections = ['dashboard']; }
 
   var h = '<div style="position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:999;display:flex;align-items:center;justify-content:center;overflow-y:auto;padding:20px" onclick="this.remove()">';
@@ -9989,7 +9998,7 @@ async function cloneCompanyRole(id) {
   var newKey = newName.toLowerCase().replace(/[^a-z0-9_]/g, '_').replace(/_+/g, '_').substring(0, 30);
   if (!newKey) newKey = 'clone_' + Date.now();
   var sections = [];
-  try { sections = JSON.parse(r.default_sections || '[]'); } catch {}
+  try { sections = JSON.parse(r.default_sections || '[]'); } catch(e) {}
   var body = { role_name: newName, role_key: newKey, description: (r.description || '') + ' (\u043a\u043e\u043f\u0438\u044f)', color: r.color || '#8B5CF6', sort_order: (r.sort_order || 0) + 1, default_sections: sections };
   var res = await api('/company-roles', { method: 'POST', body: JSON.stringify(body) });
   if (!res || res.error) { toast(res?.error || '\u041e\u0448\u0438\u0431\u043a\u0430 \u043a\u043b\u043e\u043d\u0438\u0440\u043e\u0432\u0430\u043d\u0438\u044f', 'error'); return; }
@@ -11275,7 +11284,7 @@ async function createReviewsBlock() {
   await api('/content', { method: 'POST', body: JSON.stringify({ section_key: key, section_name: title, content_json: content }) });
   var keyHyphen = key.replace(/_/g, '-');
   var maxOrder = 0;
-  try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch {}
+  try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch(e) {}
   await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: [{ section_id: keyHyphen, sort_order: maxOrder + 1, is_visible: 1, label_ru: title, label_am: '' }] }) });
   toast('Блок отзывов «' + title + '» создан! Загрузите скриншоты отзывов в раздел "Фото блока".');
   await loadData(); render();
@@ -11411,7 +11420,7 @@ async function createBlockFromTemplate(template) {
     }
     // Copy social links
     if (similarBlock.social_links && typeof similarBlock.social_links === 'string') {
-      try { var sl = JSON.parse(similarBlock.social_links); if (sl.length > 0) customHtml.social_links = sl; } catch {}
+      try { var sl = JSON.parse(similarBlock.social_links); if (sl.length > 0) customHtml.social_links = sl; } catch(e) {}
     }
     console.log('[Admin] Auto-copied data from similar block:', similarBlock.block_key);
   }
@@ -11432,7 +11441,7 @@ async function createBlockFromTemplate(template) {
   // Add to section_order with hyphenated key
   var keyHyphen = key.replace(/_/g, '-');
   var maxOrder = 0;
-  try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch {}
+  try { var soRes = await api('/section-order'); maxOrder = (soRes || []).reduce(function(m, s) { return Math.max(m, s.sort_order || 0); }, 0); } catch(e) {}
   await api('/section-order', { method: 'POST', body: JSON.stringify({ sections: [{ section_id: keyHyphen, sort_order: maxOrder + 1, is_visible: 1, label_ru: title, label_am: titleAm }] }) });
   
   // Close modal
