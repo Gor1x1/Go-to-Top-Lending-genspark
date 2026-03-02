@@ -981,9 +981,14 @@ img{max-width:100%;height:auto}
 .ticker-item{display:flex;align-items:center;gap:10px;padding:0 40px;font-size:0.88rem;color:var(--text-sec);flex-shrink:0}
 .ticker-item i{color:var(--purple)}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.section{padding:56px 0}
+.section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
+.section.section-revealed{opacity:1;transform:translateY(0)}
 .section-dark{background:var(--bg-surface)}
-.section-header{text-align:center;margin-bottom:56px}
+.section-header{text-align:center;margin-bottom:40px}
+/* Tighter header for reviews */
+#client-reviews .section-header{margin-bottom:24px}
+#client-reviews{padding-bottom:40px}
+#client-reviews .section-cta{margin-top:16px}
 .section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
 .section-title{font-size:2.2rem;font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
 .section-sub{font-size:1rem;color:var(--text-sec);max-width:640px;margin:0 auto;line-height:1.7}
@@ -1104,7 +1109,7 @@ img{max-width:100%;height:auto}
 .contact-card i.fab{font-size:2rem;color:var(--purple);margin-bottom:12px}
 .contact-card h4{font-size:1rem;font-weight:600;margin-bottom:4px}
 .contact-card p{font-size:0.82rem;color:var(--text-muted);line-height:1.5}
-.footer{padding:48px 0 24px;border-top:1px solid var(--border);margin-top:0}
+.footer{padding:48px 0 24px;border-top:1px solid var(--border);margin-top:0;opacity:0;transition:opacity 0.5s ease}
 section[style*="display: none"],section[style*="display:none"],div[style*="display: none"],div[style*="display:none"]{margin:0!important;padding:0!important;height:0!important;overflow:hidden!important;min-height:0!important;border:0!important}
 .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:48px;margin-bottom:40px}
 .footer-brand p{color:var(--text-muted);font-size:0.88rem;margin-top:12px;line-height:1.7}
@@ -1221,6 +1226,13 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
 .fade-up.visible{opacity:1;transform:translateY(0)}
+/* Hero, nav, ticker always visible immediately */
+#hero.section,.hero-section{opacity:1;transform:none}
+.ticker,.stats-bar,.wb-banner{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
+.ticker.section-revealed,.stats-bar.section-revealed,.wb-banner.section-revealed{opacity:1;transform:translateY(0)}
+/* Reviews gallery - tighter layout when no carousel */
+.reviews-gallery-area:empty,.reviews-gallery-area:has(> div:only-child:empty){display:none}
+#reviewsCarouselArea{transition:opacity 0.4s ease}
 
 /* ===== STATS BAR ===== */
 .stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -2074,10 +2086,9 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
     <p class="section-sub" data-ru="Результаты говорят сами за себя — вот что получают наши клиенты" data-am="Արդյունքները խոսում են ինքնիրենք — ահա թե ինչ են ստանում մեր հաճախորդները">Результаты говорят сами за себя — вот что получают наши клиенты</p>
   </div>
   <div class="reviews-gallery-area fade-up" id="reviewsCarouselArea">
-    <!-- Photos injected dynamically from admin panel via blockFeatures as beautiful grid -->
-    <div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)">
-      <i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i>
-      <span data-ru="Фото отзывов загружаются..." data-am="Կարծիքների լուսանկարները բեռնվում են...">Фото отзывов загружаются...</span>
+    <!-- Photos injected dynamically from admin panel via blockFeatures -->
+    <div style="text-align:center;padding:16px 0;color:var(--text-muted,#666)">
+      <i class="fas fa-spinner fa-spin" style="font-size:1.2rem;opacity:0.3"></i>
     </div>
   </div>
   <!-- Dynamic CTA buttons injected here -->
@@ -3846,10 +3857,11 @@ switchLang = function(l) {
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
     }
     
-    // Clear reviews placeholder if no photos were injected
+    // Clear reviews placeholder if no photos were injected — hide completely
     var reviewsPlaceholder = document.getElementById('reviewsCarouselArea');
     if (reviewsPlaceholder && !reviewsPlaceholder.querySelector('.rv-carousel') && !reviewsPlaceholder.querySelector('.reviews-carousel-wrap')) {
-      reviewsPlaceholder.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)"><i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i><span data-ru="\u041e\u0442\u0437\u044b\u0432\u044b \u0441\u043a\u043e\u0440\u043e \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f" data-am="\u053f\u0561\u0580\u056e\u056b\u0584\u0576\u0565\u0580\u0568 \u0577\u0578\u0582\u057f\u0578\u057e \u056f\u0570\u0561\u0575\u057f\u0576\u057e\u0565\u0576">' + (lang === 'am' ? '\u053f\u0561\u0580\u056e\u056b\u0584\u0576\u0565\u0580\u0568 \u0577\u0578\u0582\u057f\u0578\u057e \u056f\u0570\u0561\u0575\u057f\u0576\u057e\u0565\u0576' : '\u041e\u0442\u0437\u044b\u0432\u044b \u0441\u043a\u043e\u0440\u043e \u043f\u043e\u044f\u0432\u044f\u0442\u0441\u044f') + '</span></div>';
+      reviewsPlaceholder.innerHTML = '';
+      reviewsPlaceholder.style.display = 'none';
     }
     
     // ===== HIDE SECTIONS DELETED IN ADMIN =====
@@ -3972,11 +3984,41 @@ switchLang = function(l) {
       _ft.style.paddingTop = '48px';
     }
     
-    console.log('[DB] All dynamic data applied v5');
+    // ===== STAGGERED SECTION REVEAL =====
+    // Reveal sections one by one with a cascade delay
+    var allSections = document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker');
+    var revealDelay = 0;
+    allSections.forEach(function(sec) {
+      if (sec.style.display === 'none' || window.getComputedStyle(sec).display === 'none') return;
+      revealDelay += 80;
+      setTimeout(function() {
+        sec.classList.add('section-revealed');
+        // Re-observe fade-up children since section is now visible
+        sec.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
+      }, revealDelay);
+    });
+    // Reveal footer
+    var _footer = document.querySelector('footer.footer');
+    if (_footer) {
+      setTimeout(function() { _footer.style.opacity = '1'; }, revealDelay + 80);
+    }
+    
+    console.log('[DB] All dynamic data applied v6');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
+    // Fallback: reveal all sections immediately if data loading fails
+    document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.ticker').forEach(function(s) {
+      s.classList.add('section-revealed');
+    });
   }
 })();
+
+// Safety fallback: if sections still hidden after 5s (e.g. slow network), reveal everything
+setTimeout(function() {
+  document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
+    s.classList.add('section-revealed');
+  });
+}, 5000);
 
 /* ===== REFERRAL CODE CHECK ===== */
 var _refDiscount = 0;

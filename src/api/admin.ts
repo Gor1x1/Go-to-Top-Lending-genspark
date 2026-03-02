@@ -1649,7 +1649,8 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     if (existingBlock) {
       try {
         const existOpts = JSON.parse(existingBlock.custom_html as string || '{}');
-        if (existOpts.photos && existOpts.photos.length > 0) {
+        // Preserve ALL existing custom_html if it has meaningful settings (photos, show_slots, etc.)
+        if ((existOpts.photos && existOpts.photos.length > 0) || existOpts.show_slots || existOpts.show_photos || existOpts.bg_class) {
           customHtml = existOpts; // Preserve ALL existing custom_html (photos, settings, etc.)
         } else if (photoMap[key]) {
           customHtml = photoMap[key];
@@ -1687,7 +1688,30 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     }
   }
   
-  // Seed default slot counter if none exist
+  // Sync slot counters from block settings (show_slots)
+  // For each block with show_slots=true in custom_html, ensure a slot_counter exists
+  try {
+    const importedBlocks = await db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all();
+    const existingCounters = await db.prepare('SELECT * FROM slot_counter ORDER BY id').all();
+    const counterPositions = new Set((existingCounters.results || []).map((c: any) => c.position));
+    
+    for (const blk of (importedBlocks.results || [])) {
+      try {
+        const opts = JSON.parse(blk.custom_html as string || '{}');
+        if (opts.show_slots) {
+          const pos = 'in-' + (blk.block_key as string);
+          if (!counterPositions.has(pos)) {
+            // Create a new counter for this block
+            await db.prepare('INSERT INTO slot_counter (counter_name, total_slots, booked_slots, label_ru, label_am, show_timer, reset_day, position) VALUES (?,?,?,?,?,?,?,?)')
+              .bind('Счётчик: ' + (blk.block_key as string), 10, 0, 'Свободных мест', '', 1, 'monday', pos).run();
+            counterPositions.add(pos);
+          }
+        }
+      } catch(e) { /* skip parse errors */ }
+    }
+  } catch(e) { /* ignore slot sync errors */ }
+  
+  // Seed default slot counter if none exist after sync
   const existingSlots = await db.prepare('SELECT COUNT(*) as cnt FROM slot_counter').first().catch(() => ({cnt: 0}));
   if (!(existingSlots as any)?.cnt) {
     await db.prepare('INSERT INTO slot_counter (counter_name, total_slots, booked_slots, label_ru, label_am, show_timer, reset_day, position) VALUES (?,?,?,?,?,?,?,?)')
