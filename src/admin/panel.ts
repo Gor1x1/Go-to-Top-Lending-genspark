@@ -10363,6 +10363,24 @@ function renderSiteBlocks() {
               h += '</div>';
             }
             h += '</div>';
+            // ── Text style controls (color + size) ──
+            var textStyles = b.text_styles || [];
+            var curStyle = textStyles[ti] || {};
+            var curColor = curStyle.color || '';
+            var curSize = curStyle.size || '';
+            h += '<div style="display:flex;gap:8px;margin-top:4px;align-items:center;flex-wrap:wrap">';
+            h += '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:0.65rem;color:#64748b"><i class="fas fa-palette"></i></span>';
+            h += '<input type="color" id="sb_tcolor_' + b.id + '_' + ti + '" value="' + (curColor || '#e2e8f0') + '" style="width:24px;height:20px;border:none;background:none;cursor:pointer;padding:0" onchange="sbSetTextStyle(' + b.id + ',' + ti + ',&apos;color&apos;,this.value)" title="Цвет текста">';
+            if (curColor) h += '<button style="background:none;border:none;color:#f87171;cursor:pointer;font-size:0.6rem;padding:0" onclick="sbSetTextStyle(' + b.id + ',' + ti + ',&apos;color&apos;,&apos;&apos;)" title="Сбросить цвет"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+            h += '<div style="display:flex;align-items:center;gap:4px"><span style="font-size:0.65rem;color:#64748b"><i class="fas fa-text-height"></i></span>';
+            h += '<select class="input" id="sb_tsize_' + b.id + '_' + ti + '" style="width:auto;font-size:0.65rem;padding:1px 4px;background:#1a2236;border:1px solid #293548;color:#94a3b8;border-radius:4px" onchange="sbSetTextStyle(' + b.id + ',' + ti + ',&apos;size&apos;,this.value)" title="Размер текста">';
+            var sizeOptions = [['','Авто'],['0.75rem','XS'],['0.85rem','S'],['1rem','M'],['1.2rem','L'],['1.5rem','XL'],['2rem','2XL'],['2.5rem','3XL']];
+            for (var si = 0; si < sizeOptions.length; si++) {
+              h += '<option value="' + sizeOptions[si][0] + '"' + (sizeOptions[si][0] === curSize ? ' selected' : '') + '>' + sizeOptions[si][1] + '</option>';
+            }
+            h += '</select></div>';
+            h += '</div>';
             h += '<button class="tier-del-btn" style="position:absolute;top:6px;right:6px" onclick="sbRemoveTextPair(' + b.id + ',' + ti + ')" title="Удалить текст"><i class="fas fa-times"></i></button>';
             h += '</div>'; // end sb-text-pair
           }
@@ -10917,6 +10935,23 @@ function sbRemoveTextPair(blockId, idx) {
   if (b.texts_ru && idx < b.texts_ru.length) b.texts_ru.splice(idx, 1);
   if (b.texts_am && idx < b.texts_am.length) b.texts_am.splice(idx, 1);
   if (b.images && idx < b.images.length) b.images.splice(idx, 1);
+  if (b.text_styles && idx < b.text_styles.length) b.text_styles.splice(idx, 1);
+  render();
+  sbAutoSave(blockId);
+}
+
+// ── Set text style (color/size) ──
+function sbSetTextStyle(blockId, idx, prop, value) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  if (!b.text_styles) b.text_styles = [];
+  while (b.text_styles.length <= idx) b.text_styles.push({});
+  if (!b.text_styles[idx]) b.text_styles[idx] = {};
+  if (value) {
+    b.text_styles[idx][prop] = value;
+  } else {
+    delete b.text_styles[idx][prop];
+  }
   render();
   sbAutoSave(blockId);
 }
@@ -11580,6 +11615,7 @@ async function sbSaveBlock(id) {
   saveData.buttons = JSON.stringify(b.buttons || []);
   saveData.texts_ru = JSON.stringify(b.texts_ru || []);
   saveData.texts_am = JSON.stringify(b.texts_am || []);
+  saveData.text_styles = JSON.stringify(b.text_styles || []);
   
   await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(saveData) }, true);
   // Sync to site_content for instant site update

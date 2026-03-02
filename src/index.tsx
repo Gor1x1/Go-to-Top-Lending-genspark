@@ -101,7 +101,7 @@ app.get('/api/site-data', async (c) => {
     // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
     let siteBlockFeatures: any[] = [];
     try {
-      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
         try { 
@@ -138,6 +138,7 @@ app.get('/api/site-data', async (c) => {
             // Text labels for slot counters and other blocks
             texts_ru: textsRu,
             texts_am: textsAm,
+            text_styles: (() => { try { return JSON.parse((blk as any).text_styles as string || '[]'); } catch { return []; } })(),
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -992,7 +993,7 @@ img{max-width:100%;height:auto}
 .ticker-item{display:flex;align-items:center;gap:10px;padding:0 40px;font-size:0.88rem;color:var(--text-sec);flex-shrink:0}
 .ticker-item i{color:var(--purple)}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
-.section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease;overflow:hidden}
+.section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease;overflow:visible}
 .section.section-revealed{opacity:1;transform:translateY(0)}
 .section-dark{background:var(--bg-surface)}
 .section-header{text-align:center;margin-bottom:40px}
@@ -1278,8 +1279,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 /* ===== ABOUT SECTION ===== */
 .about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:center}
-.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border)}
-.about-img img{width:100%;height:auto;min-height:280px;object-fit:cover;display:block}
+.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);min-height:400px}
+.about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block}
 .about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
 .about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
@@ -1308,10 +1309,10 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .reviews-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:20px;margin-top:32px}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
-.rv-carousel{position:relative;width:100%;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
+.rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
-.rv-carousel .rv-slide img{width:100%;height:70vh;min-height:300px;max-height:80vh;object-fit:cover;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
+.rv-carousel .rv-slide img{width:100%;height:auto;min-height:300px;max-height:520px;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
 .rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
@@ -1331,12 +1332,13 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .lightbox .lb-next{right:16px}
 .lightbox .lb-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;border:none;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;z-index:10001}
 @media(max-width:768px){
-  .rv-carousel .rv-slide img{height:60vh;min-height:280px;max-height:70vh}
+  .rv-carousel{max-width:100%}
+  .rv-carousel .rv-slide img{height:auto;min-height:280px;max-height:65vh;object-fit:contain}
   .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
   .lightbox .lb-nav{width:40px;height:40px;font-size:1rem}
 }
 @media(max-width:480px){
-  .rv-carousel .rv-slide img{height:55vh;min-height:250px;max-height:60vh}
+  .rv-carousel .rv-slide img{height:auto;min-height:250px;max-height:55vh;object-fit:contain}
   .rv-carousel .rv-caption{padding:12px 16px}
   .rv-carousel .rv-caption-text{font-size:0.85rem}
   .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
@@ -1408,7 +1410,7 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* About photo full-width on mobile */
   .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px)}
-  .about-img img{width:100%;height:auto;min-height:220px;object-fit:cover}
+  .about-img img{width:100%;height:auto;min-height:300px;max-height:500px;object-fit:cover}
   /* Prevent inner horizontal scroll from blocking vertical page scroll */
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
@@ -1745,6 +1747,19 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
     <div class="highlight-result" data-ru="В результате повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Արդյունքում, ձեր քարտի ԲՈԼՈՐ փոխակերպումները մեծանում են՝ CTR, զամբյուղում ավելացումներ և պատվերներ: Ձեր քարտը դառնում է որոնման ամենաբարձր վարկանիշ ունեցող արդյունք և սկսում է ստանալ օրգանական տրաֆիկ: Որքան բարձր է վարկանիշը, այնքան շատ օրգանական վաճառքներ դուք կապահովեք առանց որևէ լրացուցիչ ներդրման:"><i class="fas fa-bolt"></i> <strong>Результат:</strong> повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.</div>
   </div>
 
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы по ключевикам" data-am="Սկսել գնումները բանալի բառերով">Начать выкупы по ключевикам</span></a>
+  </div>
+</div>
+</section>
+
+<!-- ===== 50K COMPARISON (BLOGGER vs BUYOUTS) ===== -->
+<section class="section" id="fifty-vs-fifty" data-section-id="fifty_vs_fifty">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-balance-scale-right"></i> <span data-ru="Сравнение бюджетов" data-am="Բdelays">Сравнение бюджетов</span></div>
+    <h2 class="section-title" data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы" data-am="50 000 ֏ բلоգեر vs 50 000 ֏ ինքնагнумنеर">50 000 ֏ на блогера vs 50 000 ֏ на выкупы</h2>
+  </div>
   <div class="why-block fade-up">
     <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ — որն է ավելի արդյունավետ?">50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?</span></h3>
     <div class="compare-box">
@@ -3404,16 +3419,25 @@ switchLang = function(l) {
         newSec.className = 'section fade-up';
         newSec.setAttribute('data-section-id', sectionId);
         newSec.id = sectionId;
+        var bfStyles = bf.text_styles || [];
         var secH = '<div class="container">';
         if (blockTexts.length > 0 && blockTexts[0]) {
           var titleText = lang === 'am' && blockTexts[0].am ? blockTexts[0].am : (blockTexts[0].ru || blockTexts[0] || '');
-          secH += '<h2 class="section-title" style="text-align:center;margin-bottom:32px"><span data-ru="' + (blockTexts[0].ru||'') + '" data-am="' + (blockTexts[0].am||'') + '">' + titleText + '</span></h2>';
+          var ts0 = bfStyles[0] || {};
+          var ts0Css = '';
+          if (ts0.color) ts0Css += 'color:' + ts0.color + ';';
+          if (ts0.size) ts0Css += 'font-size:' + ts0.size + ';';
+          secH += '<h2 class="section-title" style="text-align:center;margin-bottom:32px;' + ts0Css + '"><span data-ru="' + (blockTexts[0].ru||'') + '" data-am="' + (blockTexts[0].am||'') + '">' + titleText + '</span></h2>';
         }
         for (var ti = 1; ti < blockTexts.length; ti++) {
           var t = blockTexts[ti];
           if (t) {
             var tText = lang === 'am' && t.am ? t.am : (t.ru || t || '');
-            secH += '<p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto"><span data-ru="' + (t.ru||'') + '" data-am="' + (t.am||'') + '">' + tText + '</span></p>';
+            var tsI = bfStyles[ti] || {};
+            var tsICss = '';
+            if (tsI.color) tsICss += 'color:' + tsI.color + ';';
+            if (tsI.size) tsICss += 'font-size:' + tsI.size + ';';
+            secH += '<p style="text-align:center;color:var(--text-secondary);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto;' + tsICss + '"><span data-ru="' + (t.ru||'') + '" data-am="' + (t.am||'') + '">' + tText + '</span></p>';
           }
         }
         secH += '<div class="section-cta"></div>';
@@ -3937,6 +3961,36 @@ switchLang = function(l) {
         }
       });
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
+      
+      // ===== APPLY TEXT STYLES (color/size) from blockFeatures to all sections =====
+      db.blockFeatures.forEach(function(bf) {
+        var bfStyles = bf.text_styles;
+        if (!bfStyles || bfStyles.length === 0) return;
+        var sId = bf.key.replace(/_/g, '-');
+        var sec = document.querySelector('[data-section-id="' + sId + '"]') || document.querySelector('#' + sId);
+        if (!sec) return;
+        // Collect all data-ru elements in order (they correspond to texts_ru indices)
+        var ruEls = sec.querySelectorAll('[data-ru]');
+        // Build ordered list matching text indices
+        var textsRu = bf.texts_ru || [];
+        for (var sti = 0; sti < textsRu.length; sti++) {
+          var stDef = bfStyles[sti];
+          if (!stDef || (!stDef.color && !stDef.size)) continue;
+          var targetRu = (textsRu[sti] || '').trim();
+          if (!targetRu) continue;
+          // Find the matching DOM element by data-ru value
+          for (var sei = 0; sei < ruEls.length; sei++) {
+            var elRu = (ruEls[sei].getAttribute('data-ru') || '').trim();
+            if (elRu === targetRu) {
+              var targetEl = ruEls[sei].closest('h2, h3, p, li, span, div') || ruEls[sei];
+              if (stDef.color) targetEl.style.color = stDef.color;
+              if (stDef.size) targetEl.style.fontSize = stDef.size;
+              break;
+            }
+          }
+        }
+      });
+      console.log('[DB] Text styles applied');
     }
     
     // Clear reviews placeholder if no photos were injected — hide completely

@@ -218,6 +218,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
         images: (() => { try { return JSON.parse(b.images || '[]'); } catch { return []; } })(),
         buttons: (() => { try { return JSON.parse(b.buttons || '[]'); } catch { return []; } })(),
         social_links: b.social_links || '[]',
+        text_styles: (() => { try { return JSON.parse(b.text_styles || '[]'); } catch { return []; } })(),
       })),
       companyRoles: companyRoles.results || [],
       expenseCategories: expenseCategories.results || [],
@@ -678,6 +679,7 @@ api.put('/section-order/seed', authMiddleware, async (c) => {
     { id: 'services', order: 5, ru: 'Услуги', am: 'Ctions' },
     { id: 'buyout-detail', order: 6, ru: 'Детали выкупа', am: 'Gdelays' },
     { id: 'why-buyouts', order: 7, ru: 'Почему выкупы', am: 'Idelays' },
+    { id: 'fifty-vs-fifty', order: 7, ru: '50K: Блогер vs Выкупы', am: '50K: Бdelays' },
     { id: 'wb-official', order: 8, ru: 'WB официально', am: 'WB Пdelays' },
     { id: 'calculator', order: 9, ru: 'Калькулятор', am: 'Hdelays' },
     { id: 'process', order: 10, ru: 'Как мы работаем', am: 'Idelays' },
@@ -1403,6 +1405,9 @@ api.put('/permissions/:userId', authMiddleware, async (c) => {
 // ===== SITE BLOCKS (unified block constructor) =====
 api.get('/site-blocks', authMiddleware, async (c) => {
   const db = c.env.DB;
+  // Ensure text_styles column exists
+  try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN text_styles TEXT DEFAULT '[]'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN photo_url TEXT DEFAULT ''").run(); } catch {}
   const res = await db.prepare('SELECT * FROM site_blocks ORDER BY sort_order').all();
   const blocks = (res.results || []).map((b: any) => ({
     ...b,
@@ -1411,6 +1416,7 @@ api.get('/site-blocks', authMiddleware, async (c) => {
     images: JSON.parse(b.images || '[]'),
     buttons: JSON.parse(b.buttons || '[]'),
     social_links: b.social_links || '[]',
+    text_styles: JSON.parse(b.text_styles || '[]'),
   }));
   return c.json({ blocks });
 });
@@ -1457,6 +1463,11 @@ api.put('/site-blocks/:id', authMiddleware, async (c) => {
     }
     vals.push(slVal);
   }
+  if (d.text_styles !== undefined) {
+    fields.push('text_styles=?');
+    vals.push(typeof d.text_styles === 'string' ? d.text_styles : JSON.stringify(d.text_styles || []));
+  }
+  if (d.photo_url !== undefined) { fields.push('photo_url=?'); vals.push(d.photo_url); }
   if (fields.length === 0) return c.json({ error: 'No fields' }, 400);
   fields.push('updated_at=CURRENT_TIMESTAMP');
   vals.push(id);
@@ -1508,7 +1519,8 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
       {text_ru: 'Начать выкупы сейчас', text_am: 'Սksel gnumnere', icon: 'fas fa-shopping-bag'},
       {text_ru: 'Получить индивидуальный расчёт', text_am: 'Ստandsanal hashvark', icon: 'fas fa-calculator'}
     ],
-    'why_buyouts': [{text_ru: 'Начать выкупы по ключевикам', text_am: 'Սksel gnumnere banali barerov', icon: 'fas fa-fire'}],
+    'why_buyouts': [{text_ru: 'Начать выкупы', text_am: 'Սksel gnumnere', icon: 'fas fa-fire'}],
+    'fifty_vs_fifty': [{text_ru: 'Начать выкупы по ключевикам', text_am: 'Սksel gnumnere banali barerov', icon: 'fas fa-fire'}],
     'wb_official': [{text_ru: 'Занять ТОП прямо сейчас', text_am: 'Զbaghetsnel TOP hima', icon: 'fas fa-rocket'}],
     'process': [{text_ru: 'Написать менеджеру', text_am: 'Գrel menedzherin', icon: 'fab fa-telegram'}],
     'warehouse': [{text_ru: 'Заказать сейчас', text_am: 'Պatvirel hima', icon: 'fas fa-shopping-cart'}],

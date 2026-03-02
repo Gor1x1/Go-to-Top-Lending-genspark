@@ -268,6 +268,8 @@ CREATE TABLE IF NOT EXISTS site_blocks (
   buttons TEXT DEFAULT '[]',
   custom_css TEXT DEFAULT '',
   custom_html TEXT DEFAULT '',
+  social_links TEXT DEFAULT '[]',
+  text_styles TEXT DEFAULT '[]',
   is_visible INTEGER DEFAULT 1,
   sort_order INTEGER DEFAULT 0,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
