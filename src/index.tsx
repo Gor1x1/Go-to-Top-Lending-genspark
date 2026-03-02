@@ -1252,6 +1252,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 /* Photo block review cards — no bottom gap */
 .pb-card{margin-bottom:0}
 .pb-carousel{margin-bottom:0;padding-bottom:0}
+.pb-card-size img{width:100%;height:auto;max-height:500px;object-fit:contain;background:var(--bg-card,#1a1a2e)}
+@media(max-width:480px){.pb-card-size img{max-height:400px}}
 
 /* ===== STATS BAR ===== */
 .stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -3859,8 +3861,8 @@ switchLang = function(l) {
             // 1. Find the dedicated CTA container (if any)
             var ctaContainer = section.querySelector('#reviewsCtaArea') || section.querySelector('.section-cta') || section.querySelector('.hero-buttons');
             
-            // 2. Find ALL button links in the section (in ANY container)
-            var allBtns = section.querySelectorAll('a.btn, a.btn-primary, a.btn-tg, a.btn-success, a.btn-warning, a.btn-outline');
+            // 2. Find ALL button links AND form buttons in the section (in ANY container)
+            var allBtns = section.querySelectorAll('a.btn, a.btn-primary, a.btn-tg, a.btn-success, a.btn-warning, a.btn-outline, button.btn, button.btn-primary, button.btn-lg');
             var existingBtns = [];
             for (var eb = 0; eb < allBtns.length; eb++) {
               var btn = allBtns[eb];
@@ -3869,8 +3871,11 @@ switchLang = function(l) {
               existingBtns.push(btn);
             }
             
-            // 3. If no CTA container exists at all, CREATE one inside the section
-            if (!ctaContainer && existingBtns.length === 0) {
+            // 3. If section has a form with a submit button, treat it as having buttons (don't inject duplicates)
+            var hasFormButton = !!section.querySelector('form button[type="submit"], form .btn');
+            
+            // 4. If no CTA container exists at all AND no existing buttons AND no form buttons, CREATE one
+            if (!ctaContainer && existingBtns.length === 0 && !hasFormButton) {
               var containerEl = section.querySelector('.container');
               if (containerEl) {
                 ctaContainer = document.createElement('div');
@@ -3881,7 +3886,7 @@ switchLang = function(l) {
             
             var ctaIsEmpty = ctaContainer && ctaContainer.children.length === 0;
             
-            if (existingBtns.length === 0 && ctaIsEmpty) {
+            if (existingBtns.length === 0 && ctaIsEmpty && !hasFormButton) {
               // Empty CTA area — safe to inject buttons
               var _injectedCount = 0;
               for (var bNew = 0; bNew < bf.buttons.length; bNew++) {
@@ -4248,7 +4253,8 @@ async function checkRefCode() {
       '.pb-card{transition:transform 0.3s,box-shadow 0.3s}.pb-card:hover{transform:translateY(-4px);box-shadow:0 8px 30px rgba(139,92,246,0.25)}' +
       '.pb-card img{transition:transform 0.4s}.pb-card:hover img{transform:scale(1.03)}' +
       '.pb-counter{width:8px;height:8px;border-radius:50%;transition:all 0.3s;cursor:pointer}' +
-      '@media(max-width:640px){.pb-card-size{flex:0 0 78vw !important}.pb-title{font-size:1.3rem !important}}';
+      '@media(max-width:900px){.pb-card-size{flex:0 0 85vw !important}.pb-title{font-size:1.3rem !important}}' +
+      '@media(min-width:901px){.pb-card-size{flex:0 0 min(400px,80%) !important}}';
     document.head.appendChild(style);
 
     blocks.forEach(function(b) {
@@ -4283,8 +4289,8 @@ async function checkRefCode() {
         html += '<div id="' + carId + '" class="pb-carousel" style="display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding:4px 8px">';
         for (var i = 0; i < validPhotos.length; i++) {
           var p = validPhotos[i];
-          html += '<div class="pb-card pb-card-size" style="flex:0 0 280px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;max-height:500px;object-fit:cover" loading="lazy">' +
+          html += '<div class="pb-card pb-card-size" style="flex:0 0 340px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;display:flex;flex-direction:column" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;max-height:500px;object-fit:contain;flex-shrink:0;background:var(--bg-card,#1a1a2e)" loading="lazy">' +
             (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + p.caption + '</div>' : '') +
           '</div>';
         }
@@ -4305,11 +4311,11 @@ async function checkRefCode() {
         html += '</div>';
       } else {
         /* ── Grid for 1-2 photos ── */
-        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">';
+        html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">';
         for (var gi = 0; gi < validPhotos.length; gi++) {
           var gp = validPhotos[gi];
           html += '<div class="pb-card" style="border-radius:var(--r,16px);overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer" onclick="openLightbox(&apos;' + (gp.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:320px;object-fit:cover" loading="lazy">' +
+            '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:auto;max-height:500px;object-fit:contain;background:var(--bg-card,#1a1a2e)" loading="lazy">' +
             (gp.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + gp.caption + '</div>' : '') +
           '</div>';
         }

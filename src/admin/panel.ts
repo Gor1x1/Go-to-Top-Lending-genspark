@@ -10320,9 +10320,14 @@ function renderSiteBlocks() {
             var isLong = ruText.length > 100 || amText.length > 100;
             var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
 
-            h += '<div class="sb-text-pair">';
+            h += '<div class="sb-text-pair" draggable="true" data-block-id="' + b.id + '" data-text-idx="' + ti + '" ondragstart="sbDragStart(event,&apos;text&apos;,' + b.id + ',' + ti + ')" ondragover="sbDragOver(event)" ondrop="sbDrop(event,&apos;text&apos;,' + b.id + ',' + ti + ')">';
             h += '<div class="sb-text-pair-num" style="display:flex;align-items:center;justify-content:space-between;gap:8px">';
+            h += '<div style="display:flex;align-items:center;gap:6px">';
+            h += '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:0.75rem" title="Перетащить"></i>';
+            if (ti > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px;font-size:0.7rem" onclick="sbMoveText(' + b.id + ',' + ti + ',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
+            if (ti < maxTexts - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px;font-size:0.7rem" onclick="sbMoveText(' + b.id + ',' + ti + ',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
             h += '<span>' + fieldLabel + '</span>';
+            h += '</div>';
             h += '<select class="input" style="width:auto;font-size:0.65rem;padding:2px 6px;background:#1a2236;border:1px solid #293548;color:#64748b;border-radius:4px" onchange="sbSetTextRole(' + b.id + ',' + ti + ',this.value)" title="Тип текста">';
             var roleOptions = ['title','subtitle','text','note'];
             var roleLabels = ['Заголовок','Подзаголовок','Текст','Примечание'];
@@ -10383,9 +10388,14 @@ function renderSiteBlocks() {
             ? '<span class="badge badge-green" style="font-size:0.65rem" title="Связан с TG-шаблоном"><i class="fas fa-link" style="margin-right:3px"></i>TG</span>'
             : '';
           
-          h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
-          // Compact row: icon + text RU + text AM + action + TG badge + link
+          h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative" draggable="true" ondragstart="sbDragStart(event,&apos;btn&apos;,' + b.id + ',' + bti + ')" ondragover="sbDragOver(event)" ondrop="sbDrop(event,&apos;btn&apos;,' + b.id + ',' + bti + ')">';
+          // Compact row: icon + move buttons + text RU + text AM + action + TG badge + link
           h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+          // Move arrows
+          h += '<div style="display:flex;flex-direction:column;gap:0">';
+          if (bti > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:0 2px;font-size:0.65rem;line-height:1" onclick="sbMoveButton(' + b.id + ',' + bti + ',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
+          if (bti < (b.buttons || []).length - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:0 2px;font-size:0.65rem;line-height:1" onclick="sbMoveButton(' + b.id + ',' + bti + ',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
+          h += '</div>';
           // Icon: priority — manual selection > auto-detect from URL > default
           var displayIcon = sbResolveButtonIcon(btn.icon, btn.url);
           h += '<div style="min-width:36px;text-align:center"><i class="' + escHtml(displayIcon) + '" style="color:#8B5CF6;font-size:0.9rem"></i></div>';
