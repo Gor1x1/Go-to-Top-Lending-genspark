@@ -101,7 +101,7 @@ app.get('/api/site-data', async (c) => {
     // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
     let siteBlockFeatures: any[] = [];
     try {
-      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
         try { 
@@ -116,6 +116,11 @@ app.get('/api/site-data', async (c) => {
         try { blockPhotos = Array.isArray(blockOpts.photos) ? blockOpts.photos : []; } catch { blockPhotos = []; }
         let blockBtns: any[] = [];
         try { blockBtns = JSON.parse(blk.buttons as string || '[]'); } catch { blockBtns = []; }
+        // Parse texts for slot_counter blocks (needed for labels)
+        let textsRu: string[] = [];
+        let textsAm: string[] = [];
+        try { textsRu = JSON.parse(blk.texts_ru as string || '[]'); } catch { textsRu = []; }
+        try { textsAm = JSON.parse(blk.texts_am as string || '[]'); } catch { textsAm = []; }
         siteBlockFeatures.push({
             key: blk.block_key,
             social_links: socials,
@@ -127,6 +132,12 @@ app.get('/api/site-data', async (c) => {
             show_slots: blockOpts.show_slots || false,
             block_type: blk.block_type || 'section',
             buttons: blockBtns,
+            // Slot counter data (from custom_html)
+            total_slots: blockOpts.total_slots || 0,
+            booked_slots: blockOpts.booked_slots || 0,
+            // Text labels for slot counters and other blocks
+            texts_ru: textsRu,
+            texts_am: textsAm,
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -3291,6 +3302,55 @@ switchLang = function(l) {
       });
       db.blockFeatures.forEach(function(bf) {
         if (bf.key === 'floating_tg' || bf.key === 'footer' || bf.block_type === 'floating' || bf.block_type === 'footer' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup') return;
+        
+        // ── SLOT COUNTER BLOCK TYPE — create counter bar instead of section ──
+        if (bf.block_type === 'slot_counter') {
+          var scSectionId = bf.key.replace(/_/g, '-');
+          if (_existingSectionIds[scSectionId] || _existingSectionIds[bf.key]) return;
+          // Check visibility from sectionOrder
+          if (db.sectionOrder) {
+            for (var sci = 0; sci < db.sectionOrder.length; sci++) {
+              var sco = db.sectionOrder[sci];
+              var scoNorm = (sco.section_id || '').replace(/_/g, '-');
+              if ((scoNorm === scSectionId) && !sco.is_visible) return;
+            }
+          }
+          var scTotal = bf.total_slots || 10;
+          var scBooked = bf.booked_slots || 0;
+          var scFree = Math.max(0, scTotal - scBooked);
+          var scPct = scTotal > 0 ? Math.round(((scTotal - scFree) / scTotal) * 100) : 0;
+          var scLabelRu = (bf.texts_ru && bf.texts_ru[0]) || 'Свободных мест';
+          var scLabelAm = (bf.texts_am && bf.texts_am[0]) || '';
+          var scLabel = lang === 'am' && scLabelAm ? scLabelAm : scLabelRu;
+          
+          var scEl = document.createElement('div');
+          scEl.className = 'slot-counter-bar fade-up';
+          scEl.setAttribute('data-section-id', scSectionId);
+          scEl.id = scSectionId;
+          scEl.innerHTML = '<div class="container">' +
+            '<div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0">' +
+              '<div style="display:flex;align-items:center;gap:12px">' +
+                '<div style="width:14px;height:14px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>' +
+                '<span style="font-size:1rem;font-weight:600;color:var(--text-secondary)" data-ru="' + scLabelRu.replace(/"/g, '&quot;') + '" data-am="' + (scLabelAm || '').replace(/"/g, '&quot;') + '">' + scLabel + '</span>' +
+              '</div>' +
+              '<div style="display:flex;align-items:center;gap:8px">' +
+                '<span style="font-size:2.2rem;font-weight:900;color:var(--purple)">' + scFree + '</span>' +
+                '<span style="font-size:0.85rem;color:var(--text-muted)">/ ' + scTotal + '</span>' +
+              '</div>' +
+              '<div style="width:200px;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden">' +
+                '<div style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;transition:width 1s ease;width:' + scPct + '%"></div>' +
+              '</div>' +
+            '</div></div>';
+          
+          // Insert before footer
+          if (footer5) mainParent5.insertBefore(scEl, footer5);
+          else mainParent5.appendChild(scEl);
+          _existingSectionIds[scSectionId] = true;
+          _existingSectionIds[bf.key] = true;
+          console.log('[DB] Created slot-counter-bar:', scSectionId, 'free:', scFree, '/', scTotal);
+          return;
+        }
+        
         var sectionId = bf.key.replace(/_/g, '-');
         // Check BOTH formats to prevent duplicate creation
         if (_existingSectionIds[sectionId] || _existingSectionIds[bf.key]) return;
@@ -3705,33 +3765,7 @@ switchLang = function(l) {
           }
         }
         
-        // Inject slot counters — show if show_slots is on OR if any counter is positioned in this block
-        if (db.slotCounters && db.slotCounters.length > 0) {
-          var bfKey = bf.key;
-          var bfKeyHyphen = bfKey.replace(/_/g, '-');
-          db.slotCounters.forEach(function(sc) {
-            if (!sc.show_timer) return;
-            // Show counters linked to THIS block (position matches)
-            var cpos = sc.position || '';
-            if (cpos !== 'in-' + bfKey && cpos !== 'after-' + bfKey && cpos !== 'before-' + bfKey &&
-                cpos !== 'in-' + bfKeyHyphen && cpos !== 'after-' + bfKeyHyphen && cpos !== 'before-' + bfKeyHyphen) return;
-            var free = Math.max(0, (sc.total_slots || 10) - (sc.booked_slots || 0));
-            var pct = sc.total_slots > 0 ? Math.round(((sc.total_slots - free) / sc.total_slots) * 100) : 0;
-            var existingSlot = section.querySelector('.block-slot-counter');
-            if (existingSlot) return; // only one per block
-            var slotDiv = document.createElement('div');
-            slotDiv.className = 'block-slot-counter';
-            slotDiv.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:16px;padding:14px 0;margin-top:8px;flex-wrap:wrap';
-            slotDiv.innerHTML = '<div style="display:flex;align-items:center;gap:8px">' +
-              '<div style="width:10px;height:10px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>' +
-              '<span style="font-size:0.9rem;font-weight:600;color:var(--text-secondary,#999)">' + (lang === 'am' && sc.label_am ? sc.label_am : (sc.label_ru || sc.counter_name || '')) + '</span></div>' +
-              '<span style="font-size:1.6rem;font-weight:900;color:var(--purple,#8B5CF6)">' + free + '<span style="color:var(--text-muted,#666);font-weight:400;font-size:0.8rem"> / ' + sc.total_slots + '</span></span>' +
-              '<div style="width:140px;height:6px;background:var(--bg-card,#1a1a2e);border-radius:4px;overflow:hidden"><div style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;width:' + pct + '%"></div></div>';
-            var container = section.querySelector('.container');
-            if (container) container.appendChild(slotDiv);
-            else section.appendChild(slotDiv);
-          });
-        }
+        // Slot counter injection removed — now handled as separate block type 'slot_counter'
 
         // Dynamic buttons: update CTA buttons in section from DB
         // Resolve button icon: manual > auto-detect from URL > default
@@ -4073,89 +4107,8 @@ async function checkRefCode() {
   }
 }
 
-/* ===== SLOT COUNTERS (multiple) ===== */
-(function() {
-  fetch('/api/slots').then(function(r){return r.json()}).then(function(data) {
-    var counters = data.counters || [];
-    if (!counters.length) return;
-    // Remove old static slot counter section
-    // Remove legacy static slot counter section (if any)
-    var oldSection = document.getElementById('slotCounterSection');
-    if (oldSection) oldSection.remove();
-
-    counters.forEach(function(d, idx) {
-      if (!d.show_timer) return;
-      var sid = 'slotCounter_' + (d.id || idx);
-      // Prevent duplicate — skip if already exists
-      if (document.getElementById(sid)) return;
-      // Create new counter element
-      var el = document.createElement('div');
-      el.id = sid;
-      el.className = 'slot-counter-bar fade-up';
-      el.setAttribute('data-section-id', 'slot-counter-' + (d.id || idx));
-      el.innerHTML = '<div class="container">' +
-        '<div style="display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap;padding:24px 0">' +
-          '<div style="display:flex;align-items:center;gap:12px">' +
-            '<div style="width:14px;height:14px;border-radius:50%;background:#10B981;animation:pulse 2s infinite"></div>' +
-            '<span style="font-size:1rem;font-weight:600;color:var(--text-secondary)">' + (lang==='am' && d.label_am ? d.label_am : (d.label_ru || d.counter_name || '')) + '</span>' +
-          '</div>' +
-          '<div style="display:flex;align-items:center;gap:8px">' +
-            '<span style="font-size:2.2rem;font-weight:900;color:var(--purple)">' + d.free + '</span>' +
-            '<span style="font-size:0.85rem;color:var(--text-muted)">/ ' + d.total + '</span>' +
-          '</div>' +
-          '<div style="width:200px;height:8px;background:var(--bg-card);border-radius:4px;overflow:hidden">' +
-            '<div style="height:100%;background:linear-gradient(90deg,#10B981,#8B5CF6);border-radius:4px;transition:width 1s ease;width:' + Math.round(((d.total - d.free) / d.total) * 100) + '%"></div>' +
-          '</div>' +
-        '</div></div>';
-
-      // Position counter — support both 'after-X' and 'in-X' patterns
-      var pos = d.position || 'after-hero';
-      var target = null;
-      var inserted = false;
-      // Handle 'in-BLOCK' positions — inject INSIDE the section's container
-      var inMatch = pos.match(/^in-(.+)$/);
-      if (inMatch) {
-        var blockId = inMatch[1];
-        // Normalize: try both underscore and hyphen versions
-        var blockIdAlt = blockId.indexOf('_') >= 0 ? blockId.replace(/_/g, '-') : blockId.replace(/-/g, '_');
-        var blockSec = document.querySelector('[data-section-id="' + blockId + '"]') || document.querySelector('[data-section-id="' + blockIdAlt + '"]') || document.getElementById(blockId) || document.getElementById(blockIdAlt);
-        if (blockSec) {
-          var blockContainer = blockSec.querySelector('.container') || blockSec;
-          blockContainer.appendChild(el);
-          inserted = true;
-        }
-      }
-      // Handle 'after-BLOCK' positions
-      if (!inserted) {
-        var afterMatch = pos.match(/^after-(.+)$/);
-        if (afterMatch) {
-          var afterId = afterMatch[1];
-          var afterIdAlt = afterId.indexOf('_') >= 0 ? afterId.replace(/_/g, '-') : afterId.replace(/-/g, '_');
-          target = document.querySelector('[data-section-id="' + afterId + '"]') || document.querySelector('[data-section-id="' + afterIdAlt + '"]') || document.getElementById(afterId) || document.getElementById(afterIdAlt);
-          if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; }
-        }
-      }
-      // Handle 'before-BLOCK' positions
-      if (!inserted) {
-        var beforeMatch = pos.match(/^before-(.+)$/);
-        if (beforeMatch) {
-          var beforeId = beforeMatch[1];
-          var beforeIdAlt = beforeId.indexOf('_') >= 0 ? beforeId.replace(/_/g, '-') : beforeId.replace(/-/g, '_');
-          target = document.querySelector('[data-section-id="' + beforeId + '"]') || document.querySelector('[data-section-id="' + beforeIdAlt + '"]') || document.getElementById(beforeId) || document.getElementById(beforeIdAlt);
-          if (target) { target.parentNode.insertBefore(el, target); inserted = true; }
-        }
-      }
-      // Legacy named positions
-      if (!inserted) {
-        if (pos === 'in-header') { target = document.querySelector('header, nav'); if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; } }
-        else if (pos === 'after-hero') { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; } }
-        else if (pos === 'after-ticker') { target = document.querySelector('.ticker'); if (target) { target.parentNode.insertBefore(el, target.nextSibling); inserted = true; } }
-      }
-      // Default fallback: after hero (NOT before footer — that creates gaps)
-      if (!inserted) { target = document.getElementById('hero') || document.querySelector('.hero'); if (target) target.parentNode.insertBefore(el, target.nextSibling); }
-    });
-  }).catch(function(){});
-})();
+/* ===== SLOT COUNTERS — now rendered via blockFeatures (block_type='slot_counter') ===== */
+/* Old standalone fetch removed — counters are managed as site_blocks in admin */
 
 /* ===== DYNAMIC FOOTER FROM DB ===== */
 (function() {
