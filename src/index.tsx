@@ -914,7 +914,7 @@ img{max-width:100%;height:auto}
 .nav{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .logo{display:flex;align-items:center;gap:12px}
 .logo img{height:44px;width:auto;border-radius:8px}
-.logo-text{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo-text{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
 .nav-links{display:flex;align-items:center;gap:24px;list-style:none}
 .nav-links a{font-size:0.88rem;font-weight:500;color:var(--text-sec);transition:var(--t)}
 .nav-links a:hover{color:var(--text)}
@@ -1312,6 +1312,7 @@ img{max-width:100%;height:auto}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
 }
 @media(max-width:768px){
+  .logo-text{display:none}
   .nav-links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100vh;background:rgba(15,10,26,0.98);flex-direction:column;justify-content:center;align-items:center;gap:28px;padding:80px 20px 20px;z-index:10000;overflow-y:auto}
   .nav-links.active{display:flex !important}
   .nav-links li{list-style:none;width:100%;text-align:center}
@@ -1350,20 +1351,35 @@ img{max-width:100%;height:auto}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
 }
 @media(max-width:480px){
-  .hero h1{font-size:1.6rem}
-  .section{padding:44px 0}
-  .section-title{font-size:1.4rem}
-  .container{padding:0 16px}
-  .calc-wrap{padding:16px}
-  .svc-card{padding:20px}
-  .buyout-detail{padding:24px}
-  .reviews-detail{padding:24px}
-  .guarantee-card{padding:24px}
-  .form-card{padding:20px}
-  .wb-banner-card{min-width:0;padding:12px 16px}
-  .wb-banner-right{min-width:0;padding:12px 16px;flex-wrap:wrap}
+  .hero h1{font-size:1.5rem}
+  .section{padding:36px 0}
+  .section-title{font-size:1.3rem}
+  .section-sub{font-size:0.85rem}
+  .container{padding:0 14px}
+  .calc-wrap{padding:14px}
+  .svc-card{padding:16px}
+  .buyout-detail{padding:20px}
+  .reviews-detail{padding:20px}
+  .guarantee-card{padding:20px}
+  .guarantee-card img{max-height:200px}
+  .form-card{padding:16px}
+  .wb-banner-card{min-width:0;padding:10px 14px}
+  .wb-banner-right{min-width:0;padding:10px 14px;flex-wrap:wrap}
   .wb-banner-right .btn{margin-left:0;margin-top:8px;width:100%}
-  .cmp-table{min-width:380px}
+  .cmp-table{min-width:340px;font-size:0.72rem}
+  .hero-stats{gap:16px}
+  .stat-num{font-size:1.6rem}
+  .stat-label{font-size:0.72rem}
+  .hero-desc{font-size:0.9rem}
+  .btn{padding:12px 20px;font-size:0.88rem}
+  .btn-lg{padding:14px 24px;font-size:0.95rem}
+  .hero-badge{font-size:0.78rem;padding:6px 14px}
+  .nav{gap:8px}
+  .lang-btn{padding:5px 10px;font-size:0.72rem}
+  .logo img{height:36px}
+  .wh-item img{height:200px}
+  .wh-caption{font-size:0.78rem;padding:10px 14px}
+  .footer{padding:40px 0 20px}
 }
 
 /* ===== MOBILE FULL-WIDTH FIXES ===== */
@@ -1373,10 +1389,33 @@ img{max-width:100%;height:auto}
   input,textarea,select,button{font-size:16px!important;-webkit-appearance:none;border-radius:0;border-radius:10px}
 }
 @media(max-width:360px){
-  .container{padding:0 12px}
-  .hero{padding:100px 0 50px}
-  .hero h1{font-size:1.4rem}
-  .calc-tab{padding:6px 12px;font-size:0.75rem}
+  .container{padding:0 10px}
+  .hero{padding:95px 0 40px}
+  .hero h1{font-size:1.25rem}
+  .hero-desc{font-size:0.82rem;margin-bottom:20px}
+  .hero-stats{gap:12px}
+  .stat-num{font-size:1.4rem}
+  .section-title{font-size:1.15rem}
+  .calc-tab{padding:5px 10px;font-size:0.72rem}
+  .calc-wrap{padding:12px}
+  .svc-card{padding:14px}
+  .svc-card h3{font-size:0.95rem}
+  .btn{padding:10px 16px;font-size:0.82rem}
+  .section{padding:28px 0}
+  .section-cta{gap:10px;margin-top:20px}
+  .hero-buttons{gap:10px}
+  .g-list li{font-size:0.82rem}
+  .process-grid{grid-template-columns:1fr !important}
+  .buyout-grid{grid-template-columns:1fr !important}
+}
+@media(max-width:320px){
+  .container{padding:0 8px}
+  .hero{padding:85px 0 30px}
+  .hero h1{font-size:1.1rem}
+  .section-title{font-size:1.05rem}
+  .btn{padding:8px 14px;font-size:0.78rem}
+  .logo img{height:30px}
+  .lang-btn{padding:4px 8px;font-size:0.68rem}
 }
 </style>
 </head>
@@ -2541,49 +2580,56 @@ function rvGoTo(carId, idx) {
   }
 }
 
-/* ===== TIMED POPUP (5 sec) — BULLETPROOF ===== */
-var popupDismissed = false;
+/* ===== TIMED POPUP (5 sec) — ALWAYS SHOWS ON EVERY PAGE LOAD ===== */
+var _popupShown = false;
 
 function showPopup() {
-  if (popupDismissed) return;
-  if (sessionStorage.getItem('popupDone')) return;
+  if (_popupShown) return;
+  _popupShown = true;
   var ov = document.getElementById('popupOverlay');
-  if (!ov) return;
-  var isMobile = window.innerWidth <= 640;
-  /* Force visibility — mobile: slide-up from bottom; desktop: centered */
-  ov.setAttribute('style',
-    'display:flex!important;visibility:visible!important;opacity:1!important;' +
-    'position:fixed;top:0;left:0;width:100vw;height:100vh;height:100dvh;' +
-    'background:rgba(0,0,0,0.85);z-index:100000;overflow-y:auto;' +
-    (isMobile
-      ? 'justify-content:center;align-items:flex-end;padding:0;'
-      : 'justify-content:center;align-items:center;padding:20px;')
-  );
-  ov.classList.add('show');
+  if (!ov) { console.log('[Popup] No overlay element found'); return; }
   var card = ov.querySelector('.popup-card');
-  if (card) {
-    card.style.opacity = '1';
-    card.style.visibility = 'visible';
-    card.style.display = 'block';
-    if (isMobile) {
-      card.style.cssText += 'max-width:100%;width:100%;margin:0;border-radius:20px 20px 0 0;max-height:90vh;max-height:90dvh;overflow-y:auto;padding:28px 16px;animation:slideUpMobile 0.4s ease forwards;';
-    } else {
-      card.style.transform = 'scale(1) translateY(0)';
-    }
+  if (!card) { console.log('[Popup] No card element found'); return; }
+  var isMobile = window.innerWidth <= 640;
+  
+  // Reset any previous state completely
+  card.removeAttribute('style');
+  ov.removeAttribute('style');
+  
+  // Show overlay with inline styles to override any CSS
+  ov.classList.add('show');
+  ov.style.cssText = 'display:flex !important;position:fixed;top:0;left:0;width:100vw;height:100vh;background:rgba(0,0,0,0.85);z-index:100000;overflow-y:auto;visibility:visible;opacity:1;';
+  
+  if (isMobile) {
+    ov.style.justifyContent = 'center';
+    ov.style.alignItems = 'flex-end';
+    ov.style.padding = '0';
+    card.style.cssText = 'max-width:100%;width:100%;margin:0;border-radius:20px 20px 0 0;max-height:90vh;overflow-y:auto;padding:28px 16px;opacity:1;visibility:visible;display:block;animation:slideUpMobile 0.4s ease forwards;';
+  } else {
+    ov.style.justifyContent = 'center';
+    ov.style.alignItems = 'center';
+    ov.style.padding = '20px';
+    card.style.cssText = 'opacity:1;visibility:visible;display:block;';
   }
+  
+  // Ensure form is visible (reset from previous success state)
+  var formWrap = document.getElementById('popupFormWrap');
+  var successWrap = document.getElementById('popupSuccess');
+  if (formWrap) formWrap.style.display = 'block';
+  if (successWrap) successWrap.style.display = 'none';
+  
   document.body.style.overflow = 'hidden';
   console.log('[Popup] Shown on ' + (isMobile ? 'mobile' : 'desktop') + ', w=' + window.innerWidth);
 }
 
 function hidePopup() {
-  popupDismissed = true;
   var ov = document.getElementById('popupOverlay');
   if (ov) {
     ov.classList.remove('show');
-    ov.setAttribute('style','display:none!important;visibility:hidden!important;opacity:0!important;');
+    ov.style.cssText = 'display:none;visibility:hidden;opacity:0;';
   }
   document.body.style.overflow = '';
-  sessionStorage.setItem('popupDone', '1');
+  console.log('[Popup] Hidden');
 }
 
 /* Close button */
@@ -2595,7 +2641,7 @@ if (_closeBtn) {
   });
 }
 
-/* Click overlay to close */
+/* Click overlay to close (only when clicking the dark area, NOT the card) */
 var _popupOv = document.getElementById('popupOverlay');
 if (_popupOv) {
   _popupOv.addEventListener('click', function(e) {
@@ -2603,7 +2649,7 @@ if (_popupOv) {
   });
 }
 
-/* Show after 5 seconds — guaranteed */
+/* Show after 5 seconds — ALWAYS, no sessionStorage check, no popupDismissed */
 setTimeout(showPopup, 5000);
 console.log('[Popup] Timer set, will fire in 5s');
 
@@ -3257,36 +3303,51 @@ switchLang = function(l) {
         // Inject photos if photos array has items (no toggle required)
         // BUT skip if section already has images from HTML template (avoid duplicates)
         if (bf.photos && bf.photos.length > 0) {
+          // Clean up any previously injected galleries first
           var existingPhotoGal = section.querySelector('.block-photo-gallery');
           if (existingPhotoGal) existingPhotoGal.remove();
           var existingReviewGallery = section.querySelector('.rv-gallery, .rv-carousel');
           if (existingReviewGallery) existingReviewGallery.remove();
           var existingReviewCarousel = section.querySelector('.reviews-carousel-wrap');
           if (existingReviewCarousel) existingReviewCarousel.remove();
-          // Check if section already has images (from HTML, not from our injection)
+          
+          // Check if section has NATIVE content containers (grid, gallery, carousel already in HTML)
+          // This catches static templates like warehouse (.wh-grid), about (.about-grid), etc.
+          var hasStaticPhotoContainer = !!(section.querySelector('.wh-grid, .wh-item, .about-grid, .guarantee-card'));
+          
+          // Check if section has NATIVE images (from HTML template, not our injection)
           var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.rv-carousel img):not(.reviews-carousel-wrap img)');
-          var hasNativePhotos = nativeImgs.length > 0 && !existingPhotoGal && !existingReviewCarousel && bf.block_type !== 'reviews';
-          // Also check if the photos from DB match the native HTML images (to avoid duplicating e.g. warehouse photos)
-          if (hasNativePhotos && bf.show_photos !== true) {
-            // Check if ALL photos from DB already exist in the DOM
-            var allPhotosAlreadyInDom = true;
+          var hasNativePhotos = nativeImgs.length > 0 && bf.block_type !== 'reviews';
+          
+          // If section has native photos, check if ANY DB photo URLs overlap
+          var shouldSkip = false;
+          if (hasStaticPhotoContainer || hasNativePhotos) {
             var validCheck = bf.photos.filter(function(p) { return p && p.url; });
+            // Extract just the filename from each URL for reliable comparison
+            function extractFilename(u) { return (u || '').split('/').pop().split('?')[0].toLowerCase(); }
+            var allAlreadyInDom = true;
             for (var vci = 0; vci < validCheck.length; vci++) {
               var found = false;
+              var checkUrl = validCheck[vci].url;
+              var checkName = extractFilename(checkUrl);
               for (var ni = 0; ni < nativeImgs.length; ni++) {
-                if (nativeImgs[ni].src && nativeImgs[ni].src.indexOf(validCheck[vci].url) >= 0) { found = true; break; }
+                var imgSrc = nativeImgs[ni].getAttribute('src') || nativeImgs[ni].src || '';
+                var imgName = extractFilename(imgSrc);
+                // Compare: exact match, substring containment, OR filename match
+                if (imgSrc === checkUrl || imgSrc.indexOf(checkUrl) >= 0 || checkUrl.indexOf(imgSrc) >= 0 || (checkName && imgName && checkName === imgName)) { 
+                  found = true; break; 
+                }
               }
-              if (!found) { allPhotosAlreadyInDom = false; break; }
+              if (!found) { allAlreadyInDom = false; break; }
             }
-            if (allPhotosAlreadyInDom) {
-              // All photos from DB are already visible in HTML — skip injection
-            } else {
-              // Some photos are new (user uploaded via admin) — show them
-              bf.show_photos = true;
+            if (allAlreadyInDom || hasStaticPhotoContainer) {
+              shouldSkip = true; // Section has native photos — skip injection
+              console.log('[DB] Skipping photo injection for', sectionId, '(native photos present)');
             }
           }
-          if (hasNativePhotos && bf.show_photos !== true) {
-            // Section has built-in photos; skip gallery injection unless explicitly enabled
+          
+          if (shouldSkip) {
+            // Section has matching native photos — do NOT inject gallery
           } else {
           
           var validPhotos = bf.photos.filter(function(p) { return p && p.url; });
