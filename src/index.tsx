@@ -1001,8 +1001,10 @@ img{max-width:100%;height:auto}
 .section-header{text-align:center;margin-bottom:40px}
 /* Tighter header for reviews */
 #client-reviews .section-header{margin-bottom:24px}
-#client-reviews{padding-bottom:40px}
+#client-reviews{padding-bottom:0!important;margin-bottom:0!important}
 #client-reviews .section-cta{margin-top:16px}
+#client-reviews .container{padding-bottom:0}
+#client-reviews > .container{margin-bottom:0;padding-bottom:0}
 .section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
 .section-title{font-size:2.2rem;font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
 .section-sub{font-size:1rem;color:var(--text-sec);max-width:640px;margin:0 auto;line-height:1.7}
@@ -1250,8 +1252,14 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .reviews-gallery-area:empty,.reviews-gallery-area:has(> div:only-child:empty){display:none}
 #reviewsCarouselArea{transition:opacity 0.4s ease}
 /* Reviews section — tight bottom gap */
-#client-reviews .section-cta{margin-top:12px;margin-bottom:0;padding-bottom:0}
-#client-reviews .rv-dots{margin-bottom:0}
+#client-reviews .section-cta{margin-top:12px;margin-bottom:0;padding-bottom:0;border-top:none}
+#client-reviews .rv-dots{margin-bottom:0;padding-bottom:0}
+#client-reviews .reviews-gallery-area{margin-bottom:0;padding-bottom:0}
+#reviewsCtaArea:empty{display:none;margin:0;padding:0}
+#reviewsCtaArea{margin-top:12px;margin-bottom:0;padding-bottom:0}
+#client-reviews .rv-carousel{margin-bottom:0}
+#client-reviews .rv-swipe-hint{margin-bottom:0;padding-bottom:0}
+#client-reviews .extra-text:last-child{margin-bottom:0;padding-bottom:0}
 /* Photo block review cards — no bottom gap */
 .pb-card{margin-bottom:0}
 .pb-carousel{margin-bottom:0;padding-bottom:0}
@@ -1281,8 +1289,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 /* ===== ABOUT SECTION ===== */
 .about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:stretch}
-.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);min-height:400px}
-.about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block;position:absolute;top:0;left:0}
+.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);min-height:400px;display:grid}
+.about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0}
 .about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
 .about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
@@ -1411,8 +1419,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* About photo full-width on mobile */
-  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);min-height:300px}
-  .about-img img{width:100%;height:100%;min-height:300px;object-fit:cover;position:relative;top:auto;left:auto}
+  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);min-height:300px;aspect-ratio:4/3;display:grid}
+  .about-img img{width:100%;height:100%;min-height:300px;object-fit:cover;position:absolute;top:0;left:0;right:0;bottom:0}
   /* Prevent inner horizontal scroll from blocking vertical page scroll */
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
@@ -1749,20 +1757,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
     <div class="highlight-result" data-ru="В результате повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Արդյունքում, ձեր քարտի ԲՈԼՈՐ փոխակերպումները մեծանում են՝ CTR, զամբյուղում ավելացումներ և պատվերներ: Ձեր քարտը դառնում է որոնման ամենաբարձր վարկանիշ ունեցող արդյունք և սկսում է ստանալ օրգանական տրաֆիկ: Որքան բարձր է վարկանիշը, այնքան շատ օրգանական վաճառքներ դուք կապահովեք առանց որևէ լրացուցիչ ներդրման:"><i class="fas fa-bolt"></i> <strong>Результат:</strong> повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.</div>
   </div>
 
-  <div class="section-cta">
-    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы по ключевикам" data-am="Սկսել գնումները բանալի բառերով">Начать выкупы по ключевикам</span></a>
-  </div>
-</div>
-</section>
 
-<!-- ===== 50K COMPARISON (BLOGGER vs BUYOUTS) ===== -->
-<section class="section" id="fifty-vs-fifty" data-section-id="fifty_vs_fifty">
-<div class="container">
-  <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-balance-scale-right"></i> <span data-ru="Сравнение бюджетов" data-am="Բdelays">Сравнение бюджетов</span></div>
-    <h2 class="section-title" data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы" data-am="50 000 ֏ բلоգեر vs 50 000 ֏ ինքնагнумنеर">50 000 ֏ на блогера vs 50 000 ֏ на выкупы</h2>
-  </div>
-  <div class="why-block fade-up">
+<div class="why-block fade-up">
     <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ — որն է ավելի արդյունավետ?">50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?</span></h3>
     <div class="compare-box">
       <div class="compare-side bad">
@@ -2137,7 +2133,7 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
     </div>
   </div>
   <!-- Dynamic CTA buttons injected here -->
-  <div class="section-cta fade-up" id="reviewsCtaArea" style="margin-top:20px;text-align:center"></div>
+  <div class="section-cta fade-up" id="reviewsCtaArea" style="text-align:center"></div>
 </div>
 </section>
 
@@ -3058,6 +3054,10 @@ switchLang = function(l) {
         if (!section) return;
         var contentTexts = db.content[contentKey];
         if (!contentTexts || contentTexts.length === 0) return;
+        // Skip injection for sections with structured HTML layouts
+        // These sections have specific design (compare-box, why-steps, etc.) that plain text would break
+        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid');
+        if (hasStructuredContent) return;
         // Collect ALL existing data-ru values in this section
         var existingRuValues = {};
         section.querySelectorAll('[data-ru]').forEach(function(el) {
@@ -4002,6 +4002,18 @@ switchLang = function(l) {
       reviewsPlaceholder.style.display = 'none';
     }
     
+    // ===== BUILD BLOCKFEATURES SET FIRST =====
+    // IMPORTANT: Must be defined BEFORE the hide-deleted-sections block that uses it
+    var _bfKeySet = {};
+    var _bfLoaded = db.blockFeatures && db.blockFeatures.length > 0;
+    if (_bfLoaded) {
+      db.blockFeatures.forEach(function(b) {
+        _bfKeySet[b.key] = true;
+        _bfKeySet[b.key.replace(/_/g, '-')] = true;
+        _bfKeySet[b.key.replace(/-/g, '_')] = true;
+      });
+    }
+    
     // ===== HIDE SECTIONS DELETED IN ADMIN =====
     // If sectionOrder data exists, hide any sections not listed (they were deleted/removed in admin)
     if (db.sectionOrder && db.sectionOrder.length > 0) {
@@ -4019,6 +4031,15 @@ switchLang = function(l) {
       knownSections['floating-tg'] = true;
       knownSections['popup'] = true;
       // Keep dynamically created slot counters and photo blocks
+      // Also add all blockFeature keys as known sections
+      if (_bfLoaded) {
+        db.blockFeatures.forEach(function(b) {
+          var bk = b.key || '';
+          knownSections[bk] = true;
+          knownSections[bk.replace(/_/g, '-')] = true;
+          knownSections[bk.replace(/-/g, '_')] = true;
+        });
+      }
       document.querySelectorAll('[data-section-id]').forEach(function(sec) {
         var sid = sec.getAttribute('data-section-id') || '';
         var sidNorm = sid.replace(/_/g, '-');
@@ -4031,18 +4052,7 @@ switchLang = function(l) {
     }
     
     // ===== REMOVE EMPTY GAP SECTIONS =====
-    // Build a set of blockFeature keys for cross-reference
-    // IMPORTANT: Only hide orphan sections if blockFeatures loaded successfully
-    // If blockFeatures is null/empty, keep all template sections visible
-    var _bfKeySet = {};
-    var _bfLoaded = db.blockFeatures && db.blockFeatures.length > 0;
-    if (_bfLoaded) {
-      db.blockFeatures.forEach(function(b) {
-        _bfKeySet[b.key] = true;
-        _bfKeySet[b.key.replace(/_/g, '-')] = true;
-        _bfKeySet[b.key.replace(/-/g, '_')] = true;
-      });
-    }
+    // _bfKeySet and _bfLoaded already defined above
     document.querySelectorAll('section[data-section-id], div.slot-counter-bar[data-section-id]').forEach(function(sec) {
       if (sec.style.display === 'none') return;
       var sid = sec.getAttribute('data-section-id') || '';
