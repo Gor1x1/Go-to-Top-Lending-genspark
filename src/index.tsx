@@ -101,6 +101,8 @@ app.get('/api/site-data', async (c) => {
     // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
     let siteBlockFeatures: any[] = [];
     try {
+      // Ensure text_styles column exists (safe ALTER — no-op if already present)
+      try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN text_styles TEXT DEFAULT '[]'").run(); } catch {}
       const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
@@ -169,7 +171,7 @@ app.get('/api/site-data', async (c) => {
       photoBlocks: photoBlocksRes.results,
       tickerItems: tickerItems.length > 0 ? tickerItems : null,
       footerSocials: footerSocials.length > 0 ? footerSocials : null,
-      blockFeatures: siteBlockFeatures.length > 0 ? siteBlockFeatures : null,
+      blockFeatures: siteBlockFeatures.length > 0 ? siteBlockFeatures : [],
       _ts: Date.now()
     });
   } catch (e: any) {
@@ -1278,9 +1280,9 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .wb-banner-right .btn{margin-left:auto;white-space:nowrap;font-size:0.82rem;padding:10px 20px}
 
 /* ===== ABOUT SECTION ===== */
-.about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:center}
+.about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:stretch}
 .about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);min-height:400px}
-.about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block}
+.about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block;position:absolute;top:0;left:0}
 .about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
 .about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
@@ -1409,8 +1411,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* About photo full-width on mobile */
-  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px)}
-  .about-img img{width:100%;height:auto;min-height:300px;max-height:500px;object-fit:cover}
+  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);min-height:300px}
+  .about-img img{width:100%;height:100%;min-height:300px;object-fit:cover;position:relative;top:auto;left:auto}
   /* Prevent inner horizontal scroll from blocking vertical page scroll */
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
@@ -4030,8 +4032,11 @@ switchLang = function(l) {
     
     // ===== REMOVE EMPTY GAP SECTIONS =====
     // Build a set of blockFeature keys for cross-reference
+    // IMPORTANT: Only hide orphan sections if blockFeatures loaded successfully
+    // If blockFeatures is null/empty, keep all template sections visible
     var _bfKeySet = {};
-    if (db.blockFeatures) {
+    var _bfLoaded = db.blockFeatures && db.blockFeatures.length > 0;
+    if (_bfLoaded) {
       db.blockFeatures.forEach(function(b) {
         _bfKeySet[b.key] = true;
         _bfKeySet[b.key.replace(/_/g, '-')] = true;
@@ -4048,6 +4053,8 @@ switchLang = function(l) {
       if (sid.indexOf('slot-counter-') === 0 || sid.indexOf('slotCounter') === 0) return;
       
       // Check 1: Section exists in sectionOrder but NOT in blockFeatures → template/orphan
+      // Only apply this check if blockFeatures actually loaded (otherwise keep everything visible)
+      if (!_bfLoaded) return; // No blockFeatures data — skip orphan check entirely
       var inBF = _bfKeySet[sid] || _bfKeySet[sidNorm] || _bfKeySet[sidAlt];
       if (!inBF) {
         // Not in blockFeatures — hide it (it's an orphaned template section)
@@ -4089,8 +4096,9 @@ switchLang = function(l) {
     });
     
     // ===== FINAL CLEANUP: Remove ALL elements between contact and footer =====
+    // Only run aggressive cleanup if blockFeatures loaded successfully
     var _ft = document.querySelector('footer');
-    if (_ft) {
+    if (_ft && _bfLoaded) {
       // AGGRESSIVE: Remove every hidden/empty sibling before footer
       var prev = _ft.previousElementSibling;
       while (prev) {
