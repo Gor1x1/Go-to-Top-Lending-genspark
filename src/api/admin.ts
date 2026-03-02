@@ -1617,6 +1617,7 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
         { url: '/static/img/warehouse1.jpg', caption: 'Склад Ереван' },
         { url: '/static/img/warehouse2.jpg', caption: 'Рабочее пространство' }
       ]},
+      'client_reviews': { photo_url: '', photos: [], show_photos: true },
     };
     if (photoMap[key]) {
       customHtml = photoMap[key];

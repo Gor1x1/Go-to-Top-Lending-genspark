@@ -3362,6 +3362,12 @@ switchLang = function(l) {
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
     }
     
+    // Clear reviews placeholder if no photos were injected
+    var reviewsPlaceholder = document.getElementById('reviewsCarouselArea');
+    if (reviewsPlaceholder && !reviewsPlaceholder.querySelector('.reviews-carousel-wrap')) {
+      reviewsPlaceholder.innerHTML = '<div style="text-align:center;padding:40px 0;color:var(--text-muted,#666)"><i class="fas fa-images" style="font-size:2.5rem;opacity:0.3;margin-bottom:12px;display:block"></i><span data-ru="Отзывы скоро появятся" data-am="Կարdelays շուտdelays կdelays">' + (lang === 'am' ? 'Կարdelays շուտdelays' : 'Отзывы скоро появятся') + '</span></div>';
+    }
+    
     console.log('[DB] All dynamic data applied v3');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);

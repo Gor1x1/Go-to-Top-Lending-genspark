@@ -10446,8 +10446,12 @@ function renderSiteBlocks() {
 
         // ── Block Photos section (only for blocks that have photos by design) ──
         var isTickerBlock = (b.block_key === 'ticker' || b.block_type === 'ticker');
-        var hasPhotoSupport = !!photoBlocks[b.block_key] || !!(opts.photo_url) || (opts.photos && opts.photos.length > 0);
-        if (!isTickerBlock && hasPhotoSupport) {
+        var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
+        var isPopupOrFloat = (b.block_type === 'popup' || b.block_type === 'floating' || b.block_key === 'nav');
+        var isReviewsBlock = (b.block_type === 'reviews');
+        // All block types support photos except calculator, ticker, popup, floating, nav
+        var hasPhotoSupport = !isTickerBlock && !isCalcBlock && !isPopupOrFloat;
+        if (hasPhotoSupport) {
           var blockPhotos = [];
           try { blockPhotos = opts.photos || []; } catch(e) { blockPhotos = []; }
           if (!Array.isArray(blockPhotos)) blockPhotos = [];
@@ -10455,11 +10459,10 @@ function renderSiteBlocks() {
           // Recommended photo dimensions per block type
           var photoDims = { hero: '600×800px (портрет) или 1200×675px (16:9)', about: '800×600px (горизонт) или 600×600px (квадрат)', warehouse: '800×500px (горизонт, 16:10)', wb_official: '1200×675px (16:9)', services: '600×400px (горизонт)', wb_banner: '1200×400px (баннер, 3:1)' };
           var dimHint = photoDims[b.block_key] || '800×600px (рекомендуемый размер)';
-          var isReviewsBlock = (b.block_type === 'reviews');
           if (isReviewsBlock) dimHint = '280×360px (вертикальный скриншот отзыва)';
           
           h += '<div style="margin-bottom:16px">';
-          h += '<details' + (blockPhotos.length > 0 || opts.photo_url ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>' + (isReviewsBlock ? 'Скриншоты отзывов (карусель)' : 'Фото блока') + ' <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
+          h += '<details' + (blockPhotos.length > 0 || opts.photo_url || isReviewsBlock ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-camera" style="color:#60a5fa;margin-right:6px"></i>' + (isReviewsBlock ? 'Скриншоты отзывов (карусель)' : 'Фото блока') + ' <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + (blockPhotos.length + (opts.photo_url ? 1 : 0)) + ')</span></summary>';
           
           // Photo size recommendation
           h += '<div style="padding:6px 10px;background:rgba(96,165,250,0.06);border:1px solid rgba(96,165,250,0.15);border-radius:6px;margin-bottom:10px;display:flex;align-items:center;gap:6px">' +
