@@ -1849,12 +1849,32 @@ api.post('/site-blocks/:id/sync-to-site', authMiddleware, async (c) => {
   // Sync buttons back to telegram_messages
   let btns: any[] = [];
   try { btns = JSON.parse(block.buttons as string || '[]'); } catch {}
+  
+  // Collect current button labels for this block
+  const currentBtnLabels = new Set<string>();
   for (const btn of btns) {
     if (!btn.text_ru) continue;
+    currentBtnLabels.add(btn.text_ru.trim());
     const existingTg = await db.prepare('SELECT id FROM telegram_messages WHERE button_label_ru = ?').bind(btn.text_ru).first();
     if (existingTg) {
       await db.prepare('UPDATE telegram_messages SET button_label_am = ?, telegram_url = ?, message_template_ru = ?, message_template_am = ? WHERE id = ?')
         .bind(btn.text_am || '', btn.url || '', btn.message_ru || '', btn.message_am || '', existingTg.id).run();
+    }
+  }
+  
+  // Delete telegram_messages that belong to this block but are no longer in the buttons array
+  // button_key format: {block_key}_{button_text_sanitized}
+  const blockKeyPrefix = blockKey + '_';
+  const blockKeyPrefixAlt = blockKey.replace(/-/g, '_') + '_';
+  const allTgForBlock = await db.prepare(
+    'SELECT id, button_key, button_label_ru FROM telegram_messages WHERE button_key LIKE ? OR button_key LIKE ?'
+  ).bind(blockKeyPrefix + '%', blockKeyPrefixAlt + '%').all();
+  
+  for (const tgMsg of (allTgForBlock.results || [])) {
+    const label = (tgMsg.button_label_ru as string || '').trim();
+    if (label && !currentBtnLabels.has(label)) {
+      // This telegram_message no longer has a matching button in the block — delete it
+      await db.prepare('DELETE FROM telegram_messages WHERE id = ?').bind(tgMsg.id).run();
     }
   }
   

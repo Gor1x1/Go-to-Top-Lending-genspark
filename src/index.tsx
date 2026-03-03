@@ -1246,8 +1246,9 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
 .fade-up.visible{opacity:1;transform:translateY(0)}
-/* Hero, nav, ticker always visible immediately */
-#hero.section,.hero-section{opacity:1;transform:none}
+/* Hero starts hidden too — revealed only after DB data is applied (prevents stale content flash) */
+#hero.section,.hero-section{opacity:0;transform:none;transition:opacity 0.4s ease}
+#hero.section.section-revealed,.hero-section.section-revealed{opacity:1}
 .ticker,.stats-bar,.wb-banner,.slot-counter-bar{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
 .ticker.section-revealed,.stats-bar.section-revealed,.wb-banner.section-revealed,.slot-counter-bar.section-revealed{opacity:1;transform:translateY(0)}
 /* Reviews gallery - tighter layout when no carousel */
@@ -1506,6 +1507,15 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </style>
 </head>
 <body>
+
+<!-- Loading overlay: prevents stale content flash while DB data loads -->
+<div id="siteLoadingOverlay" style="position:fixed;inset:0;z-index:9999;background:var(--dark,#0f172a);display:flex;align-items:center;justify-content:center;transition:opacity 0.3s ease">
+  <div style="text-align:center">
+    <div style="width:40px;height:40px;border:3px solid rgba(139,92,246,0.2);border-top-color:#8B5CF6;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px"></div>
+    <div style="color:#94a3b8;font-size:0.85rem;font-family:system-ui,sans-serif">Загрузка...</div>
+  </div>
+</div>
+<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- ===== HEADER ===== -->
 <header class="header" id="header">
@@ -3946,9 +3956,9 @@ switchLang = function(l) {
             } else if (existingBtns.length > 0) {
               // 4. UPDATE existing buttons with DB data (URL, text, icon) — NO new elements created
               var dbBtnIdx = 0;
-              for (var bIdx2 = 0; bIdx2 < bf.buttons.length && dbBtnIdx < existingBtns.length; bIdx2++) {
-                var dbBtn2 = bf.buttons[bIdx2];
-                if (!dbBtn2.text_ru && !dbBtn2.text_am) continue;
+              var validDbBtns = bf.buttons.filter(function(b2) { return b2.text_ru || b2.text_am; });
+              for (var bIdx2 = 0; bIdx2 < validDbBtns.length && dbBtnIdx < existingBtns.length; bIdx2++) {
+                var dbBtn2 = validDbBtns[bIdx2];
                 var btnText2 = lang === 'am' && dbBtn2.text_am ? dbBtn2.text_am : (dbBtn2.text_ru || '');
                 var btnIcon2 = resolveIcon(dbBtn2.icon, dbBtn2.url);
                 var eBtn = existingBtns[dbBtnIdx];
@@ -3966,9 +3976,23 @@ switchLang = function(l) {
                 }
                 dbBtnIdx++;
               }
+              // Hide surplus HTML buttons that no longer exist in DB
+              for (var hIdx = dbBtnIdx; hIdx < existingBtns.length; hIdx++) {
+                existingBtns[hIdx].style.display = 'none';
+                existingBtns[hIdx].setAttribute('data-db-hidden', 'true');
+              }
+              if (dbBtnIdx < existingBtns.length) {
+                console.log('[DB] Hidden', (existingBtns.length - dbBtnIdx), 'surplus buttons in', sectionIdH);
+              }
             }
-            // NOTE: We intentionally do NOT create new button containers or hide surplus buttons
-            // The HTML template is the source of truth for button count and layout
+            // If DB has 0 buttons but HTML has buttons — hide all HTML buttons
+            if (bf.buttons.length === 0 && existingBtns.length > 0) {
+              for (var hb = 0; hb < existingBtns.length; hb++) {
+                existingBtns[hb].style.display = 'none';
+                existingBtns[hb].setAttribute('data-db-hidden', 'true');
+              }
+              console.log('[DB] Hidden all', existingBtns.length, 'buttons in', sectionIdH, '(0 in DB)');
+            }
           }
         }
       });
@@ -4179,6 +4203,13 @@ switchLang = function(l) {
       _ft.style.paddingTop = '48px';
     }
     
+    // ===== HIDE LOADING OVERLAY =====
+    var _loadingOverlay = document.getElementById('siteLoadingOverlay');
+    if (_loadingOverlay) {
+      _loadingOverlay.style.opacity = '0';
+      setTimeout(function() { _loadingOverlay.remove(); }, 350);
+    }
+    
     // ===== STAGGERED SECTION REVEAL =====
     // Reveal sections one by one with a cascade delay
     var allSections = document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker');
@@ -4198,13 +4229,16 @@ switchLang = function(l) {
       setTimeout(function() { _footer.style.opacity = '1'; }, revealDelay + 80);
     }
     
-    console.log('[DB] All dynamic data applied v6');
+    console.log('[DB] All dynamic data applied v7 – loading overlay removed');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
     // Fallback: reveal all sections immediately if data loading fails
     document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(s) {
       s.classList.add('section-revealed');
     });
+    // Also remove loading overlay on error
+    var _loadingOverlayErr = document.getElementById('siteLoadingOverlay');
+    if (_loadingOverlayErr) { _loadingOverlayErr.style.opacity = '0'; setTimeout(function() { _loadingOverlayErr.remove(); }, 350); }
   }
 })();
 
@@ -4213,6 +4247,9 @@ setTimeout(function() {
   document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.slot-counter-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
     s.classList.add('section-revealed');
   });
+  // Also remove loading overlay as safety fallback
+  var _loadingOverlaySafe = document.getElementById('siteLoadingOverlay');
+  if (_loadingOverlaySafe) { _loadingOverlaySafe.style.opacity = '0'; setTimeout(function() { _loadingOverlaySafe.remove(); }, 350); }
 }, 5000);
 
 /* ===== REFERRAL CODE CHECK ===== */
