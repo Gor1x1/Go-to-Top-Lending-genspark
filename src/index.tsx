@@ -1264,8 +1264,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 /* Photo block review cards — no bottom gap */
 .pb-card{margin-bottom:0}
 .pb-carousel{margin-bottom:0;padding-bottom:0}
-.pb-card-size img{width:100%;height:400px;object-fit:cover}
-@media(max-width:480px){.pb-card-size img{height:340px}}
+.pb-card-size img{width:100%;height:auto;max-height:500px;object-fit:contain}
+@media(max-width:480px){.pb-card-size img{max-height:400px}}
 /* Photo block sections — remove extra padding below photos */
 section[data-section-id^="photo-block"]{padding-bottom:16px!important}
 section[data-section-id^="photo-block"] .container{padding-bottom:0}
@@ -1326,7 +1326,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
-.rv-carousel .rv-slide img{width:100%;height:auto;min-height:300px;max-height:520px;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
+.rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
 .rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
@@ -1347,12 +1347,12 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .lightbox .lb-close{position:absolute;top:20px;right:20px;width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.15);color:#fff;border:none;cursor:pointer;font-size:1.2rem;display:flex;align-items:center;justify-content:center;z-index:10001}
 @media(max-width:768px){
   .rv-carousel{max-width:100%}
-  .rv-carousel .rv-slide img{height:auto;min-height:280px;max-height:65vh;object-fit:contain}
+  .rv-carousel .rv-slide img{height:auto;object-fit:contain}
   .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
   .lightbox .lb-nav{width:40px;height:40px;font-size:1rem}
 }
 @media(max-width:480px){
-  .rv-carousel .rv-slide img{height:auto;min-height:250px;max-height:55vh;object-fit:contain}
+  .rv-carousel .rv-slide img{height:auto;object-fit:contain}
   .rv-carousel .rv-caption{padding:12px 16px}
   .rv-carousel .rv-caption-text{font-size:0.85rem}
   .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
@@ -1423,8 +1423,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* About photo full-width on mobile */
-  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);min-height:350px;max-height:500px;position:relative;overflow:hidden}
-  .about-img img{width:100%;height:auto;min-height:350px;object-fit:cover;display:block;position:static}
+  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:auto;max-height:none;height:auto}
+  .about-img img{width:100%;height:auto;object-fit:contain;display:block;position:static;min-height:auto;max-height:none;border-radius:12px}
   /* Prevent inner horizontal scroll from blocking vertical page scroll */
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
@@ -4366,7 +4366,7 @@ async function checkRefCode() {
         for (var i = 0; i < validPhotos.length; i++) {
           var p = validPhotos[i];
           html += '<div class="pb-card pb-card-size" style="flex:0 0 340px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;display:flex;flex-direction:column" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:400px;object-fit:cover;flex-shrink:0" loading="lazy">' +
+            '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;object-fit:contain;flex-shrink:0" loading="lazy">' +
             (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + p.caption + '</div>' : '') +
           '</div>';
         }
@@ -4391,7 +4391,7 @@ async function checkRefCode() {
         for (var gi = 0; gi < validPhotos.length; gi++) {
           var gp = validPhotos[gi];
           html += '<div class="pb-card" style="border-radius:var(--r,16px);overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer" onclick="openLightbox(&apos;' + (gp.url||'').replace(/'/g,'') + '&apos;)">' +
-            '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:360px;object-fit:cover" loading="lazy">' +
+            '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:auto;object-fit:contain" loading="lazy">' +
             (gp.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + gp.caption + '</div>' : '') +
           '</div>';
         }
