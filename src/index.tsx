@@ -1248,9 +1248,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 .fade-up{opacity:0;transform:translateY(30px);transition:opacity 0.7s ease,transform 0.7s ease}
 .fade-up.visible{opacity:1;transform:translateY(0)}
-/* Hero starts hidden too — revealed only after DB data is applied (prevents stale content flash) */
-#hero.section,.hero-section{opacity:0;transform:none;transition:opacity 0.4s ease}
-#hero.section.section-revealed,.hero-section.section-revealed{opacity:1}
+/* Hero visible immediately — no loading overlay needed */
+#hero.section,.hero-section{opacity:1;transform:none}
 .ticker,.stats-bar,.wb-banner,.slot-counter-bar{opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease}
 .ticker.section-revealed,.stats-bar.section-revealed,.wb-banner.section-revealed,.slot-counter-bar.section-revealed{opacity:1;transform:translateY(0)}
 /* Reviews gallery - tighter layout when no carousel */
@@ -1509,15 +1508,6 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </style>
 </head>
 <body>
-
-<!-- Loading overlay: prevents stale content flash while DB data loads -->
-<div id="siteLoadingOverlay" style="position:fixed;inset:0;z-index:9999;background:var(--dark,#0f172a);display:flex;align-items:center;justify-content:center;transition:opacity 0.3s ease">
-  <div style="text-align:center">
-    <div style="width:40px;height:40px;border:3px solid rgba(139,92,246,0.2);border-top-color:#8B5CF6;border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px"></div>
-    <div style="color:#94a3b8;font-size:0.85rem;font-family:system-ui,sans-serif">Загрузка...</div>
-  </div>
-</div>
-<style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 
 <!-- ===== HEADER ===== -->
 <header class="header" id="header">
@@ -4264,13 +4254,6 @@ switchLang = function(l) {
       _ft.style.paddingTop = '48px';
     }
     
-    // ===== HIDE LOADING OVERLAY =====
-    var _loadingOverlay = document.getElementById('siteLoadingOverlay');
-    if (_loadingOverlay) {
-      _loadingOverlay.style.opacity = '0';
-      setTimeout(function() { _loadingOverlay.remove(); }, 350);
-    }
-    
     // ===== STAGGERED SECTION REVEAL =====
     // Reveal sections one by one with a cascade delay
     var allSections = document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker');
@@ -4297,9 +4280,7 @@ switchLang = function(l) {
     document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(s) {
       s.classList.add('section-revealed');
     });
-    // Also remove loading overlay on error
-    var _loadingOverlayErr = document.getElementById('siteLoadingOverlay');
-    if (_loadingOverlayErr) { _loadingOverlayErr.style.opacity = '0'; setTimeout(function() { _loadingOverlayErr.remove(); }, 350); }
+
   }
 })();
 
@@ -4308,9 +4289,11 @@ setTimeout(function() {
   document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.slot-counter-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
     s.classList.add('section-revealed');
   });
-  // Also remove loading overlay as safety fallback
-  var _loadingOverlaySafe = document.getElementById('siteLoadingOverlay');
-  if (_loadingOverlaySafe) { _loadingOverlaySafe.style.opacity = '0'; setTimeout(function() { _loadingOverlaySafe.remove(); }, 350); }
+  // Also reveal footer if still hidden
+  var _fallbackFooter = document.querySelector('footer.footer');
+  if (_fallbackFooter && (!_fallbackFooter.style.opacity || _fallbackFooter.style.opacity === '0')) {
+    _fallbackFooter.style.opacity = '1';
+  }
 }, 5000);
 
 /* ===== REFERRAL CODE CHECK ===== */

@@ -15,6 +15,14 @@ api.onError((err, c) => {
   return c.json({ error: 'Server error: ' + (err?.message || 'Unknown') }, 500);
 })
 
+// Prevent caching of admin API responses — ensures fresh data on every request
+api.use('*', async (c, next) => {
+  await next();
+  c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+  c.header('Pragma', 'no-cache');
+  c.header('Expires', '0');
+})
+
 // ===== AUTH MIDDLEWARE =====
 async function authMiddleware(c: any, next: () => Promise<void>) {
   const authHeader = c.req.header('Authorization');

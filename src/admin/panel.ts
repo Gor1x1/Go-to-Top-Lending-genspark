@@ -131,7 +131,7 @@ if (token) startTokenRefresh();
 const API = '/api/admin';
 function ensureArray(v) { return Array.isArray(v) ? v : []; }
 async function api(path, methodOrOpts, bodyData) {
-  const headers = { 'Content-Type': 'application/json' };
+  const headers = { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache, no-store', 'Pragma': 'no-cache' };
   if (token) headers['Authorization'] = 'Bearer ' + token;
   var opts = {};
   var silent = false;
@@ -142,8 +142,15 @@ async function api(path, methodOrOpts, bodyData) {
     opts = methodOrOpts;
     if (methodOrOpts._silent) { silent = true; delete opts._silent; }
   }
+  // Cache-busting: append timestamp to GET requests to prevent stale data
+  var fetchMethod = (opts.method || 'GET').toUpperCase();
+  var fetchUrl = API + path;
+  if (fetchMethod === 'GET') {
+    var sep = path.indexOf('?') >= 0 ? '&' : '?';
+    fetchUrl = API + path + sep + '_t=' + Date.now();
+  }
   try {
-    const res = await fetch(API + path, { ...opts, headers });
+    const res = await fetch(fetchUrl, { ...opts, headers, cache: 'no-store' });
     if (res.status === 401 && !silent) {
       // Try to refresh token once before logging out
       try {
@@ -10981,14 +10988,20 @@ function sbShowSaveStatus(status) {
   var ind = document.getElementById('sbSaveIndicator');
   if (ind) {
     ind.className = 'sb-save-indicator ' + status;
-    ind.innerHTML = status === 'saving' ? '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение и синхронизация...' : '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено и синхронизировано';
+    if (status === 'saving') {
+      ind.innerHTML = '<i class="fas fa-spinner fa-spin" style="margin-right:6px"></i>Сохранение и синхронизация...';
+    } else if (status === 'error') {
+      ind.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:6px;color:#ef4444"></i>Ошибка сохранения!';
+    } else {
+      ind.innerHTML = '<i class="fas fa-check" style="margin-right:6px"></i>Сохранено и синхронизировано';
+    }
   }
-  if (status === 'saved') {
+  if (status === 'saved' || status === 'error') {
     setTimeout(function() {
       sbSaveStatus = 'hidden';
       var ind2 = document.getElementById('sbSaveIndicator');
       if (ind2) ind2.className = 'sb-save-indicator hidden';
-    }, 2000);
+    }, status === 'error' ? 5000 : 2000);
   }
 }
 
@@ -11766,9 +11779,15 @@ async function sbSaveBlock(id) {
   saveData.texts_am = JSON.stringify(b.texts_am || []);
   saveData.text_styles = JSON.stringify(b.text_styles || []);
   
-  await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(saveData) }, true);
+  var saveResult = await api('/site-blocks/' + id, { method: 'PUT', body: JSON.stringify(saveData) });
+  if (!saveResult || saveResult.error) {
+    console.error('[SB] Save failed for block', id, saveResult);
+    sbShowSaveStatus('error');
+    toast('Ошибка сохранения блока #' + id, 'error');
+    return;
+  }
   // Sync to site_content for instant site update
-  await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' }, true);
+  await api('/site-blocks/' + id + '/sync-to-site', { method: 'POST' });
   
   sbShowSaveStatus('saved');
 }
