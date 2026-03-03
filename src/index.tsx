@@ -22,17 +22,53 @@ app.get('/api/site-data', async (c) => {
       try { dbContent[row.section_key as string] = JSON.parse(row.content_json as string); } catch { dbContent[row.section_key as string] = []; }
     }
     
-    // Build text_map: original_ru -> {ru, am} using seed data as the source of original keys
-    // The HTML has data-ru="original text" hardcoded. We match by seed items (which mirror the HTML).
-    // If user edited text in admin, db content[section][i].ru != seed[section][i].ru
-    // So we map: seed_item.ru (= HTML data-ru) -> db_item (edited values)
+    // Build text_map: original_ru -> {ru, am} using smart content-aware matching
+    // The HTML has data-ru="original text" hardcoded from seed. We need to find which DB items
+    // correspond to which seed items, even when DB has fewer items (missing CTA buttons etc.)
     const textMap: Record<string, {ru: string, am: string}> = {};
     for (const seedSection of SEED_CONTENT_SECTIONS) {
       const dbItems = dbContent[seedSection.key] || [];
-      for (let i = 0; i < seedSection.items.length; i++) {
-        const origRu = seedSection.items[i].ru; // this matches data-ru in HTML
-        const dbItem = dbItems[i]; // edited version (if any)
-        if (dbItem && (dbItem.ru !== origRu || dbItem.am !== seedSection.items[i].am)) {
+      if (!dbItems.length) continue;
+      
+      const seedLen = seedSection.items.length;
+      const dbLen = dbItems.length;
+      const seedMatched = new Array(seedLen).fill(-1);
+      const dbMatched = new Array(dbLen).fill(-1);
+      
+      // First pass: exact text matches (prefer same position, then nearby)
+      for (let si = 0; si < seedLen; si++) {
+        const seedRu = seedSection.items[si].ru;
+        if (si < dbLen && dbMatched[si] === -1 && dbItems[si].ru === seedRu) {
+          seedMatched[si] = si; dbMatched[si] = si; continue;
+        }
+        for (let offset = 1; offset <= 3; offset++) {
+          for (const di of [si - offset, si + offset]) {
+            if (di >= 0 && di < dbLen && dbMatched[di] === -1 && dbItems[di].ru === seedRu) {
+              seedMatched[si] = di; dbMatched[di] = si; break;
+            }
+          }
+          if (seedMatched[si] !== -1) break;
+        }
+      }
+      
+      // Second pass: match remaining unmatched items sequentially
+      let nextUnmatchedDb = 0;
+      for (let si = 0; si < seedLen; si++) {
+        if (seedMatched[si] !== -1) continue;
+        while (nextUnmatchedDb < dbLen && dbMatched[nextUnmatchedDb] !== -1) nextUnmatchedDb++;
+        if (nextUnmatchedDb < dbLen) {
+          seedMatched[si] = nextUnmatchedDb;
+          dbMatched[nextUnmatchedDb] = si;
+          nextUnmatchedDb++;
+        }
+      }
+      
+      for (let si = 0; si < seedLen; si++) {
+        const di = seedMatched[si];
+        if (di === -1) continue;
+        const origRu = seedSection.items[si].ru;
+        const dbItem = dbItems[di];
+        if (dbItem && (dbItem.ru !== origRu || dbItem.am !== seedSection.items[si].am)) {
           textMap[origRu] = { ru: dbItem.ru, am: dbItem.am };
         }
       }
@@ -904,6 +940,8 @@ app.get('/', async (c) => {
   c.header('Expires', '0');
   
   // Build textMap from DB so we can inject current texts into HTML server-side
+  // Strategy: Match seed items to DB items per section using content-aware alignment
+  // (not just positional matching, which breaks when DB has fewer items than seed)
   let textMap: Record<string, {ru: string, am: string}> = {};
   let photoMap: Record<string, string> = {};
   try {
@@ -915,10 +953,57 @@ app.get('/', async (c) => {
     }
     for (const seedSection of SEED_CONTENT_SECTIONS) {
       const dbItems = dbContent[seedSection.key] || [];
-      for (let i = 0; i < seedSection.items.length; i++) {
-        const origRu = seedSection.items[i].ru;
-        const dbItem = dbItems[i];
-        if (dbItem && (dbItem.ru !== origRu || dbItem.am !== seedSection.items[i].am)) {
+      if (!dbItems.length) continue;
+      
+      // Smart matching: find exact matches first (unchanged items), then align remaining
+      // Step 1: Find seed items that exist unchanged in DB (exact ru match at close positions)
+      const seedLen = seedSection.items.length;
+      const dbLen = dbItems.length;
+      const seedMatched = new Array(seedLen).fill(-1); // seedIdx -> dbIdx
+      const dbMatched = new Array(dbLen).fill(-1); // dbIdx -> seedIdx
+      
+      // First pass: exact text matches (prefer same position, then nearby positions)
+      for (let si = 0; si < seedLen; si++) {
+        const seedRu = seedSection.items[si].ru;
+        // Try exact position first
+        if (si < dbLen && dbMatched[si] === -1 && dbItems[si].ru === seedRu) {
+          seedMatched[si] = si;
+          dbMatched[si] = si;
+          continue;
+        }
+        // Try nearby positions (within ±3)
+        for (let offset = 1; offset <= 3; offset++) {
+          for (const di of [si - offset, si + offset]) {
+            if (di >= 0 && di < dbLen && dbMatched[di] === -1 && dbItems[di].ru === seedRu) {
+              seedMatched[si] = di;
+              dbMatched[di] = si;
+              break;
+            }
+          }
+          if (seedMatched[si] !== -1) break;
+        }
+      }
+      
+      // Second pass: match remaining unmatched items by sequential order
+      let nextUnmatchedDb = 0;
+      for (let si = 0; si < seedLen; si++) {
+        if (seedMatched[si] !== -1) continue; // already matched
+        // Find next unmatched DB item
+        while (nextUnmatchedDb < dbLen && dbMatched[nextUnmatchedDb] !== -1) nextUnmatchedDb++;
+        if (nextUnmatchedDb < dbLen) {
+          seedMatched[si] = nextUnmatchedDb;
+          dbMatched[nextUnmatchedDb] = si;
+          nextUnmatchedDb++;
+        }
+      }
+      
+      // Build textMap entries for matched items where content differs
+      for (let si = 0; si < seedLen; si++) {
+        const di = seedMatched[si];
+        if (di === -1) continue; // no DB match for this seed item
+        const origRu = seedSection.items[si].ru;
+        const dbItem = dbItems[di];
+        if (dbItem && (dbItem.ru !== origRu || dbItem.am !== seedSection.items[si].am)) {
           textMap[origRu] = { ru: dbItem.ru, am: dbItem.am };
         }
       }
@@ -4818,35 +4903,11 @@ async function checkRefCode() {
   
   // ===== SERVER-SIDE TEXT INJECTION using HTMLRewriter =====
   // HTMLRewriter is Cloudflare's built-in streaming HTML parser/transformer.
-  // It processes elements by CSS selectors, allowing position-based replacement
-  // instead of text-based regex which breaks on cascading/duplicate values.
-  //
-  // Strategy: Build a map of section_key → [{ru, am}, ...] from DB.
-  // For each section in HTML (by data-section-id), track data-ru element index.
-  // Replace the N-th data-ru element in section X with dbContent[X][N].
+  // Strategy: Use textMap (origRu -> {ru, am}) to match elements by their data-ru attribute.
+  // HTMLRewriter reads original attribute values before any modifications, so no cascade conflicts.
+  // Each element is processed independently — changing data-ru="A" to "B" won't affect
+  // another element that originally had data-ru="B".
   
-  // Build full content map from DB (ALL items, not just changed ones)
-  let fullContentMap: Record<string, any[]> = {};
-  try {
-    const db2 = c.env.DB;
-    const allContent = await db2.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
-    for (const row of allContent.results) {
-      try { fullContentMap[row.section_key as string] = JSON.parse(row.content_json as string); } catch { /* skip */ }
-    }
-  } catch { /* fallback to textMap-based approach below */ }
-  
-  // Build seed-to-section index: for each seed section, create a map of origRu -> position
-  // so we know which element at what position in which section needs replacing
-  const seedIndex: Record<string, { sectionKey: string, idx: number, seedRu: string, seedAm: string }> = {};
-  for (const seedSection of SEED_CONTENT_SECTIONS) {
-    for (let i = 0; i < seedSection.items.length; i++) {
-      const item = seedSection.items[i];
-      // Key by section + original ru text for unique identification
-      const lookupKey = seedSection.key + '::' + item.ru;
-      seedIndex[lookupKey] = { sectionKey: seedSection.key, idx: i, seedRu: item.ru, seedAm: item.am };
-    }
-  }
-
   // Photo injection (simple string replace - no conflicts)
   if (photoMap['hero']) {
     pageHtml = pageHtml.replace('/static/img/founder.jpg', photoMap['hero']);
@@ -4858,64 +4919,40 @@ async function checkRefCode() {
     pageHtml = pageHtml.replace('/static/img/team-office.jpg', photoMap['guarantee']);
   }
   
-  // Mark as server-injected if we have DB content
-  const hasDbContent = Object.keys(fullContentMap).length > 0;
-  if (hasDbContent) {
+  // Mark as server-injected and apply text replacements if we have changes
+  const hasTextChanges = Object.keys(textMap).length > 0;
+  if (hasTextChanges) {
     pageHtml = pageHtml.replace('<html lang="ru">', '<html lang="ru" class="server-injected">');
   }
   
-  // Use HTMLRewriter to do position-based element replacement
-  if (hasDbContent) {
-    // Track current section and element counters
-    let currentSectionKey = '';
-    let elementCounters: Record<string, number> = {};
-    // Map from normalized section keys (data-section-id uses hyphens, DB uses underscores)
-    const normalizeSectionId = (id: string) => id.replace(/-/g, '_');
-    
+  // Use HTMLRewriter to replace texts by matching data-ru attribute values against textMap
+  if (hasTextChanges) {
     const response = new Response(pageHtml, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
     
     const rewritten = new HTMLRewriter()
-      // Track which section we're in
-      .on('[data-section-id]', {
-        element(el) {
-          const sectionId = el.getAttribute('data-section-id') || '';
-          currentSectionKey = normalizeSectionId(sectionId);
-          // Reset counter for this section
-          elementCounters[currentSectionKey] = 0;
-        }
-      })
       // Process all elements with data-ru attribute
       .on('[data-ru]', {
         element(el) {
-          const origRu = el.getAttribute('data-ru') || '';
-          if (!origRu || !currentSectionKey) return;
+          const currentRu = el.getAttribute('data-ru') || '';
+          if (!currentRu) return;
           
-          // Get current index for this section
-          const idx = elementCounters[currentSectionKey] || 0;
-          elementCounters[currentSectionKey] = idx + 1;
+          // Look up this element's data-ru text in textMap
+          const replacement = textMap[currentRu];
+          if (!replacement) return;
           
-          // Look up DB content for this section + index
-          const sectionKey = currentSectionKey;
-          const dbItems = fullContentMap[sectionKey];
-          if (!dbItems || idx >= dbItems.length) return;
-          
-          const dbItem = dbItems[idx];
-          if (!dbItem) return;
-          
-          // Find the corresponding seed item to check if changed
-          const seedSection = SEED_CONTENT_SECTIONS.find(s => s.key === sectionKey);
-          if (!seedSection || idx >= seedSection.items.length) return;
-          
-          const seedItem = seedSection.items[idx];
-          
-          // Only replace if DB value differs from seed (template) value
-          if (dbItem.ru !== seedItem.ru || dbItem.am !== seedItem.am) {
-            el.setAttribute('data-ru', dbItem.ru);
-            el.setAttribute('data-am', dbItem.am || '');
-            // Replace visible text content
-            el.setInnerContent(dbItem.ru);
+          // Update data-ru attribute with new Russian text
+          if (replacement.ru !== currentRu) {
+            el.setAttribute('data-ru', replacement.ru);
+          }
+          // Always update data-am (might have changed even if ru stayed same)
+          if (replacement.am) {
+            el.setAttribute('data-am', replacement.am);
+          }
+          // Replace visible text content only if ru changed
+          if (replacement.ru !== currentRu) {
+            el.setInnerContent(replacement.ru);
           }
         }
       })
