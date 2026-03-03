@@ -142,6 +142,8 @@ app.get('/api/site-data', async (c) => {
             texts_ru: textsRu,
             texts_am: textsAm,
             text_styles: (() => { try { return JSON.parse((blk as any).text_styles as string || '[]'); } catch { return []; } })(),
+            // Nav links mapping (for nav block)
+            nav_links: blockOpts.nav_links || [],
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -3971,6 +3973,36 @@ switchLang = function(l) {
         }
       });
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
+      
+      // ===== APPLY NAV LINKS from blockFeatures (nav block) =====
+      var navBf = db.blockFeatures.find(function(b) { return b.key === 'nav'; });
+      if (navBf && navBf.nav_links && navBf.nav_links.length > 0) {
+        var navUl = document.getElementById('navLinks');
+        if (navUl) {
+          var navItems = navUl.querySelectorAll('li:not(.nav-mobile-cta) a');
+          navBf.nav_links.forEach(function(nl) {
+            if (nl.target === '_telegram' || nl.target === '_cta') return; // skip CTA links
+            var link = navItems[nl.idx];
+            if (link) {
+              var target = (nl.target || '').replace(/_/g, '-');
+              if (target && target !== '_telegram' && target !== '_cta') {
+                link.setAttribute('href', '#' + target);
+              }
+            }
+          });
+          // Also update nav text labels from DB texts
+          if (navBf.texts_ru && navBf.texts_ru.length > 0) {
+            for (var ni = 0; ni < navItems.length && ni < navBf.texts_ru.length; ni++) {
+              var navLink = navItems[ni];
+              if (navBf.texts_ru[ni]) navLink.setAttribute('data-ru', navBf.texts_ru[ni]);
+              if (navBf.texts_am && navBf.texts_am[ni]) navLink.setAttribute('data-am', navBf.texts_am[ni]);
+              var txt = navLink.getAttribute('data-' + lang);
+              if (txt) navLink.textContent = txt;
+            }
+          }
+          console.log('[DB] Nav links applied:', navBf.nav_links.length, 'items');
+        }
+      }
       
       // ===== APPLY TEXT STYLES (color/size) from blockFeatures to all sections =====
       db.blockFeatures.forEach(function(bf) {

@@ -10380,6 +10380,33 @@ function renderSiteBlocks() {
               h += '</div>';
             }
             h += '</div>';
+            // ── Nav link target selector (only for nav block) ──
+            if (b.block_key === 'nav') {
+              var navLinks = opts.nav_links || [];
+              var curTarget = '';
+              for (var nli = 0; nli < navLinks.length; nli++) { if (navLinks[nli].idx === ti) { curTarget = navLinks[nli].target || ''; break; } }
+              // Build list of available sections from sectionOrder
+              var allSections = (data.sectionOrder || []).filter(function(s) { return s.section_id !== 'nav' && s.section_id !== 'footer' && s.section_id !== 'floating_tg' && s.section_id !== 'popup'; });
+              h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px">';
+              h += '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600;white-space:nowrap"><i class="fas fa-link" style="margin-right:4px"></i>Ссылка на секцию:</span>';
+              h += '<select class="input" id="sb_navlink_' + b.id + '_' + ti + '" style="flex:1;font-size:0.78rem;padding:4px 8px;background:#1a2236;border:1px solid #293548;color:#60a5fa;border-radius:6px" onchange="sbSetNavLink(' + b.id + ',' + ti + ',this.value)">';
+              h += '<option value="">— выберите секцию —</option>';
+              h += '<option value="_telegram"' + (curTarget === '_telegram' ? ' selected' : '') + '>Telegram (внешняя ссылка)</option>';
+              for (var asi = 0; asi < allSections.length; asi++) {
+                var sec = allSections[asi];
+                var secId = sec.section_id || '';
+                var secLabel = secId.replace(/_/g, ' ').replace(/-/g, ' ');
+                // Try to find human-readable name from block texts
+                var secBlock = (data.siteBlocks || []).find(function(bl) { return bl.block_key === secId.replace(/-/g, '_'); });
+                if (secBlock && secBlock.texts_ru && secBlock.texts_ru.length > 0) {
+                  var firstText = secBlock.texts_ru[0] || '';
+                  if (firstText.length > 0 && firstText.length < 50) secLabel = firstText;
+                }
+                h += '<option value="' + escHtml(secId) + '"' + (curTarget === secId || curTarget === secId.replace(/-/g, '_') ? ' selected' : '') + '>' + escHtml(secLabel) + ' (' + escHtml(secId) + ')</option>';
+              }
+              h += '</select>';
+              h += '</div>';
+            }
             // ── Text style controls (color + size) ──
             var textStyles = b.text_styles || [];
             var curStyle = textStyles[ti] || {};
@@ -10737,6 +10764,30 @@ function sbSetTextRole(blockId, textIdx, role) {
   // The role info is cosmetic — the actual rendering uses position-based logic
   console.log('[Admin] Text role set:', blockId, textIdx, role);
   // Trigger auto-save to persist any changes
+  sbAutoSave(blockId);
+}
+
+// ── Set nav link target for a menu item ──
+function sbSetNavLink(blockId, textIdx, target) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = typeof b.custom_html === 'string' ? JSON.parse(b.custom_html || '{}') : (b.custom_html || {}); } catch(e) { opts = {}; }
+  if (!opts.nav_links) opts.nav_links = [];
+  // Find existing entry for this index or create new
+  var found = false;
+  for (var i = 0; i < opts.nav_links.length; i++) {
+    if (opts.nav_links[i].idx === textIdx) {
+      opts.nav_links[i].target = target;
+      found = true;
+      break;
+    }
+  }
+  if (!found) {
+    opts.nav_links.push({ idx: textIdx, target: target });
+  }
+  b.custom_html = JSON.stringify(opts);
+  console.log('[Admin] Nav link set:', textIdx, '->', target);
   sbAutoSave(blockId);
 }
 
@@ -11608,6 +11659,22 @@ async function sbSaveBlock(id) {
   // Collect main photo URL
   var mainPhotoEl = document.getElementById('sb_mainphoto_' + id);
   if (mainPhotoEl) blockOpts.photo_url = mainPhotoEl.value || '';
+
+  // Collect nav link targets (for nav block)
+  if (b.block_key === 'nav') {
+    var navLinksArr = blockOpts.nav_links || [];
+    for (var nti = 0; nti < maxTexts; nti++) {
+      var nlEl = document.getElementById('sb_navlink_' + id + '_' + nti);
+      if (nlEl) {
+        var found = false;
+        for (var nli = 0; nli < navLinksArr.length; nli++) {
+          if (navLinksArr[nli].idx === nti) { navLinksArr[nli].target = nlEl.value; found = true; break; }
+        }
+        if (!found) navLinksArr.push({ idx: nti, target: nlEl.value });
+      }
+    }
+    blockOpts.nav_links = navLinksArr;
+  }
 
   // Collect block photos from DOM
   var isTicker = (b.block_key === 'ticker' || b.block_type === 'ticker');
