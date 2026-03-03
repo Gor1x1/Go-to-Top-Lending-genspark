@@ -1039,6 +1039,7 @@ img{max-width:100%;height:auto}
 @keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 .section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease;overflow:visible}
 .section.section-revealed{opacity:1;transform:translateY(0)}
+html.server-injected .section,html.server-injected .ticker,html.server-injected .stats-bar,html.server-injected .wb-banner,html.server-injected .slot-counter-bar,html.server-injected .footer{opacity:1!important;transform:translateY(0)!important}
 .section-dark{background:var(--bg-surface)}
 .section-header{text-align:center;margin-bottom:40px}
 /* Tighter header for reviews */
@@ -3135,21 +3136,47 @@ switchLang = function(l) {
     
     // ===== 1. APPLY CHANGED TEXTS =====
     // textMap: { original_ru: {ru, am} } — only for CHANGED texts
+    // If server already injected texts (server-injected class), skip text replacement
+    // to avoid cascading conflicts. Only update data-am for elements where ru matches.
+    var serverInjected = document.documentElement.classList.contains('server-injected');
     if (hasContent) {
-      document.querySelectorAll('[data-ru]').forEach(function(el) {
-        var origRu = el.getAttribute('data-ru');
-        if (!origRu) return;
-        var changed = db.textMap[origRu.trim()];
-        if (changed) {
-          // Update data attributes with new values
-          el.setAttribute('data-ru', changed.ru);
-          el.setAttribute('data-am', changed.am);
-          // Update visible text
-          var t = el.getAttribute('data-' + lang);
-          if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
-        }
-      });
-      console.log('[DB] Texts applied');
+      if (serverInjected) {
+        // Server already replaced texts by position — only update data-am where needed
+        // Build a reverse map: newRu -> am (from textMap values)
+        var amMap = {};
+        Object.keys(db.textMap).forEach(function(origKey) {
+          var entry = db.textMap[origKey];
+          amMap[entry.ru] = entry.am;
+          // Also map origKey in case ru didn't change
+          amMap[origKey] = entry.am;
+        });
+        document.querySelectorAll('[data-ru]').forEach(function(el) {
+          var currentRu = el.getAttribute('data-ru');
+          if (!currentRu) return;
+          var newAm = amMap[currentRu.trim()];
+          if (newAm) {
+            el.setAttribute('data-am', newAm);
+            // Update visible text for current language
+            var t = el.getAttribute('data-' + lang);
+            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+          }
+        });
+        console.log('[DB] Server-injected texts: only AM updated client-side');
+      } else {
+        // Fallback: server didn't inject — do full client-side replacement
+        document.querySelectorAll('[data-ru]').forEach(function(el) {
+          var origRu = el.getAttribute('data-ru');
+          if (!origRu) return;
+          var changed = db.textMap[origRu.trim()];
+          if (changed) {
+            el.setAttribute('data-ru', changed.ru);
+            el.setAttribute('data-am', changed.am);
+            var t = el.getAttribute('data-' + lang);
+            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+          }
+        });
+        console.log('[DB] Texts applied (client-side fallback)');
+      }
     }
     
     // ===== 1b. INJECT EXTRA TEXTS FROM db.content INTO EXISTING SECTIONS =====
@@ -4789,47 +4816,38 @@ async function checkRefCode() {
 </body>
 </html>`;
   
-  // ===== SERVER-SIDE TEXT INJECTION =====
-  // Replace hardcoded texts with current DB values so no "flash of old content" occurs
-  if (Object.keys(textMap).length > 0) {
-    for (const [origRu, newTexts] of Object.entries(textMap)) {
-      // Escape special regex characters in the original text
-      const escapedOrig = origRu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      
-      // Replace data-ru="original" with data-ru="new" 
-      // Pattern: data-ru="originalText" — replace the attribute value
-      const ruAttrRegex = new RegExp('data-ru="' + escapedOrig + '"', 'g');
-      const escapedNewRu = newTexts.ru.replace(/"/g, '&quot;');
-      pageHtml = pageHtml.replace(ruAttrRegex, 'data-ru="' + escapedNewRu + '"');
-      
-      // Replace the visible text content between tags
-      // Pattern: >originalText< (the text node between > and <)
-      // This handles cases like <span data-ru="...">OriginalText</span>
-      const escapedOrigContent = origRu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
-      const contentRegex = new RegExp('>' + escapedOrigContent + '\\s*<', 'g');
-      pageHtml = pageHtml.replace(contentRegex, '>' + newTexts.ru + '<');
-      
-      // Also replace data-am attribute for the same element
-      // Find: data-am="oldAm" — but we need to find it near data-ru="origRu"
-      // Since we already changed data-ru, we find elements by the NEW data-ru value
-      // and update data-am. We use a combined pattern.
-      // Pattern: data-ru="newRu" data-am="anything"
-      const combinedRegex = new RegExp(
-        'data-ru="' + escapedNewRu + '"\\s+data-am="[^"]*"', 'g'
-      );
-      const escapedNewAm = newTexts.am.replace(/"/g, '&quot;');
-      pageHtml = pageHtml.replace(combinedRegex, 'data-ru="' + escapedNewRu + '" data-am="' + escapedNewAm + '"');
-      
-      // Also handle reverse order: data-am="..." data-ru="..."
-      const reverseRegex = new RegExp(
-        'data-am="[^"]*"\\s+data-ru="' + escapedNewRu + '"', 'g'
-      );
-      pageHtml = pageHtml.replace(reverseRegex, 'data-am="' + escapedNewAm + '" data-ru="' + escapedNewRu + '"');
+  // ===== SERVER-SIDE TEXT INJECTION using HTMLRewriter =====
+  // HTMLRewriter is Cloudflare's built-in streaming HTML parser/transformer.
+  // It processes elements by CSS selectors, allowing position-based replacement
+  // instead of text-based regex which breaks on cascading/duplicate values.
+  //
+  // Strategy: Build a map of section_key → [{ru, am}, ...] from DB.
+  // For each section in HTML (by data-section-id), track data-ru element index.
+  // Replace the N-th data-ru element in section X with dbContent[X][N].
+  
+  // Build full content map from DB (ALL items, not just changed ones)
+  let fullContentMap: Record<string, any[]> = {};
+  try {
+    const db2 = c.env.DB;
+    const allContent = await db2.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
+    for (const row of allContent.results) {
+      try { fullContentMap[row.section_key as string] = JSON.parse(row.content_json as string); } catch { /* skip */ }
+    }
+  } catch { /* fallback to textMap-based approach below */ }
+  
+  // Build seed-to-section index: for each seed section, create a map of origRu -> position
+  // so we know which element at what position in which section needs replacing
+  const seedIndex: Record<string, { sectionKey: string, idx: number, seedRu: string, seedAm: string }> = {};
+  for (const seedSection of SEED_CONTENT_SECTIONS) {
+    for (let i = 0; i < seedSection.items.length; i++) {
+      const item = seedSection.items[i];
+      // Key by section + original ru text for unique identification
+      const lookupKey = seedSection.key + '::' + item.ru;
+      seedIndex[lookupKey] = { sectionKey: seedSection.key, idx: i, seedRu: item.ru, seedAm: item.am };
     }
   }
-  
-  // ===== SERVER-SIDE PHOTO INJECTION =====
-  // Replace hardcoded photo src with current DB values
+
+  // Photo injection (simple string replace - no conflicts)
   if (photoMap['hero']) {
     pageHtml = pageHtml.replace('/static/img/founder.jpg', photoMap['hero']);
   }
@@ -4838,6 +4856,73 @@ async function checkRefCode() {
   }
   if (photoMap['guarantee']) {
     pageHtml = pageHtml.replace('/static/img/team-office.jpg', photoMap['guarantee']);
+  }
+  
+  // Mark as server-injected if we have DB content
+  const hasDbContent = Object.keys(fullContentMap).length > 0;
+  if (hasDbContent) {
+    pageHtml = pageHtml.replace('<html lang="ru">', '<html lang="ru" class="server-injected">');
+  }
+  
+  // Use HTMLRewriter to do position-based element replacement
+  if (hasDbContent) {
+    // Track current section and element counters
+    let currentSectionKey = '';
+    let elementCounters: Record<string, number> = {};
+    // Map from normalized section keys (data-section-id uses hyphens, DB uses underscores)
+    const normalizeSectionId = (id: string) => id.replace(/-/g, '_');
+    
+    const response = new Response(pageHtml, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    });
+    
+    const rewritten = new HTMLRewriter()
+      // Track which section we're in
+      .on('[data-section-id]', {
+        element(el) {
+          const sectionId = el.getAttribute('data-section-id') || '';
+          currentSectionKey = normalizeSectionId(sectionId);
+          // Reset counter for this section
+          elementCounters[currentSectionKey] = 0;
+        }
+      })
+      // Process all elements with data-ru attribute
+      .on('[data-ru]', {
+        element(el) {
+          const origRu = el.getAttribute('data-ru') || '';
+          if (!origRu || !currentSectionKey) return;
+          
+          // Get current index for this section
+          const idx = elementCounters[currentSectionKey] || 0;
+          elementCounters[currentSectionKey] = idx + 1;
+          
+          // Look up DB content for this section + index
+          const sectionKey = currentSectionKey;
+          const dbItems = fullContentMap[sectionKey];
+          if (!dbItems || idx >= dbItems.length) return;
+          
+          const dbItem = dbItems[idx];
+          if (!dbItem) return;
+          
+          // Find the corresponding seed item to check if changed
+          const seedSection = SEED_CONTENT_SECTIONS.find(s => s.key === sectionKey);
+          if (!seedSection || idx >= seedSection.items.length) return;
+          
+          const seedItem = seedSection.items[idx];
+          
+          // Only replace if DB value differs from seed (template) value
+          if (dbItem.ru !== seedItem.ru || dbItem.am !== seedItem.am) {
+            el.setAttribute('data-ru', dbItem.ru);
+            el.setAttribute('data-am', dbItem.am || '');
+            // Replace visible text content
+            el.setInnerContent(dbItem.ru);
+          }
+        }
+      })
+      .transform(response);
+    
+    // Get the transformed HTML
+    pageHtml = await rewritten.text();
   }
   
   return c.html(pageHtml);
