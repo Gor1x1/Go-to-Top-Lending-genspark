@@ -944,6 +944,7 @@ app.get('/', async (c) => {
   // (not just positional matching, which breaks when DB has fewer items than seed)
   let textMap: Record<string, {ru: string, am: string}> = {};
   let photoMap: Record<string, string> = {};
+  let buttonMap: Record<string, any[]> = {};
   try {
     const db = c.env.DB;
     const contentRes = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
@@ -1019,6 +1020,19 @@ app.get('/', async (c) => {
         try { const opts = JSON.parse(blk.custom_html as string || '{}'); url = opts.photo_url || ''; } catch {}
       }
       if (url) photoMap[blk.block_key as string] = url;
+    }
+    
+    // Load buttons from site_blocks for server-side injection (avoids button text flash)
+    const buttonBlocks = await db.prepare(
+      "SELECT block_key, buttons FROM site_blocks WHERE is_visible = 1 AND buttons IS NOT NULL AND buttons != '[]'"
+    ).all();
+    for (const blk of (buttonBlocks.results || [])) {
+      try {
+        const btns = JSON.parse(blk.buttons as string || '[]');
+        if (btns.length > 0) {
+          buttonMap[blk.block_key as string] = btns;
+        }
+      } catch { /* skip invalid JSON */ }
     }
   } catch (e) {
     // If DB fails, serve original HTML without modifications
@@ -3164,6 +3178,25 @@ function updateTelegramLinks() {
       if (tgMsg.button_label_am) tgByLabel[tgMsg.button_label_am.trim()] = tgMsg;
     }
   }
+  // Also add new button labels from _blockFeaturesBtns (set during blockFeatures processing)
+  if (window._blockFeaturesBtns) {
+    for (var bfKey in window._blockFeaturesBtns) {
+      var bfBtns = window._blockFeaturesBtns[bfKey];
+      for (var bi = 0; bi < bfBtns.length; bi++) {
+        var bfBtn = bfBtns[bi];
+        if (bfBtn.text_ru && !tgByLabel[bfBtn.text_ru.trim()]) {
+          // Find matching telegram message for this section
+          for (var tk2 in window._tgData) {
+            if (tk2.indexOf(bfKey + '_') === 0) {
+              tgByLabel[bfBtn.text_ru.trim()] = window._tgData[tk2];
+              if (bfBtn.text_am) tgByLabel[bfBtn.text_am.trim()] = window._tgData[tk2];
+              break;
+            }
+          }
+        }
+      }
+    }
+  }
   // Match all links with t.me/ or wa.me/ or whatsapp
   document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
     if (a.id === 'calcTgBtn') return;
@@ -3216,6 +3249,7 @@ switchLang = function(l) {
     var hasContent = db.textMap && Object.keys(db.textMap).length > 0;
     var hasCalc = db.tabs && db.tabs.length && db.services && db.services.length;
     var hasTg = db.telegram && Object.keys(db.telegram).length > 0;
+    var hasBlockFeatures = db.blockFeatures && db.blockFeatures.length > 0;
     
     console.log('[DB] Loaded data. Changed texts:', Object.keys(db.textMap || {}).length, ', services:', (db.services || []).length);
     
@@ -3408,6 +3442,34 @@ switchLang = function(l) {
         }
       }
       
+      // When server has injected buttons with NEW labels from blockFeatures,
+      // the tgByLabel map only has OLD labels (from telegram_messages table).
+      // We need to also map NEW button labels to their telegram message data,
+      // so that updateTelegramLinks() can find them after language switch.
+      if (hasBlockFeatures && serverInjected) {
+        db.blockFeatures.forEach(function(bfTg) {
+          if (!bfTg.buttons || bfTg.buttons.length === 0) return;
+          // Find telegram messages for this section
+          var sKey = bfTg.key;
+          bfTg.buttons.forEach(function(btn, idx) {
+            if (!btn.text_ru) return;
+            var newLabel = btn.text_ru.trim();
+            if (tgByLabel[newLabel]) return; // already mapped
+            // Try to find matching telegram message by section key pattern
+            for (var tk in db.telegram) {
+              if (tk.indexOf(sKey + '_') === 0) {
+                var tm = db.telegram[tk];
+                if (tm && !tgByLabel[newLabel]) {
+                  // Check if this telegram message was for the old label of this button position
+                  tgByLabel[newLabel] = tm;
+                  break;
+                }
+              }
+            }
+          });
+        });
+      }
+      
       // Find all <a> tags pointing to t.me/ or wa.me/ and update their href with message template
       document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
         if (a.id === 'calcTgBtn') return;
@@ -3429,12 +3491,23 @@ switchLang = function(l) {
         }
         updateMessengerIcon(a, mUrl);
         if (spanWithDataRu) {
-          var newLabelRu = tgMsg.button_label_ru;
-          var newLabelAm = tgMsg.button_label_am;
-          if (newLabelRu) spanWithDataRu.setAttribute('data-ru', newLabelRu);
-          if (newLabelAm) spanWithDataRu.setAttribute('data-am', newLabelAm);
-          var currentLangText = spanWithDataRu.getAttribute('data-' + lang);
-          if (currentLangText && spanWithDataRu.tagName !== 'INPUT') spanWithDataRu.textContent = currentLangText;
+          // When server-injected, buttons already have correct labels from blockFeatures.
+          // telegram_messages may have OLD labels (e.g., "Написать в Telegram" instead of "Начать сейчас").
+          // Only update labels from telegram_messages when NOT server-injected.
+          if (!serverInjected) {
+            var newLabelRu = tgMsg.button_label_ru;
+            var newLabelAm = tgMsg.button_label_am;
+            if (newLabelRu) spanWithDataRu.setAttribute('data-ru', newLabelRu);
+            if (newLabelAm) spanWithDataRu.setAttribute('data-am', newLabelAm);
+            var currentLangText = spanWithDataRu.getAttribute('data-' + lang);
+            if (currentLangText && spanWithDataRu.tagName !== 'INPUT') spanWithDataRu.textContent = currentLangText;
+          } else {
+            // Server-injected: only update data-am from telegram if it provides Armenian translation
+            // but DON'T change data-ru or visible text (those come from blockFeatures buttons)
+            if (tgMsg.button_label_am && !spanWithDataRu.getAttribute('data-am')) {
+              spanWithDataRu.setAttribute('data-am', tgMsg.button_label_am);
+            }
+          }
         }
       });
       
@@ -3751,6 +3824,16 @@ switchLang = function(l) {
     if (db.blockFeatures && db.blockFeatures.length > 0) {
       var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-x-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk', website:'fas fa-globe', email:'fas fa-envelope', phone:'fas fa-phone', pinterest:'fab fa-pinterest', snapchat:'fab fa-snapchat', discord:'fab fa-discord', github:'fab fa-github', threads:'fab fa-threads', viber:'fab fa-viber' };
       var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2', website:'#8B5CF6', email:'#F59E0B', phone:'#10B981', pinterest:'#E60023', snapchat:'#FFFC00', discord:'#5865F2', github:'#333', threads:'#000', viber:'#7360F2' };
+      
+      // Build a map of blockFeature buttons for updateTelegramLinks() to use with new labels
+      window._blockFeaturesBtns = {};
+      if (hasBlockFeatures) {
+        db.blockFeatures.forEach(function(bfMap) {
+          if (bfMap.buttons && bfMap.buttons.length > 0) {
+            window._blockFeaturesBtns[bfMap.key] = bfMap.buttons;
+          }
+        });
+      }
       
       db.blockFeatures.forEach(function(bf) {
         // Map block_key (underscores) to data-section-id (hyphens)
@@ -4125,6 +4208,46 @@ switchLang = function(l) {
             
             // 3. If section has a form with a submit button, treat it as having buttons (don't inject duplicates)
             var hasFormButton = !!section.querySelector('form button[type="submit"], form .btn');
+            
+            // === SERVER-INJECTED BUTTON CHECK ===
+            // If server already injected buttons via HTMLRewriter, buttons already have correct text.
+            // Only update data-am for current language, don't replace text (prevents flash/flicker).
+            if (serverInjected && existingBtns.length > 0) {
+              var validDbBtns3 = bf.buttons.filter(function(b3) { return b3.text_ru || b3.text_am; });
+              var needsUpdate = false;
+              for (var si = 0; si < validDbBtns3.length && si < existingBtns.length; si++) {
+                var dbBtn3 = validDbBtns3[si];
+                var eBtn3 = existingBtns[si];
+                var eSpan3 = eBtn3.querySelector('span[data-ru]');
+                if (eSpan3) {
+                  var currentBtnRu = eSpan3.getAttribute('data-ru') || '';
+                  // Only do full replacement if server didn't inject this button correctly
+                  if (currentBtnRu !== (dbBtn3.text_ru || '')) {
+                    needsUpdate = true;
+                    break;
+                  }
+                  // Server already set correct text — just ensure data-am is current and update visible text for current language
+                  if (dbBtn3.text_am) eSpan3.setAttribute('data-am', dbBtn3.text_am);
+                  if (dbBtn3.url) eBtn3.href = dbBtn3.url;
+                  // Update visible text for current language without flash
+                  var curLangText = eSpan3.getAttribute('data-' + lang);
+                  if (curLangText && eSpan3.textContent !== curLangText) eSpan3.textContent = curLangText;
+                } else {
+                  needsUpdate = true;
+                  break;
+                }
+              }
+              if (!needsUpdate) {
+                // Hide surplus HTML buttons if DB has fewer
+                for (var hIdx3 = validDbBtns3.length; hIdx3 < existingBtns.length; hIdx3++) {
+                  existingBtns[hIdx3].style.display = 'none';
+                  existingBtns[hIdx3].setAttribute('data-db-hidden', 'true');
+                }
+                console.log('[DB] Buttons already server-injected in', sectionIdH, '- only AM/lang updated');
+                return; // Skip full replacement — no flash
+              }
+              // If needsUpdate=true, fall through to full replacement below
+            }
             
             // 4. If no CTA container exists at all AND no existing buttons AND no form buttons, CREATE one
             if (!ctaContainer && existingBtns.length === 0 && !hasFormButton) {
@@ -4921,8 +5044,97 @@ async function checkRefCode() {
   
   // Mark as server-injected and apply text replacements if we have changes
   const hasTextChanges = Object.keys(textMap).length > 0;
-  if (hasTextChanges) {
+  const hasButtonChanges = Object.keys(buttonMap).length > 0;
+  if (hasTextChanges || hasButtonChanges) {
     pageHtml = pageHtml.replace('<html lang="ru">', '<html lang="ru" class="server-injected">');
+  }
+  
+  // ===== SERVER-SIDE BUTTON INJECTION =====
+  // Replace button texts/URLs/icons in HTML with data from admin panel (blockFeatures.buttons)
+  // This prevents the flash of old button text on page load
+  if (hasButtonChanges) {
+    // Use HTMLRewriter to track sections and replace buttons
+    const btnResponse = new Response(pageHtml, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    });
+    
+    let currentSection = '';
+    let btnCounters: Record<string, number> = {};
+    // Track depth: when we enter a section, depth=1. Nested sections increase depth.
+    // When we leave, depth decreases. Buttons only replaced at depth >= 1.
+    let sectionDepth = 0;
+    
+    const btnRewritten = new HTMLRewriter()
+      // Track which section we're in
+      .on('[data-section-id]', {
+        element(el) {
+          const sectionId = el.getAttribute('data-section-id') || '';
+          currentSection = sectionId.replace(/-/g, '_');
+          btnCounters[currentSection] = 0;
+          sectionDepth++;
+          // Use onEndTag to know when we leave this section
+          el.onEndTag(() => {
+            sectionDepth--;
+            if (sectionDepth <= 0) {
+              currentSection = '';
+              sectionDepth = 0;
+            }
+          });
+        }
+      })
+      // Process anchor buttons inside sections (class="btn" catches all button styles)
+      .on('a.btn', {
+        element(el) {
+          if (!currentSection || sectionDepth <= 0) return;
+          
+          // Skip calc button (has id)
+          const id = el.getAttribute('id') || '';
+          if (id === 'calcTgBtn') return;
+          
+          // Skip buttons that are internal links (like #calculator)
+          const href = el.getAttribute('href') || '';
+          
+          // Get buttons for this section
+          const sectionBtns = buttonMap[currentSection];
+          if (!sectionBtns || sectionBtns.length === 0) return;
+          
+          const btnIdx = btnCounters[currentSection] || 0;
+          btnCounters[currentSection] = btnIdx + 1;
+          
+          if (btnIdx >= sectionBtns.length) return;
+          
+          const dbBtn = sectionBtns[btnIdx];
+          if (!dbBtn || (!dbBtn.text_ru && !dbBtn.text_am)) return;
+          
+          // Update URL
+          if (dbBtn.url) {
+            el.setAttribute('href', dbBtn.url);
+          }
+          // Set target
+          el.setAttribute('target', '_blank');
+          
+          // Determine icon class
+          let iconClass = dbBtn.icon || 'fas fa-link';
+          if (dbBtn.url) {
+            if (dbBtn.url.includes('wa.me') || dbBtn.url.includes('whatsapp')) {
+              iconClass = 'fab fa-whatsapp';
+            } else if (dbBtn.url.includes('t.me') || dbBtn.url.includes('telegram')) {
+              if (!iconClass || iconClass === 'fas fa-link') iconClass = 'fab fa-telegram';
+            }
+          }
+          
+          // Replace inner content with new icon + span
+          const textRu = (dbBtn.text_ru || '').replace(/"/g, '&quot;');
+          const textAm = (dbBtn.text_am || '').replace(/"/g, '&quot;');
+          el.setInnerContent(
+            `<i class="${iconClass}"></i> <span data-ru="${textRu}" data-am="${textAm}">${dbBtn.text_ru || ''}</span>`,
+            { html: true }
+          );
+        }
+      })
+      .transform(btnResponse);
+    
+    pageHtml = await btnRewritten.text();
   }
   
   // Use HTMLRewriter to replace texts by matching data-ru attribute values against textMap
