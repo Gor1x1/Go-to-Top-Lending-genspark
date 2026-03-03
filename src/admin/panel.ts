@@ -10252,8 +10252,8 @@ function renderSiteBlocks() {
           h += '<span style="flex:1;font-size:0.78rem;color:#e2e8f0">' + eLabel + '</span>';
           // Up/down arrows
           h += '<div style="display:flex;gap:2px">';
-          if (eoi > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px 4px;font-size:0.72rem" onclick="sbMoveElement(' + b.id + ',\'' + eKey + '\',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
-          if (eoi < elOrder.length - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px 4px;font-size:0.72rem" onclick="sbMoveElement(' + b.id + ',\'' + eKey + '\',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
+          if (eoi > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px 4px;font-size:0.72rem" onclick="sbMoveElement(' + b.id + ',&apos;' + eKey + '&apos;,-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
+          if (eoi < elOrder.length - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px 4px;font-size:0.72rem" onclick="sbMoveElement(' + b.id + ',&apos;' + eKey + '&apos;,1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
           h += '</div>';
           h += '</div>';
         }
