@@ -103,7 +103,8 @@ app.get('/api/site-data', async (c) => {
     try {
       // Ensure text_styles column exists (safe ALTER — no-op if already present)
       try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN text_styles TEXT DEFAULT '[]'").run(); } catch {}
-      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+      try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN photo_url TEXT DEFAULT ''").run(); } catch {}
+      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
       for (const blk of (blocksRes.results || [])) {
         let socials: any[] = [];
         try { 
@@ -128,7 +129,7 @@ app.get('/api/site-data', async (c) => {
             social_links: socials,
             social_settings: blockOpts.social_settings || {},
             photos: blockPhotos,
-            photo_url: blockOpts.photo_url || '',
+            photo_url: (blk as any).photo_url || blockOpts.photo_url || '',
             show_socials: socials.length > 0 || blockOpts.show_socials || false,
             show_photos: blockPhotos.length > 0 || blockOpts.show_photos || false,
             show_slots: blockOpts.show_slots || false,
@@ -1265,6 +1266,9 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 .pb-carousel{margin-bottom:0;padding-bottom:0}
 .pb-card-size img{width:100%;height:400px;object-fit:cover}
 @media(max-width:480px){.pb-card-size img{height:340px}}
+/* Photo block sections — remove extra padding below photos */
+section[data-section-id^="photo-block"]{padding-bottom:16px!important}
+section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 /* ===== STATS BAR ===== */
 .stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
@@ -1419,8 +1423,8 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* About photo full-width on mobile */
-  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);min-height:300px;aspect-ratio:4/3;display:grid}
-  .about-img img{width:100%;height:100%;min-height:300px;object-fit:cover;position:absolute;top:0;left:0;right:0;bottom:0}
+  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);min-height:350px;max-height:500px;position:relative;overflow:hidden}
+  .about-img img{width:100%;height:auto;min-height:350px;object-fit:cover;display:block;position:static}
   /* Prevent inner horizontal scroll from blocking vertical page scroll */
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
@@ -1628,7 +1632,7 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 <div class="container">
   <div class="about-grid fade-up">
     <div class="about-img">
-      <img src="/static/img/about-hero2.jpg" alt="Go to Top — Business Growth">
+      <img src="/static/img/team-office.jpg" alt="Go to Top — Наша команда">
     </div>
     <div class="about-text">
       <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
@@ -4372,14 +4376,14 @@ async function checkRefCode() {
           html += '<button onclick="document.getElementById(&apos;' + carId + '&apos;).scrollBy({left:-296,behavior:&apos;smooth&apos;})" style="position:absolute;left:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);z-index:2"><i class="fas fa-chevron-left"></i></button>';
           html += '<button onclick="document.getElementById(&apos;' + carId + '&apos;).scrollBy({left:296,behavior:&apos;smooth&apos;})" style="position:absolute;right:4px;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(139,92,246,0.85);color:#fff;border:none;cursor:pointer;font-size:1.1rem;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 12px rgba(0,0,0,0.3);z-index:2"><i class="fas fa-chevron-right"></i></button>';
           /* Dot counters */
-          html += '<div id="' + carId + '_dots" style="display:flex;justify-content:center;gap:8px;margin-top:14px">';
+          html += '<div id="' + carId + '_dots" style="display:flex;justify-content:center;gap:8px;margin-top:10px;margin-bottom:0">';
           for (var d = 0; d < validPhotos.length; d++) {
             html += '<div class="pb-counter" style="background:' + (d===0?'#8B5CF6':'rgba(139,92,246,0.3)') + '" onclick="document.getElementById(&apos;' + carId + '&apos;).children[' + d + '].scrollIntoView({behavior:&apos;smooth&apos;,inline:&apos;center&apos;,block:&apos;nearest&apos;})"></div>';
           }
           html += '</div>';
         }
         /* Photo counter badge */
-        html += '<div style="text-align:center;margin-top:10px;font-size:0.8rem;color:var(--text-sec,#64748b)"><i class="fas fa-images" style="margin-right:4px"></i>' + validPhotos.length + ' ' + (lang==='am'?'նկար':'фото') + ' — ' + (lang==='am'?'սահեցրեք':'листайте') + ' <i class="fas fa-arrow-right" style="font-size:0.7rem;margin-left:2px"></i></div>';
+        html += '<div style="text-align:center;margin-top:4px;margin-bottom:0;font-size:0.75rem;color:var(--text-sec,#64748b);opacity:0.7"><i class="fas fa-hand-pointer" style="margin-right:4px;font-size:0.7rem"></i>' + (lang==='am'?'սահdelays':'листайте') + '</div>';
         html += '</div>';
       } else {
         /* ── Grid for 1-2 photos ── */

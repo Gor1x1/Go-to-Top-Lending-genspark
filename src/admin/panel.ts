@@ -8613,6 +8613,7 @@ function renderPhotos() {
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
       '<h3 style="font-weight:700"><i class="fas fa-images" style="color:#8B5CF6;margin-right:8px"></i>' + escHtml(b.block_name || 'Блок #'+(bi+1)) + ' <span style="font-size:0.75rem;color:#64748b;font-weight:400">(' + photos.length + ' фото)</span></h3>' +
       '<div style="display:flex;gap:8px"><label style="display:flex;align-items:center;gap:6px;font-size:0.85rem;color:#94a3b8"><input type="checkbox" id="pb_vis_'+b.id+'"'+(b.is_visible?' checked':'')+'>Видимый</label>' +
+      '<button class="btn btn-outline" style="font-size:0.8rem;padding:6px 14px;color:#8B5CF6;border-color:rgba(139,92,246,0.3)" onclick="duplicatePhotoBlock('+b.id+')"><i class="fas fa-copy" style="margin-right:4px"></i>Дублировать</button>' +
       '<button class="btn btn-danger" style="font-size:0.8rem;padding:6px 14px" onclick="deletePhotoBlock('+b.id+')"><i class="fas fa-trash"></i></button></div>' +
       '</div>' +
       '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
@@ -8762,6 +8763,22 @@ async function dupPhotoBlock(id) {
 async function addPhotoBlock() {
   await api('/photo-blocks', { method: 'POST', body: JSON.stringify({ block_name: 'Фото блок ' + ((data.photoBlocks||[]).length+1), position: 'after-services', is_visible: 1, photos_json: '[]' }) });
   toast('Блок создан');
+  await loadData(); render();
+}
+
+async function duplicatePhotoBlock(blockId) {
+  var block = (data.photoBlocks||[]).find(function(b){return b.id===blockId});
+  if (!block) return;
+  await api('/photo-blocks', { method: 'POST', body: JSON.stringify({
+    block_name: (block.block_name || 'Блок') + ' (копия)',
+    position: block.position || 'after-services',
+    is_visible: 1,
+    photos_json: block.photos_json || '[]',
+    description_ru: block.description_ru || '',
+    description_am: block.description_am || '',
+    sort_order: (block.sort_order || 0) + 1
+  }) });
+  toast('Блок продублирован');
   await loadData(); render();
 }
 
