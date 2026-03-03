@@ -10386,24 +10386,32 @@ function renderSiteBlocks() {
               var navLinks = (navOpts && navOpts.nav_links) || [];
               var curTarget = '';
               for (var nli = 0; nli < navLinks.length; nli++) { if (navLinks[nli].idx === ti) { curTarget = navLinks[nli].target || ''; break; } }
-              // Build list of available sections from sectionOrder
-              var allSections = (data.sectionOrder || []).filter(function(s) { return s.section_id !== 'nav' && s.section_id !== 'footer' && s.section_id !== 'floating_tg' && s.section_id !== 'popup'; });
+              // Only main site sections — clean list without copies, counters, tickers etc.
+              var navSectionsList = [
+                { id: 'hero', label: 'Главная (Hero)' },
+                { id: 'about', label: 'О компании' },
+                { id: 'services', label: 'Наши услуги' },
+                { id: 'buyout-detail', label: 'Услуга выкупа' },
+                { id: 'why-buyouts', label: 'Почему это работает' },
+                { id: 'client-reviews', label: 'Отзывы клиентов' },
+                { id: 'wb-official', label: 'Официально (WB)' },
+                { id: 'calculator', label: 'Калькулятор' },
+                { id: 'process', label: 'Как мы работаем' },
+                { id: 'warehouse', label: 'Наш склад' },
+                { id: 'guarantee', label: 'Гарантия безопасности' },
+                { id: 'comparison', label: 'Сравнение' },
+                { id: 'important', label: 'Важно знать' },
+                { id: 'faq', label: 'FAQ' },
+                { id: 'contact', label: 'Связаться с нами' }
+              ];
               h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px">';
               h += '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600;white-space:nowrap"><i class="fas fa-link" style="margin-right:4px"></i>Ссылка на секцию:</span>';
               h += '<select class="input" id="sb_navlink_' + b.id + '_' + ti + '" style="flex:1;font-size:0.78rem;padding:4px 8px;background:#1a2236;border:1px solid #293548;color:#60a5fa;border-radius:6px" onchange="sbSetNavLink(' + b.id + ',' + ti + ',this.value)">';
               h += '<option value="">— выберите секцию —</option>';
-              h += '<option value="_telegram"' + (curTarget === '_telegram' ? ' selected' : '') + '>Telegram (внешняя ссылка)</option>';
-              for (var asi = 0; asi < allSections.length; asi++) {
-                var sec = allSections[asi];
-                var secId = sec.section_id || '';
-                var secLabel = secId.replace(/_/g, ' ').replace(/-/g, ' ');
-                // Try to find human-readable name from block texts
-                var secBlock = (data.siteBlocks || []).find(function(bl) { return bl.block_key === secId.replace(/-/g, '_'); });
-                if (secBlock && secBlock.texts_ru && secBlock.texts_ru.length > 0) {
-                  var firstText = secBlock.texts_ru[0] || '';
-                  if (firstText.length > 0 && firstText.length < 50) secLabel = firstText;
-                }
-                h += '<option value="' + escHtml(secId) + '"' + (curTarget === secId || curTarget === secId.replace(/-/g, '_') ? ' selected' : '') + '>' + escHtml(secLabel) + ' (' + escHtml(secId) + ')</option>';
+              h += '<option value="_telegram"' + (curTarget === '_telegram' ? ' selected' : '') + '>\u2708 Telegram (внешняя ссылка)</option>';
+              for (var asi = 0; asi < navSectionsList.length; asi++) {
+                var ns = navSectionsList[asi];
+                h += '<option value="' + escHtml(ns.id) + '"' + (curTarget === ns.id || curTarget === ns.id.replace(/-/g, '_') ? ' selected' : '') + '>' + escHtml(ns.label) + '</option>';
               }
               h += '</select>';
               h += '</div>';
