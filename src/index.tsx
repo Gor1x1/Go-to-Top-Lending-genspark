@@ -1430,13 +1430,69 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .popup-card .pf-row{grid-template-columns:1fr}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
-  /* About photo full-width on mobile */
-  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:500px;height:auto;aspect-ratio:2/3}
-  .about-img img{width:100%;height:100%;min-height:500px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0}
-  /* Prevent inner horizontal scroll from blocking vertical page scroll */
+  /* ===== MOBILE: proper element order inside sections ===== */
+  /* About: text first, photo after on mobile */
+  .about-grid{display:flex!important;flex-direction:column;gap:24px}
+  .about-text{order:1!important}
+  .about-img{order:2!important;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:280px;height:auto;aspect-ratio:3/4}
+  .about-img img{width:100%;height:100%;min-height:280px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0}
+  /* Hero: text block first, image after on mobile */
+  .hero-grid{display:flex!important;flex-direction:column;gap:24px}
+  .hero-grid > div:first-child{order:1!important}
+  .hero-image{order:2!important;max-width:100%}
+  .hero-image img{height:auto;max-height:320px;width:100%}
+  /* Guarantee: text first, photo after on mobile */
+  .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
+  .guarantee-card > div{order:1!important}
+  .guarantee-card > img{order:2!important;max-height:300px;width:100%;object-fit:cover;border-radius:12px}
+  /* WB Official — proper block ordering on mobile */
+  .why-block{display:flex;flex-direction:column}
+  /* Warehouse — stack photos */
+  .wh-grid{display:flex!important;flex-direction:column;gap:16px}
+  /* Buyout detail — stack cards */
+  .buyout-grid{display:flex!important;flex-direction:column;gap:16px}
+  .buyout-detail{display:flex;flex-direction:column}
+  /* ===== MOBILE: remove ALL inner scroll from sections ===== */
+  .section{overflow:hidden!important}
+  .section .container{overflow:visible!important;max-width:100%!important}
+  /* Key fix: prevent ANY child from causing horizontal scroll */
+  body{overflow-x:hidden}
+  .section *{max-width:100%;box-sizing:border-box}
+  /* Comparison table: fixed layout, no scroll outside wrapper */
+  .cmp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r);margin:0;padding:0;max-width:100%}
+  .cmp-table{min-width:0!important;width:100%;table-layout:fixed;font-size:0.72rem}
+  .cmp-table td,.cmp-table th{padding:8px 6px;word-wrap:break-word;overflow-wrap:break-word}
+  /* Carousels: controlled scroll */
+  .rv-carousel,.pb-carousel{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
   .rv-carousel{touch-action:pan-x pinch-zoom}
-  .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
-  .cmp-table-wrap{touch-action:pan-y pan-x}
+  .pb-carousel{touch-action:pan-x pinch-zoom}
+  /* Section CTA buttons — always at bottom with proper spacing */
+  .section-cta{margin-top:24px!important;text-align:center}
+  .section-cta .btn{width:100%;max-width:360px;justify-content:center;display:inline-flex}
+  /* Fix photos inside sections — no overflow */
+  img{max-width:100%;height:auto}
+  .wh-item{overflow:hidden;border-radius:var(--r)}
+  .wh-item img{width:100%;height:auto;max-height:300px;object-fit:cover}
+  /* Why-steps, process-grid — single column on mobile */
+  .why-steps{grid-template-columns:1fr!important}
+  .process-grid{grid-template-columns:1fr!important}
+  /* Compare box — stack columns */
+  .compare-box{display:flex!important;flex-direction:column;gap:16px}
+  .compare-side{width:100%!important}
+  /* Services grid — single column */
+  .services-grid{grid-template-columns:1fr!important}
+  /* Stats grid: 2 columns on mobile */
+  .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:16px!important}
+  /* Contact grid */
+  .contact-grid{grid-template-columns:1fr!important}
+  /* Ticker — no overflow issues */
+  .ticker{overflow:hidden!important}
+  /* Slot counter */
+  .slot-counter-bar .container{overflow:visible!important}
+  /* WB Banner */
+  .wb-banner-inner{flex-direction:column;gap:16px;text-align:center}
+  .wb-banner-right{flex-direction:column;gap:8px;min-width:0}
+  .wb-banner-right .btn{width:100%;margin-left:0}
 }
 @media(max-width:480px){
   .hero h1{font-size:1.5rem}
@@ -1448,13 +1504,17 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .svc-card{padding:16px}
   .buyout-detail{padding:20px}
   .reviews-detail{padding:20px}
-  .guarantee-card{padding:20px}
-  .guarantee-card img{max-height:none;object-fit:cover;border-radius:12px}
+  .guarantee-card{padding:20px!important;flex-direction:column!important;gap:20px!important}
+  .guarantee-card > img{max-height:250px!important;object-fit:cover;border-radius:12px;order:2!important}
+  .guarantee-card > div{order:1!important}
+  .about-grid{gap:16px!important}
+  .about-img{min-height:250px!important;aspect-ratio:4/3!important}
+  .about-img img{min-height:250px!important}
   .form-card{padding:16px}
   .wb-banner-card{min-width:0;padding:10px 14px}
   .wb-banner-right{min-width:0;padding:10px 14px;flex-wrap:wrap}
   .wb-banner-right .btn{margin-left:0;margin-top:8px;width:100%}
-  .cmp-table{min-width:340px;font-size:0.72rem}
+  .cmp-table{min-width:0!important;width:100%!important;table-layout:fixed!important;font-size:0.68rem}
   .hero-stats{gap:16px}
   .stat-num{font-size:1.6rem}
   .stat-label{font-size:0.72rem}
@@ -3507,6 +3567,9 @@ switchLang = function(l) {
         // Re-query after dedup
         sectionArr = Array.from(document.querySelectorAll('[data-section-id]'));
         var activeCount = 0;
+        // Stable sort: sections with same sort_order keep their DOM order
+        var _originalIndex = {};
+        sectionArr.forEach(function(s, i) { _originalIndex[s.getAttribute('data-section-id')] = i; });
         sectionArr.sort(function(a, b) {
           var aidN = (a.getAttribute('data-section-id') || '').replace(/_/g, '-');
           var bidN = (b.getAttribute('data-section-id') || '').replace(/_/g, '-');
@@ -3514,7 +3577,9 @@ switchLang = function(l) {
           var ob = orderMap[bidN] || orderMap[b.getAttribute('data-section-id')];
           var sa = oa ? oa.sort_order : 999;
           var sb = ob ? ob.sort_order : 999;
-          return sa - sb;
+          if (sa !== sb) return sa - sb;
+          // Same sort_order: preserve original DOM order
+          return (_originalIndex[a.getAttribute('data-section-id')] || 0) - (_originalIndex[b.getAttribute('data-section-id')] || 0);
         });
         var footer = document.querySelector('footer');
         sectionArr.forEach(function(section) {
@@ -4051,7 +4116,8 @@ switchLang = function(l) {
       console.log('[DB] Text styles applied');
     }
     
-    // ===== APPLY ELEMENT ORDER (reorder content within sections) =====
+    // ===== APPLY ELEMENT ORDER (flex + CSS order within sections) =====
+    // For each section with element_order defined, convert the inner wrapper to flex and apply order
     if (db.blockFeatures && db.blockFeatures.length > 0) {
       db.blockFeatures.forEach(function(bf) {
         if (!bf.element_order || !Array.isArray(bf.element_order) || bf.element_order.length === 0) return;
@@ -4060,52 +4126,48 @@ switchLang = function(l) {
         if (!section) return;
         var container = section.querySelector('.container') || section;
         
-        // Tag each child element with its type for reordering
-        var children = Array.prototype.slice.call(container.children);
-        children.forEach(function(child) {
-          if (child.getAttribute('data-el-type')) return; // already tagged
-          // Classify element by its content/class
-          var classes = child.className || '';
-          var tag = child.tagName.toLowerCase();
-          var html = child.innerHTML || '';
-          if (child.querySelector('img') || classes.indexOf('-img') >= 0 || classes.indexOf('photo') >= 0 || classes.indexOf('gallery') >= 0 || classes.indexOf('-grid') >= 0) {
-            child.setAttribute('data-el-type', 'photo');
-          } else if (tag === 'h1' || tag === 'h2' || classes.indexOf('section-title') >= 0 || classes.indexOf('hero-title') >= 0) {
-            child.setAttribute('data-el-type', 'title');
-          } else if (classes.indexOf('stats') >= 0 || classes.indexOf('hero-stats') >= 0 || classes.indexOf('counter') >= 0) {
-            child.setAttribute('data-el-type', 'stats');
-          } else if (classes.indexOf('section-cta') >= 0 || classes.indexOf('hero-buttons') >= 0 || (child.querySelector('a.btn, a.btn-tg') && !child.querySelector('p, h2, h3'))) {
-            child.setAttribute('data-el-type', 'buttons');
-          } else if (classes.indexOf('social') >= 0 || classes.indexOf('block-socials') >= 0) {
-            child.setAttribute('data-el-type', 'socials');
-          } else if (tag === 'p' || tag === 'ul' || tag === 'ol' || classes.indexOf('text') >= 0 || classes.indexOf('desc') >= 0 || child.querySelector('p, li')) {
-            child.setAttribute('data-el-type', 'texts');
-          }
+        // Find the main flex/grid wrapper inside container (e.g. .about-grid, .guarantee-card, .hero-grid)
+        // or use container itself if no wrapper found
+        var wrappers = container.querySelectorAll('.about-grid, .guarantee-card, .hero-grid, .buyout-detail');
+        var flexTargets = wrappers.length > 0 ? Array.from(wrappers) : [container];
+        
+        // Convert each wrapper to flex column so CSS order works
+        flexTargets.forEach(function(w) {
+          w.style.display = 'flex';
+          w.style.flexDirection = 'column';
         });
         
-        // Reorder children based on element_order
-        // Strategy: for each order entry, find matching children and append them in order
-        // Elements not in the order list keep their relative position at the end
-        var orderedChildren = [];
-        var usedSet = {};
-        bf.element_order.forEach(function(elType) {
-          children.forEach(function(child, idx) {
-            if (usedSet[idx]) return;
-            if (child.getAttribute('data-el-type') === elType) {
-              orderedChildren.push(child);
-              usedSet[idx] = true;
-            }
+        // Map element types to selectors — for DIRECT children of wrappers
+        var typeMap = {
+          'photo': '.about-img, .hero-image, .guarantee-card > img, .wh-grid, .block-photo-gallery, img.section-photo, .wh-item',
+          'title': '.section-header, h2, h1, .hero-badge, .buyout-detail-header, .section-badge, .wb-official-badge',
+          'stats': '.hero-stats, .stats-grid, .block-slot-counter',
+          'texts': '.about-text, .hero-desc, p.section-sub, .why-block, .why-steps, .process-grid, .buyout-grid, .highlight-result, .about-highlight, .g-list, .g-badge, p, ul, ol, .faq-list, .compare-box, .svc-card, .buyout-card',
+          'buttons': '.section-cta, .hero-buttons',
+          'socials': '.block-socials, .footer-socials'
+        };
+        
+        // Apply order to elements found in ANY of the flex containers
+        bf.element_order.forEach(function(elType, orderIdx) {
+          var selString = typeMap[elType];
+          if (!selString) return;
+          
+          // Search in main container AND all sub-wrappers
+          var allSearchAreas = [container].concat(flexTargets);
+          var applied = {};
+          allSearchAreas.forEach(function(area) {
+            try {
+              var targets = area.querySelectorAll(selString);
+              targets.forEach(function(t) {
+                // Skip if already ordered (prevent duplicates from multiple search areas)
+                if (applied[t.tagName + t.className]) return;
+                applied[t.tagName + t.className] = true;
+                t.style.order = String(orderIdx);
+              });
+            } catch(e) {}
           });
         });
-        // Append any untagged/remaining children
-        children.forEach(function(child, idx) {
-          if (!usedSet[idx]) orderedChildren.push(child);
-        });
-        
-        // Apply new order to DOM
-        var fragment = document.createDocumentFragment();
-        orderedChildren.forEach(function(child) { fragment.appendChild(child); });
-        container.appendChild(fragment);
+        console.log('[DB] Element order applied for:', sectionId, bf.element_order);
       });
       console.log('[DB] Element order applied');
     }
@@ -4284,7 +4346,7 @@ switchLang = function(l) {
   }
 })();
 
-// Safety fallback: if sections still hidden after 5s (e.g. slow network), reveal everything
+// Safety fallback: if sections still hidden after 8s (mobile / slow network), reveal everything
 setTimeout(function() {
   document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.slot-counter-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
     s.classList.add('section-revealed');
@@ -4294,7 +4356,7 @@ setTimeout(function() {
   if (_fallbackFooter && (!_fallbackFooter.style.opacity || _fallbackFooter.style.opacity === '0')) {
     _fallbackFooter.style.opacity = '1';
   }
-}, 5000);
+}, 8000);
 
 /* ===== REFERRAL CODE CHECK ===== */
 var _refDiscount = 0;
