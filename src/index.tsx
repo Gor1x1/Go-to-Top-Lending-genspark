@@ -1085,7 +1085,7 @@ img{max-width:100%;height:auto}
 .wh-item:hover img{transform:scale(1.05)}
 .wh-caption{position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.8));font-size:0.85rem;font-weight:500}
 .guarantee-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
-.guarantee-card img{border-radius:var(--r);width:100%;height:auto;object-fit:contain;border:1px solid var(--border)}
+.guarantee-card img{border-radius:var(--r);width:100%;height:auto;max-height:500px;object-fit:cover;border:1px solid var(--border)}
 
 
 .guarantee-card h2{font-size:1.9rem;font-weight:800;margin-bottom:16px}
@@ -1445,7 +1445,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .buyout-detail{padding:20px}
   .reviews-detail{padding:20px}
   .guarantee-card{padding:20px}
-  .guarantee-card img{max-height:200px}
+  .guarantee-card img{max-height:none;object-fit:cover;border-radius:12px}
   .form-card{padding:16px}
   .wb-banner-card{min-width:0;padding:10px 14px}
   .wb-banner-right{min-width:0;padding:10px 14px;flex-wrap:wrap}
@@ -1636,7 +1636,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <div class="container">
   <div class="about-grid fade-up">
     <div class="about-img">
-      <img src="/static/img/team-office.jpg" alt="Go to Top — Наша команда">
+      <img src="/static/img/about-hero2.jpg" alt="Go to Top — О компании">
     </div>
     <div class="about-text">
       <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
@@ -2045,7 +2045,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <section class="section" id="guarantee" data-section-id="guarantee">
 <div class="container">
     <div class="guarantee-card fade-up">
-    <img src="/static/img/team-new.jpg" alt="Команда Go to Top">
+    <img src="/static/img/team-office.jpg" alt="Команда Go to Top">
     <div>
       <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">Гарантия безопасности</span></div>
       <h2 data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը">Всё организовано и по полочкам. Наша команда</h2>
