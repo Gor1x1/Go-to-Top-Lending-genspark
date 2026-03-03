@@ -10224,6 +10224,34 @@ function renderSiteBlocks() {
         if (showAm) h += '<div class="sb-field-group"><div class="sb-field-label am"><i class="fas fa-heading"></i> Վերնագիր (AM)</div><input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div>';
 
+        // ── ELEMENT ORDER within section (drag-sort content blocks on site) ──
+        var elOrderOpts = {};
+        try { elOrderOpts = JSON.parse(b.custom_html || '{}'); } catch(e) { elOrderOpts = {}; }
+        var defaultOrder = ['photo', 'title', 'stats', 'texts', 'buttons', 'socials'];
+        var elOrder = (elOrderOpts.element_order && Array.isArray(elOrderOpts.element_order) && elOrderOpts.element_order.length > 0) ? elOrderOpts.element_order : defaultOrder;
+        // Ensure all default elements are present
+        for (var dei = 0; dei < defaultOrder.length; dei++) { if (elOrder.indexOf(defaultOrder[dei]) < 0) elOrder.push(defaultOrder[dei]); }
+        var elLabels = { photo: '\u{1F4F7} Фото', title: '\u{1F4CB} Заголовок', stats: '\u{1F4CA} Счётчик/Стат.', texts: '\u{1F4DD} Тексты', buttons: '\u{1F517} Кнопки', socials: '\u{1F310} Соц. сети' };
+        var elIcons = { photo: 'fas fa-camera', title: 'fas fa-heading', stats: 'fas fa-chart-bar', texts: 'fas fa-align-left', buttons: 'fas fa-hand-pointer', socials: 'fas fa-share-alt' };
+        h += '<details style="margin-bottom:16px"><summary style="font-size:0.82rem;font-weight:700;color:#a78bfa;cursor:pointer"><i class="fas fa-sort" style="margin-right:6px"></i>Порядок элементов на сайте <span style="font-weight:400;color:#475569;font-size:0.72rem">(перетащи для перестановки)</span></summary>';
+        h += '<div id="sb_elorder_' + b.id + '" style="margin-top:8px;padding:10px;background:#1a2236;border:1px solid #293548;border-radius:8px">';
+        for (var eoi = 0; eoi < elOrder.length; eoi++) {
+          var eKey = elOrder[eoi];
+          var eLabel = elLabels[eKey] || eKey;
+          var eIcon = elIcons[eKey] || 'fas fa-circle';
+          h += '<div class="sb-elorder-item" data-elkey="' + eKey + '" style="display:flex;align-items:center;gap:8px;padding:6px 10px;margin-bottom:4px;background:#0f172a;border:1px solid #293548;border-radius:6px;cursor:grab;user-select:none">';
+          h += '<i class="fas fa-grip-vertical" style="color:#475569;font-size:0.75rem"></i>';
+          h += '<i class="' + eIcon + '" style="color:#8B5CF6;font-size:0.8rem;min-width:18px;text-align:center"></i>';
+          h += '<span style="flex:1;font-size:0.78rem;color:#e2e8f0">' + eLabel + '</span>';
+          // Up/down arrows
+          h += '<div style="display:flex;gap:2px">';
+          if (eoi > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px 4px;font-size:0.72rem" onclick="sbMoveElement(' + b.id + ',\'' + eKey + '\',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
+          if (eoi < elOrder.length - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px 4px;font-size:0.72rem" onclick="sbMoveElement(' + b.id + ',\'' + eKey + '\',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
+          h += '</div>';
+          h += '</div>';
+        }
+        h += '</div></details>';
+
         // ── CALCULATOR EDITOR (compact — only title texts + link) ──
         var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
         if (isCalcBlock) {
@@ -10773,6 +10801,31 @@ function sbSetTextRole(blockId, textIdx, role) {
   // The role info is cosmetic — the actual rendering uses position-based logic
   console.log('[Admin] Text role set:', blockId, textIdx, role);
   // Trigger auto-save to persist any changes
+  sbAutoSave(blockId);
+}
+
+// ── Move element in section order (reorder block content on site) ──
+function sbMoveElement(blockId, elKey, direction) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = typeof b.custom_html === 'string' ? JSON.parse(b.custom_html || '{}') : (b.custom_html || {}); } catch(e) { opts = {}; }
+  var defaultOrder = ['photo', 'title', 'stats', 'texts', 'buttons', 'socials'];
+  var order = (opts.element_order && Array.isArray(opts.element_order)) ? opts.element_order.slice() : defaultOrder.slice();
+  // Ensure all defaults
+  for (var di = 0; di < defaultOrder.length; di++) { if (order.indexOf(defaultOrder[di]) < 0) order.push(defaultOrder[di]); }
+  var idx = order.indexOf(elKey);
+  if (idx < 0) return;
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= order.length) return;
+  // Swap
+  var tmp = order[newIdx];
+  order[newIdx] = order[idx];
+  order[idx] = tmp;
+  opts.element_order = order;
+  b.custom_html = JSON.stringify(opts);
+  console.log('[Admin] Element order changed:', order);
+  render();
   sbAutoSave(blockId);
 }
 

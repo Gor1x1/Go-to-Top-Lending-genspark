@@ -144,6 +144,8 @@ app.get('/api/site-data', async (c) => {
             text_styles: (() => { try { return JSON.parse((blk as any).text_styles as string || '[]'); } catch { return []; } })(),
             // Nav links mapping (for nav block)
             nav_links: blockOpts.nav_links || [],
+            // Element order within section (for frontend reordering)
+            element_order: blockOpts.element_order || [],
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -4057,6 +4059,65 @@ switchLang = function(l) {
         }
       });
       console.log('[DB] Text styles applied');
+    }
+    
+    // ===== APPLY ELEMENT ORDER (reorder content within sections) =====
+    if (db.blockFeatures && db.blockFeatures.length > 0) {
+      db.blockFeatures.forEach(function(bf) {
+        if (!bf.element_order || !Array.isArray(bf.element_order) || bf.element_order.length === 0) return;
+        var sectionId = bf.key.replace(/_/g, '-');
+        var section = document.querySelector('[data-section-id="' + sectionId + '"]');
+        if (!section) return;
+        var container = section.querySelector('.container') || section;
+        
+        // Tag each child element with its type for reordering
+        var children = Array.prototype.slice.call(container.children);
+        children.forEach(function(child) {
+          if (child.getAttribute('data-el-type')) return; // already tagged
+          // Classify element by its content/class
+          var classes = child.className || '';
+          var tag = child.tagName.toLowerCase();
+          var html = child.innerHTML || '';
+          if (child.querySelector('img') || classes.indexOf('-img') >= 0 || classes.indexOf('photo') >= 0 || classes.indexOf('gallery') >= 0 || classes.indexOf('-grid') >= 0) {
+            child.setAttribute('data-el-type', 'photo');
+          } else if (tag === 'h1' || tag === 'h2' || classes.indexOf('section-title') >= 0 || classes.indexOf('hero-title') >= 0) {
+            child.setAttribute('data-el-type', 'title');
+          } else if (classes.indexOf('stats') >= 0 || classes.indexOf('hero-stats') >= 0 || classes.indexOf('counter') >= 0) {
+            child.setAttribute('data-el-type', 'stats');
+          } else if (classes.indexOf('section-cta') >= 0 || classes.indexOf('hero-buttons') >= 0 || (child.querySelector('a.btn, a.btn-tg') && !child.querySelector('p, h2, h3'))) {
+            child.setAttribute('data-el-type', 'buttons');
+          } else if (classes.indexOf('social') >= 0 || classes.indexOf('block-socials') >= 0) {
+            child.setAttribute('data-el-type', 'socials');
+          } else if (tag === 'p' || tag === 'ul' || tag === 'ol' || classes.indexOf('text') >= 0 || classes.indexOf('desc') >= 0 || child.querySelector('p, li')) {
+            child.setAttribute('data-el-type', 'texts');
+          }
+        });
+        
+        // Reorder children based on element_order
+        // Strategy: for each order entry, find matching children and append them in order
+        // Elements not in the order list keep their relative position at the end
+        var orderedChildren = [];
+        var usedSet = {};
+        bf.element_order.forEach(function(elType) {
+          children.forEach(function(child, idx) {
+            if (usedSet[idx]) return;
+            if (child.getAttribute('data-el-type') === elType) {
+              orderedChildren.push(child);
+              usedSet[idx] = true;
+            }
+          });
+        });
+        // Append any untagged/remaining children
+        children.forEach(function(child, idx) {
+          if (!usedSet[idx]) orderedChildren.push(child);
+        });
+        
+        // Apply new order to DOM
+        var fragment = document.createDocumentFragment();
+        orderedChildren.forEach(function(child) { fragment.appendChild(child); });
+        container.appendChild(fragment);
+      });
+      console.log('[DB] Element order applied');
     }
     
     // Clear reviews placeholder if no photos were injected — hide completely
