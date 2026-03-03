@@ -1003,8 +1003,7 @@ img{max-width:100%;height:auto}
 /* Tighter header for reviews */
 #client-reviews .section-header{margin-bottom:24px}
 #client-reviews{padding-bottom:0!important;margin-bottom:0!important}
-#client-reviews .section-cta{margin-top:16px}
-#client-reviews .container{padding-bottom:0}
+#client-reviews .container{padding-bottom:0!important;margin-bottom:0!important}
 #client-reviews > .container{margin-bottom:0;padding-bottom:0}
 .section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
 .section-title{font-size:2.2rem;font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
@@ -1252,15 +1251,18 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 /* Reviews gallery - tighter layout when no carousel */
 .reviews-gallery-area:empty,.reviews-gallery-area:has(> div:only-child:empty){display:none}
 #reviewsCarouselArea{transition:opacity 0.4s ease}
-/* Reviews section — tight bottom gap */
-#client-reviews .section-cta{margin-top:12px;margin-bottom:0;padding-bottom:0;border-top:none}
-#client-reviews .rv-dots{margin-bottom:0;padding-bottom:0}
-#client-reviews .reviews-gallery-area{margin-bottom:0;padding-bottom:0}
-#reviewsCtaArea:empty{display:none;margin:0;padding:0}
-#reviewsCtaArea{margin-top:12px;margin-bottom:0;padding-bottom:0}
-#client-reviews .rv-carousel{margin-bottom:0}
-#client-reviews .rv-swipe-hint{margin-bottom:0;padding-bottom:0}
-#client-reviews .extra-text:last-child{margin-bottom:0;padding-bottom:0}
+/* Reviews section — eliminate ALL bottom gaps */
+#client-reviews .section-cta{margin-top:8px;margin-bottom:0!important;padding-bottom:0!important;border-top:none}
+#client-reviews .rv-dots{margin-top:10px;margin-bottom:0!important;padding-bottom:0!important}
+#client-reviews .reviews-gallery-area{margin-bottom:0!important;padding-bottom:0!important}
+#reviewsCarouselArea{margin-bottom:0!important;padding-bottom:0!important}
+#reviewsCtaArea:empty{display:none!important;margin:0!important;padding:0!important;height:0!important;overflow:hidden}
+#reviewsCtaArea{margin-top:8px;margin-bottom:0!important;padding-bottom:0!important}
+#client-reviews .rv-carousel{margin-bottom:0!important}
+#client-reviews .rv-swipe-hint{margin-top:8px;margin-bottom:0!important;padding-bottom:0!important}
+#client-reviews .extra-text{margin-bottom:0!important;padding-bottom:0!important}
+#client-reviews .container{padding-bottom:0!important;margin-bottom:0!important}
+#client-reviews > .container > *:last-child{margin-bottom:0!important;padding-bottom:0!important}
 /* Photo block review cards — no bottom gap */
 .pb-card{margin-bottom:0}
 .pb-carousel{margin-bottom:0;padding-bottom:0}
@@ -1326,7 +1328,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:1px solid var(--border);background:var(--bg-card);box-shadow:0 8px 40px rgba(0,0,0,0.25)}
 .rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
-.rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:#0a0a1a;-webkit-user-drag:none;user-select:none}
+.rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:16px 20px;background:linear-gradient(135deg,rgba(10,10,30,0.95),rgba(20,15,45,0.95))}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#c4b5fd);font-style:italic}
 .rv-carousel .rv-badge{position:absolute;top:12px;right:12px;background:rgba(139,92,246,0.9);color:#fff;font-size:0.72rem;padding:4px 10px;border-radius:20px;font-weight:600;backdrop-filter:blur(6px);z-index:2}
@@ -1348,12 +1350,14 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 @media(max-width:768px){
   .rv-carousel{max-width:100%}
   .rv-carousel .rv-slide img{height:auto;object-fit:contain}
+  .rv-carousel{background:transparent;border:none;box-shadow:none}
   .rv-carousel .rv-nav-btn{width:38px;height:38px;font-size:0.95rem}
   .lightbox .lb-nav{width:40px;height:40px;font-size:1rem}
 }
 @media(max-width:480px){
   .rv-carousel .rv-slide img{height:auto;object-fit:contain}
-  .rv-carousel .rv-caption{padding:12px 16px}
+  .rv-carousel{background:transparent;border:none;box-shadow:none}
+  .rv-carousel .rv-caption{padding:10px 16px}
   .rv-carousel .rv-caption-text{font-size:0.85rem}
   .rv-carousel .rv-nav-btn{width:34px;height:34px;font-size:0.85rem}
   .rv-dots .rv-dot{width:8px;height:8px}
@@ -1423,8 +1427,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* About photo full-width on mobile */
-  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:auto;max-height:none;height:auto}
-  .about-img img{width:100%;height:auto;object-fit:contain;display:block;position:static;min-height:auto;max-height:none;border-radius:12px}
+  .about-img{border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:500px;height:auto;aspect-ratio:2/3}
+  .about-img img{width:100%;height:100%;min-height:500px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0}
   /* Prevent inner horizontal scroll from blocking vertical page scroll */
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom;-webkit-overflow-scrolling:auto}
