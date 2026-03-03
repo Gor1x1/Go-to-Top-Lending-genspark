@@ -10382,7 +10382,8 @@ function renderSiteBlocks() {
             h += '</div>';
             // ── Nav link target selector (only for nav block) ──
             if (b.block_key === 'nav') {
-              var navLinks = opts.nav_links || [];
+              var navOpts = {}; try { navOpts = JSON.parse(b.custom_html || '{}'); } catch(e) { navOpts = {}; }
+              var navLinks = (navOpts && navOpts.nav_links) || [];
               var curTarget = '';
               for (var nli = 0; nli < navLinks.length; nli++) { if (navLinks[nli].idx === ti) { curTarget = navLinks[nli].target || ''; break; } }
               // Build list of available sections from sectionOrder
