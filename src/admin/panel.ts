@@ -10790,8 +10790,10 @@ function sbReorderPhotos(blockId, container) {
     if (data.siteBlocks[i].id === blockId) { block = data.siteBlocks[i]; break; }
   }
   if (!block) return;
-  var photos = [];
-  try { photos = JSON.parse(block.photos_json || '[]'); } catch(e) { photos = []; }
+  // Photos are stored in custom_html JSON as blockOpts.photos
+  var blockOpts = {};
+  try { blockOpts = JSON.parse(block.custom_html || '{}'); } catch(e) { blockOpts = {}; }
+  var photos = blockOpts.photos || [];
   if (!photos.length) return;
   // Build new order from DOM
   var newPhotos = [];
@@ -10801,8 +10803,9 @@ function sbReorderPhotos(blockId, container) {
       newPhotos.push(photos[oldIdx]);
     }
   });
-  // Update block data
-  block.photos_json = JSON.stringify(newPhotos);
+  // Update block data in custom_html
+  blockOpts.photos = newPhotos;
+  block.custom_html = JSON.stringify(blockOpts);
   // Re-assign indices and input IDs
   items.forEach(function(item, newIdx) {
     item.setAttribute('data-photo-idx', newIdx);
