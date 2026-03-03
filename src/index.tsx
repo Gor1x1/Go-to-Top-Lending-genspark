@@ -898,11 +898,48 @@ app.post('/api/admin/seed-from-site', async (c) => {
   return c.json({ success: true, message: 'Seeded successfully' });
 })
 
-app.get('/', (c) => {
+app.get('/', async (c) => {
   c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
   c.header('Pragma', 'no-cache');
   c.header('Expires', '0');
-  return c.html(html`<!DOCTYPE html>
+  
+  // Build textMap from DB so we can inject current texts into HTML server-side
+  let textMap: Record<string, {ru: string, am: string}> = {};
+  let photoMap: Record<string, string> = {};
+  try {
+    const db = c.env.DB;
+    const contentRes = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
+    const dbContent: Record<string, any[]> = {};
+    for (const row of contentRes.results) {
+      try { dbContent[row.section_key as string] = JSON.parse(row.content_json as string); } catch { dbContent[row.section_key as string] = []; }
+    }
+    for (const seedSection of SEED_CONTENT_SECTIONS) {
+      const dbItems = dbContent[seedSection.key] || [];
+      for (let i = 0; i < seedSection.items.length; i++) {
+        const origRu = seedSection.items[i].ru;
+        const dbItem = dbItems[i];
+        if (dbItem && (dbItem.ru !== origRu || dbItem.am !== seedSection.items[i].am)) {
+          textMap[origRu] = { ru: dbItem.ru, am: dbItem.am };
+        }
+      }
+    }
+    
+    // Also load photo_url for key sections to inject server-side (avoids photo flash)
+    const photoBlocks = await db.prepare(
+      "SELECT block_key, photo_url, custom_html FROM site_blocks WHERE block_key IN ('hero','about','guarantee') AND is_visible = 1"
+    ).all();
+    for (const blk of (photoBlocks.results || [])) {
+      let url = blk.photo_url as string || '';
+      if (!url) {
+        try { const opts = JSON.parse(blk.custom_html as string || '{}'); url = opts.photo_url || ''; } catch {}
+      }
+      if (url) photoMap[blk.block_key as string] = url;
+    }
+  } catch (e) {
+    // If DB fails, serve original HTML without modifications
+  }
+  
+  let pageHtml = /* raw HTML template follows */`<!DOCTYPE html>
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
@@ -4750,7 +4787,60 @@ async function checkRefCode() {
 })();
 </script>
 </body>
-</html>`)
+</html>`;
+  
+  // ===== SERVER-SIDE TEXT INJECTION =====
+  // Replace hardcoded texts with current DB values so no "flash of old content" occurs
+  if (Object.keys(textMap).length > 0) {
+    for (const [origRu, newTexts] of Object.entries(textMap)) {
+      // Escape special regex characters in the original text
+      const escapedOrig = origRu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      
+      // Replace data-ru="original" with data-ru="new" 
+      // Pattern: data-ru="originalText" — replace the attribute value
+      const ruAttrRegex = new RegExp('data-ru="' + escapedOrig + '"', 'g');
+      const escapedNewRu = newTexts.ru.replace(/"/g, '&quot;');
+      pageHtml = pageHtml.replace(ruAttrRegex, 'data-ru="' + escapedNewRu + '"');
+      
+      // Replace the visible text content between tags
+      // Pattern: >originalText< (the text node between > and <)
+      // This handles cases like <span data-ru="...">OriginalText</span>
+      const escapedOrigContent = origRu.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+');
+      const contentRegex = new RegExp('>' + escapedOrigContent + '\\s*<', 'g');
+      pageHtml = pageHtml.replace(contentRegex, '>' + newTexts.ru + '<');
+      
+      // Also replace data-am attribute for the same element
+      // Find: data-am="oldAm" — but we need to find it near data-ru="origRu"
+      // Since we already changed data-ru, we find elements by the NEW data-ru value
+      // and update data-am. We use a combined pattern.
+      // Pattern: data-ru="newRu" data-am="anything"
+      const combinedRegex = new RegExp(
+        'data-ru="' + escapedNewRu + '"\\s+data-am="[^"]*"', 'g'
+      );
+      const escapedNewAm = newTexts.am.replace(/"/g, '&quot;');
+      pageHtml = pageHtml.replace(combinedRegex, 'data-ru="' + escapedNewRu + '" data-am="' + escapedNewAm + '"');
+      
+      // Also handle reverse order: data-am="..." data-ru="..."
+      const reverseRegex = new RegExp(
+        'data-am="[^"]*"\\s+data-ru="' + escapedNewRu + '"', 'g'
+      );
+      pageHtml = pageHtml.replace(reverseRegex, 'data-am="' + escapedNewAm + '" data-ru="' + escapedNewRu + '"');
+    }
+  }
+  
+  // ===== SERVER-SIDE PHOTO INJECTION =====
+  // Replace hardcoded photo src with current DB values
+  if (photoMap['hero']) {
+    pageHtml = pageHtml.replace('/static/img/founder.jpg', photoMap['hero']);
+  }
+  if (photoMap['about']) {
+    pageHtml = pageHtml.replace('/static/img/about-hero2.jpg', photoMap['about']);
+  }
+  if (photoMap['guarantee']) {
+    pageHtml = pageHtml.replace('/static/img/team-office.jpg', photoMap['guarantee']);
+  }
+  
+  return c.html(pageHtml);
 })
 
 export default app
