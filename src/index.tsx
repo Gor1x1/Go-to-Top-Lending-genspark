@@ -1589,7 +1589,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .hero h1{font-size:1.9rem}
   .hero-stats{flex-wrap:wrap;gap:20px}
   .hero-buttons{flex-direction:column}
-  .hero-image img{height:auto;max-height:420px}
+  .hero-image img{height:auto;max-height:none}
   .section-title{font-size:1.7rem}
   .services-grid{grid-template-columns:1fr}
   .wh-grid{grid-template-columns:1fr}
@@ -4544,6 +4544,8 @@ switchLang = function(l) {
       db.blockFeatures.forEach(function(bf) {
         var ps = bf.photo_settings;
         if (!ps || typeof ps !== 'object') return;
+        // Skip empty settings (no values set)
+        if (!ps.max_height_mobile && !ps.max_height_desktop && !ps.object_fit && ps.border_radius == null && ps.full_width_mobile == null) return;
         var sid = bf.key.replace(/_/g, '-');
         var section = document.querySelector('[data-section-id="' + sid + '"]');
         if (!section) return;
