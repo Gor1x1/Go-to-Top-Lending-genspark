@@ -945,6 +945,8 @@ app.get('/', async (c) => {
   let textMap: Record<string, {ru: string, am: string}> = {};
   let photoMap: Record<string, string> = {};
   let buttonMap: Record<string, any[]> = {};
+  let styleMap: Record<string, {texts_ru: string[], styles: any[]}> = {};
+  let orderMap: Record<string, string[]> = {};
   try {
     const db = c.env.DB;
     const contentRes = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
@@ -1033,6 +1035,27 @@ app.get('/', async (c) => {
           buttonMap[blk.block_key as string] = btns;
         }
       } catch { /* skip invalid JSON */ }
+    }
+    
+    // Load text_styles and element_order for server-side CSS injection (avoids color/order flash)
+    const styleBlocks = await db.prepare(
+      "SELECT block_key, text_styles, texts_ru, custom_html FROM site_blocks WHERE is_visible = 1"
+    ).all();
+    for (const blk of (styleBlocks.results || [])) {
+      try {
+        const styles = JSON.parse(blk.text_styles as string || '[]');
+        const textsRu = (() => { try { return JSON.parse(blk.texts_ru as string || '[]'); } catch { return []; } })();
+        if (styles.length > 0 && styles.some((s: any) => s && (s.color || s.size))) {
+          styleMap[blk.block_key as string] = { texts_ru: textsRu, styles };
+        }
+        // Load element_order from custom_html JSON
+        try {
+          const opts = JSON.parse(blk.custom_html as string || '{}');
+          if (opts.element_order && Array.isArray(opts.element_order) && opts.element_order.length > 0) {
+            orderMap[blk.block_key as string] = opts.element_order;
+          }
+        } catch {}
+      } catch { /* skip */ }
     }
   } catch (e) {
     // If DB fails, serve original HTML without modifications
@@ -1568,20 +1591,20 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* ===== MOBILE: proper element order inside sections ===== */
-  /* About: text first, photo after on mobile */
+  /* About: default order (can be overridden by server-injected element_order) */
   .about-grid{display:flex!important;flex-direction:column;gap:24px}
-  .about-text{order:1!important}
-  .about-img{order:2!important;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:280px;height:auto;aspect-ratio:3/4}
+  .about-text{order:1}
+  .about-img{order:2;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:280px;height:auto;aspect-ratio:3/4}
   .about-img img{width:100%;height:100%;min-height:280px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0}
-  /* Hero: text block first, image after on mobile */
+  /* Hero: default order (can be overridden by server-injected element_order) */
   .hero-grid{display:flex!important;flex-direction:column;gap:24px}
-  .hero-grid > div:first-child{order:1!important}
-  .hero-image{order:2!important;max-width:100%}
+  .hero-grid > div:first-child{order:1}
+  .hero-image{order:2;max-width:100%}
   .hero-image img{height:auto;max-height:320px;width:100%}
-  /* Guarantee: text first, photo after on mobile */
+  /* Guarantee: default order (can be overridden by server-injected element_order) */
   .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
-  .guarantee-card > div{order:1!important}
-  .guarantee-card > img{order:2!important;max-height:300px;width:100%;object-fit:cover;border-radius:12px}
+  .guarantee-card > div{order:1}
+  .guarantee-card > img{order:2;max-height:300px;width:100%;object-fit:cover;border-radius:12px}
   /* WB Official — proper block ordering on mobile */
   .why-block{display:flex;flex-direction:column}
   /* Warehouse — stack photos */
@@ -4358,6 +4381,9 @@ switchLang = function(l) {
       }
       
       // ===== APPLY TEXT STYLES (color/size) from blockFeatures to all sections =====
+      // When server-injected, CSS styles are already in <style id="server-styles"> tag
+      // Only apply client-side as fallback when NOT server-injected
+      if (!serverInjected) {
       db.blockFeatures.forEach(function(bf) {
         var bfStyles = bf.text_styles;
         if (!bfStyles || bfStyles.length === 0) return;
@@ -4385,63 +4411,92 @@ switchLang = function(l) {
           }
         }
       });
-      console.log('[DB] Text styles applied');
+      console.log('[DB] Text styles applied (client-side fallback)');
+      } else {
+        console.log('[DB] Text styles already server-injected via CSS');
+      }
     }
     
     // ===== APPLY ELEMENT ORDER (flex + CSS order within sections) =====
-    // For each section with element_order defined, convert the inner wrapper to flex and apply order
+    // When server-injected, CSS order rules are already in <style id="server-styles"> tag
+    // Only apply client-side as fallback when NOT server-injected
     if (db.blockFeatures && db.blockFeatures.length > 0) {
+      if (!serverInjected) {
       db.blockFeatures.forEach(function(bf) {
         if (!bf.element_order || !Array.isArray(bf.element_order) || bf.element_order.length === 0) return;
         var sectionId = bf.key.replace(/_/g, '-');
         var section = document.querySelector('[data-section-id="' + sectionId + '"]');
         if (!section) return;
-        var container = section.querySelector('.container') || section;
         
-        // Find the main flex/grid wrapper inside container (e.g. .about-grid, .guarantee-card, .hero-grid)
-        // or use container itself if no wrapper found
-        var wrappers = container.querySelectorAll('.about-grid, .guarantee-card, .hero-grid, .buyout-detail');
-        var flexTargets = wrappers.length > 0 ? Array.from(wrappers) : [container];
+        // Determine photo vs text position
+        var photoIdx = bf.element_order.indexOf('photo');
+        var textPositions = ['title', 'texts', 'stats', 'buttons'].map(function(t) { return bf.element_order.indexOf(t); }).filter(function(i) { return i >= 0; });
+        var minTextPos = textPositions.length > 0 ? Math.min.apply(null, textPositions) : 999;
+        var photoBeforeText = photoIdx >= 0 && photoIdx < minTextPos;
         
-        // Convert each wrapper to flex column so CSS order works
-        flexTargets.forEach(function(w) {
-          w.style.display = 'flex';
-          w.style.flexDirection = 'column';
-        });
-        
-        // Map element types to selectors — for DIRECT children of wrappers
-        var typeMap = {
-          'photo': '.about-img, .hero-image, .guarantee-card > img, .wh-grid, .block-photo-gallery, img.section-photo, .wh-item',
-          'title': '.section-header, h2, h1, .hero-badge, .buyout-detail-header, .section-badge, .wb-official-badge',
-          'stats': '.hero-stats, .stats-grid, .block-slot-counter',
-          'texts': '.about-text, .hero-desc, p.section-sub, .why-block, .why-steps, .process-grid, .buyout-grid, .highlight-result, .about-highlight, .g-list, .g-badge, p, ul, ol, .faq-list, .compare-box, .svc-card, .buyout-card',
-          'buttons': '.section-cta, .hero-buttons',
-          'socials': '.block-socials, .footer-socials'
-        };
-        
-        // Apply order to elements found in ANY of the flex containers
-        bf.element_order.forEach(function(elType, orderIdx) {
-          var selString = typeMap[elType];
-          if (!selString) return;
+        // Section-specific: work with DIRECT children of grid/flex containers
+        if (sectionId === 'hero') {
+          var heroGrid = section.querySelector('.hero-grid');
+          if (heroGrid) {
+            heroGrid.style.display = 'flex';
+            heroGrid.style.flexDirection = 'column';
+            var heroTextDiv = heroGrid.querySelector(':scope > div:not(.hero-image)');
+            var heroImg = heroGrid.querySelector('.hero-image');
+            if (heroTextDiv) heroTextDiv.style.order = photoBeforeText ? '1' : '0';
+            if (heroImg) heroImg.style.order = photoBeforeText ? '0' : '1';
+          }
+        } else if (sectionId === 'about') {
+          var aboutGrid = section.querySelector('.about-grid');
+          if (aboutGrid) {
+            aboutGrid.style.display = 'flex';
+            aboutGrid.style.flexDirection = 'column';
+            var aboutText = aboutGrid.querySelector('.about-text');
+            var aboutImg = aboutGrid.querySelector('.about-img');
+            if (aboutText) aboutText.style.order = photoBeforeText ? '1' : '0';
+            if (aboutImg) aboutImg.style.order = photoBeforeText ? '0' : '1';
+          }
+        } else if (sectionId === 'guarantee') {
+          var gCard = section.querySelector('.guarantee-card');
+          if (gCard) {
+            gCard.style.display = 'flex';
+            gCard.style.flexDirection = 'column';
+            var gTextDiv = gCard.querySelector(':scope > div');
+            var gImg = gCard.querySelector(':scope > img');
+            if (gTextDiv) gTextDiv.style.order = photoBeforeText ? '1' : '0';
+            if (gImg) gImg.style.order = photoBeforeText ? '0' : '1';
+          }
+        } else {
+          // Generic: apply to container
+          var container = section.querySelector('.container') || section;
+          container.style.display = 'flex';
+          container.style.flexDirection = 'column';
           
-          // Search in main container AND all sub-wrappers
-          var allSearchAreas = [container].concat(flexTargets);
-          var applied = {};
-          allSearchAreas.forEach(function(area) {
+          var typeMap = {
+            'photo': '.block-photo-gallery, img.section-photo, .wh-grid, .wh-item',
+            'title': '.section-header, h2, h1',
+            'stats': '.stats-grid, .block-slot-counter',
+            'texts': 'p.section-sub, .why-block, .why-steps, .process-grid, .buyout-grid, .faq-list, .compare-box',
+            'buttons': '.section-cta',
+            'socials': '.block-socials'
+          };
+          
+          bf.element_order.forEach(function(elType, orderIdx) {
+            var selString = typeMap[elType];
+            if (!selString) return;
             try {
-              var targets = area.querySelectorAll(selString);
-              targets.forEach(function(t) {
-                // Skip if already ordered (prevent duplicates from multiple search areas)
-                if (applied[t.tagName + t.className]) return;
-                applied[t.tagName + t.className] = true;
+              container.querySelectorAll(selString).forEach(function(t) {
                 t.style.order = String(orderIdx);
               });
             } catch(e) {}
           });
-        });
+        }
+        
         console.log('[DB] Element order applied for:', sectionId, bf.element_order);
       });
-      console.log('[DB] Element order applied');
+      console.log('[DB] Element order applied (client-side fallback)');
+      } else {
+        console.log('[DB] Element order already server-injected via CSS');
+      }
     }
     
     // Clear reviews placeholder if no photos were injected — hide completely
@@ -5045,7 +5100,8 @@ async function checkRefCode() {
   // Mark as server-injected and apply text replacements if we have changes
   const hasTextChanges = Object.keys(textMap).length > 0;
   const hasButtonChanges = Object.keys(buttonMap).length > 0;
-  if (hasTextChanges || hasButtonChanges) {
+  const hasAnyServerChanges = hasTextChanges || hasButtonChanges || Object.keys(styleMap).length > 0 || Object.keys(orderMap).length > 0;
+  if (hasAnyServerChanges) {
     pageHtml = pageHtml.replace('<html lang="ru">', '<html lang="ru" class="server-injected">');
   }
   
@@ -5135,6 +5191,124 @@ async function checkRefCode() {
       .transform(btnResponse);
     
     pageHtml = await btnRewritten.text();
+  }
+  
+  // ===== SERVER-SIDE CSS INJECTION for text_styles + element_order =====
+  // Generate a <style> block with text colors/sizes and mobile element ordering
+  // This prevents the "flash of unstyled content" (FOUC) for colors and element order
+  const hasStyleChanges = Object.keys(styleMap).length > 0;
+  const hasOrderChanges = Object.keys(orderMap).length > 0;
+  
+  if (hasStyleChanges || hasOrderChanges) {
+    let cssRules: string[] = [];
+    
+    // 1. Text styles (color, size) — target elements by data-ru attribute value
+    if (hasStyleChanges) {
+      for (const [blockKey, data] of Object.entries(styleMap)) {
+        const sectionId = blockKey.replace(/_/g, '-');
+        for (let i = 0; i < data.styles.length; i++) {
+          const st = data.styles[i];
+          if (!st || (!st.color && !st.size)) continue;
+          const textRu = (data.texts_ru[i] || '').trim();
+          if (!textRu) continue;
+          // CSS attribute selector — escape special chars for CSS
+          const escapedRu = textRu.replace(/\\/g, '\\\\\\\\').replace(/"/g, '\\\\"').replace(/\n/g, '\\\\a ');
+          const props: string[] = [];
+          if (st.color) props.push(`color:${st.color}!important`);
+          if (st.size) props.push(`font-size:${st.size}!important`);
+          cssRules.push(`[data-section-id="${sectionId}"] [data-ru="${escapedRu}"]{${props.join(';')}}`);
+        }
+      }
+    }
+    
+    // 2. Element order — generate CSS for mobile layout ordering
+    // IMPORTANT: CSS order only works on DIRECT children of flex containers.
+    // For sections with 2-column grid layout (hero-grid, about-grid, guarantee-card),
+    // direct children are: text-wrapper and photo-wrapper.
+    // We determine photo position relative to text and apply order accordingly.
+    if (hasOrderChanges) {
+      let orderCss: string[] = [];
+      
+      for (const [blockKey, order] of Object.entries(orderMap)) {
+        const sectionId = blockKey.replace(/_/g, '-');
+        
+        // Find the position of 'photo' in the order array
+        const photoIdx = order.indexOf('photo');
+        const titleIdx = order.indexOf('title');
+        const textsIdx = order.indexOf('texts');
+        
+        // Determine if photo should come before or after text content
+        // Text content = min position of title, texts, stats, buttons
+        const textPositions = ['title', 'texts', 'stats', 'buttons']
+          .map(t => order.indexOf(t))
+          .filter(i => i >= 0);
+        const minTextPos = textPositions.length > 0 ? Math.min(...textPositions) : 999;
+        
+        const photoBeforeText = photoIdx >= 0 && photoIdx < minTextPos;
+        
+        // Section-specific CSS for grid layouts
+        if (sectionId === 'hero') {
+          // hero-grid has 2 direct children: <div> (text container) and .hero-image
+          if (photoBeforeText) {
+            orderCss.push(`[data-section-id="hero"] .hero-grid>div:first-child{order:1!important}`);
+            orderCss.push(`[data-section-id="hero"] .hero-image{order:0!important}`);
+          } else {
+            orderCss.push(`[data-section-id="hero"] .hero-grid>div:first-child{order:0!important}`);
+            orderCss.push(`[data-section-id="hero"] .hero-image{order:1!important}`);
+          }
+        } else if (sectionId === 'about') {
+          // about-grid has .about-text and .about-img
+          if (photoBeforeText) {
+            orderCss.push(`[data-section-id="about"] .about-text{order:1!important}`);
+            orderCss.push(`[data-section-id="about"] .about-img{order:0!important}`);
+          } else {
+            orderCss.push(`[data-section-id="about"] .about-text{order:0!important}`);
+            orderCss.push(`[data-section-id="about"] .about-img{order:1!important}`);
+          }
+        } else if (sectionId === 'guarantee') {
+          // guarantee-card has <div> (text) and <img> (photo)
+          if (photoBeforeText) {
+            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>div{order:1!important}`);
+            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>img{order:0!important}`);
+          } else {
+            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>div{order:0!important}`);
+            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>img{order:1!important}`);
+          }
+        } else {
+          // Generic sections: use container > * selectors
+          // Map element types to selectors that are typically direct children
+          const typeSelectors: Record<string, string[]> = {
+            'photo': ['.block-photo-gallery', 'img.section-photo', '.wh-grid', '.wh-item'],
+            'title': ['.section-header', 'h2', 'h1'],
+            'stats': ['.stats-grid', '.block-slot-counter'],
+            'texts': ['p.section-sub', '.why-block', '.why-steps', '.process-grid', '.buyout-grid', '.faq-list', '.compare-box'],
+            'buttons': ['.section-cta'],
+            'socials': ['.block-socials']
+          };
+          
+          order.forEach((elType: string, idx: number) => {
+            const selectors = typeSelectors[elType];
+            if (!selectors) return;
+            selectors.forEach(sel => {
+              orderCss.push(`[data-section-id="${sectionId}"] ${sel}{order:${idx}!important}`);
+            });
+          });
+          
+          // Ensure container is flex column for ordering to work
+          orderCss.push(`[data-section-id="${sectionId}"] .container{display:flex!important;flex-direction:column}`);
+        }
+      }
+      
+      if (orderCss.length > 0) {
+        // Wrap in media query for mobile only (same breakpoint as existing mobile CSS)
+        cssRules.push(`@media(max-width:768px){${orderCss.join('')}}`);
+      }
+    }
+    
+    if (cssRules.length > 0) {
+      const styleTag = `<style id="server-styles">${cssRules.join('')}</style></head>`;
+      pageHtml = pageHtml.replace('</head>', styleTag);
+    }
   }
   
   // Use HTMLRewriter to replace texts by matching data-ru attribute values against textMap
