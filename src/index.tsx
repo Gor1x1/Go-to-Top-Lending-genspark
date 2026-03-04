@@ -3738,6 +3738,22 @@ switchLang = function(l) {
         _existingSectionIds[sid.replace(/-/g, '_')] = true;
         _existingSectionIds[sid.replace(/_/g, '-')] = true;
       });
+      // Resolve button icon: manual > auto-detect from URL > default
+      function resolveIcon(ic, url) {
+        var defs = ['fas fa-link','fas fa-arrow-right',''];
+        if (ic && defs.indexOf(ic) < 0) return ic;
+        if (url) {
+          if (url.indexOf('t.me/')>=0||url.indexOf('telegram.')>=0) return 'fab fa-telegram';
+          if (url.indexOf('wa.me/')>=0||url.indexOf('whatsapp.')>=0) return 'fab fa-whatsapp';
+          if (url.indexOf('instagram.com')>=0) return 'fab fa-instagram';
+          if (url.indexOf('facebook.com')>=0) return 'fab fa-facebook';
+          if (url.indexOf('tiktok.com')>=0) return 'fab fa-tiktok';
+          if (url.indexOf('youtube.com')>=0) return 'fab fa-youtube';
+          if (url.indexOf('#calc')>=0) return 'fas fa-calculator';
+          if (url.indexOf('tel:')>=0) return 'fas fa-phone';
+        }
+        return ic || 'fas fa-link';
+      }
       db.blockFeatures.forEach(function(bf) {
         if (bf.key === 'floating_tg' || bf.key === 'footer' || bf.block_type === 'floating' || bf.block_type === 'footer' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup') return;
         
@@ -4246,22 +4262,6 @@ switchLang = function(l) {
         // Slot counter injection removed — now handled as separate block type 'slot_counter'
 
         // Dynamic buttons: update CTA buttons in section from DB
-        // Resolve button icon: manual > auto-detect from URL > default
-        function resolveIcon(ic, url) {
-          var defs = ['fas fa-link','fas fa-arrow-right',''];
-          if (ic && defs.indexOf(ic) < 0) return ic;
-          if (url) {
-            if (url.indexOf('t.me/')>=0||url.indexOf('telegram.')>=0) return 'fab fa-telegram';
-            if (url.indexOf('wa.me/')>=0||url.indexOf('whatsapp.')>=0) return 'fab fa-whatsapp';
-            if (url.indexOf('instagram.com')>=0) return 'fab fa-instagram';
-            if (url.indexOf('facebook.com')>=0) return 'fab fa-facebook';
-            if (url.indexOf('tiktok.com')>=0) return 'fab fa-tiktok';
-            if (url.indexOf('youtube.com')>=0) return 'fab fa-youtube';
-            if (url.indexOf('#calc')>=0) return 'fas fa-calculator';
-            if (url.indexOf('tel:')>=0) return 'fas fa-phone';
-          }
-          return ic || 'fas fa-link';
-        }
         if (bf.buttons && bf.buttons.length > 0) {
           var sectionIdH = bf.key.replace(/_/g, '-');
           
