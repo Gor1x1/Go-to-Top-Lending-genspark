@@ -10259,7 +10259,7 @@ function renderSiteBlocks() {
         }
         h += '</div></details>';
 
-        // ── CALCULATOR EDITOR (compact — only title texts + link) ──
+        // ── CALCULATOR EDITOR (full — all texts + buttons + link) ──
         var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
         if (isCalcBlock) {
           h += '<div style="margin-bottom:16px;padding:16px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);border-radius:10px">';
@@ -10268,13 +10268,14 @@ function renderSiteBlocks() {
             '<h4 style="font-size:0.95rem;font-weight:700;color:#a78bfa">Блок калькулятора</h4>' +
           '</div>';
           
-          // Show only first 2 texts (heading + subheading)
-          var calcTextsCount = Math.min(maxTexts, 2);
+          // Show ALL calculator texts (heading, subheading, description, promo label, total label, etc.)
+          var calcTextLabels = ['Заголовок секции', 'Подзаголовок', 'Описание', 'Надпись «Итого»', 'Промокод (лейбл)', 'Кнопка «Применить»'];
+          var calcTextsCount = Math.max(maxTexts, calcTextLabels.length);
           for (var ti = 0; ti < calcTextsCount; ti++) {
             var ruText = (ti < textsRu.length ? textsRu[ti] : '') || '';
             var amText = (ti < textsAm.length ? textsAm[ti] : '') || '';
             var isLong = ruText.length > 100 || amText.length > 100;
-            var fieldLabel = ti === 0 ? 'Заголовок секции' : 'Подзаголовок';
+            var fieldLabel = ti < calcTextLabels.length ? calcTextLabels[ti] : 'Текст ' + (ti + 1);
             h += '<div class="sb-text-pair" style="margin-bottom:10px">';
             h += '<div class="sb-text-pair-num">' + fieldLabel + '</div>';
             h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
@@ -10292,6 +10293,48 @@ function renderSiteBlocks() {
             }
             h += '</div></div>';
           }
+          
+          // ── Calculator buttons section ──
+          h += '<div style="margin-top:14px;margin-bottom:14px">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">' +
+            '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-hand-pointer" style="color:#a78bfa;margin-right:6px"></i>Кнопки калькулятора <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + btnsCount + ')</span></h4>' +
+            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddButton(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Кнопка</button>' +
+          '</div>';
+          for (var bti = 0; bti < (b.buttons || []).length; bti++) {
+            var btn = b.buttons[bti];
+            var displayIcon = sbResolveButtonIcon(btn.icon, btn.url);
+            h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
+            h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+            // Move arrows
+            h += '<div style="display:flex;flex-direction:column;gap:0">';
+            if (bti > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:0 2px;font-size:0.65rem;line-height:1" onclick="sbMoveButton(' + b.id + ',' + bti + ',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
+            if (bti < (b.buttons || []).length - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:0 2px;font-size:0.65rem;line-height:1" onclick="sbMoveButton(' + b.id + ',' + bti + ',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
+            h += '</div>';
+            h += '<div style="min-width:36px;text-align:center"><i class="' + escHtml(displayIcon) + '" style="color:#8B5CF6;font-size:0.9rem"></i></div>';
+            if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;text_ru&apos;,this.value);sbAutoSave(' + b.id + ')">';
+            if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="AM" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;text_am&apos;,this.value);sbAutoSave(' + b.id + ')">';
+            h += '<button class="tier-del-btn" style="position:static;flex-shrink:0" onclick="sbRemoveButton(' + b.id + ',' + bti + ')"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+            // Collapsible settings
+            h += '<details style="margin-top:6px"><summary style="font-size:0.70rem;color:#64748b;cursor:pointer;user-select:none"><i class="fas fa-cog" style="margin-right:4px"></i>URL и иконка</summary>';
+            h += '<div style="margin-top:8px;display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end">';
+            h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">URL</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/..." style="font-size:0.78rem" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;url&apos;,this.value);sbAutoSave(' + b.id + ')"></div>';
+            var iconOptions = [{v:'fab fa-telegram',l:'Telegram'},{v:'fab fa-whatsapp',l:'WhatsApp'},{v:'fas fa-calculator',l:'Калькулятор'},{v:'fas fa-rocket',l:'Ракета'},{v:'fas fa-arrow-right',l:'Стрелка'},{v:'fas fa-file-pdf',l:'PDF'},{v:'fas fa-gift',l:'Подарок'},{v:'fas fa-fire',l:'Огонь'},{v:'fas fa-check-circle',l:'Галочка'},{v:'fas fa-shopping-cart',l:'Корзина'}];
+            var currentIcon = btn.icon || 'fas fa-arrow-right';
+            h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Иконка</div><select class="input" id="sb_btnicon_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;icon&apos;,this.value);sbAutoSave(' + b.id + ')">';
+            for (var ici = 0; ici < iconOptions.length; ici++) {
+              h += '<option value="' + iconOptions[ici].v + '"' + (currentIcon === iconOptions[ici].v ? ' selected' : '') + '>' + iconOptions[ici].l + '</option>';
+            }
+            var iconInList = iconOptions.some(function(io) { return io.v === currentIcon; });
+            if (!iconInList && currentIcon) h += '<option value="' + escHtml(currentIcon) + '" selected>' + escHtml(currentIcon) + '</option>';
+            h += '</select></div>';
+            h += '</div></details>';
+            h += '</div>';
+          }
+          if ((b.buttons || []).length === 0) {
+            h += '<div style="font-size:0.78rem;color:#475569;padding:8px;text-align:center;border:1px dashed #293548;border-radius:8px">Нет кнопок. Нажмите + чтобы добавить.</div>';
+          }
+          h += '</div>';
           
           // Link to calculator settings page
           h += '<div style="margin-top:12px;padding:12px;background:#1a2236;border:1px solid #293548;border-radius:8px;display:flex;align-items:center;justify-content:between;gap:12px;cursor:pointer" onclick="navigate(&apos;calculator&apos;)">';
@@ -11694,6 +11737,15 @@ async function sbSaveBlock(id) {
   // Collect texts
   var newRu = [], newAm = [];
   var maxTexts = Math.max((b.texts_ru || []).length, (b.texts_am || []).length);
+  // For calculator blocks, also check for additional text fields that may have been rendered
+  var isCalc = (b.block_key === 'calculator' || b.block_type === 'calculator');
+  if (isCalc) {
+    for (var ci = maxTexts; ci < 20; ci++) {
+      if (document.getElementById('sb_tru_' + id + '_' + ci) || document.getElementById('sb_tam_' + id + '_' + ci)) {
+        maxTexts = ci + 1;
+      } else { break; }
+    }
+  }
   for (var ti = 0; ti < maxTexts; ti++) {
     var ruEl = document.getElementById('sb_tru_' + id + '_' + ti);
     var amEl = document.getElementById('sb_tam_' + id + '_' + ti);

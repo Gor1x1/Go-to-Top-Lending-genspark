@@ -1539,7 +1539,8 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     'client_reviews': [{text_ru: 'Начать сейчас', text_am: 'Սկսել հիմա', icon: 'fab fa-whatsapp'}],
     'contact': [{text_ru: 'Отправить заявку', text_am: 'Ughарkel hayty', icon: 'fas fa-paper-plane'}],
     'floating_tg': [{text_ru: 'Написать нам', text_am: 'Гrel mez', icon: 'fab fa-telegram'}],
-    'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Ստandsanal hashvark Telegram-ov', icon: 'fab fa-telegram'}]
+    'popup': [{text_ru: 'Получить расчёт в Telegram', text_am: 'Ստandsanal hashvark Telegram-ov', icon: 'fab fa-telegram'}],
+    'calculator': [{text_ru: 'Заказать в Telegram', text_am: 'Պատվիրել հիմա', icon: 'fab fa-telegram'}]
   };
   
   // Load section order for visibility
@@ -1594,13 +1595,34 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     
     const textsRu: string[] = [];
     const textsAm: string[] = [];
-    for (let ti = 0; ti < useItems.length; ti++) {
-      const ruText = (useItems[ti] as any).ru || '';
-      const amText = (useItems[ti] as any).am || '';
-      // Skip items that match button labels (they belong in buttons, not texts)
-      if (btnTextLabels.has(ruText.trim())) continue;
-      textsRu.push(ruText);
-      textsAm.push(amText);
+    
+    // For calculator block: only store 6 structural texts (title, subtitle, description, total, promo, apply)
+    // The remaining texts (tab names, service names, prices) are managed via site_content + calculator_tabs/services
+    if (key === 'calculator') {
+      // Calculator structural text defaults (matching positions used by admin panel & client)
+      const calcDefaults = [
+        { ru: 'Калькулятор', am: 'Հաշվիչ' },
+        { ru: 'Рассчитайте стоимость услуг', am: 'Հաշվեք ծառայությունների արժեքը' },
+        { ru: 'Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.', am: 'Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:' },
+        { ru: 'Итого:', am: 'Ընդամենը:' },
+        { ru: 'Есть промокод?', am: 'Պրոմոկոդ ունեք?' },
+        { ru: 'Применить', am: 'Կիրառել' }
+      ];
+      for (const cd of calcDefaults) {
+        // Try to find updated text from DB items (by exact match on original ru)
+        const dbMatch = useItems.find((it: any) => (it as any).ru === cd.ru);
+        textsRu.push(dbMatch ? (dbMatch as any).ru : cd.ru);
+        textsAm.push(dbMatch ? (dbMatch as any).am : cd.am);
+      }
+    } else {
+      for (let ti = 0; ti < useItems.length; ti++) {
+        const ruText = (useItems[ti] as any).ru || '';
+        const amText = (useItems[ti] as any).am || '';
+        // Skip items that match button labels (they belong in buttons, not texts)
+        if (btnTextLabels.has(ruText.trim())) continue;
+        textsRu.push(ruText);
+        textsAm.push(amText);
+      }
     }
     
     for (const btnDef of secBtns) {

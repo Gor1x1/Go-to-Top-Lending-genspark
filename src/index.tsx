@@ -1066,6 +1066,9 @@ app.get('/', async (c) => {
         } catch {}
       } catch { /* skip */ }
     }
+    
+    // Calculator texts are handled client-side via blockFeatures (not via textMap/HTMLRewriter)
+    // The HTMLRewriter skips the calculator section to avoid site_content positional corruption
   } catch (e) {
     // If DB fails, serve original HTML without modifications
   }
@@ -4441,6 +4444,57 @@ switchLang = function(l) {
       });
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
       
+      // ===== APPLY CALCULATOR BUTTONS (separate from main loop which skips calculator) =====
+      var calcBf = db.blockFeatures.find(function(b) { return b.key === 'calculator' || b.block_type === 'calculator'; });
+      if (calcBf && calcBf.buttons && calcBf.buttons.length > 0) {
+        var calcSec = document.getElementById('calculator');
+        if (calcSec) {
+          var calcTgBtn = document.getElementById('calcTgBtn');
+          if (calcTgBtn && calcBf.buttons[0]) {
+            var cBtn = calcBf.buttons[0];
+            if (cBtn.url) calcTgBtn.setAttribute('href', cBtn.url);
+            var cSpn = calcTgBtn.querySelector('span[data-ru]');
+            if (cSpn) {
+              if (cBtn.text_ru) cSpn.setAttribute('data-ru', cBtn.text_ru);
+              if (cBtn.text_am) cSpn.setAttribute('data-am', cBtn.text_am);
+              var cTxt = lang === 'am' && cBtn.text_am ? cBtn.text_am : (cBtn.text_ru || '');
+              if (cTxt) cSpn.textContent = cTxt;
+            }
+            var cIco = calcTgBtn.querySelector('i');
+            if (cIco && cBtn.icon) cIco.className = resolveIcon(cBtn.icon, cBtn.url);
+          }
+          console.log('[DB] Calculator buttons applied:', calcBf.buttons.length);
+        }
+      }
+      
+      // ===== APPLY CALCULATOR TEXTS from blockFeatures =====
+      if (calcBf && calcBf.texts_ru && calcBf.texts_ru.length > 2) {
+        var calcSec2 = document.getElementById('calculator');
+        if (calcSec2) {
+          // texts[2] = description (section-sub), texts[3] = total label, texts[4] = promo label, texts[5] = apply button
+          var calcTextMap = [
+            null, null, // 0,1 handled by server textMap
+            { sel: '.section-sub', attr: 'data-ru' },
+            { sel: '.calc-total-label', attr: 'data-ru' },
+            { sel: '#calcRefWrap label span', attr: 'data-ru' },
+            { sel: '#calcRefWrap button span', attr: 'data-ru' }
+          ];
+          for (var cti = 2; cti < calcBf.texts_ru.length && cti < calcTextMap.length; cti++) {
+            var cMap = calcTextMap[cti];
+            if (!cMap) continue;
+            var cEl = calcSec2.querySelector(cMap.sel);
+            if (!cEl) continue;
+            var cRu = calcBf.texts_ru[cti] || '';
+            var cAm = (calcBf.texts_am && calcBf.texts_am[cti]) || '';
+            if (cRu) cEl.setAttribute('data-ru', cRu);
+            if (cAm) cEl.setAttribute('data-am', cAm);
+            var cText2 = lang === 'am' && cAm ? cAm : (cRu || '');
+            if (cText2) cEl.textContent = cText2;
+          }
+          console.log('[DB] Calculator texts applied from blockFeatures');
+        }
+      }
+      
       // ===== APPLY NAV LINKS from blockFeatures (nav block) =====
       var navBf = db.blockFeatures.find(function(b) { return b.key === 'nav'; });
       if (navBf && navBf.nav_links && navBf.nav_links.length > 0) {
@@ -5275,10 +5329,6 @@ async function checkRefCode() {
         element(el) {
           if (!currentSection || sectionDepth <= 0) return;
           
-          // Skip calc button (has id)
-          const id = el.getAttribute('id') || '';
-          if (id === 'calcTgBtn') return;
-          
           // Skip buttons that are internal links (like #calculator)
           const href = el.getAttribute('href') || '';
           
@@ -5538,17 +5588,30 @@ async function checkRefCode() {
   }
   
   // Use HTMLRewriter to replace texts by matching data-ru attribute values against textMap
+  // Skip calculator section: its texts are managed via site_blocks.texts_ru,
+  // and site_content positional matching can corrupt calculator structural elements
   if (hasTextChanges) {
     const response = new Response(pageHtml, {
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
     
+    // Track current section via data-section-id to skip calculator
+    let currentTextSection = '';
+    
     const rewritten = new HTMLRewriter()
+      .on('[data-section-id]', {
+        element(el) {
+          currentTextSection = el.getAttribute('data-section-id') || '';
+        }
+      })
       // Process all elements with data-ru attribute
       .on('[data-ru]', {
         element(el) {
           const currentRu = el.getAttribute('data-ru') || '';
           if (!currentRu) return;
+          
+          // Skip replacement inside calculator section
+          if (currentTextSection === 'calculator') return;
           
           // Look up this element's data-ru text in textMap
           const replacement = textMap[currentRu];
