@@ -2289,7 +2289,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       </div>
       <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
     </div>
-    <div class="calc-cta">
+    <div class="calc-cta" style="display:none">
       <a href="https://t.me/goo_to_top" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
         <i class="fab fa-telegram"></i>
         <span data-ru="Заказать в Telegram" data-am="Պատվիրել հիմա">Заказать сейчас</span>
@@ -4447,6 +4447,7 @@ switchLang = function(l) {
       
       // ===== APPLY CALCULATOR BUTTONS (separate from main loop which skips calculator) =====
       var calcBf = db.blockFeatures.find(function(b) { return b.key === 'calculator' || b.block_type === 'calculator'; });
+      var calcCtaWrap = document.querySelector('.calc-cta');
       if (calcBf && calcBf.buttons && calcBf.buttons.length > 0) {
         var calcSec = document.getElementById('calculator');
         if (calcSec) {
@@ -4464,8 +4465,13 @@ switchLang = function(l) {
             var cIco = calcTgBtn.querySelector('i');
             if (cIco && cBtn.icon) cIco.className = resolveIcon(cBtn.icon, cBtn.url);
           }
+          // Show the calc-cta wrapper (hidden by default)
+          if (calcCtaWrap) calcCtaWrap.style.display = '';
           console.log('[DB] Calculator buttons applied:', calcBf.buttons.length);
         }
+      } else {
+        // No buttons in DB — keep calc-cta hidden
+        if (calcCtaWrap) calcCtaWrap.style.display = 'none';
       }
       
       // ===== APPLY CALCULATOR TEXTS from blockFeatures =====
@@ -4503,31 +4509,80 @@ switchLang = function(l) {
       
       // ===== APPLY NAV LINKS from blockFeatures (nav block) =====
       var navBf = db.blockFeatures.find(function(b) { return b.key === 'nav'; });
-      if (navBf && navBf.nav_links && navBf.nav_links.length > 0) {
+      if (navBf && navBf.texts_ru && navBf.texts_ru.length > 0) {
         var navUl = document.getElementById('navLinks');
         if (navUl) {
-          var navItems = navUl.querySelectorAll('li:not(.nav-mobile-cta) a');
-          navBf.nav_links.forEach(function(nl) {
-            if (nl.target === '_telegram' || nl.target === '_cta') return; // skip CTA links
-            var link = navItems[nl.idx];
-            if (link) {
-              var target = (nl.target || '').replace(/_/g, '-');
-              if (target && target !== '_telegram' && target !== '_cta') {
-                link.setAttribute('href', '#' + target);
-              }
-            }
-          });
-          // Also update nav text labels from DB texts
-          if (navBf.texts_ru && navBf.texts_ru.length > 0) {
-            for (var ni = 0; ni < navItems.length && ni < navBf.texts_ru.length; ni++) {
-              var navLink = navItems[ni];
-              if (navBf.texts_ru[ni]) navLink.setAttribute('data-ru', navBf.texts_ru[ni]);
-              if (navBf.texts_am && navBf.texts_am[ni]) navLink.setAttribute('data-am', navBf.texts_am[ni]);
-              var txt = navLink.getAttribute('data-' + lang);
-              if (txt) navLink.textContent = txt;
+          // Build nav_links map: idx -> target
+          var navTargetMap = {};
+          if (navBf.nav_links) {
+            for (var nmi = 0; nmi < navBf.nav_links.length; nmi++) {
+              navTargetMap[navBf.nav_links[nmi].idx] = navBf.nav_links[nmi].target || '';
             }
           }
-          console.log('[DB] Nav links applied:', navBf.nav_links.length, 'items');
+          // Default section targets for original 7 items
+          var defaultTargets = ['about', 'services', 'calculator', 'warehouse', 'guarantee', 'faq', 'contact'];
+          
+          // Count valid nav items from DB (skip CTA-type)
+          var dbNavItems = [];
+          for (var ni = 0; ni < navBf.texts_ru.length; ni++) {
+            var ruText = navBf.texts_ru[ni] || '';
+            var amText = (navBf.texts_am && navBf.texts_am[ni]) || '';
+            if (!ruText && !amText) continue;
+            var target = navTargetMap[ni] || (ni < defaultTargets.length ? defaultTargets[ni] : '');
+            target = target.replace(/_/g, '-');
+            if (target === '_telegram' || target === '_cta') continue;
+            dbNavItems.push({ ru: ruText, am: amText, target: target });
+          }
+          
+          var existingLis = navUl.querySelectorAll('li:not(.nav-mobile-cta)');
+          
+          // If count matches — just update in place (no flash)
+          if (existingLis.length === dbNavItems.length) {
+            for (var ui = 0; ui < dbNavItems.length; ui++) {
+              var exA = existingLis[ui].querySelector('a');
+              if (!exA) continue;
+              var di = dbNavItems[ui];
+              if (di.target) exA.setAttribute('href', '#' + di.target);
+              exA.setAttribute('data-ru', di.ru);
+              exA.setAttribute('data-am', di.am);
+              var navTxt = lang === 'am' && di.am ? di.am : di.ru;
+              if (navTxt && exA.textContent !== navTxt) exA.textContent = navTxt;
+            }
+          } else {
+            // Count changed — rebuild nav items
+            for (var rli = 0; rli < existingLis.length; rli++) {
+              existingLis[rli].remove();
+            }
+            var ctaLi = navUl.querySelector('.nav-mobile-cta');
+            
+            for (var ci = 0; ci < dbNavItems.length; ci++) {
+              var d = dbNavItems[ci];
+              var li = document.createElement('li');
+              var a = document.createElement('a');
+              a.setAttribute('href', d.target ? '#' + d.target : '#');
+              a.setAttribute('data-ru', d.ru);
+              a.setAttribute('data-am', d.am);
+              a.textContent = lang === 'am' && d.am ? d.am : d.ru;
+              a.addEventListener('click', function(e) {
+                var href = this.getAttribute('href');
+                if (href && href.charAt(0) === '#' && href.length > 1) {
+                  e.preventDefault();
+                  var targetEl = document.getElementById(href.substring(1)) || document.querySelector('[data-section-id="' + href.substring(1) + '"]');
+                  if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    var navMenu = document.getElementById('navLinks');
+                    if (navMenu) navMenu.classList.remove('active');
+                    var hamburger = document.getElementById('hamburger');
+                    if (hamburger) hamburger.classList.remove('active');
+                  }
+                }
+              });
+              li.appendChild(a);
+              if (ctaLi) navUl.insertBefore(li, ctaLi);
+              else navUl.appendChild(li);
+            }
+          }
+          console.log('[DB] Nav links applied:', dbNavItems.length, 'items');
         }
       }
       
@@ -5435,6 +5490,15 @@ async function checkRefCode() {
       .transform(btnResponse);
     
     pageHtml = await btnRewritten.text();
+  }
+  
+  // ===== SERVER-SIDE CALC-CTA VISIBILITY =====
+  // Show .calc-cta if calculator has buttons in DB, otherwise keep hidden
+  if (buttonMap['calculator'] && buttonMap['calculator'].length > 0) {
+    pageHtml = pageHtml.replace(
+      '<div class="calc-cta" style="display:none">',
+      '<div class="calc-cta">'
+    );
   }
   
   // ===== SERVER-SIDE CSS INJECTION for text_styles + element_order =====

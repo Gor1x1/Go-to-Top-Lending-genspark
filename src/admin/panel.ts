@@ -10467,10 +10467,13 @@ function renderSiteBlocks() {
               // Only main site sections — clean list without copies, counters, tickers etc.
               var navSectionsList = [
                 { id: 'hero', label: 'Главная (Hero)' },
+                { id: 'wb-banner', label: 'Баннер WB' },
+                { id: 'stats-bar', label: 'Статистика' },
                 { id: 'about', label: 'О компании' },
                 { id: 'services', label: 'Наши услуги' },
                 { id: 'buyout-detail', label: 'Услуга выкупа' },
                 { id: 'why-buyouts', label: 'Почему это работает' },
+                { id: 'fifty-vs-fifty', label: '50/50 — Честный формат' },
                 { id: 'client-reviews', label: 'Отзывы клиентов' },
                 { id: 'wb-official', label: 'Официально (WB)' },
                 { id: 'calculator', label: 'Калькулятор' },
@@ -11147,6 +11150,20 @@ function sbRemoveTextPair(blockId, idx) {
   if (b.texts_am && idx < b.texts_am.length) b.texts_am.splice(idx, 1);
   if (b.images && idx < b.images.length) b.images.splice(idx, 1);
   if (b.text_styles && idx < b.text_styles.length) b.text_styles.splice(idx, 1);
+  // For nav block: also remove/reindex nav_links entries
+  if (b.block_key === 'nav') {
+    var opts = {};
+    try { opts = typeof b.custom_html === 'string' ? JSON.parse(b.custom_html || '{}') : (b.custom_html || {}); } catch(e) { opts = {}; }
+    if (opts.nav_links) {
+      // Remove the entry for this index
+      opts.nav_links = opts.nav_links.filter(function(nl) { return nl.idx !== idx; });
+      // Reindex: entries with idx > removed idx need idx-1
+      for (var ri = 0; ri < opts.nav_links.length; ri++) {
+        if (opts.nav_links[ri].idx > idx) opts.nav_links[ri].idx--;
+      }
+      b.custom_html = JSON.stringify(opts);
+    }
+  }
   render();
   sbAutoSave(blockId);
 }
