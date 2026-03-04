@@ -10512,9 +10512,9 @@ function renderSiteBlocks() {
           var displayIcon = sbResolveButtonIcon(btn.icon, btn.url);
           h += '<div style="min-width:36px;text-align:center"><i class="' + escHtml(displayIcon) + '" style="color:#8B5CF6;font-size:0.9rem"></i></div>';
           // Button text RU
-          if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbAutoSave(' + b.id + ')">';
+          if (showRu) h += '<input class="input" id="sb_btnru_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_ru) + '" placeholder="Текст кнопки (RU)" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;text_ru&apos;,this.value);sbAutoSave(' + b.id + ')">';
           // Button text AM
-          if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="AM" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbAutoSave(' + b.id + ')">';
+          if (showAm) h += '<input class="input" id="sb_btnam_' + b.id + '_' + bti + '" value="' + escHtml(btn.text_am) + '" placeholder="AM" style="font-size:0.82rem;flex:1;min-width:120px" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;text_am&apos;,this.value);sbAutoSave(' + b.id + ')">';
           // TG badge
           h += tgBadge;
           // Delete
@@ -10547,7 +10547,7 @@ function renderSiteBlocks() {
             {v:'fas fa-heart',l:'Сердце',c:'#EC4899'}
           ];
           var currentIcon = btn.icon || 'fas fa-arrow-right';
-          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="' + escHtml(displayIcon) + '" style="margin-right:4px;color:#8B5CF6"></i>Иконка</div><select class="input" id="sb_btnicon_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="' + escHtml(displayIcon) + '" style="margin-right:4px;color:#8B5CF6"></i>Иконка</div><select class="input" id="sb_btnicon_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;icon&apos;,this.value);sbAutoSave(' + b.id + ')">';
           for (var ici = 0; ici < iconOptions.length; ici++) {
             h += '<option value="' + iconOptions[ici].v + '"' + (currentIcon === iconOptions[ici].v ? ' selected' : '') + '>' + iconOptions[ici].l + '</option>';
           }
@@ -10557,14 +10557,7 @@ function renderSiteBlocks() {
             h += '<option value="' + escHtml(currentIcon) + '" selected>' + escHtml(currentIcon) + '</option>';
           }
           h += '</select></div>';
-          h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>URL</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/..." style="font-size:0.78rem;color:#60a5fa" onchange="sbAutoSave(' + b.id + ')"></div>';
-          h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Действие</div><select class="input" id="sb_btnact_' + b.id + '_' + bti + '" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">' +
-            '<option value="telegram"' + (btn.action_type === 'telegram' ? ' selected' : '') + '>Telegram</option>' +
-            '<option value="whatsapp"' + (btn.action_type === 'whatsapp' ? ' selected' : '') + '>WhatsApp</option>' +
-            '<option value="link"' + (btn.action_type === 'link' ? ' selected' : '') + '>Ссылка</option>' +
-            '<option value="calculator"' + (btn.action_type === 'calculator' ? ' selected' : '') + '>Калькулятор</option>' +
-            '<option value="lead_form"' + (btn.action_type === 'lead_form' ? ' selected' : '') + '>Создать лид</option>' +
-          '</select></div>';
+          h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>URL</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/..." style="font-size:0.78rem;color:#60a5fa" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;url&apos;,this.value);sbAutoSave(' + b.id + ')"></div>';
           h += '</div>';
           // Message templates
           h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:8px;margin-top:8px">';
@@ -11287,6 +11280,13 @@ function sbAddButton(blockId) {
   render();
 }
 
+// ── Instantly update a button field in JS object (before sbAutoSave timer fires) ──
+function sbUpdateBtnField(blockId, btnIdx, field, value) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b || !b.buttons || !b.buttons[btnIdx]) return;
+  b.buttons[btnIdx][field] = value;
+}
+
 // ── Remove button ──
 function sbRemoveButton(blockId, idx) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
@@ -11708,15 +11708,20 @@ async function sbSaveBlock(id) {
     var btnAm = document.getElementById('sb_btnam_' + id + '_' + bti);
     var btnUrl = document.getElementById('sb_btnurl_' + id + '_' + bti);
     var btnIcon = document.getElementById('sb_btnicon_' + id + '_' + bti);
-    var btnAct = document.getElementById('sb_btnact_' + id + '_' + bti);
     var btnMsgRu = document.getElementById('sb_btnmsg_ru_' + id + '_' + bti);
     var btnMsgAm = document.getElementById('sb_btnmsg_am_' + id + '_' + bti);
+    var urlVal = btnUrl ? btnUrl.value : (b.buttons[bti].url || '');
+    // Auto-detect action_type from URL
+    var autoAction = 'link';
+    if (urlVal.indexOf('t.me/') >= 0 || urlVal.indexOf('telegram.') >= 0) autoAction = 'telegram';
+    else if (urlVal.indexOf('wa.me/') >= 0 || urlVal.indexOf('whatsapp.') >= 0 || urlVal.indexOf('api.whatsapp.') >= 0) autoAction = 'whatsapp';
+    else if (urlVal.indexOf('#calculator') >= 0 || urlVal.indexOf('#calc') >= 0) autoAction = 'calculator';
     newBtns.push({
       text_ru: btnRu ? btnRu.value : (b.buttons[bti].text_ru || ''),
       text_am: btnAm ? btnAm.value : (b.buttons[bti].text_am || ''),
-      url: btnUrl ? btnUrl.value : (b.buttons[bti].url || ''),
+      url: urlVal,
       icon: btnIcon ? btnIcon.value : (b.buttons[bti].icon || 'fas fa-arrow-right'),
-      action_type: btnAct ? btnAct.value : (b.buttons[bti].action_type || 'telegram'),
+      action_type: autoAction,
       message_ru: btnMsgRu ? btnMsgRu.value : (b.buttons[bti].message_ru || ''),
       message_am: btnMsgAm ? btnMsgAm.value : (b.buttons[bti].message_am || '')
     });
