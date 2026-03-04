@@ -3235,8 +3235,10 @@ recalc = function() { if (window._calcServices) recalcDynamic(); else _origRecal
 
 // Update all messenger links (Telegram/WhatsApp) to match current language
 function updateMessengerIcon(a, url) {
+  // Skip if icon was manually set by admin (don't override user choice)
+  if (a.hasAttribute('data-icon-manual')) return;
   // Update icon to match messenger type
-  var icon = a.querySelector('i.fab');
+  var icon = a.querySelector('i.fab, i.fas');
   if (icon) {
     var isWa = url && (url.includes('wa.me') || url.includes('whatsapp'));
     icon.className = isWa ? 'fab fa-whatsapp' : 'fab fa-telegram';
@@ -4351,6 +4353,9 @@ switchLang = function(l) {
                   newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
                 }
                 newBtn.setAttribute('target', '_blank');
+                // Mark button if icon was manually set by admin
+                var _defs = ['fas fa-link','fas fa-arrow-right',''];
+                if (dbBtnNew.icon && _defs.indexOf(dbBtnNew.icon) < 0) newBtn.setAttribute('data-icon-manual', '1');
                 newBtn.innerHTML = '<i class="' + btnIconNew + '"></i> <span data-ru="' + (dbBtnNew.text_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (dbBtnNew.text_am||'').replace(/"/g,'&quot;') + '">' + btnTextNew + '</span>';
                 ctaContainer.appendChild(newBtn);
                 _injectedCount++;
@@ -4367,6 +4372,10 @@ switchLang = function(l) {
                 var eBtn = existingBtns[dbBtnIdx];
                 if (dbBtn2.url) eBtn.href = dbBtn2.url;
                 eBtn.setAttribute('target', '_blank');
+                // Mark button if icon was manually set by admin
+                var _defs2 = ['fas fa-link','fas fa-arrow-right',''];
+                if (dbBtn2.icon && _defs2.indexOf(dbBtn2.icon) < 0) eBtn.setAttribute('data-icon-manual', '1');
+                else eBtn.removeAttribute('data-icon-manual');
                 var eIcon = eBtn.querySelector('i');
                 if (eIcon) eIcon.className = btnIcon2;
                 var eSpan = eBtn.querySelector('span');
@@ -5261,14 +5270,28 @@ async function checkRefCode() {
           // Set target
           el.setAttribute('target', '_blank');
           
-          // Determine icon class
-          let iconClass = dbBtn.icon || 'fas fa-link';
-          if (dbBtn.url) {
+          // Determine icon class — DB value is PRIORITY, URL auto-detect only for defaults
+          let iconClass = dbBtn.icon || '';
+          const defaultIcons = ['fas fa-link', 'fas fa-arrow-right', ''];
+          const isDefaultIcon = defaultIcons.includes(iconClass);
+          
+          // Only auto-detect from URL if icon is default/empty
+          if (isDefaultIcon && dbBtn.url) {
             if (dbBtn.url.includes('wa.me') || dbBtn.url.includes('whatsapp')) {
               iconClass = 'fab fa-whatsapp';
             } else if (dbBtn.url.includes('t.me') || dbBtn.url.includes('telegram')) {
-              if (!iconClass || iconClass === 'fas fa-link') iconClass = 'fab fa-telegram';
+              iconClass = 'fab fa-telegram';
+            } else if (dbBtn.url.includes('instagram.com')) {
+              iconClass = 'fab fa-instagram';
+            } else if (dbBtn.url.includes('#calc')) {
+              iconClass = 'fas fa-calculator';
             }
+          }
+          if (!iconClass) iconClass = 'fas fa-link';
+          
+          // Mark button if icon was manually set (prevents updateMessengerIcon override)
+          if (!isDefaultIcon && dbBtn.icon) {
+            el.setAttribute('data-icon-manual', '1');
           }
           
           // Replace inner content with new icon + span
