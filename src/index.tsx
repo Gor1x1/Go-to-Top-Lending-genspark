@@ -1619,15 +1619,15 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .about-el-title{order:0}
   .about-el-texts{order:1}
   .about-el-buttons{order:2;width:100%;display:flex;flex-direction:column;align-items:center}
-  .about-img{order:3;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:auto;height:auto;aspect-ratio:auto}
-  .about-img img{width:100%;height:auto;min-height:auto;object-fit:cover;display:block;position:relative;border-radius:0}
+  .about-img{order:3;border-radius:12px;margin:0 auto;width:100%;position:relative;overflow:hidden;min-height:auto;height:auto;aspect-ratio:auto}
+  .about-img img{width:100%;height:auto;min-height:auto;object-fit:cover;display:block;position:relative;border-radius:12px}
   /* Hero: flex-column with orderable children (overridden by server element_order) */
   .hero-grid{display:flex!important;flex-direction:column;gap:24px}
   .hero-el-title{order:0}
   .hero-el-texts{order:1}
   .hero-el-stats{order:2;margin-bottom:0}
   .hero-el-buttons{order:3;width:100%;display:flex;flex-direction:column;align-items:center}
-  .hero-image{order:4;max-width:100%;margin:0 -14px;width:calc(100% + 28px)}
+  .hero-image{order:4;max-width:100%;margin:0 auto;width:100%}
   .hero-image img{height:auto;max-height:none;width:100%;aspect-ratio:auto;border-radius:12px;border:none}
   /* Guarantee: flex-column with orderable children (overridden by server element_order) */
   .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
@@ -1635,7 +1635,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .guarantee-el-texts{order:1}
   .guarantee-el-buttons{order:2;width:100%;display:flex;flex-direction:column;align-items:center}
   .guarantee-el-photo{order:3}
-  .guarantee-el-photo{margin:0 -14px;width:calc(100% + 28px)}
+  .guarantee-el-photo{margin:0 auto;width:100%}
   .guarantee-el-photo img,.guarantee-card > img{max-height:none;width:100%;height:auto;object-fit:cover;border-radius:12px}
   /* WB Official — proper block ordering on mobile */
   .why-block{display:flex;flex-direction:column}
@@ -3385,7 +3385,7 @@ switchLang = function(l) {
         if (!contentTexts || contentTexts.length === 0) return;
         // Skip injection for sections with structured HTML layouts
         // These sections have specific design (compare-box, why-steps, etc.) that plain text would break
-        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid');
+        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid, .calc-wrap');
         if (hasStructuredContent) return;
         // Collect ALL existing data-ru values in this section
         var existingRuValues = {};
