@@ -10269,7 +10269,7 @@ function renderSiteBlocks() {
           '</div>';
           
           // Show ALL calculator texts (heading, subheading, description, promo label, total label, etc.)
-          var calcTextLabels = ['Заголовок секции', 'Подзаголовок', 'Описание', 'Надпись «Итого»', 'Промокод (лейбл)', 'Кнопка «Применить»'];
+          var calcTextLabels = ['Заголовок секции', 'Подзаголовок', 'Описание', 'Надпись «Итого»', 'Промокод (лейбл)', 'Кнопка «Применить»', 'PDF-форма: заголовок', 'PDF-форма: плейсхолдер «Имя»', 'PDF-форма: плейсхолдер «Телефон»', 'PDF-форма: кнопка «Скачать КП»'];
           var calcTextsCount = Math.max(maxTexts, calcTextLabels.length);
           for (var ti = 0; ti < calcTextsCount; ti++) {
             var ruText = (ti < textsRu.length ? textsRu[ti] : '') || '';

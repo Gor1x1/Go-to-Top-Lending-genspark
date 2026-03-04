@@ -1606,7 +1606,11 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
         { ru: 'Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.', am: 'Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:' },
         { ru: 'Итого:', am: 'Ընդամենը:' },
         { ru: 'Есть промокод?', am: 'Պրոմոկոդ ունեք?' },
-        { ru: 'Применить', am: 'Կիրառել' }
+        { ru: 'Применить', am: 'Կիրառել' },
+        { ru: 'Скачать расчёт (PDF)', am: 'Ներբեռնել հաշվարկ (PDF)' },
+        { ru: 'Имя', am: 'Անուն' },
+        { ru: 'Телефон', am: 'Հեռախոս' },
+        { ru: 'Скачать КП (PDF)', am: 'Ներբեռնել ԿԱ (PDF)' }
       ];
       for (const cd of calcDefaults) {
         // Try to find updated text from DB items (by exact match on original ru)

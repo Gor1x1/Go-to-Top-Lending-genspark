@@ -4492,6 +4492,11 @@ switchLang = function(l) {
             if (cText2) cEl.textContent = cText2;
           }
           console.log('[DB] Calculator texts applied from blockFeatures');
+          
+          // ===== APPLY PDF FORM TEXTS from blockFeatures (texts[6]-[9]) =====
+          if (calcBf.texts_ru.length > 6 && typeof window._applyPdfTexts === 'function') {
+            window._applyPdfTexts(calcBf.texts_ru, calcBf.texts_am, lang);
+          }
         }
       }
       
@@ -5160,6 +5165,48 @@ async function checkRefCode() {
     '</button>';
 
   totalWrap.parentElement.insertBefore(formDiv, totalWrap.nextSibling);
+
+  // Register global callback for blockFeatures to update PDF form texts
+  window._applyPdfTexts = function(textsRu, textsAm, curLang) {
+    if (!textsRu) return;
+    // texts[6] = PDF form header
+    if (textsRu[6]) {
+      var hs = formDiv.querySelector('div > span[data-ru]');
+      if (hs) {
+        hs.setAttribute('data-ru', textsRu[6]);
+        if (textsAm && textsAm[6]) hs.setAttribute('data-am', textsAm[6]);
+        hs.textContent = curLang === 'am' && textsAm && textsAm[6] ? textsAm[6] : textsRu[6];
+      }
+    }
+    // texts[7] = Name placeholder
+    if (textsRu[7]) {
+      var ni = formDiv.querySelector('#pdfClientName');
+      if (ni) ni.placeholder = (curLang === 'am' && textsAm && textsAm[7] ? textsAm[7] : textsRu[7]) + ' *';
+    }
+    // texts[8] = Phone placeholder
+    if (textsRu[8]) {
+      var pi = formDiv.querySelector('#pdfClientPhone');
+      if (pi) pi.placeholder = (curLang === 'am' && textsAm && textsAm[8] ? textsAm[8] : textsRu[8]) + ' *';
+    }
+    // texts[9] = Download button label
+    if (textsRu[9]) {
+      var bs = formDiv.querySelector('#pdfDownloadBtn span[data-ru]');
+      if (bs) {
+        bs.setAttribute('data-ru', textsRu[9]);
+        if (textsAm && textsAm[9]) bs.setAttribute('data-am', textsAm[9]);
+        bs.textContent = curLang === 'am' && textsAm && textsAm[9] ? textsAm[9] : textsRu[9];
+      }
+    }
+    console.log('[DB] PDF form texts applied from blockFeatures');
+  };
+
+  // Helper: get current PDF button label from DOM (accounts for blockFeatures updates)
+  function _getPdfBtnLabel() {
+    var sp = document.querySelector('#pdfDownloadBtn span[data-ru]');
+    if (!sp) return lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c \u053f\u0531 (PDF)' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c \u041a\u041f (PDF)';
+    return sp.getAttribute('data-' + lang) || sp.textContent || sp.getAttribute('data-ru');
+  }
+
   var pdfBtn = document.getElementById('pdfDownloadBtn');
 
   pdfBtn.addEventListener('click', function() {
@@ -5222,7 +5269,7 @@ async function checkRefCode() {
       body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, clientName: clientName, clientContact: clientPhone, referralCode: refCode })
     }).then(function(r){ return r.json(); }).then(function(data) {
       pdfBtn.disabled = false;
-      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c \u053f\u0531 (PDF)' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c \u041a\u041f (PDF)');
+      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + _getPdfBtnLabel();
       /* Navigate to PDF page — works on ALL devices: Android WebView, iOS Safari, Desktop */
       /* CRITICAL: Use window.location.href instead of window.open() — popup blockers on iOS Safari
          and Android browsers (Chrome, Samsung Internet, WebView) block window.open() called
@@ -5234,7 +5281,7 @@ async function checkRefCode() {
     }).catch(function(e){
       console.error('PDF error:', e);
       pdfBtn.disabled = false;
-      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + (lang==='am' ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c \u053f\u0531 (PDF)' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c \u041a\u041f (PDF)');
+      pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + _getPdfBtnLabel();
     });
   });
 
