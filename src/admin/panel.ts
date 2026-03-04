@@ -10722,6 +10722,35 @@ function renderSiteBlocks() {
           h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddPhoto(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить фото (URL)</button>';
           h += '<label class="btn btn-primary" style="padding:4px 12px;font-size:0.72rem;cursor:pointer"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить с устройства<input type="file" accept="image/*" multiple style="display:none" onchange="sbUploadPhotoBatch(this,' + b.id + ')"></label>';
           h += '</div>';
+          
+          // ── Photo display settings ──
+          var ps = opts.photo_settings || {};
+          h += '<div style="margin-top:12px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid #1e293b">';
+          h += '<div style="font-size:0.72rem;color:#8B5CF6;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-sliders-h" style="margin-right:4px"></i>Настройки отображения фото</div>';
+          h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">';
+          // Max height (mobile)
+          h += '<div><label style="font-size:0.68rem;color:#64748b;display:block;margin-bottom:3px">Макс. высота, моб. (px)</label>';
+          h += '<input class="input" id="sb_ps_maxh_' + b.id + '" type="number" min="0" max="1200" step="10" value="' + (ps.max_height_mobile || 0) + '" placeholder="0 = авто" style="font-size:0.78rem;width:100%" onchange="sbAutoSave(' + b.id + ')"></div>';
+          // Max height (desktop)
+          h += '<div><label style="font-size:0.68rem;color:#64748b;display:block;margin-bottom:3px">Макс. высота, ПК (px)</label>';
+          h += '<input class="input" id="sb_ps_maxhd_' + b.id + '" type="number" min="0" max="1200" step="10" value="' + (ps.max_height_desktop || 0) + '" placeholder="0 = авто" style="font-size:0.78rem;width:100%" onchange="sbAutoSave(' + b.id + ')"></div>';
+          // Object fit
+          h += '<div><label style="font-size:0.68rem;color:#64748b;display:block;margin-bottom:3px">Режим вписки</label>';
+          h += '<select class="input" id="sb_ps_fit_' + b.id + '" style="font-size:0.78rem;width:100%" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<option value="cover"' + (ps.object_fit === 'cover' || !ps.object_fit ? ' selected' : '') + '>Cover (заполнить)</option>';
+          h += '<option value="contain"' + (ps.object_fit === 'contain' ? ' selected' : '') + '>Contain (вместить)</option>';
+          h += '<option value="fill"' + (ps.object_fit === 'fill' ? ' selected' : '') + '>Fill (растянуть)</option>';
+          h += '</select></div>';
+          // Border radius
+          h += '<div><label style="font-size:0.68rem;color:#64748b;display:block;margin-bottom:3px">Скругление (px)</label>';
+          h += '<input class="input" id="sb_ps_radius_' + b.id + '" type="number" min="0" max="50" step="1" value="' + (ps.border_radius != null ? ps.border_radius : 12) + '" style="font-size:0.78rem;width:100%" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '</div>'; // end grid
+          // Full width toggle (mobile)
+          h += '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer;font-size:0.78rem;color:#94a3b8">';
+          h += '<input type="checkbox" id="sb_ps_fw_' + b.id + '"' + (ps.full_width_mobile !== false ? ' checked' : '') + ' onchange="sbAutoSave(' + b.id + ')" style="accent-color:#8B5CF6">';
+          h += 'На всю ширину экрана (моб.)</label>';
+          h += '</div>';
+          
           h += '</details></div>';
         }
         h += '<div style="margin-bottom:16px">';
@@ -11785,6 +11814,21 @@ async function sbSaveBlock(id) {
       });
     }
     blockOpts.photos = newPhotos;
+  }
+  
+  // Collect photo display settings
+  var psMaxH = document.getElementById('sb_ps_maxh_' + id);
+  var psMaxHD = document.getElementById('sb_ps_maxhd_' + id);
+  var psFit = document.getElementById('sb_ps_fit_' + id);
+  var psRadius = document.getElementById('sb_ps_radius_' + id);
+  var psFW = document.getElementById('sb_ps_fw_' + id);
+  if (psMaxH || psFit || psRadius) {
+    if (!blockOpts.photo_settings) blockOpts.photo_settings = {};
+    if (psMaxH) blockOpts.photo_settings.max_height_mobile = parseInt(psMaxH.value) || 0;
+    if (psMaxHD) blockOpts.photo_settings.max_height_desktop = parseInt(psMaxHD.value) || 0;
+    if (psFit) blockOpts.photo_settings.object_fit = psFit.value || 'cover';
+    if (psRadius) blockOpts.photo_settings.border_radius = parseInt(psRadius.value);
+    if (psFW) blockOpts.photo_settings.full_width_mobile = psFW.checked;
   }
   
   b.custom_html = JSON.stringify(blockOpts);

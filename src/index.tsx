@@ -182,6 +182,8 @@ app.get('/api/site-data', async (c) => {
             nav_links: blockOpts.nav_links || [],
             // Element order within section (for frontend reordering)
             element_order: blockOpts.element_order || [],
+            // Photo display settings
+            photo_settings: blockOpts.photo_settings || {},
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -947,6 +949,7 @@ app.get('/', async (c) => {
   let buttonMap: Record<string, any[]> = {};
   let styleMap: Record<string, {texts_ru: string[], styles: any[]}> = {};
   let orderMap: Record<string, string[]> = {};
+  let photoSettingsMap: Record<string, any> = {};
   try {
     const db = c.env.DB;
     const contentRes = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
@@ -1054,6 +1057,12 @@ app.get('/', async (c) => {
           if (opts.element_order && Array.isArray(opts.element_order) && opts.element_order.length > 0) {
             orderMap[blk.block_key as string] = opts.element_order;
           }
+          if (opts.photo_settings && typeof opts.photo_settings === 'object') {
+            const ps = opts.photo_settings;
+            if (ps.max_height_mobile || ps.max_height_desktop || ps.object_fit || ps.border_radius != null) {
+              photoSettingsMap[blk.block_key as string] = ps;
+            }
+          }
         } catch {}
       } catch { /* skip */ }
     }
@@ -1155,7 +1164,7 @@ img{max-width:100%;height:auto}
 .btn-outline:hover{border-color:var(--purple);background:rgba(139,92,246,0.05)}
 .btn-lg{padding:16px 32px;font-size:1.05rem}
 .hero-image{position:relative}
-.hero-image img{border-radius:var(--r-lg);width:100%;height:480px;object-fit:cover;object-position:center;border:1px solid var(--border)}
+.hero-image img{border-radius:var(--r-lg);width:100%;height:auto;aspect-ratio:3/4;max-height:520px;object-fit:cover;object-position:center;border:1px solid var(--border)}
 .hero-badge-img{position:absolute;bottom:20px;left:20px;background:rgba(15,10,26,0.9);backdrop-filter:blur(10px);padding:12px 18px;border-radius:var(--r-sm);display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
 .hero-badge-img i{color:var(--success);font-size:1.1rem}
 .hero-badge-img span{font-size:0.85rem;font-weight:500}
@@ -1472,8 +1481,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .about-el-texts{grid-area:texts}
 .about-el-buttons{grid-area:buttons}
 .about-img{grid-area:photo}
-.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);min-height:400px;display:grid}
-.about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0}
+.about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);display:block}
+.about-img img{width:100%;height:auto;object-fit:cover;display:block}
 .about-el-title h2,.about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
 .about-el-title h2 .gr,.about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .about-el-texts p,.about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
@@ -1555,7 +1564,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 @media(max-width:1024px){
   .hero h1{font-size:2.4rem}
   .hero-grid{grid-template-columns:1fr;gap:40px}
-  .hero-image{max-width:500px}
+  .hero-image{max-width:100%}
   .process-grid{grid-template-columns:repeat(3,1fr)}
   .step:nth-child(n+4){margin-top:16px}
   .guarantee-card{grid-template-columns:1fr;gap:32px}
@@ -1580,7 +1589,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .hero h1{font-size:1.9rem}
   .hero-stats{flex-wrap:wrap;gap:20px}
   .hero-buttons{flex-direction:column}
-  .hero-image img{height:300px}
+  .hero-image img{height:auto;max-height:420px}
   .section-title{font-size:1.7rem}
   .services-grid{grid-template-columns:1fr}
   .wh-grid{grid-template-columns:1fr}
@@ -1609,23 +1618,24 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .about-el-title{order:0}
   .about-el-texts{order:1}
   .about-el-buttons{order:2}
-  .about-img{order:3;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:280px;height:auto;aspect-ratio:3/4}
-  .about-img img{width:100%;height:100%;min-height:280px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0}
+  .about-img{order:3;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:auto;height:auto;aspect-ratio:auto}
+  .about-img img{width:100%;height:auto;min-height:auto;object-fit:cover;display:block;position:relative;border-radius:0}
   /* Hero: flex-column with orderable children (overridden by server element_order) */
   .hero-grid{display:flex!important;flex-direction:column;gap:24px}
   .hero-el-title{order:0}
   .hero-el-texts{order:1}
   .hero-el-stats{order:2;margin-bottom:0}
   .hero-el-buttons{order:3}
-  .hero-image{order:4;max-width:100%}
-  .hero-image img{height:auto;max-height:320px;width:100%}
+  .hero-image{order:4;max-width:100%;margin:0 -14px;width:calc(100% + 28px)}
+  .hero-image img{height:auto;max-height:none;width:100%;aspect-ratio:auto;border-radius:12px;border:none}
   /* Guarantee: flex-column with orderable children (overridden by server element_order) */
   .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
   .guarantee-el-title{order:0}
   .guarantee-el-texts{order:1}
   .guarantee-el-buttons{order:2}
   .guarantee-el-photo{order:3}
-  .guarantee-el-photo img,.guarantee-card > img{max-height:300px;width:100%;object-fit:cover;border-radius:12px}
+  .guarantee-el-photo{margin:0 -14px;width:calc(100% + 28px)}
+  .guarantee-el-photo img,.guarantee-card > img{max-height:none;width:100%;height:auto;object-fit:cover;border-radius:12px}
   /* WB Official — proper block ordering on mobile */
   .why-block{display:flex;flex-direction:column}
   /* Warehouse — stack photos */
@@ -1652,8 +1662,11 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .section-cta .btn{width:100%;max-width:360px;justify-content:center;display:inline-flex}
   /* Fix photos inside sections — no overflow */
   img{max-width:100%;height:auto}
+  .block-photo-gallery{grid-template-columns:1fr!important;margin:0 -14px!important;width:calc(100% + 28px)!important;padding:0!important}
+  .block-photo-gallery img{height:auto!important;max-height:none!important;border-radius:0!important}
+  .block-photo-gallery > div{border-radius:0!important}
   .wh-item{overflow:hidden;border-radius:var(--r)}
-  .wh-item img{width:100%;height:auto;max-height:300px;object-fit:cover}
+  .wh-item img{width:100%;height:auto;max-height:none;object-fit:cover}
   /* Why-steps, process-grid — single column on mobile */
   .why-steps{grid-template-columns:1fr!important}
   .process-grid{grid-template-columns:1fr!important}
@@ -1686,10 +1699,10 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .buyout-detail{padding:20px}
   .reviews-detail{padding:20px}
   .guarantee-card{padding:20px!important;flex-direction:column!important;gap:20px!important}
-  .guarantee-el-photo img,.guarantee-card > img{max-height:250px!important;object-fit:cover;border-radius:12px}
+  .guarantee-el-photo img,.guarantee-card > img{max-height:none!important;object-fit:cover;border-radius:12px}
   .about-grid{gap:16px!important}
-  .about-img{min-height:250px!important;aspect-ratio:4/3!important}
-  .about-img img{min-height:250px!important}
+  .about-img{min-height:auto!important;aspect-ratio:auto!important}
+  .about-img img{min-height:auto!important}
   .form-card{padding:16px}
   .wb-banner-card{min-width:0;padding:10px 14px}
   .wb-banner-right{min-width:0;padding:10px 14px;flex-wrap:wrap}
@@ -1705,7 +1718,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .nav{gap:8px}
   .lang-btn{padding:5px 10px;font-size:0.72rem}
   .logo img{height:36px}
-  .wh-item img{height:200px}
+  .wh-item img{height:auto;max-height:none;aspect-ratio:4/3;object-fit:cover}
   .wh-caption{font-size:0.78rem;padding:10px 14px}
   .footer{padding:40px 0 20px}
 }
@@ -4124,7 +4137,7 @@ switchLang = function(l) {
               var phH = '';
               validPhotos.forEach(function(p) {
                 phH += '<div style="border-radius:12px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));cursor:pointer" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-                  '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:320px;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
+                  '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;object-fit:cover;transition:transform 0.3s" onmouseover="this.style.transform=&apos;scale(1.05)&apos;" onmouseout="this.style.transform=&apos;scale(1)&apos;">' +
                   (p.caption ? '<div style="padding:8px 12px;font-size:0.82rem;color:var(--text-sec,#aaa)">' + p.caption + '</div>' : '') +
                 '</div>';
               });
@@ -4513,6 +4526,65 @@ switchLang = function(l) {
       } else {
         console.log('[DB] Element order already server-injected via CSS');
       }
+    }
+    
+    // ===== APPLY PHOTO SETTINGS (client-side fallback when not server-injected) =====
+    if (db.blockFeatures && db.blockFeatures.length > 0) {
+      var photoSectionSelectors = {
+        'hero': '.hero-image img',
+        'about': '.about-img img',
+        'guarantee': '.guarantee-el-photo img',
+        'warehouse': '.wh-item img'
+      };
+      var photoContainerSelectors = {
+        'hero': '.hero-image',
+        'about': '.about-img',
+        'guarantee': '.guarantee-el-photo'
+      };
+      db.blockFeatures.forEach(function(bf) {
+        var ps = bf.photo_settings;
+        if (!ps || typeof ps !== 'object') return;
+        var sid = bf.key.replace(/_/g, '-');
+        var section = document.querySelector('[data-section-id="' + sid + '"]');
+        if (!section) return;
+        
+        var imgSel = photoSectionSelectors[sid] || '.block-photo-gallery img';
+        var imgs = section.querySelectorAll(imgSel);
+        
+        imgs.forEach(function(img) {
+          if (ps.object_fit) img.style.objectFit = ps.object_fit;
+          if (ps.border_radius != null) img.style.borderRadius = ps.border_radius + 'px';
+          // Apply mobile or desktop max-height depending on screen
+          var isMobile = window.innerWidth <= 768;
+          if (isMobile && ps.max_height_mobile > 0) {
+            img.style.maxHeight = ps.max_height_mobile + 'px';
+            img.style.height = 'auto';
+          } else if (!isMobile && ps.max_height_desktop > 0) {
+            img.style.maxHeight = ps.max_height_desktop + 'px';
+            img.style.height = 'auto';
+          }
+        });
+        
+        // Container border-radius + full width mobile
+        var contSel = photoContainerSelectors[sid];
+        if (contSel) {
+          var cont = section.querySelector(contSel);
+          if (cont) {
+            if (ps.border_radius != null) {
+              cont.style.borderRadius = ps.border_radius + 'px';
+              cont.style.overflow = 'hidden';
+            }
+            // If full_width_mobile is disabled, remove negative margins
+            var isMob = window.innerWidth <= 768;
+            if (isMob && ps.full_width_mobile === false) {
+              cont.style.margin = '0';
+              cont.style.width = '100%';
+            }
+          }
+        }
+        
+        console.log('[DB] Photo settings applied for:', sid, ps);
+      });
     }
     
     // Clear reviews placeholder if no photos were injected — hide completely
@@ -5116,7 +5188,7 @@ async function checkRefCode() {
   // Mark as server-injected and apply text replacements if we have changes
   const hasTextChanges = Object.keys(textMap).length > 0;
   const hasButtonChanges = Object.keys(buttonMap).length > 0;
-  const hasAnyServerChanges = hasTextChanges || hasButtonChanges || Object.keys(styleMap).length > 0 || Object.keys(orderMap).length > 0;
+  const hasAnyServerChanges = hasTextChanges || hasButtonChanges || Object.keys(styleMap).length > 0 || Object.keys(orderMap).length > 0 || Object.keys(photoSettingsMap).length > 0;
   if (hasAnyServerChanges) {
     pageHtml = pageHtml.replace('<html lang="ru">', '<html lang="ru" class="server-injected">');
   }
@@ -5340,6 +5412,63 @@ async function checkRefCode() {
         // Mobile: order property only applies when flex-column is active
         if (mobileCss.length > 0) {
           cssRules.push(`@media(max-width:768px){${mobileCss.join('')}}`);
+        }
+      }
+    }
+    
+    // 3. Photo settings — generate CSS for photo display customization
+    const hasPhotoSettings = Object.keys(photoSettingsMap).length > 0;
+    if (hasPhotoSettings) {
+      // Known section photo selectors
+      const photoSelectors: Record<string, string[]> = {
+        'hero': ['.hero-image img'],
+        'about': ['.about-img img', '.about-img'],
+        'guarantee': ['.guarantee-el-photo img', '.guarantee-card > img'],
+        'warehouse': ['.wh-item img'],
+      };
+      
+      for (const [blockKey, ps] of Object.entries(photoSettingsMap)) {
+        const sectionId = blockKey.replace(/_/g, '-');
+        const selectors = photoSelectors[sectionId] || ['.block-photo-gallery img', 'img.section-photo'];
+        const imgSel = selectors[0]; // primary img selector
+        const containerSel = selectors.length > 1 ? selectors[1] : null;
+        
+        let desktopPhotoRules: string[] = [];
+        let mobilePhotoRules: string[] = [];
+        
+        // Desktop max-height
+        if (ps.max_height_desktop && ps.max_height_desktop > 0) {
+          desktopPhotoRules.push(`[data-section-id="${sectionId}"] ${imgSel}{max-height:${ps.max_height_desktop}px!important;height:auto!important}`);
+        }
+        
+        // Object-fit (applies everywhere)
+        if (ps.object_fit && ps.object_fit !== 'cover') {
+          desktopPhotoRules.push(`[data-section-id="${sectionId}"] ${imgSel}{object-fit:${ps.object_fit}!important}`);
+        }
+        
+        // Border radius
+        if (ps.border_radius != null && ps.border_radius !== 12) {
+          desktopPhotoRules.push(`[data-section-id="${sectionId}"] ${imgSel}{border-radius:${ps.border_radius}px!important}`);
+          if (containerSel) {
+            desktopPhotoRules.push(`[data-section-id="${sectionId}"] ${containerSel}{border-radius:${ps.border_radius}px!important;overflow:hidden}`);
+          }
+        }
+        
+        // Mobile max-height
+        if (ps.max_height_mobile && ps.max_height_mobile > 0) {
+          mobilePhotoRules.push(`[data-section-id="${sectionId}"] ${imgSel}{max-height:${ps.max_height_mobile}px!important;height:auto!important}`);
+        }
+        
+        // Full width mobile
+        if (ps.full_width_mobile === false) {
+          mobilePhotoRules.push(`[data-section-id="${sectionId}"] .hero-image,[data-section-id="${sectionId}"] .about-img,[data-section-id="${sectionId}"] .guarantee-el-photo,[data-section-id="${sectionId}"] .block-photo-gallery{margin:0!important;width:100%!important}`);
+        }
+        
+        if (desktopPhotoRules.length > 0) {
+          cssRules.push(desktopPhotoRules.join(''));
+        }
+        if (mobilePhotoRules.length > 0) {
+          cssRules.push(`@media(max-width:768px){${mobilePhotoRules.join('')}}`);
         }
       }
     }
