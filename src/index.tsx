@@ -1332,6 +1332,15 @@ section[style*="display: none"],section[style*="display:none"],div[style*="displ
 
 /* ===== CTA BUTTONS AFTER SECTIONS ===== */
 .section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
+/* Force correct order: content blocks BEFORE CTA buttons in why-buyouts & fifty-vs-fifty */
+section#why-buyouts .container{display:flex;flex-direction:column}
+section#why-buyouts .section-header{order:0!important}
+section#why-buyouts .why-block{order:1!important}
+section#why-buyouts .section-cta{order:2!important}
+section#fifty-vs-fifty .container{display:flex;flex-direction:column}
+section#fifty-vs-fifty .section-header{order:0!important}
+section#fifty-vs-fifty .why-block{order:1!important}
+section#fifty-vs-fifty .section-cta{order:2!important}
 .slot-counter-bar .section-cta{margin-top:0;padding-top:0;border-top:none;padding-bottom:16px}
 .slot-counter-bar .section-cta:empty{display:none}
 .section-cta .btn{font-size:0.9rem;padding:12px 24px}
