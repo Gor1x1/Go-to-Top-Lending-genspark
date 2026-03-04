@@ -1337,10 +1337,15 @@ section#why-buyouts .container{display:flex;flex-direction:column}
 section#why-buyouts .section-header{order:0!important}
 section#why-buyouts .why-block{order:1!important}
 section#why-buyouts .section-cta{order:2!important}
+/* Reset order for children INSIDE .why-block so server CSS doesn't break inner layout */
+section#why-buyouts .why-block > *{order:0!important}
+section#why-buyouts .why-block .highlight-result{order:99!important}
 section#fifty-vs-fifty .container{display:flex;flex-direction:column}
 section#fifty-vs-fifty .section-header{order:0!important}
 section#fifty-vs-fifty .why-block{order:1!important}
 section#fifty-vs-fifty .section-cta{order:2!important}
+section#fifty-vs-fifty .why-block > *{order:0!important}
+section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 .slot-counter-bar .section-cta{margin-top:0;padding-top:0;border-top:none;padding-bottom:16px}
 .slot-counter-bar .section-cta:empty{display:none}
 .section-cta .btn{font-size:0.9rem;padding:12px 24px}
