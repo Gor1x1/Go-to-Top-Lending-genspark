@@ -2039,6 +2039,20 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <div class="highlight-result" data-ru="В результате повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Արդյունքում, ձեր քարտի ԲՈԼՈՐ փոխակերպումները մեծանում են՝ CTR, զամբյուղում ավելացումներ և պատվերներ: Ձեր քարտը դառնում է որոնման ամենաբարձր վարկանիշ ունեցող արդյունք և սկսում է ստանալ օրգանական տրաֆիկ: Որքան բարձր է վարկանիշը, այնքան շատ օրգանական վաճառքներ դուք կապահովեք առանց որևէ լրացուցիչ ներդրման:"><i class="fas fa-bolt"></i> <strong>Результат:</strong> повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.</div>
   </div>
 
+  <div class="section-cta">
+    <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы" data-am="Սկսել գնումները">Начать выкупы</span></a>
+  </div>
+</div>
+</section>
+
+
+<!-- ===== 50K: BLOGGER VS BUYOUTS ===== -->
+<section class="section" id="fifty-vs-fifty" data-section-id="fifty-vs-fifty">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-balance-scale-right"></i> <span data-ru="Сравнение бюджетов" data-am="Բյուջեների համեմատություն">Сравнение бюджетов</span></div>
+    <h2 class="section-title" data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ">50 000 ֏ на блогера vs 50 000 ֏ на выкупы</h2>
+  </div>
 
 <div class="why-block fade-up">
     <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ — որն է ավելի արդյունավետ?">50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?</span></h3>
@@ -2062,6 +2076,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </div>
 </div>
 </section>
+
 
 <!-- ===== WB OFFICIAL ===== -->
 <section class="section section-dark" id="wb-official" data-section-id="wb-official">
