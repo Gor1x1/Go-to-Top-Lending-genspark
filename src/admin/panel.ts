@@ -11288,6 +11288,19 @@ function sbUpdateBtnField(blockId, btnIdx, field, value) {
 }
 
 // ── Remove button ──
+// ── Move button up/down ──
+function sbMoveButton(blockId, idx, direction) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b || !b.buttons) return;
+  var newIdx = idx + direction;
+  if (newIdx < 0 || newIdx >= b.buttons.length) return;
+  var tmp = b.buttons[idx];
+  b.buttons[idx] = b.buttons[newIdx];
+  b.buttons[newIdx] = tmp;
+  render();
+  sbAutoSave(blockId);
+}
+
 function sbRemoveButton(blockId, idx) {
   var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
   if (!b || !b.buttons) return;
