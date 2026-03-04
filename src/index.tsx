@@ -1588,7 +1588,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .hero{padding:110px 0 60px}
   .hero h1{font-size:1.9rem}
   .hero-stats{flex-wrap:wrap;gap:20px}
-  .hero-buttons{flex-direction:column}
+  .hero-buttons{flex-direction:column;align-items:center;width:100%}
+  .hero-buttons .btn{width:100%;max-width:400px;justify-content:center}
   .hero-image img{height:auto;max-height:none}
   .section-title{font-size:1.7rem}
   .services-grid{grid-template-columns:1fr}
@@ -1617,7 +1618,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .about-grid{display:flex!important;flex-direction:column;gap:24px}
   .about-el-title{order:0}
   .about-el-texts{order:1}
-  .about-el-buttons{order:2}
+  .about-el-buttons{order:2;width:100%;display:flex;flex-direction:column;align-items:center}
   .about-img{order:3;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:auto;height:auto;aspect-ratio:auto}
   .about-img img{width:100%;height:auto;min-height:auto;object-fit:cover;display:block;position:relative;border-radius:0}
   /* Hero: flex-column with orderable children (overridden by server element_order) */
@@ -1625,14 +1626,14 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .hero-el-title{order:0}
   .hero-el-texts{order:1}
   .hero-el-stats{order:2;margin-bottom:0}
-  .hero-el-buttons{order:3}
+  .hero-el-buttons{order:3;width:100%;display:flex;flex-direction:column;align-items:center}
   .hero-image{order:4;max-width:100%;margin:0 -14px;width:calc(100% + 28px)}
   .hero-image img{height:auto;max-height:none;width:100%;aspect-ratio:auto;border-radius:12px;border:none}
   /* Guarantee: flex-column with orderable children (overridden by server element_order) */
   .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
   .guarantee-el-title{order:0}
   .guarantee-el-texts{order:1}
-  .guarantee-el-buttons{order:2}
+  .guarantee-el-buttons{order:2;width:100%;display:flex;flex-direction:column;align-items:center}
   .guarantee-el-photo{order:3}
   .guarantee-el-photo{margin:0 -14px;width:calc(100% + 28px)}
   .guarantee-el-photo img,.guarantee-card > img{max-height:none;width:100%;height:auto;object-fit:cover;border-radius:12px}
@@ -1658,8 +1659,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .rv-carousel{touch-action:pan-x pinch-zoom}
   .pb-carousel{touch-action:pan-x pinch-zoom}
   /* Section CTA buttons — always at bottom with proper spacing */
-  .section-cta{margin-top:24px!important;text-align:center}
-  .section-cta .btn{width:100%;max-width:360px;justify-content:center;display:inline-flex}
+  .section-cta{margin-top:24px!important;text-align:center;display:flex;flex-direction:column;align-items:center}
+  .section-cta .btn{width:100%;max-width:400px;justify-content:center;display:inline-flex}
   /* Fix photos inside sections — no overflow */
   img{max-width:100%;height:auto}
   .block-photo-gallery{grid-template-columns:1fr!important;margin:0 -14px!important;width:calc(100% + 28px)!important;padding:0!important}
@@ -1744,7 +1745,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .btn{padding:10px 16px;font-size:0.82rem}
   .section{padding:28px 0}
   .section-cta{gap:10px;margin-top:20px}
-  .hero-buttons{gap:10px}
+  .hero-buttons{gap:10px;align-items:center;width:100%}
+  .hero-buttons .btn{width:100%;max-width:100%;justify-content:center}
   .g-list li{font-size:0.82rem}
   .process-grid{grid-template-columns:1fr !important}
   .buyout-grid{grid-template-columns:1fr !important}
