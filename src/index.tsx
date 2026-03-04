@@ -1133,12 +1133,17 @@ img{max-width:100%;height:auto}
 .nav-mobile-cta{display:none}
 .hero{padding:140px 0 80px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;gap:60px;align-items:center}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start}
+.hero-el-title{grid-area:title}
+.hero-el-texts{grid-area:texts}
+.hero-el-stats{grid-area:stats;margin-bottom:36px}
+.hero-el-buttons{grid-area:buttons}
+.hero-image{grid-area:photo;align-self:center}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.85rem;font-weight:500;color:var(--accent);margin-bottom:24px}
 .hero h1{font-size:3rem;font-weight:800;line-height:1.15;margin-bottom:20px;letter-spacing:-0.02em}
 .hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .hero-desc{font-size:1.05rem;color:var(--text-sec);margin-bottom:32px;max-width:520px;line-height:1.8}
-.hero-stats{display:flex;gap:32px;margin-bottom:36px}
+.hero-stats{display:flex;gap:32px}
 .stat{text-align:left}
 .stat-num{font-size:2rem;font-weight:800;color:var(--purple)}
 .stat-label{font-size:0.78rem;color:var(--text-muted);margin-top:2px}
@@ -1248,12 +1253,16 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .wh-item img{width:100%;height:250px;object-fit:cover;transition:var(--t)}
 .wh-item:hover img{transform:scale(1.05)}
 .wh-caption{position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.8));font-size:0.85rem;font-weight:500}
-.guarantee-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
-.guarantee-card img{border-radius:var(--r);width:100%;height:auto;max-height:500px;object-fit:cover;border:1px solid var(--border)}
+.guarantee-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"photo title" "photo texts" "photo buttons";gap:0 48px;align-items:start}
+.guarantee-el-photo{grid-area:photo}
+.guarantee-el-title{grid-area:title}
+.guarantee-el-texts{grid-area:texts}
+.guarantee-el-buttons{grid-area:buttons}
+.guarantee-card img,.guarantee-el-photo img{border-radius:var(--r);width:100%;height:auto;max-height:500px;object-fit:cover;border:1px solid var(--border)}
 
 
-.guarantee-card h2{font-size:1.9rem;font-weight:800;margin-bottom:16px}
-.guarantee-card>div p{color:var(--text-sec);margin-bottom:16px;line-height:1.8}
+.guarantee-card h2,.guarantee-el-title h2{font-size:1.9rem;font-weight:800;margin-bottom:16px}
+.guarantee-card>div p,.guarantee-el-texts p{color:var(--text-sec);margin-bottom:16px;line-height:1.8}
 .g-list{list-style:none;margin:20px 0}
 .g-list li{display:flex;align-items:flex-start;gap:12px;padding:8px 0;font-size:0.92rem}
 .g-list li i{color:var(--success);margin-top:4px}
@@ -1458,12 +1467,16 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .wb-banner-right .btn{margin-left:auto;white-space:nowrap;font-size:0.82rem;padding:10px 20px}
 
 /* ===== ABOUT SECTION ===== */
-.about-grid{display:grid;grid-template-columns:1fr 1.5fr;gap:48px;align-items:stretch}
+.about-grid{display:grid;grid-template-columns:1fr 1.5fr;grid-template-areas:"photo title" "photo texts" "photo buttons";gap:0 48px;align-items:start}
+.about-el-title{grid-area:title}
+.about-el-texts{grid-area:texts}
+.about-el-buttons{grid-area:buttons}
+.about-img{grid-area:photo}
 .about-img{position:relative;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);min-height:400px;display:grid}
 .about-img img{width:100%;height:100%;min-height:400px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0}
-.about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
-.about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
+.about-el-title h2,.about-text h2{font-size:2rem;font-weight:800;margin-bottom:20px;line-height:1.3}
+.about-el-title h2 .gr,.about-text h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.about-el-texts p,.about-text p{color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:16px}
 .about-highlight{background:rgba(139,92,246,0.08);border:1px solid var(--border);border-radius:var(--r);padding:20px 24px;margin-top:16px}
 .about-highlight p{font-weight:600;color:var(--accent);margin:0!important}
 
@@ -1591,20 +1604,28 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
   /* ===== MOBILE: proper element order inside sections ===== */
-  /* About: default order (can be overridden by server-injected element_order) */
+  /* About: flex-column with orderable children (overridden by server element_order) */
   .about-grid{display:flex!important;flex-direction:column;gap:24px}
-  .about-text{order:1}
-  .about-img{order:2;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:280px;height:auto;aspect-ratio:3/4}
+  .about-el-title{order:0}
+  .about-el-texts{order:1}
+  .about-el-buttons{order:2}
+  .about-img{order:3;border-radius:12px;margin:0 -14px;width:calc(100% + 28px);position:relative;overflow:hidden;min-height:280px;height:auto;aspect-ratio:3/4}
   .about-img img{width:100%;height:100%;min-height:280px;object-fit:cover;display:block;position:absolute;top:0;left:0;right:0;bottom:0;border-radius:0}
-  /* Hero: default order (can be overridden by server-injected element_order) */
+  /* Hero: flex-column with orderable children (overridden by server element_order) */
   .hero-grid{display:flex!important;flex-direction:column;gap:24px}
-  .hero-grid > div:first-child{order:1}
-  .hero-image{order:2;max-width:100%}
+  .hero-el-title{order:0}
+  .hero-el-texts{order:1}
+  .hero-el-stats{order:2;margin-bottom:0}
+  .hero-el-buttons{order:3}
+  .hero-image{order:4;max-width:100%}
   .hero-image img{height:auto;max-height:320px;width:100%}
-  /* Guarantee: default order (can be overridden by server-injected element_order) */
+  /* Guarantee: flex-column with orderable children (overridden by server element_order) */
   .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
-  .guarantee-card > div{order:1}
-  .guarantee-card > img{order:2;max-height:300px;width:100%;object-fit:cover;border-radius:12px}
+  .guarantee-el-title{order:0}
+  .guarantee-el-texts{order:1}
+  .guarantee-el-buttons{order:2}
+  .guarantee-el-photo{order:3}
+  .guarantee-el-photo img,.guarantee-card > img{max-height:300px;width:100%;object-fit:cover;border-radius:12px}
   /* WB Official — proper block ordering on mobile */
   .why-block{display:flex;flex-direction:column}
   /* Warehouse — stack photos */
@@ -1665,8 +1686,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .buyout-detail{padding:20px}
   .reviews-detail{padding:20px}
   .guarantee-card{padding:20px!important;flex-direction:column!important;gap:20px!important}
-  .guarantee-card > img{max-height:250px!important;object-fit:cover;border-radius:12px;order:2!important}
-  .guarantee-card > div{order:1!important}
+  .guarantee-el-photo img,.guarantee-card > img{max-height:250px!important;object-fit:cover;border-radius:12px}
   .about-grid{gap:16px!important}
   .about-img{min-height:250px!important;aspect-ratio:4/3!important}
   .about-img img{min-height:250px!important}
@@ -1768,7 +1788,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <section class="hero" id="hero" data-section-id="hero">
 <div class="container">
 <div class="hero-grid">
-  <div>
+  <div class="hero-el-title">
     <div class="hero-badge">
       <i class="fas fa-circle" style="color:var(--success);font-size:0.5rem"></i>
       <span data-ru="Успешный опыт с 2021 года" data-am="Հաջողված փորձ 2021 թվականից">Успешный опыт с 2021 года</span>
@@ -1777,14 +1797,20 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <span data-ru="Выведем ваш товар" data-am="Մենք կբարձրացնենք ձեր ապրանքը">Выведем ваш товар</span><br>
       <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի TOP">в ТОП Wildberries</span>
     </h1>
+  </div>
+  <div class="hero-el-texts">
     <p class="hero-desc" data-ru="Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:">
       Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване.
     </p>
+  </div>
+  <div class="hero-el-stats">
     <div class="hero-stats">
       <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանքներ TOP-ում">товаров в ТОП</div></div>
       <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արգելափակում">блокировок</div></div>
       <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հաշիվներ">аккаунтов</div></div>
     </div>
+  </div>
+  <div class="hero-el-buttons">
     <div class="hero-buttons">
       <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary btn-lg">
         <i class="fab fa-telegram"></i>
@@ -1862,14 +1888,18 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <div class="about-img">
       <img src="/static/img/about-hero2.jpg" alt="Go to Top — О компании">
     </div>
-    <div class="about-text">
+    <div class="about-el-title">
       <div class="section-badge"><i class="fas fa-info-circle"></i> <span data-ru="О компании" data-am="Ընկերության մասին">О компании</span></div>
       <h2 data-ru="Что такое" data-am="Ի՞նչ է Go to Top-ը">Что такое <span class="gr">Go to Top</span>?</h2>
+    </div>
+    <div class="about-el-texts">
       <p data-ru="«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе." data-am="«Go to Top» — ձեր բիզնեսի զարգացման ծառայություն մարկետփլեյսներում՝ ինքնագնումների միջոցով առաջխաղացման մեթոդ է TOP-ում երկարաժամկետ դիրքավորվելու համար:">«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе.</p>
       <p data-ru="Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную." data-am="Մեր մասնագետների թիմը 2021 թվականից աշխատում է արդյունքի համար: Մենք ունենք սեփական պահեստներ և գրասենյակներ Երևանում: Գնումների համար օգտագործում ենք միայն իրական մարդկանց հաշիվներ և ամեն ինչ անում ենք ձեռքով:">Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную.</p>
       <div class="about-highlight">
         <p data-ru="Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!" data-am="Լավագույն արդյունքը կստանաք օգտվելով մեր ծառայությունների փաթեթը!"><i class="fas fa-bolt" style="margin-right:8px"></i>Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!</p>
       </div>
+    </div>
+    <div class="about-el-buttons">
       <div class="section-cta">
         <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fas fa-shopping-cart"></i> <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span></a>
       </div>
@@ -2269,10 +2299,14 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <section class="section" id="guarantee" data-section-id="guarantee">
 <div class="container">
     <div class="guarantee-card fade-up">
+    <div class="guarantee-el-photo">
     <img src="/static/img/team-office.jpg" alt="Команда Go to Top">
-    <div>
+    </div>
+    <div class="guarantee-el-title">
       <div class="section-badge"><i class="fas fa-shield-alt"></i> <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">Гарантия безопасности</span></div>
       <h2 data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը">Всё организовано и по полочкам. Наша команда</h2>
+    </div>
+    <div class="guarantee-el-texts">
       <p data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе." data-am="Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Երբ նախագիծը վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:">За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе.</p>
       <ul class="g-list">
         <li><i class="fas fa-check-circle"></i> <span data-ru="Реальное поведение человека во время выкупа" data-am="Իրական մարդկային վարքագիծ գնում կատարելիս">Реальное поведение человека во время выкупа</span></li>
@@ -2283,6 +2317,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
         <i class="fas fa-award"></i>
         <span data-ru="0 блокировок за всё время работы" data-am="0 արգելափակում աշխատանքի ողջ ընթացքում">0 блокировок за всё время работы</span>
       </div>
+    </div>
+    <div class="guarantee-el-buttons">
       <div class="section-cta" style="margin-top:24px">
         <a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">Начать продвижение</span></a>
       </div>
@@ -4422,66 +4458,46 @@ switchLang = function(l) {
     // Only apply client-side as fallback when NOT server-injected
     if (db.blockFeatures && db.blockFeatures.length > 0) {
       if (!serverInjected) {
+      // Map section IDs to their element selectors (direct flex children)
+      var sectionElMap = {
+        'hero': { title: '.hero-el-title', photo: '.hero-image', texts: '.hero-el-texts', stats: '.hero-el-stats', buttons: '.hero-el-buttons', socials: '.block-socials' },
+        'about': { title: '.about-el-title', photo: '.about-img', texts: '.about-el-texts', stats: '.block-slot-counter', buttons: '.about-el-buttons', socials: '.block-socials' },
+        'guarantee': { title: '.guarantee-el-title', photo: '.guarantee-el-photo', texts: '.guarantee-el-texts', stats: '.block-slot-counter', buttons: '.guarantee-el-buttons', socials: '.block-socials' }
+      };
+      
+      var defaultTypeMap = {
+        'photo': '.block-photo-gallery, img.section-photo, .wh-grid, .wh-item',
+        'title': '.section-header, h2, h1',
+        'stats': '.stats-grid, .block-slot-counter',
+        'texts': 'p.section-sub, .why-block, .why-steps, .process-grid, .buyout-grid, .faq-list, .compare-box',
+        'buttons': '.section-cta',
+        'socials': '.block-socials'
+      };
+      
       db.blockFeatures.forEach(function(bf) {
         if (!bf.element_order || !Array.isArray(bf.element_order) || bf.element_order.length === 0) return;
         var sectionId = bf.key.replace(/_/g, '-');
         var section = document.querySelector('[data-section-id="' + sectionId + '"]');
         if (!section) return;
         
-        // Determine photo vs text position
-        var photoIdx = bf.element_order.indexOf('photo');
-        var textPositions = ['title', 'texts', 'stats', 'buttons'].map(function(t) { return bf.element_order.indexOf(t); }).filter(function(i) { return i >= 0; });
-        var minTextPos = textPositions.length > 0 ? Math.min.apply(null, textPositions) : 999;
-        var photoBeforeText = photoIdx >= 0 && photoIdx < minTextPos;
+        var elMap = sectionElMap[sectionId];
         
-        // Section-specific: work with DIRECT children of grid/flex containers
-        if (sectionId === 'hero') {
-          var heroGrid = section.querySelector('.hero-grid');
-          if (heroGrid) {
-            heroGrid.style.display = 'flex';
-            heroGrid.style.flexDirection = 'column';
-            var heroTextDiv = heroGrid.querySelector(':scope > div:not(.hero-image)');
-            var heroImg = heroGrid.querySelector('.hero-image');
-            if (heroTextDiv) heroTextDiv.style.order = photoBeforeText ? '1' : '0';
-            if (heroImg) heroImg.style.order = photoBeforeText ? '0' : '1';
-          }
-        } else if (sectionId === 'about') {
-          var aboutGrid = section.querySelector('.about-grid');
-          if (aboutGrid) {
-            aboutGrid.style.display = 'flex';
-            aboutGrid.style.flexDirection = 'column';
-            var aboutText = aboutGrid.querySelector('.about-text');
-            var aboutImg = aboutGrid.querySelector('.about-img');
-            if (aboutText) aboutText.style.order = photoBeforeText ? '1' : '0';
-            if (aboutImg) aboutImg.style.order = photoBeforeText ? '0' : '1';
-          }
-        } else if (sectionId === 'guarantee') {
-          var gCard = section.querySelector('.guarantee-card');
-          if (gCard) {
-            gCard.style.display = 'flex';
-            gCard.style.flexDirection = 'column';
-            var gTextDiv = gCard.querySelector(':scope > div');
-            var gImg = gCard.querySelector(':scope > img');
-            if (gTextDiv) gTextDiv.style.order = photoBeforeText ? '1' : '0';
-            if (gImg) gImg.style.order = photoBeforeText ? '0' : '1';
-          }
+        if (elMap) {
+          // Known sections with specific element wrappers
+          bf.element_order.forEach(function(elType, orderIdx) {
+            var selector = elMap[elType];
+            if (!selector) return;
+            var el = section.querySelector(selector);
+            if (el) el.style.order = String(orderIdx);
+          });
         } else {
-          // Generic: apply to container
+          // Generic sections
           var container = section.querySelector('.container') || section;
           container.style.display = 'flex';
           container.style.flexDirection = 'column';
           
-          var typeMap = {
-            'photo': '.block-photo-gallery, img.section-photo, .wh-grid, .wh-item',
-            'title': '.section-header, h2, h1',
-            'stats': '.stats-grid, .block-slot-counter',
-            'texts': 'p.section-sub, .why-block, .why-steps, .process-grid, .buyout-grid, .faq-list, .compare-box',
-            'buttons': '.section-cta',
-            'socials': '.block-socials'
-          };
-          
           bf.element_order.forEach(function(elType, orderIdx) {
-            var selString = typeMap[elType];
+            var selString = defaultTypeMap[elType];
             if (!selString) return;
             try {
               container.querySelectorAll(selString).forEach(function(t) {
@@ -5222,72 +5238,77 @@ async function checkRefCode() {
     }
     
     // 2. Element order — generate CSS for mobile layout ordering
-    // IMPORTANT: CSS order only works on DIRECT children of flex containers.
-    // For sections with 2-column grid layout (hero-grid, about-grid, guarantee-card),
-    // direct children are: text-wrapper and photo-wrapper.
-    // We determine photo position relative to text and apply order accordingly.
+    // Each element type (title, photo, texts, stats, buttons, socials) maps to a specific
+    // CSS class that is a DIRECT child of the flex container on mobile.
     if (hasOrderChanges) {
       let orderCss: string[] = [];
       
+      // Map element types to CSS selectors per section
+      const sectionElementMap: Record<string, Record<string, string>> = {
+        'hero': {
+          'title': '.hero-el-title',
+          'photo': '.hero-image',
+          'texts': '.hero-el-texts',
+          'stats': '.hero-el-stats',
+          'buttons': '.hero-el-buttons',
+          'socials': '.block-socials'
+        },
+        'about': {
+          'title': '.about-el-title',
+          'photo': '.about-img',
+          'texts': '.about-el-texts',
+          'stats': '.block-slot-counter',
+          'buttons': '.about-el-buttons',
+          'socials': '.block-socials'
+        },
+        'guarantee': {
+          'title': '.guarantee-el-title',
+          'photo': '.guarantee-el-photo',
+          'texts': '.guarantee-el-texts',
+          'stats': '.block-slot-counter',
+          'buttons': '.guarantee-el-buttons',
+          'socials': '.block-socials'
+        }
+      };
+      
+      // Default selector map for generic sections
+      const defaultElementMap: Record<string, string[]> = {
+        'photo': ['.block-photo-gallery', 'img.section-photo', '.wh-grid', '.wh-item'],
+        'title': ['.section-header', 'h2', 'h1'],
+        'stats': ['.stats-grid', '.block-slot-counter'],
+        'texts': ['p.section-sub', '.why-block', '.why-steps', '.process-grid', '.buyout-grid', '.faq-list', '.compare-box'],
+        'buttons': ['.section-cta'],
+        'socials': ['.block-socials']
+      };
+      
       for (const [blockKey, order] of Object.entries(orderMap)) {
         const sectionId = blockKey.replace(/_/g, '-');
+        const elMap = sectionElementMap[sectionId];
         
-        // Find the position of 'photo' in the order array
-        const photoIdx = order.indexOf('photo');
-        const titleIdx = order.indexOf('title');
-        const textsIdx = order.indexOf('texts');
-        
-        // Determine if photo should come before or after text content
-        // Text content = min position of title, texts, stats, buttons
-        const textPositions = ['title', 'texts', 'stats', 'buttons']
-          .map(t => order.indexOf(t))
-          .filter(i => i >= 0);
-        const minTextPos = textPositions.length > 0 ? Math.min(...textPositions) : 999;
-        
-        const photoBeforeText = photoIdx >= 0 && photoIdx < minTextPos;
-        
-        // Section-specific CSS for grid layouts
-        if (sectionId === 'hero') {
-          // hero-grid has 2 direct children: <div> (text container) and .hero-image
-          if (photoBeforeText) {
-            orderCss.push(`[data-section-id="hero"] .hero-grid>div:first-child{order:1!important}`);
-            orderCss.push(`[data-section-id="hero"] .hero-image{order:0!important}`);
-          } else {
-            orderCss.push(`[data-section-id="hero"] .hero-grid>div:first-child{order:0!important}`);
-            orderCss.push(`[data-section-id="hero"] .hero-image{order:1!important}`);
-          }
-        } else if (sectionId === 'about') {
-          // about-grid has .about-text and .about-img
-          if (photoBeforeText) {
-            orderCss.push(`[data-section-id="about"] .about-text{order:1!important}`);
-            orderCss.push(`[data-section-id="about"] .about-img{order:0!important}`);
-          } else {
-            orderCss.push(`[data-section-id="about"] .about-text{order:0!important}`);
-            orderCss.push(`[data-section-id="about"] .about-img{order:1!important}`);
-          }
-        } else if (sectionId === 'guarantee') {
-          // guarantee-card has <div> (text) and <img> (photo)
-          if (photoBeforeText) {
-            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>div{order:1!important}`);
-            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>img{order:0!important}`);
-          } else {
-            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>div{order:0!important}`);
-            orderCss.push(`[data-section-id="guarantee"] .guarantee-card>img{order:1!important}`);
+        if (elMap) {
+          // Known sections with specific element wrappers — each element is a direct flex child
+          order.forEach((elType: string, idx: number) => {
+            const selector = elMap[elType];
+            if (!selector) return;
+            orderCss.push(`[data-section-id="${sectionId}"] ${selector}{order:${idx}!important}`);
+          });
+          
+          // Also override grid-template-areas on desktop based on element_order
+          // This lets photo appear in a different column position on desktop too
+          if (sectionId === 'hero') {
+            const areas = order.filter((t: string) => t !== 'photo').map((t: string) => `"${t} photo"`).join(' ');
+            orderCss.push(`[data-section-id="hero"] .hero-grid{grid-template-areas:${areas}}`);
+          } else if (sectionId === 'about') {
+            const areas = order.filter((t: string) => t !== 'photo').map((t: string) => `"photo ${t}"`).join(' ');
+            orderCss.push(`[data-section-id="about"] .about-grid{grid-template-areas:${areas}}`);
+          } else if (sectionId === 'guarantee') {
+            const areas = order.filter((t: string) => t !== 'photo').map((t: string) => `"photo ${t}"`).join(' ');
+            orderCss.push(`[data-section-id="guarantee"] .guarantee-card{grid-template-areas:${areas}}`);
           }
         } else {
-          // Generic sections: use container > * selectors
-          // Map element types to selectors that are typically direct children
-          const typeSelectors: Record<string, string[]> = {
-            'photo': ['.block-photo-gallery', 'img.section-photo', '.wh-grid', '.wh-item'],
-            'title': ['.section-header', 'h2', 'h1'],
-            'stats': ['.stats-grid', '.block-slot-counter'],
-            'texts': ['p.section-sub', '.why-block', '.why-steps', '.process-grid', '.buyout-grid', '.faq-list', '.compare-box'],
-            'buttons': ['.section-cta'],
-            'socials': ['.block-socials']
-          };
-          
+          // Generic sections: apply order to matching selectors
           order.forEach((elType: string, idx: number) => {
-            const selectors = typeSelectors[elType];
+            const selectors = defaultElementMap[elType];
             if (!selectors) return;
             selectors.forEach(sel => {
               orderCss.push(`[data-section-id="${sectionId}"] ${sel}{order:${idx}!important}`);
@@ -5300,8 +5321,26 @@ async function checkRefCode() {
       }
       
       if (orderCss.length > 0) {
-        // Wrap in media query for mobile only (same breakpoint as existing mobile CSS)
-        cssRules.push(`@media(max-width:768px){${orderCss.join('')}}`);
+        // Separate desktop CSS (grid-template-areas) from mobile CSS (order)
+        const desktopCss: string[] = [];
+        const mobileCss: string[] = [];
+        
+        for (const rule of orderCss) {
+          if (rule.includes('grid-template-areas')) {
+            desktopCss.push(rule);
+          } else {
+            mobileCss.push(rule);
+          }
+        }
+        
+        // Desktop: grid-template-areas apply on all screen sizes
+        if (desktopCss.length > 0) {
+          cssRules.push(desktopCss.join(''));
+        }
+        // Mobile: order property only applies when flex-column is active
+        if (mobileCss.length > 0) {
+          cssRules.push(`@media(max-width:768px){${mobileCss.join('')}}`);
+        }
       }
     }
     

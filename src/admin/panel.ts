@@ -10378,7 +10378,7 @@ function renderSiteBlocks() {
             var isLong = ruText.length > 100 || amText.length > 100;
             var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
 
-            h += '<div class="sb-text-pair" draggable="true" data-block-id="' + b.id + '" data-text-idx="' + ti + '" ondragstart="sbDragStart(event,&apos;text&apos;,' + b.id + ',' + ti + ')" ondragover="sbDragOver(event)" ondrop="sbDrop(event,&apos;text&apos;,' + b.id + ',' + ti + ')">';
+            h += '<div class="sb-text-pair" draggable="true" data-block-id="' + b.id + '" data-text-idx="' + ti + '" ondragstart="sbDragStart(event,&apos;text&apos;,' + b.id + ',' + ti + ')" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event,&apos;text&apos;,' + b.id + ',' + ti + ')">';
             h += '<div class="sb-text-pair-num" style="display:flex;align-items:center;justify-content:space-between;gap:8px">';
             h += '<div style="display:flex;align-items:center;gap:6px">';
             h += '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:0.75rem" title="Перетащить"></i>';
@@ -10500,7 +10500,7 @@ function renderSiteBlocks() {
             ? '<span class="badge badge-green" style="font-size:0.65rem" title="Связан с TG-шаблоном"><i class="fas fa-link" style="margin-right:3px"></i>TG</span>'
             : '';
           
-          h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative" draggable="true" ondragstart="sbDragStart(event,&apos;btn&apos;,' + b.id + ',' + bti + ')" ondragover="sbDragOver(event)" ondrop="sbDrop(event,&apos;btn&apos;,' + b.id + ',' + bti + ')">';
+          h += '<div style="margin-bottom:8px;padding:10px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative" draggable="true" ondragstart="sbDragStart(event,&apos;btn&apos;,' + b.id + ',' + bti + ')" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event,&apos;btn&apos;,' + b.id + ',' + bti + ')">';
           // Compact row: icon + move buttons + text RU + text AM + action + TG badge + link
           h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
           // Move arrows
@@ -11141,7 +11141,21 @@ function sbDragStart(e, type, blockId, idx) {
   _sbDragIdx = idx;
   e.dataTransfer.effectAllowed = 'move';
   e.dataTransfer.setData('text/plain', type + ':' + blockId + ':' + idx);
-  if (e.target && e.target.style) e.target.style.opacity = '0.5';
+  var dragEl = e.target.closest('.sb-text-pair') || e.target.closest('[draggable]') || e.target;
+  if (dragEl && dragEl.style) dragEl.style.opacity = '0.5';
+  // Reset opacity when drag ends (critical: prevents stuck dimming)
+  dragEl.addEventListener('dragend', function() {
+    dragEl.style.opacity = '1';
+    dragEl.style.borderColor = '';
+    // Also reset all highlighted siblings
+    var parent = dragEl.parentElement;
+    if (parent) {
+      parent.querySelectorAll('[draggable]').forEach(function(el) {
+        el.style.opacity = '1';
+        el.style.borderColor = '';
+      });
+    }
+  }, { once: true });
 }
 
 function sbDragOver(e) {
@@ -11150,6 +11164,11 @@ function sbDragOver(e) {
   // Visual feedback: highlight drop target
   var pair = e.target.closest('.sb-text-pair') || e.target.closest('[draggable]');
   if (pair) pair.style.borderColor = '#8B5CF6';
+}
+
+function sbDragLeave(e) {
+  var pair = e.target.closest('.sb-text-pair') || e.target.closest('[draggable]');
+  if (pair) pair.style.borderColor = '';
 }
 
 function sbDrop(e, type, blockId, targetIdx) {
