@@ -1186,10 +1186,11 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
 .section-title{font-size:2.2rem;font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
 .section-sub{font-size:1rem;color:var(--text-sec);max-width:640px;margin:0 auto;line-height:1.7}
-.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:24px;margin-bottom:16px}
-.svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:32px;transition:var(--t);position:relative;overflow:hidden}
+.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:28px;margin-bottom:16px}
+.svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:32px;transition:var(--t);position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);display:flex;flex-direction:column}
 .svc-card:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-4px);box-shadow:var(--glow)}
-.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--purple),var(--accent));opacity:0;transition:var(--t)}
+.svc-card .svc-features{flex:1}
+.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--purple),var(--accent));opacity:1;transition:var(--t)}
 .svc-card:hover::before{opacity:1}
 .svc-icon{width:56px;height:56px;border-radius:14px;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple);margin-bottom:20px}
 .svc-card h3{font-size:1.2rem;font-weight:700;margin-bottom:10px}
@@ -1592,7 +1593,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .hero-buttons .btn{width:100%;max-width:400px;justify-content:center}
   .hero-image img{height:auto;max-height:none}
   .section-title{font-size:1.7rem}
-  .services-grid{grid-template-columns:1fr}
+  .services-grid{grid-template-columns:1fr;gap:20px}
   .wh-grid{grid-template-columns:1fr}
   .buyout-grid{grid-template-columns:1fr}
   .stats-grid{grid-template-columns:repeat(2,1fr);gap:20px}
@@ -1678,7 +1679,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .compare-box{display:flex!important;flex-direction:column;gap:16px}
   .compare-side{width:100%!important}
   /* Services grid — single column */
-  .services-grid{grid-template-columns:1fr!important}
+  .services-grid{grid-template-columns:1fr!important;gap:20px}
   /* Stats grid: 2 columns on mobile */
   .stats-grid{grid-template-columns:repeat(2,1fr)!important;gap:16px!important}
   /* Contact grid */
@@ -1945,6 +1946,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
         <li><i class="fas fa-check"></i> <span data-ru="Естественное поведение покупателей" data-am="Գնորդների բնական վարքագիծ">Естественное поведение покупателей</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Забор товара из ПВЗ" data-am="Ապրանքի ստացում ՊՎԶ-ից">Забор товара из ПВЗ</span></li>
       </ul>
+      <div style="margin-top:20px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-tg" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Повысить рейтинг" data-am="Բարձրացնել վարկանիշը">Повысить рейтинг</span></a></div>
     </div>
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-star"></i></div>
@@ -3387,7 +3389,7 @@ switchLang = function(l) {
         if (!contentTexts || contentTexts.length === 0) return;
         // Skip injection for sections with structured HTML layouts
         // These sections have specific design (compare-box, why-steps, etc.) that plain text would break
-        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid, .calc-wrap');
+        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid, .calc-wrap, .services-grid');
         if (hasStructuredContent) return;
         // Collect ALL existing data-ru values in this section
         var existingRuValues = {};
