@@ -4262,7 +4262,8 @@ switchLang = function(l) {
         // Slot counter injection removed — now handled as separate block type 'slot_counter'
 
         // Dynamic buttons: update CTA buttons in section from DB
-        if (bf.buttons && bf.buttons.length > 0) {
+        // Skip calculator — its button (calcTgBtn) is handled separately after this loop
+        if (bf.buttons && bf.buttons.length > 0 && bf.block_type !== 'calculator') {
           var sectionIdH = bf.key.replace(/_/g, '-');
           
           // Special handling for floating_tg block
