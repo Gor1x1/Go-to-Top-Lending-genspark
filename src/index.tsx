@@ -1263,7 +1263,7 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .wh-item:hover img{transform:scale(1.05)}
 .wh-caption{position:absolute;bottom:0;left:0;right:0;padding:12px 16px;background:linear-gradient(transparent,rgba(0,0,0,0.8));font-size:0.85rem;font-weight:500}
 .guarantee-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px;display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"photo title" "photo texts" "photo buttons";gap:0 48px;align-items:start}
-.guarantee-el-photo{grid-area:photo}
+.guarantee-el-photo{grid-area:photo;display:flex;justify-content:center;align-items:center}
 .guarantee-el-title{grid-area:title}
 .guarantee-el-texts{grid-area:texts}
 .guarantee-el-buttons{grid-area:buttons}
@@ -1646,6 +1646,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .buyout-detail{display:flex;flex-direction:column}
   /* ===== MOBILE: remove ALL inner scroll from sections ===== */
   .section{overflow:hidden!important}
+  /* Allow carousel sections to scroll horizontally inside */
+  #client-reviews{overflow:visible!important}
+  #client-reviews .container{overflow:visible!important}
   .section .container{overflow:visible!important;max-width:100%!important}
   /* Key fix: prevent ANY child from causing horizontal scroll */
   body{overflow-x:hidden}
@@ -1654,10 +1657,10 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .cmp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r);margin:0;padding:0;max-width:100%}
   .cmp-table{min-width:0!important;width:100%;table-layout:fixed;font-size:0.72rem}
   .cmp-table td,.cmp-table th{padding:8px 6px;word-wrap:break-word;overflow-wrap:break-word}
-  /* Carousels: controlled scroll */
-  .rv-carousel,.pb-carousel{overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
-  .rv-carousel{touch-action:pan-x pinch-zoom}
-  .pb-carousel{touch-action:pan-x pinch-zoom}
+  /* Carousels: horizontal scroll only inside, vertical scroll passthrough to page */
+  .rv-carousel,.pb-carousel{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+  .rv-carousel{touch-action:auto}
+  .pb-carousel{touch-action:auto}
   /* Section CTA buttons — always at bottom with proper spacing */
   .section-cta{margin-top:24px!important;text-align:center;display:flex;flex-direction:column;align-items:center}
   .section-cta .btn{width:100%;max-width:400px;justify-content:center;display:inline-flex}
@@ -2110,10 +2113,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
         <div class="calc-price" id="buyoutPriceLabel">2 000 ֏</div>
         <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><input type="number" id="buyoutQty" value="0" min="0" max="999" onchange="onBuyoutInput()" oninput="onBuyoutInput()"><button onclick="ccBuyout(1)">+</button></div>
       </div>
-      <div class="buyout-tier-info">
-        <strong data-ru="Чем больше выкупов — тем дешевле:" data-am="Որքան շատ գնումներ — այնքան էժան:">Чем больше выкупов — тем дешевле:</strong><br>
-        <span data-ru="1-20 шт → 2 000 ֏ | 21-40 шт → 1 700 ֏ | 41-60 шт → 1 500 ֏ | 60+ шт → 1 250 ֏" data-am="1-20 հատ → 2 000 ֏ | 21-40 հատ → 1 700 ֏ | 41-60 հատ → 1 500 ֏ | 60+ հատ → 1 250 ֏">1-20 шт → ֏2 000 &nbsp;|&nbsp; 21-40 шт → ֏1 700 &nbsp;|&nbsp; 41-60 шт → ֏1 500 &nbsp;|&nbsp; 60+ шт → ֏1 250</span>
-      </div>
+      <!-- tier-info removed: dynamically generated from DB by JS -->
       <div class="calc-row" data-price="2500">
         <div class="calc-label" data-ru="Выкуп КГТ + забор из ПВЗ" data-am="Ծանրաքաշ ապրանքի գնում + ստացում ՊՎԶ-ից">Выкуп КГТ + забор из ПВЗ</div>
         <div class="calc-price">2 500 ֏</div>
