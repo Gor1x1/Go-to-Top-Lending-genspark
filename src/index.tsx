@@ -3399,6 +3399,11 @@ switchLang = function(l) {
           amMap[origKey] = entry.am;
         });
         document.querySelectorAll('[data-ru]').forEach(function(el) {
+          // Skip elements with data-no-rewrite (floating buttons, footer)
+          // Their text is managed by blockFeatures/footer API, not textMap
+          if (el.getAttribute('data-no-rewrite') === '1') return;
+          // Also skip elements inside footer or floating buttons
+          if (el.closest('.tg-float') || el.closest('.calc-float') || el.closest('footer')) return;
           var currentRu = el.getAttribute('data-ru');
           if (!currentRu) return;
           var newAm = amMap[currentRu.trim()];
@@ -3413,6 +3418,9 @@ switchLang = function(l) {
       } else {
         // Fallback: server didn't inject — do full client-side replacement
         document.querySelectorAll('[data-ru]').forEach(function(el) {
+          // Skip elements with data-no-rewrite (floating buttons, footer)
+          if (el.getAttribute('data-no-rewrite') === '1') return;
+          if (el.closest('.tg-float') || el.closest('.calc-float') || el.closest('footer')) return;
           var origRu = el.getAttribute('data-ru');
           if (!origRu) return;
           var changed = db.textMap[origRu.trim()];
@@ -4290,36 +4298,10 @@ switchLang = function(l) {
         if (bf.buttons && bf.buttons.length > 0 && bf.block_type !== 'calculator') {
           var sectionIdH = bf.key.replace(/_/g, '-');
           
-          // Special handling for floating_tg block
-          if (bf.key === 'floating_tg') {
-            var floatEl = document.querySelector('.tg-float');
-            if (floatEl && bf.buttons[0]) {
-              var fb = bf.buttons[0];
-              if (fb.url) floatEl.setAttribute('href', fb.url);
-              var fIcon = floatEl.querySelector('i');
-              if (fIcon) fIcon.className = resolveIcon(fb.icon, fb.url);
-              var fSpan = floatEl.querySelector('span');
-              if (fSpan) {
-                var fText = lang === 'am' && fb.text_am ? fb.text_am : (fb.text_ru || '');
-                if (fText) { fSpan.textContent = fText; fSpan.setAttribute('data-ru', fb.text_ru || ''); fSpan.setAttribute('data-am', fb.text_am || ''); }
-              }
-            }
-            // Handle second floating button (calc)
-            if (bf.buttons[1]) {
-              var calcFloat = document.querySelector('.calc-float');
-              if (calcFloat) {
-                var cb = bf.buttons[1];
-                if (cb.url) calcFloat.setAttribute('href', cb.url);
-                var cIcon = calcFloat.querySelector('i');
-                if (cIcon) cIcon.className = resolveIcon(cb.icon, cb.url);
-                var cSpan = calcFloat.querySelector('span');
-                if (cSpan) {
-                  var cText = lang === 'am' && cb.text_am ? cb.text_am : (cb.text_ru || '');
-                  if (cText) { cSpan.textContent = cText; cSpan.setAttribute('data-ru', cb.text_ru || ''); cSpan.setAttribute('data-am', cb.text_am || ''); }
-                }
-              }
-            }
-          } else {
+          // floating_tg is handled separately after the main loop
+          // (this forEach skips floating_tg on entry, so this code block is for regular sections only)
+          
+          {
             // For regular sections: UPDATE existing buttons IN-PLACE only
             // NEVER create new containers or buttons — only update what already exists in HTML
             // This prevents duplicate buttons from appearing after async DB load
@@ -4468,6 +4450,41 @@ switchLang = function(l) {
         }
       });
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
+      
+      // ===== APPLY FLOATING BUTTONS (separate from main loop which skips floating_tg) =====
+      var floatBf = db.blockFeatures.find(function(b) { return b.key === 'floating_tg'; });
+      if (floatBf && floatBf.buttons && floatBf.buttons.length > 0) {
+        var floatEl = document.querySelector('.tg-float');
+        if (floatEl && floatBf.buttons[0]) {
+          var fb = floatBf.buttons[0];
+          if (fb.url) floatEl.setAttribute('href', fb.url);
+          var fIcon = floatEl.querySelector('i');
+          if (fIcon) fIcon.className = resolveIcon(fb.icon, fb.url);
+          var fSpan = floatEl.querySelector('span');
+          if (fSpan) {
+            var fText = lang === 'am' && fb.text_am ? fb.text_am : (fb.text_ru || '');
+            if (fText) { fSpan.textContent = fText; fSpan.setAttribute('data-ru', fb.text_ru || ''); fSpan.setAttribute('data-am', fb.text_am || ''); fSpan.setAttribute('data-no-rewrite', '1'); }
+          }
+          // Update messenger icon based on URL type
+          if (typeof updateMessengerIcon === 'function') updateMessengerIcon(floatEl, fb.url);
+        }
+        // Handle second floating button (calc)
+        if (floatBf.buttons[1]) {
+          var calcFloat = document.querySelector('.calc-float');
+          if (calcFloat) {
+            var cb = floatBf.buttons[1];
+            if (cb.url) calcFloat.setAttribute('href', cb.url);
+            var cIcon = calcFloat.querySelector('i');
+            if (cIcon) cIcon.className = resolveIcon(cb.icon, cb.url);
+            var cSpan = calcFloat.querySelector('span');
+            if (cSpan) {
+              var cText = lang === 'am' && cb.text_am ? cb.text_am : (cb.text_ru || '');
+              if (cText) { cSpan.textContent = cText; cSpan.setAttribute('data-ru', cb.text_ru || ''); cSpan.setAttribute('data-am', cb.text_am || ''); cSpan.setAttribute('data-no-rewrite', '1'); }
+            }
+          }
+        }
+        console.log('[DB] Floating buttons applied from blockFeatures');
+      }
       
       // ===== APPLY CALCULATOR BUTTONS (separate from main loop which skips calculator) =====
       var calcBf = db.blockFeatures.find(function(b) { return b.key === 'calculator' || b.block_type === 'calculator'; });
@@ -4619,7 +4636,7 @@ switchLang = function(l) {
               // Skip items without section target (CTA buttons like _telegram, _cta)
               if (!fnItem.target || fnItem.target.charAt(0) === '_') continue;
               var fnText = lang === 'am' && fnItem.am ? fnItem.am : fnItem.ru;
-              footerNavHtml += '<li><a href="#' + fnItem.target + '" data-ru="' + fnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (fnItem.am||'').replace(/"/g,'&quot;') + '">' + fnText + '</a></li>';
+              footerNavHtml += '<li><a href="#' + fnItem.target + '" data-ru="' + fnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (fnItem.am||'').replace(/"/g,'&quot;') + '" data-no-rewrite="1">' + fnText + '</a></li>';
               footerNavCount++;
             }
             footerNavList.innerHTML = footerNavHtml;
@@ -5054,7 +5071,9 @@ async function checkRefCode() {
       if (brandP) {
         brandP.setAttribute('data-ru', f.brand_text_ru);
         if (f.brand_text_am) brandP.setAttribute('data-am', f.brand_text_am);
-        brandP.textContent = lang === 'am' && f.brand_text_am ? f.brand_text_am : f.brand_text_ru;
+        // Show correct language text; if AM is empty, keep original data-am from HTML
+        var brandAm = f.brand_text_am || brandP.getAttribute('data-am') || '';
+        _setTextPreserveIcons(brandP, lang === 'am' && brandAm ? brandAm : f.brand_text_ru);
       }
     }
 
@@ -5064,10 +5083,10 @@ async function checkRefCode() {
     if (contacts.length > 0) {
       var contactCol = document.getElementById('footerContactCol');
       if (contactCol) {
-        var chtml = '<h4 data-ru="Контакты" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580">' + (lang==='am' ? '\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580' : 'Контакты') + '</h4><ul>';
+        var chtml = '<h4 data-ru="Контакты" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580" data-no-rewrite="1">' + (lang==='am' ? '\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580' : 'Контакты') + '</h4><ul>';
         for (var i = 0; i < contacts.length; i++) {
           var c = contacts[i];
-          chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> <span' + (c.name_am ? ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + c.name_am.replace(/"/g,'&quot;') + '"' : '') + '>' + (lang === 'am' && c.name_am ? c.name_am : (c.name_ru || '')) + '</span></a></li>';
+          chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> <span' + (c.name_am ? ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + c.name_am.replace(/"/g,'&quot;') + '" data-no-rewrite="1"' : '') + '>' + (lang === 'am' && c.name_am ? c.name_am : (c.name_ru || '')) + '</span></a></li>';
         }
         chtml += '</ul>';
         contactCol.innerHTML = chtml;
@@ -5100,17 +5119,22 @@ async function checkRefCode() {
     if (f.copyright_ru) {
       var copySp = footer.querySelector('.footer-bottom > span:first-child');
       if (copySp) {
-        copySp.innerHTML = f.copyright_ru;
-        if (f.copyright_am && lang === 'am') copySp.innerHTML = f.copyright_am;
+        var copyAm = f.copyright_am || '';
+        if (lang === 'am' && copyAm) {
+          copySp.innerHTML = copyAm;
+        } else {
+          copySp.innerHTML = f.copyright_ru;
+        }
       }
     }
     // Update location
     if (f.location_ru) {
       var locSp = footer.querySelector('.footer-bottom > span:last-of-type');
       if (locSp) {
-        locSp.textContent = lang === 'am' && f.location_am ? f.location_am : f.location_ru;
+        var locAm = f.location_am || locSp.getAttribute('data-am') || '';
         locSp.setAttribute('data-ru', f.location_ru);
         if (f.location_am) locSp.setAttribute('data-am', f.location_am);
+        _setTextPreserveIcons(locSp, lang === 'am' && locAm ? locAm : f.location_ru);
       }
     }
     // Custom HTML
@@ -5119,6 +5143,13 @@ async function checkRefCode() {
       if (!customDiv) { customDiv = document.createElement('div'); customDiv.className = 'footer-custom'; footer.querySelector('.container').appendChild(customDiv); }
       customDiv.innerHTML = f.custom_html;
     }
+    
+    // Re-apply language to newly created footer elements
+    // (footer fetch creates new DOM elements that weren't present during initial switchLang)
+    footer.querySelectorAll('[data-' + lang + ']').forEach(function(el) {
+      var t = el.getAttribute('data-' + lang);
+      if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
+    });
   }).catch(function(){});
 })();
 
