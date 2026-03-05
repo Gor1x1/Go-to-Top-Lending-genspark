@@ -1829,16 +1829,16 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
     <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
     <li><a href="#contact" data-ru="Контакты" data-am="Կոնտակտներ">Контакты</a></li>
-    <li class="nav-mobile-cta"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary"><i class="fab fa-telegram"></i> Написать нам</a></li>
+    <li class="nav-mobile-cta"><a href="https://wa.me/37441888389" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> Написать нам</a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
       <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')">RU</button>
       <button class="lang-btn active" data-lang="am" onclick="switchLang('am')">AM</button>
     </div>
-    <a href="https://t.me/goo_to_top" target="_blank" class="nav-cta">
-      <i class="fab fa-telegram"></i>
-      <span data-ru="Написать нам" data-am="Գրել մեզ">Написать нам</span>
+    <a href="https://wa.me/37441888389" target="_blank" class="nav-cta">
+      <i class="fab fa-whatsapp"></i>
+      <span data-ru="Написать нам" data-am="Գրել հիմա">Написать нам</span>
     </a>
   </div>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()">
@@ -2602,9 +2602,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </footer>
 
 <!-- FLOATING TG BUTTON -->
-<a href="https://t.me/goo_to_top" target="_blank" class="tg-float">
-  <i class="fab fa-telegram"></i>
-  <span data-ru="Написать нам" data-am="Գրել մեզ" data-no-rewrite="1">Написать нам</span>
+<a href="https://wa.me/37441888389" target="_blank" class="tg-float">
+  <i class="fab fa-whatsapp"></i>
+  <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">Написать нам</span>
 </a>
 
 <!-- FLOATING CALC BUTTON -->
@@ -2668,7 +2668,7 @@ const AM = {
   "Гарантии":"Երաշխիքներ",
   "FAQ":"ՀՏՀ",
   "Контакты":"Կոնտակտներ",
-  "Написать нам":"Գրել մեզ",
+  "Написать нам":"Գրել հիմա",
   "Работаем в Армении":"Աշխատում ենք Հայաստանում",
   "Выведем ваш товар":"Մենք կբարձրացնենք ձեր ապրանքը",
   "в ТОП Wildberries":"Wildberries-ի TOP",
