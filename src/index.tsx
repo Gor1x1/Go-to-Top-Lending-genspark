@@ -2649,13 +2649,25 @@ const AM = {
   "в ТОП Wildberries":"Wildberries-ի TOP",
   "Рассчитать стоимость":"Հաշվել արժեքը"
 };
+// Helper: set text on element while preserving child <i> icons (e.g. quote icons in captions)
+function _setTextPreserveIcons(el, t) {
+  var icons = el.querySelectorAll('i');
+  if (icons.length > 0) {
+    // Remove only text nodes, keep icon elements intact
+    var cn = Array.prototype.slice.call(el.childNodes);
+    for (var ci = 0; ci < cn.length; ci++) { if (cn[ci].nodeType === 3) el.removeChild(cn[ci]); }
+    el.appendChild(document.createTextNode(t));
+  } else {
+    el.textContent = t;
+  }
+}
 function switchLang(l) {
   lang = l;
   localStorage.setItem('gtt_lang', l);
   document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
   document.querySelectorAll('[data-' + l + ']').forEach(el => {
     const t = el.getAttribute('data-' + l);
-    if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+    if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
 }
@@ -3346,7 +3358,7 @@ switchLang = function(l) {
   document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.lang === l); });
   document.querySelectorAll('[data-' + l + ']').forEach(function(el) {
     var t = el.getAttribute('data-' + l);
-    if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+    if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
   // Re-apply Telegram links with correct language message templates
@@ -3390,7 +3402,7 @@ switchLang = function(l) {
             el.setAttribute('data-am', newAm);
             // Update visible text for current language
             var t = el.getAttribute('data-' + lang);
-            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
           }
         });
         console.log('[DB] Server-injected texts: only AM updated client-side');
@@ -3404,7 +3416,7 @@ switchLang = function(l) {
             el.setAttribute('data-ru', changed.ru);
             el.setAttribute('data-am', changed.am);
             var t = el.getAttribute('data-' + lang);
-            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') el.textContent = t;
+            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
           }
         });
         console.log('[DB] Texts applied (client-side fallback)');
@@ -5350,7 +5362,7 @@ async function checkRefCode() {
   });
 
   if (lang === 'am') {
-    formDiv.querySelectorAll('[data-am]').forEach(function(el) { el.textContent = el.getAttribute('data-am'); });
+    formDiv.querySelectorAll('[data-am]').forEach(function(el) { _setTextPreserveIcons(el, el.getAttribute('data-am')); });
   }
   var _s = document.createElement('style');
   _s.textContent = '@media(max-width:640px){.pdf-form-row{grid-template-columns:1fr!important}}';
