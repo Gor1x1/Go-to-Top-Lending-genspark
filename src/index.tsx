@@ -4500,6 +4500,33 @@ switchLang = function(l) {
           // Update messenger icon based on URL type
           if (typeof updateMessengerIcon === 'function') updateMessengerIcon(floatEl, fb.url);
         }
+        // Also update nav CTA button (desktop + mobile) from same floating block button[0]
+        if (floatBf.buttons[0]) {
+          var fb0 = floatBf.buttons[0];
+          // Desktop nav CTA
+          var navCta = document.querySelector('.nav-cta');
+          if (navCta) {
+            if (fb0.url) navCta.setAttribute('href', fb0.url);
+            var ncIcon = navCta.querySelector('i');
+            if (ncIcon) ncIcon.className = resolveIcon(fb0.icon, fb0.url);
+            var ncSpan = navCta.querySelector('span');
+            if (ncSpan) {
+              var ncText = lang === 'am' && fb0.text_am ? fb0.text_am : (fb0.text_ru || '');
+              if (ncText) { ncSpan.textContent = ncText; ncSpan.setAttribute('data-ru', fb0.text_ru || ''); ncSpan.setAttribute('data-am', fb0.text_am || ''); ncSpan.setAttribute('data-no-rewrite', '1'); }
+            }
+            if (typeof updateMessengerIcon === 'function') updateMessengerIcon(navCta, fb0.url);
+          }
+          // Mobile nav CTA
+          var mobCta = document.querySelector('.nav-mobile-cta a');
+          if (mobCta) {
+            if (fb0.url) mobCta.setAttribute('href', fb0.url);
+            var mcIcon = mobCta.querySelector('i');
+            if (mcIcon) mcIcon.className = resolveIcon(fb0.icon, fb0.url);
+            var mcText = lang === 'am' && fb0.text_am ? fb0.text_am : (fb0.text_ru || '');
+            if (mcText) { mobCta.setAttribute('data-ru', fb0.text_ru || ''); mobCta.setAttribute('data-am', fb0.text_am || ''); }
+            if (typeof updateMessengerIcon === 'function') updateMessengerIcon(mobCta, fb0.url);
+          }
+        }
         // Handle second floating button (calc)
         if (floatBf.buttons[1]) {
           var calcFloat = document.querySelector('.calc-float');
