@@ -8477,10 +8477,11 @@ function renderFooter() {
   h += '<div id="footerContactsList">';
   for (var ci = 0; ci < contacts.length; ci++) {
     var ct = contacts[ci];
-    h += '<div style="display:grid;grid-template-columns:auto 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:10px;background:#0f172a;border-radius:8px">' +
+    h += '<div style="display:grid;grid-template-columns:auto 1fr 1fr 1fr auto;gap:8px;align-items:center;margin-bottom:8px;padding:10px;background:#0f172a;border-radius:8px">' +
       '<select class="input" style="width:140px" id="fc_icon_'+ci+'"><option value="fab fa-telegram"'+(ct.icon==='fab fa-telegram'?' selected':'')+'>Telegram</option><option value="fab fa-whatsapp"'+(ct.icon==='fab fa-whatsapp'?' selected':'')+'>WhatsApp</option><option value="fas fa-phone"'+(ct.icon==='fas fa-phone'?' selected':'')+'>Телефон</option><option value="fas fa-envelope"'+(ct.icon==='fas fa-envelope'?' selected':'')+'>Email</option><option value="fab fa-instagram"'+(ct.icon==='fab fa-instagram'?' selected':'')+'>Instagram</option></select>' +
-      '<input class="input" placeholder="Название (RU)" id="fc_name_'+ci+'" value="'+escHtml(ct.name_ru)+'">' +
-      '<input class="input" placeholder="Ссылка/URL" id="fc_url_'+ci+'" value="'+escHtml(ct.url)+'">' +
+      '<input class="input" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 (RU)" id="fc_name_'+ci+'" value="'+escHtml(ct.name_ru)+'">' +
+      '<input class="input" placeholder="\u0531\u0576\u057e\u0561\u0576\u0578\u0582\u0574 (AM)" id="fc_name_am_'+ci+'" value="'+escHtml(ct.name_am || '')+'">' +
+      '<input class="input" placeholder="\u0421\u0441\u044b\u043b\u043a\u0430/URL" id="fc_url_'+ci+'" value="'+escHtml(ct.url)+'">' +
       '<button class="tier-del-btn" onclick="removeFooterContact('+ci+')"><i class="fas fa-times"></i></button>' +
     '</div>';
   }
@@ -8555,7 +8556,8 @@ function collectFooterContacts() {
   for (var i = 0; ; i++) {
     var iconEl = document.getElementById('fc_icon_'+i);
     if (!iconEl) break;
-    arr.push({ icon: iconEl.value, name_ru: document.getElementById('fc_name_'+i).value, url: document.getElementById('fc_url_'+i).value });
+    var nameAmEl = document.getElementById('fc_name_am_'+i);
+    arr.push({ icon: iconEl.value, name_ru: document.getElementById('fc_name_'+i).value, name_am: nameAmEl ? nameAmEl.value : '', url: document.getElementById('fc_url_'+i).value });
   }
   return arr;
 }

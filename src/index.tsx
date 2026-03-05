@@ -1072,6 +1072,27 @@ app.get('/', async (c) => {
     
     // Calculator texts are handled client-side via blockFeatures (not via textMap/HTMLRewriter)
     // The HTMLRewriter skips the calculator section to avoid site_content positional corruption
+    
+    // Load footer_settings for server-side footer injection (prevents flash of old footer)
+    try {
+      const footerRow = await db.prepare('SELECT * FROM footer_settings LIMIT 1').first();
+      if (footerRow) {
+        (globalThis as any).__footerSettings = footerRow;
+      }
+    } catch {}
+    
+    // Load footer block social_links + social_settings from site_blocks (for server-side footer socials)
+    try {
+      const fBlock = await db.prepare("SELECT social_links, custom_html FROM site_blocks WHERE block_key = 'footer' AND is_visible = 1 LIMIT 1").first();
+      if (fBlock) {
+        let fSocials: any[] = [];
+        try { fSocials = JSON.parse(fBlock.social_links as string || '[]'); } catch {}
+        let fOpts: any = {};
+        try { fOpts = JSON.parse(fBlock.custom_html as string || '{}'); } catch {}
+        (globalThis as any).__footerBlockSocials = fSocials;
+        (globalThis as any).__footerBlockSocialSettings = fOpts.social_settings || {};
+      }
+    } catch {}
   } catch (e) {
     // If DB fails, serve original HTML without modifications
   }
@@ -3702,30 +3723,49 @@ switchLang = function(l) {
     }
     
     // ===== 3d. FOOTER SOCIAL LINKS FROM DB =====
+    // Server-side already injects footer socials with title/subtitle from site_blocks.footer
+    // Client-side only updates if server didn't inject (fallback) or if data changed
     if (db.footerSocials && db.footerSocials.length > 0) {
-      var footerSocialEl = document.querySelector('.footer-social, .social-links, footer .socials');
-      if (!footerSocialEl) {
-        // Create social links container in footer
-        var footerEl = document.querySelector('footer');
-        if (footerEl) {
-          footerSocialEl = document.createElement('div');
-          footerSocialEl.className = 'footer-socials';
-          footerSocialEl.style.cssText = 'display:flex;gap:12px;justify-content:center;margin-top:16px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1)';
-          footerEl.appendChild(footerSocialEl);
+      var existingSocialsBlock = document.querySelector('.footer-socials-block');
+      if (!existingSocialsBlock) {
+        // Server didn't inject — create client-side as fallback
+        var footerSocialEl = document.querySelector('.footer-social, .social-links, footer .socials');
+        if (!footerSocialEl) {
+          var footerEl = document.querySelector('footer .container');
+          if (footerEl) {
+            footerSocialEl = document.createElement('div');
+            footerSocialEl.className = 'footer-socials-block';
+            footerSocialEl.style.cssText = 'margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:center';
+            footerEl.appendChild(footerSocialEl);
+          }
         }
-      }
-      if (footerSocialEl) {
-        var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk' };
-        var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2' };
-        var sh = '';
-        db.footerSocials.forEach(function(s) {
-          var icon = socialIcons[s.type] || 'fas fa-link';
-          var color = socialColors[s.type] || '#8B5CF6';
-          sh += '<a href="' + (s.url||'#') + '" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;background:' + color + ';color:white;font-size:1.1rem;transition:transform 0.2s">' +
-            '<i class="' + icon + '"></i></a>';
-        });
-        footerSocialEl.innerHTML = sh;
-        console.log('[DB] Footer social links applied:', db.footerSocials.length);
+        if (footerSocialEl) {
+          var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk' };
+          var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2' };
+          // Find social_settings from blockFeatures for footer
+          var footerBf = null;
+          if (db.blockFeatures) { for (var fi = 0; fi < db.blockFeatures.length; fi++) { if (db.blockFeatures[fi].key === 'footer') { footerBf = db.blockFeatures[fi]; break; } } }
+          var fss = footerBf ? (footerBf.social_settings || {}) : {};
+          var fsh = '';
+          // Title
+          var fsTitle = lang === 'am' ? (fss.title_am || fss.title_ru || '') : (fss.title_ru || '');
+          var fsSubtitle = lang === 'am' ? (fss.subtitle_am || fss.subtitle_ru || '') : (fss.subtitle_ru || '');
+          if (fsTitle) fsh += '<div style="font-size:1.1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:4px">' + fsTitle + '</div>';
+          if (fsSubtitle) fsh += '<div style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">' + fsSubtitle + '</div>';
+          fsh += '<div style="display:flex;gap:' + (fss.gap || 12) + 'px;justify-content:center;align-items:center;flex-wrap:wrap">';
+          db.footerSocials.forEach(function(s) {
+            var icon = socialIcons[s.type] || 'fas fa-link';
+            var color = s.bg_color || socialColors[s.type] || '#8B5CF6';
+            var sz = s.icon_size || 40;
+            fsh += '<a href="' + (s.url||'#') + '" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + color + ';color:white;font-size:' + Math.round(sz*0.45) + 'px;transition:transform 0.2s">' +
+              '<i class="' + icon + '"></i></a>';
+          });
+          fsh += '</div>';
+          footerSocialEl.innerHTML = fsh;
+          console.log('[DB] Footer social links applied (client fallback):', db.footerSocials.length);
+        }
+      } else {
+        console.log('[DB] Footer social links already server-injected:', db.footerSocials.length);
       }
     }
     
@@ -5059,82 +5099,88 @@ async function checkRefCode() {
 /* Old standalone fetch removed — counters are managed as site_blocks in admin */
 
 /* ===== DYNAMIC FOOTER FROM DB ===== */
+/* Footer is now server-side injected to prevent flash. Client-side only updates attributes for:
+   - Language switching (data-ru/data-am on new elements)
+   - Elements not covered by server injection (custom_html)
+   This prevents the "old content -> new content" flash on page load. */
 (function() {
   fetch('/api/footer').then(function(r){return r.json()}).then(function(f) {
     if (!f || (!f.contacts_json && !f.brand_text_ru && !f.copyright_ru)) return;
     var footer = document.querySelector('footer.footer');
     if (!footer) return;
 
-    // Update brand text
+    // Update brand text attributes (server already set the content, we only update for live changes)
     if (f.brand_text_ru) {
       var brandP = footer.querySelector('.footer-brand p');
       if (brandP) {
-        brandP.setAttribute('data-ru', f.brand_text_ru);
-        if (f.brand_text_am) brandP.setAttribute('data-am', f.brand_text_am);
-        // Show correct language text; if AM is empty, keep original data-am from HTML
-        var brandAm = f.brand_text_am || brandP.getAttribute('data-am') || '';
-        _setTextPreserveIcons(brandP, lang === 'am' && brandAm ? brandAm : f.brand_text_ru);
+        var currentBrandRu = brandP.getAttribute('data-ru') || '';
+        // Only update if brand text changed from what server injected
+        if (currentBrandRu !== f.brand_text_ru) {
+          brandP.setAttribute('data-ru', f.brand_text_ru);
+          if (f.brand_text_am) brandP.setAttribute('data-am', f.brand_text_am);
+          var brandAm = f.brand_text_am || brandP.getAttribute('data-am') || '';
+          _setTextPreserveIcons(brandP, lang === 'am' && brandAm ? brandAm : f.brand_text_ru);
+        }
       }
     }
 
-    // Rebuild contacts column
+    // Rebuild contacts — only if data changed from server-injected version
     var contacts = [];
     try { contacts = JSON.parse(f.contacts_json || '[]'); } catch(e) {}
     if (contacts.length > 0) {
       var contactCol = document.getElementById('footerContactCol');
       if (contactCol) {
-        var chtml = '<h4 data-ru="Контакты" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580" data-no-rewrite="1">' + (lang==='am' ? '\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580' : 'Контакты') + '</h4><ul>';
-        for (var i = 0; i < contacts.length; i++) {
-          var c = contacts[i];
-          chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> <span' + (c.name_am ? ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + c.name_am.replace(/"/g,'&quot;') + '" data-no-rewrite="1"' : '') + '>' + (lang === 'am' && c.name_am ? c.name_am : (c.name_ru || '')) + '</span></a></li>';
+        // Check if contacts differ from server-injected version
+        var existingLinks = contactCol.querySelectorAll('ul li a');
+        var needsRebuild = existingLinks.length !== contacts.length;
+        if (!needsRebuild) {
+          for (var ci = 0; ci < contacts.length; ci++) {
+            var linkEl = existingLinks[ci];
+            if (!linkEl || linkEl.getAttribute('href') !== (contacts[ci].url || '#')) {
+              needsRebuild = true; break;
+            }
+            var nameSpan = linkEl.querySelector('span');
+            if (nameSpan && nameSpan.getAttribute('data-ru') !== (contacts[ci].name_ru || '')) {
+              needsRebuild = true; break;
+            }
+          }
         }
-        chtml += '</ul>';
-        contactCol.innerHTML = chtml;
+        if (needsRebuild) {
+          var chtml = '<h4 data-ru="Контакты" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580" data-no-rewrite="1">' + (lang==='am' ? '\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580' : 'Контакты') + '</h4><ul>';
+          for (var i = 0; i < contacts.length; i++) {
+            var c = contacts[i];
+            var nameAmAttr = c.name_am ? ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + c.name_am.replace(/"/g,'&quot;') + '" data-no-rewrite="1"' : ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-no-rewrite="1"';
+            chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> <span' + nameAmAttr + '>' + (lang === 'am' && c.name_am ? c.name_am : (c.name_ru || '')) + '</span></a></li>';
+          }
+          chtml += '</ul>';
+          contactCol.innerHTML = chtml;
+        }
       }
     }
 
-    // Rebuild socials
-    var socials = [];
-    try { socials = JSON.parse(f.socials_json || '[]'); } catch(e) {}
-    if (socials.length > 0) {
-      var bottom = footer.querySelector('.footer-bottom');
-      if (bottom) {
-        var socHtml = '<div style="display:flex;gap:16px;align-items:center">';
-        for (var si = 0; si < socials.length; si++) {
-          var s = socials[si];
-          socHtml += '<a href="'+(s.url||'#')+'" target="_blank" style="color:var(--text-sec);font-size:1.2rem;transition:all 0.2s" title="'+(s.name||'')+'"><i class="'+(s.icon||'fab fa-link')+'"></i></a>';
-        }
-        socHtml += '</div>';
-        // Insert socials after copyright span
-        var existingSocials = bottom.querySelector('.footer-socials');
-        if (existingSocials) existingSocials.remove();
-        var socDiv = document.createElement('div');
-        socDiv.className = 'footer-socials';
-        socDiv.innerHTML = socHtml;
-        bottom.appendChild(socDiv);
-      }
-    }
-
-    // Update copyright
+    // Update copyright — only if changed
     if (f.copyright_ru) {
       var copySp = footer.querySelector('.footer-bottom > span:first-child');
       if (copySp) {
         var copyAm = f.copyright_am || '';
-        if (lang === 'am' && copyAm) {
-          copySp.innerHTML = copyAm;
-        } else {
-          copySp.innerHTML = f.copyright_ru;
+        var copySpan = copySp.querySelector('[data-ru]');
+        if (copySpan) {
+          // Just update attributes for language switching
+          if (copyAm) copySp.querySelector('[data-am]') && copySpan.setAttribute('data-am', copyAm);
         }
       }
     }
-    // Update location
+    // Update location — only if changed
     if (f.location_ru) {
       var locSp = footer.querySelector('.footer-bottom > span:last-of-type');
       if (locSp) {
-        var locAm = f.location_am || locSp.getAttribute('data-am') || '';
-        locSp.setAttribute('data-ru', f.location_ru);
-        if (f.location_am) locSp.setAttribute('data-am', f.location_am);
-        _setTextPreserveIcons(locSp, lang === 'am' && locAm ? locAm : f.location_ru);
+        var currentLocRu = locSp.getAttribute('data-ru') || '';
+        if (currentLocRu !== f.location_ru) {
+          var locAm = f.location_am || locSp.getAttribute('data-am') || '';
+          locSp.setAttribute('data-ru', f.location_ru);
+          if (f.location_am) locSp.setAttribute('data-am', f.location_am);
+          _setTextPreserveIcons(locSp, lang === 'am' && locAm ? locAm : f.location_ru);
+        }
       }
     }
     // Custom HTML
@@ -5144,12 +5190,13 @@ async function checkRefCode() {
       customDiv.innerHTML = f.custom_html;
     }
     
-    // Re-apply language to newly created footer elements
-    // (footer fetch creates new DOM elements that weren't present during initial switchLang)
-    footer.querySelectorAll('[data-' + lang + ']').forEach(function(el) {
-      var t = el.getAttribute('data-' + lang);
-      if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
-    });
+    // Re-apply language to all footer elements (ensures AM text is shown when language is AM)
+    if (lang === 'am') {
+      footer.querySelectorAll('[data-am]').forEach(function(el) {
+        var t = el.getAttribute('data-am');
+        if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
+      });
+    }
   }).catch(function(){});
 })();
 
@@ -5847,6 +5894,108 @@ async function checkRefCode() {
     
     // Get the transformed HTML
     pageHtml = await rewritten.text();
+  }
+  
+  // ===== SERVER-SIDE FOOTER INJECTION =====
+  // Inject footer_settings data into HTML to prevent flash of old footer content
+  const footerSettings = (globalThis as any).__footerSettings;
+  const footerBlockSocials = (globalThis as any).__footerBlockSocials || [];
+  const footerBlockSocialSettings = (globalThis as any).__footerBlockSocialSettings || {};
+  // Clean up global refs
+  delete (globalThis as any).__footerSettings;
+  delete (globalThis as any).__footerBlockSocials;
+  delete (globalThis as any).__footerBlockSocialSettings;
+  
+  if (footerSettings) {
+    // 1. Inject brand text from footer_settings
+    if (footerSettings.brand_text_ru) {
+      const brandAm = footerSettings.brand_text_am || '';
+      const oldBrandMatch = pageHtml.match(/<p data-ru="[^"]*" data-am="[^"]*" data-no-rewrite="1">[^<]*<\/p>\s*<\/div>\s*<div class="footer-col" id="footerNavCol">/);
+      if (oldBrandMatch) {
+        const escRu = (footerSettings.brand_text_ru as string).replace(/"/g, '&quot;');
+        const escAm = brandAm ? (brandAm as string).replace(/"/g, '&quot;') : '';
+        const newBrand = `<p data-ru="${escRu}" data-am="${escAm || escRu}" data-no-rewrite="1">${footerSettings.brand_text_ru}</p></div>\n    <div class="footer-col" id="footerNavCol">`;
+        pageHtml = pageHtml.replace(oldBrandMatch[0], newBrand);
+      }
+    }
+    
+    // 2. Inject contacts from footer_settings.contacts_json
+    let contacts: any[] = [];
+    try { contacts = JSON.parse(footerSettings.contacts_json as string || '[]'); } catch {}
+    if (contacts.length > 0) {
+      let contactHtml = '<h4 data-ru="\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580" data-no-rewrite="1">\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b</h4>\n      <ul>\n';
+      for (const ct of contacts) {
+        const nameRu = (ct.name_ru || '').replace(/"/g, '&quot;');
+        const nameAm = (ct.name_am || '').replace(/"/g, '&quot;');
+        contactHtml += `        <li><a href="${ct.url || '#'}" target="_blank"><i class="${ct.icon || 'fab fa-telegram'}"></i> <span data-ru="${nameRu}" data-am="${nameAm || nameRu}" data-no-rewrite="1">${ct.name_ru || ''}</span></a></li>\n`;
+      }
+      contactHtml += '      </ul>';
+      // Replace the contacts column content
+      const contactColMatch = pageHtml.match(/<div class="footer-col" id="footerContactCol">[\s\S]*?<\/div>/);
+      if (contactColMatch) {
+        pageHtml = pageHtml.replace(contactColMatch[0], `<div class="footer-col" id="footerContactCol">\n      ${contactHtml}\n    </div>`);
+      }
+    }
+    
+    // 3. Inject copyright
+    if (footerSettings.copyright_ru) {
+      const copyAm = footerSettings.copyright_am || '';
+      const copyRu = footerSettings.copyright_ru as string;
+      // Replace the copyright span content
+      const oldCopyMatch = pageHtml.match(/© 2026 Go to Top\. <span data-ru="[^"]*" data-am="[^"]*" data-no-rewrite="1">[^<]*<\/span>/);
+      if (oldCopyMatch) {
+        pageHtml = pageHtml.replace(oldCopyMatch[0], `${copyRu.includes('©') ? '' : ''}${copyRu.replace('© 2026 Go to Top. ', '')}`.length > 0 ? 
+          `© 2026 Go to Top. <span data-ru="\u0412\u0441\u0435 \u043f\u0440\u0430\u0432\u0430 \u0437\u0430\u0449\u0438\u0449\u0435\u043d\u044b" data-am="${copyAm ? (copyAm as string).replace(/"/g, '&quot;') : '\u0532\u0578\u056c\u0578\u0580 \u056b\u0580\u0561\u057e\u0578\u0582\u0576\u0584\u0576\u0565\u0580\u0568 \u057a\u0561\u0577\u057f\u057a\u0561\u0576\u057e\u0561\u056e \u0565\u0576'}" data-no-rewrite="1">\u0412\u0441\u0435 \u043f\u0440\u0430\u0432\u0430 \u0437\u0430\u0449\u0438\u0449\u0435\u043d\u044b</span>` : oldCopyMatch[0]);
+      }
+    }
+    
+    // 4. Inject location
+    if (footerSettings.location_ru) {
+      const locRu = (footerSettings.location_ru as string).replace(/"/g, '&quot;');
+      const locAm = footerSettings.location_am ? (footerSettings.location_am as string).replace(/"/g, '&quot;') : '';
+      const oldLocMatch = pageHtml.match(/<span data-ru="[^"]*" data-am="[^"]*" data-no-rewrite="1">[^<]*<\/span>\s*<\/div>\s*<\/div>\s*<\/footer>/);
+      if (oldLocMatch) {
+        pageHtml = pageHtml.replace(oldLocMatch[0], `<span data-ru="${locRu}" data-am="${locAm || locRu}" data-no-rewrite="1">${footerSettings.location_ru}</span>\n  </div>\n</div>\n</footer>`);
+      }
+    }
+  }
+  
+  // 5. Inject footer social links with title/subtitle from site_blocks.footer
+  if (footerBlockSocials.length > 0) {
+    const socialIcons: Record<string,string> = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter' };
+    const socialColors: Record<string,string> = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2' };
+    const ss = footerBlockSocialSettings;
+    const gap = ss.gap || 12;
+    const align = ss.align || 'center';
+    const justifyMap: Record<string,string> = { center:'center', left:'flex-start', right:'flex-end' };
+    
+    let socialsHtml = '<div class="footer-socials-block" style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:' + (justifyMap[align] || 'center') + '">';
+    // Title
+    if (ss.title_ru) {
+      const titleRu = (ss.title_ru as string).replace(/"/g, '&quot;');
+      const titleAm = ss.title_am ? (ss.title_am as string).replace(/"/g, '&quot;') : titleRu;
+      socialsHtml += `<div data-ru="${titleRu}" data-am="${titleAm}" data-no-rewrite="1" style="font-size:1.1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:4px">${ss.title_ru}</div>`;
+    }
+    // Subtitle
+    if (ss.subtitle_ru) {
+      const subRu = (ss.subtitle_ru as string).replace(/"/g, '&quot;');
+      const subAm = ss.subtitle_am ? (ss.subtitle_am as string).replace(/"/g, '&quot;') : subRu;
+      socialsHtml += `<div data-ru="${subRu}" data-am="${subAm}" data-no-rewrite="1" style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">${ss.subtitle_ru}</div>`;
+    }
+    // Icons
+    socialsHtml += `<div style="display:flex;gap:${gap}px;justify-content:${justifyMap[align] || 'center'};align-items:center;flex-wrap:wrap">`;
+    for (const s of footerBlockSocials) {
+      if (!s.url) continue;
+      const icon = socialIcons[s.type] || 'fas fa-link';
+      const color = s.bg_color || socialColors[s.type] || '#8B5CF6';
+      const sz = s.icon_size || 40;
+      const fontSize = Math.round(sz * 0.45);
+      socialsHtml += `<a href="${s.url}" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;border-radius:50%;background:${color};color:white;font-size:${fontSize}px;transition:transform 0.2s"><i class="${icon}"></i></a>`;
+    }
+    socialsHtml += '</div></div>';
+    
+    // Insert before </div></footer>
+    pageHtml = pageHtml.replace('</div>\n</footer>', socialsHtml + '\n</div>\n</footer>');
   }
   
   return c.html(pageHtml);
