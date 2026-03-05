@@ -3722,53 +3722,45 @@ switchLang = function(l) {
       }
     }
     
-    // ===== 3d. FOOTER SOCIAL LINKS FROM DB =====
-    // Server-side already injects footer socials with title/subtitle from site_blocks.footer
-    // Client-side only updates if server didn't inject (fallback) or if data changed
+    // ===== 3d. FOOTER SOCIAL LINKS — inside contacts column =====
+    // Server-side injects socials inside #footerContactCol. Client-side fallback only if needed.
     if (db.footerSocials && db.footerSocials.length > 0) {
-      var existingSocialsBlock = document.querySelector('.footer-socials-block');
+      var existingSocialsBlock = document.querySelector('#footerContactCol .footer-socials-block');
       if (!existingSocialsBlock) {
-        // Server didn't inject — create client-side as fallback
-        var footerSocialEl = document.querySelector('.footer-social, .social-links, footer .socials');
-        if (!footerSocialEl) {
-          var footerEl = document.querySelector('footer .container');
-          if (footerEl) {
-            footerSocialEl = document.createElement('div');
-            footerSocialEl.className = 'footer-socials-block';
-            footerSocialEl.style.cssText = 'margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:center';
-            footerEl.appendChild(footerSocialEl);
-          }
-        }
-        if (footerSocialEl) {
+        // Server didn't inject — create client-side inside contacts column
+        var contactCol = document.getElementById('footerContactCol');
+        if (contactCol) {
           var socialIcons = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter', linkedin:'fab fa-linkedin', vk:'fab fa-vk' };
           var socialColors = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2', linkedin:'#0A66C2', vk:'#4680C2' };
-          // Find social_settings from blockFeatures for footer
           var footerBf = null;
           if (db.blockFeatures) { for (var fi = 0; fi < db.blockFeatures.length; fi++) { if (db.blockFeatures[fi].key === 'footer') { footerBf = db.blockFeatures[fi]; break; } } }
           var fss = footerBf ? (footerBf.social_settings || {}) : {};
+          
+          var socialsDiv = document.createElement('div');
+          socialsDiv.className = 'footer-socials-block';
+          socialsDiv.style.cssText = 'margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08)';
           var fsh = '';
-          // Title
           var fsTitle = lang === 'am' ? (fss.title_am || fss.title_ru || '') : (fss.title_ru || '');
-          var fsSubtitle = lang === 'am' ? (fss.subtitle_am || fss.subtitle_ru || '') : (fss.subtitle_ru || '');
-          if (fsTitle) fsh += '<div style="font-size:1.1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:4px">' + fsTitle + '</div>';
-          if (fsSubtitle) fsh += '<div style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">' + fsSubtitle + '</div>';
-          fsh += '<div style="display:flex;gap:' + (fss.gap || 12) + 'px;justify-content:center;align-items:center;flex-wrap:wrap">';
+          if (fsTitle) fsh += '<div style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent,#8B5CF6);margin-bottom:12px">' + fsTitle + '</div>';
+          fsh += '<div style="display:flex;gap:' + (fss.gap || 10) + 'px;flex-wrap:wrap">';
           db.footerSocials.forEach(function(s) {
             var icon = socialIcons[s.type] || 'fas fa-link';
             var color = s.bg_color || socialColors[s.type] || '#8B5CF6';
-            var sz = s.icon_size || 40;
+            var sz = s.icon_size || 36;
             fsh += '<a href="' + (s.url||'#') + '" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:' + color + ';color:white;font-size:' + Math.round(sz*0.45) + 'px;transition:transform 0.2s">' +
               '<i class="' + icon + '"></i></a>';
           });
           fsh += '</div>';
-          footerSocialEl.innerHTML = fsh;
-          console.log('[DB] Footer social links applied (client fallback):', db.footerSocials.length);
+          socialsDiv.innerHTML = fsh;
+          contactCol.appendChild(socialsDiv);
+          console.log('[DB] Footer social links injected into contacts column (client fallback):', db.footerSocials.length);
         }
       } else {
-        console.log('[DB] Footer social links already server-injected:', db.footerSocials.length);
+        console.log('[DB] Footer social links already in contacts column:', db.footerSocials.length);
       }
     }
     
+
     // ===== 4. INJECT CUSTOM SCRIPTS =====
     if (db.scripts) {
       if (db.scripts.head && db.scripts.head.length) {
@@ -5146,13 +5138,16 @@ async function checkRefCode() {
           }
         }
         if (needsRebuild) {
-          var chtml = '<h4 data-ru="Контакты" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580" data-no-rewrite="1">' + (lang==='am' ? '\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580' : 'Контакты') + '</h4><ul>';
+          // Preserve existing socials block before rebuilding contacts
+          var existingSocials = contactCol.querySelector('.footer-socials-block');
+          var socialsHtml = existingSocials ? existingSocials.outerHTML : '';
+          var chtml = '<h4 data-ru="Контакты" data-am="Կոնտակտներ" data-no-rewrite="1">' + (lang==='am' ? 'Կոնտակտներ' : 'Контакты') + '</h4><ul>';
           for (var i = 0; i < contacts.length; i++) {
             var c = contacts[i];
             var nameAmAttr = c.name_am ? ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + c.name_am.replace(/"/g,'&quot;') + '" data-no-rewrite="1"' : ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-no-rewrite="1"';
             chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> <span' + nameAmAttr + '>' + (lang === 'am' && c.name_am ? c.name_am : (c.name_ru || '')) + '</span></a></li>';
           }
-          chtml += '</ul>';
+          chtml += '</ul>' + socialsHtml;
           contactCol.innerHTML = chtml;
         }
       }
@@ -5919,23 +5914,54 @@ async function checkRefCode() {
       }
     }
     
-    // 2. Inject contacts from footer_settings.contacts_json
+    // 2. Inject contacts + socials COMBINED into contacts column
     let contacts: any[] = [];
     try { contacts = JSON.parse(footerSettings.contacts_json as string || '[]'); } catch {}
-    if (contacts.length > 0) {
-      let contactHtml = '<h4 data-ru="\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580" data-no-rewrite="1">\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b</h4>\n      <ul>\n';
-      for (const ct of contacts) {
-        const nameRu = (ct.name_ru || '').replace(/"/g, '&quot;');
-        const nameAm = (ct.name_am || '').replace(/"/g, '&quot;');
-        contactHtml += `        <li><a href="${ct.url || '#'}" target="_blank"><i class="${ct.icon || 'fab fa-telegram'}"></i> <span data-ru="${nameRu}" data-am="${nameAm || nameRu}" data-no-rewrite="1">${ct.name_ru || ''}</span></a></li>\n`;
+    {
+      let contactHtml = '<h4 data-ru="Контакты" data-am="Կոնտակտներ" data-no-rewrite="1">Контакты</h4>\n      <ul>\n';
+      if (contacts.length > 0) {
+        for (const ct of contacts) {
+          const nameRu = (ct.name_ru || '').replace(/"/g, '&quot;');
+          const nameAm = (ct.name_am || '').replace(/"/g, '&quot;');
+          contactHtml += `        <li><a href="${ct.url || '#'}" target="_blank"><i class="${ct.icon || 'fab fa-telegram'}"></i> <span data-ru="${nameRu}" data-am="${nameAm || nameRu}" data-no-rewrite="1">${ct.name_ru || ''}</span></a></li>\n`;
+        }
+      } else {
+        contactHtml += '        <li><a href="https://t.me/goo_to_top" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Ադմինիստրատոր" data-no-rewrite="1">Администратор</span></a></li>\n';
       }
       contactHtml += '      </ul>';
+      
+      // Add social links INSIDE contacts column (below contacts list)
+      if (footerBlockSocials.length > 0) {
+        const socialIcons: Record<string,string> = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter' };
+        const socialColors: Record<string,string> = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2' };
+        const ss = footerBlockSocialSettings;
+        const gap = ss.gap || 10;
+        
+        contactHtml += '\n      <div class="footer-socials-block" style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.08)">';
+        if (ss.title_ru) {
+          const titleRu = (ss.title_ru as string).replace(/"/g, '&quot;');
+          const titleAm = ss.title_am ? (ss.title_am as string).replace(/"/g, '&quot;') : titleRu;
+          contactHtml += `<div data-ru="${titleRu}" data-am="${titleAm}" data-no-rewrite="1" style="font-size:0.75rem;font-weight:600;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent,#8B5CF6);margin-bottom:12px">${ss.title_ru}</div>`;
+        }
+        contactHtml += `<div style="display:flex;gap:${gap}px;flex-wrap:wrap">`;
+        for (const s of footerBlockSocials) {
+          if (!s.url) continue;
+          const icon = socialIcons[s.type] || 'fas fa-link';
+          const color = s.bg_color || socialColors[s.type] || '#8B5CF6';
+          const sz = s.icon_size || 36;
+          const fontSize = Math.round(sz * 0.45);
+          contactHtml += `<a href="${s.url}" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;border-radius:50%;background:${color};color:white;font-size:${fontSize}px;transition:transform 0.2s"><i class="${icon}"></i></a>`;
+        }
+        contactHtml += '</div></div>';
+      }
+      
       // Replace the contacts column content
       const contactColMatch = pageHtml.match(/<div class="footer-col" id="footerContactCol">[\s\S]*?<\/div>/);
       if (contactColMatch) {
         pageHtml = pageHtml.replace(contactColMatch[0], `<div class="footer-col" id="footerContactCol">\n      ${contactHtml}\n    </div>`);
       }
     }
+
     
     // 3. Inject copyright
     if (footerSettings.copyright_ru) {
@@ -5960,43 +5986,8 @@ async function checkRefCode() {
     }
   }
   
-  // 5. Inject footer social links with title/subtitle from site_blocks.footer
-  if (footerBlockSocials.length > 0) {
-    const socialIcons: Record<string,string> = { instagram:'fab fa-instagram', facebook:'fab fa-facebook', telegram:'fab fa-telegram', whatsapp:'fab fa-whatsapp', youtube:'fab fa-youtube', tiktok:'fab fa-tiktok', twitter:'fab fa-twitter' };
-    const socialColors: Record<string,string> = { instagram:'#E4405F', facebook:'#1877F2', telegram:'#26A5E4', whatsapp:'#25D366', youtube:'#FF0000', tiktok:'#000', twitter:'#1DA1F2' };
-    const ss = footerBlockSocialSettings;
-    const gap = ss.gap || 12;
-    const align = ss.align || 'center';
-    const justifyMap: Record<string,string> = { center:'center', left:'flex-start', right:'flex-end' };
-    
-    let socialsHtml = '<div class="footer-socials-block" style="margin-top:24px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.08);display:flex;flex-direction:column;align-items:' + (justifyMap[align] || 'center') + '">';
-    // Title
-    if (ss.title_ru) {
-      const titleRu = (ss.title_ru as string).replace(/"/g, '&quot;');
-      const titleAm = ss.title_am ? (ss.title_am as string).replace(/"/g, '&quot;') : titleRu;
-      socialsHtml += `<div data-ru="${titleRu}" data-am="${titleAm}" data-no-rewrite="1" style="font-size:1.1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:4px">${ss.title_ru}</div>`;
-    }
-    // Subtitle
-    if (ss.subtitle_ru) {
-      const subRu = (ss.subtitle_ru as string).replace(/"/g, '&quot;');
-      const subAm = ss.subtitle_am ? (ss.subtitle_am as string).replace(/"/g, '&quot;') : subRu;
-      socialsHtml += `<div data-ru="${subRu}" data-am="${subAm}" data-no-rewrite="1" style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">${ss.subtitle_ru}</div>`;
-    }
-    // Icons
-    socialsHtml += `<div style="display:flex;gap:${gap}px;justify-content:${justifyMap[align] || 'center'};align-items:center;flex-wrap:wrap">`;
-    for (const s of footerBlockSocials) {
-      if (!s.url) continue;
-      const icon = socialIcons[s.type] || 'fas fa-link';
-      const color = s.bg_color || socialColors[s.type] || '#8B5CF6';
-      const sz = s.icon_size || 40;
-      const fontSize = Math.round(sz * 0.45);
-      socialsHtml += `<a href="${s.url}" target="_blank" rel="noopener" class="footer-social-btn" style="display:inline-flex;align-items:center;justify-content:center;width:${sz}px;height:${sz}px;border-radius:50%;background:${color};color:white;font-size:${fontSize}px;transition:transform 0.2s"><i class="${icon}"></i></a>`;
-    }
-    socialsHtml += '</div></div>';
-    
-    // Insert before </div></footer>
-    pageHtml = pageHtml.replace('</div>\n</footer>', socialsHtml + '\n</div>\n</footer>');
-  }
+  // 5. Footer social links now injected INSIDE contacts column (step 2 above)
+  // No separate block needed
   
   return c.html(pageHtml);
 })
