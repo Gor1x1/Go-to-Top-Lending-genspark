@@ -1093,6 +1093,30 @@ app.get('/', async (c) => {
         (globalThis as any).__footerBlockSocialSettings = fOpts.social_settings || {};
       }
     } catch {}
+
+    // Save sectionOrder + blockFeatures for server-side reorder/injection
+    // Query section_order and site_blocks directly (not from API scope)
+    const soRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
+    (globalThis as any).__sectionOrder = soRes.results || [];
+    
+    // Load blockFeatures for nav links injection
+    const bfRes = await db.prepare("SELECT block_key, texts_ru, texts_am, custom_html FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
+    const bfArr: any[] = [];
+    for (const blk of (bfRes.results || [])) {
+      let textsRu: string[] = [];
+      let textsAm: string[] = [];
+      let opts: any = {};
+      try { textsRu = JSON.parse(blk.texts_ru as string || '[]'); } catch { textsRu = []; }
+      try { textsAm = JSON.parse(blk.texts_am as string || '[]'); } catch { textsAm = []; }
+      try { opts = JSON.parse(blk.custom_html as string || '{}'); } catch { opts = {}; }
+      bfArr.push({
+        key: blk.block_key,
+        texts_ru: textsRu,
+        texts_am: textsAm,
+        nav_links: opts.nav_links || []
+      });
+    }
+    (globalThis as any).__blockFeatures = bfArr;
   } catch (e) {
     // If DB fails, serve original HTML without modifications
   }
@@ -3934,7 +3958,9 @@ switchLang = function(l) {
     }
     
     // ===== 5b. REORDER ALL SECTIONS (including newly created ones) =====
-    if (db.sectionOrder && db.sectionOrder.length > 0) {
+    // Skip if server already reordered sections (data-server-ordered="1" on <html>)
+    var serverOrdered = document.documentElement.getAttribute('data-server-ordered') === '1';
+    if (db.sectionOrder && db.sectionOrder.length > 0 && !serverOrdered) {
       // Build orderMap with normalized (hyphen) key lookups
       var orderMap = {};
       db.sectionOrder.forEach(function(s) {
@@ -4685,7 +4711,9 @@ switchLang = function(l) {
           console.log('[DB] Nav links applied:', dbNavItems.length, 'items');
           
           // ===== SYNC FOOTER NAVIGATION with header nav =====
+          // Skip if server already injected footer nav (data-server-ordered="1")
           // Footer nav mirrors header nav dynamically — what you add in admin nav appears in footer
+          if (!serverOrdered) {
           var footerNavList = document.getElementById('footerNavList');
           if (footerNavList && dbNavItems.length > 0) {
             var footerNavHtml = '';
@@ -4712,6 +4740,7 @@ switchLang = function(l) {
             });
             console.log('[DB] Footer nav synced with header:', footerNavCount, 'items');
           }
+          } // end !serverOrdered check for footer nav
         }
       }
       
@@ -6015,6 +6044,162 @@ async function checkRefCode() {
   
   // 5. Footer social links now injected INSIDE contacts column (step 2 above)
   // No separate block needed
+  
+  // ===== 6. SERVER-SIDE SECTION REORDERING =====
+  // Reorder sections in HTML based on section_order from DB so the page loads with correct order instantly
+  const sectionOrder: any[] = (globalThis as any).__sectionOrder || [];
+  const blockFeatures: any[] = (globalThis as any).__blockFeatures || [];
+  delete (globalThis as any).__sectionOrder;
+  delete (globalThis as any).__blockFeatures;
+  
+  if (sectionOrder.length > 0) {
+    // Build order map: normalized section_id -> { sort_order, is_visible }
+    const soMap: Record<string, { sort_order: number, is_visible: number }> = {};
+    for (const s of sectionOrder) {
+      const sid = (s.section_id || '').replace(/_/g, '-');
+      soMap[sid] = { sort_order: s.sort_order ?? 999, is_visible: s.is_visible ?? 1 };
+      // Also store underscore variant
+      const sidU = (s.section_id || '').replace(/-/g, '_');
+      if (!soMap[sidU]) soMap[sidU] = soMap[sid];
+    }
+    
+    // Extract sections using HTML comment markers as boundaries
+    // Each section starts with <!-- ===== NAME ===== --> followed by a tag with data-section-id
+    // Important: Only match top-level section comments (not nested ones inside calculator)
+    const sectionComments: Array<{ name: string, sectionId: string, pos: number }> = [
+      { name: 'HERO', sectionId: 'hero', pos: -1 },
+      { name: 'TICKER', sectionId: 'ticker', pos: -1 },
+      { name: 'WB BANNER', sectionId: 'wb-banner', pos: -1 },
+      { name: 'STATS BAR', sectionId: 'stats-bar', pos: -1 },
+      { name: 'ABOUT', sectionId: 'about', pos: -1 },
+      { name: 'SERVICES', sectionId: 'services', pos: -1 },
+      { name: 'BUYOUT DETAIL', sectionId: 'buyout-detail', pos: -1 },
+      { name: 'WHY BUYOUTS BY KEYWORDS', sectionId: 'why-buyouts', pos: -1 },
+      { name: '50K: BLOGGER VS BUYOUTS', sectionId: 'fifty-vs-fifty', pos: -1 },
+      { name: 'WB OFFICIAL', sectionId: 'wb-official', pos: -1 },
+      { name: 'CALCULATOR', sectionId: 'calculator', pos: -1 },
+      { name: 'PROCESS', sectionId: 'process', pos: -1 },
+      { name: 'WAREHOUSE', sectionId: 'warehouse', pos: -1 },
+      { name: 'GUARANTEE', sectionId: 'guarantee', pos: -1 },
+      { name: 'COMPARISON', sectionId: 'comparison', pos: -1 },
+      { name: 'IMPORTANT NOTES', sectionId: 'important', pos: -1 },
+      { name: 'CLIENT REVIEWS / REAL CASES', sectionId: 'client-reviews', pos: -1 },
+      { name: 'FAQ', sectionId: 'faq', pos: -1 },
+      { name: 'CONTACT FORM', sectionId: 'contact', pos: -1 },
+    ];
+    
+    // Find each section comment position
+    for (const sc of sectionComments) {
+      const marker = `<!-- ===== ${sc.name} =====`;
+      sc.pos = pageHtml.indexOf(marker);
+    }
+    
+    // Filter to only found sections and sort by position
+    const foundSections = sectionComments.filter(sc => sc.pos >= 0).sort((a, b) => a.pos - b.pos);
+    const footerPos = pageHtml.indexOf('\n<!-- ===== FOOTER =====');
+    
+    if (foundSections.length > 0 && footerPos > 0) {
+      const beforeSections = pageHtml.substring(0, foundSections[0].pos);
+      const afterSections = pageHtml.substring(footerPos);
+      
+      // Extract each section's HTML chunk
+      const sectionParts: Array<{ id: string, html: string, sortOrder: number }> = [];
+      for (let i = 0; i < foundSections.length; i++) {
+        const start = foundSections[i].pos;
+        const end = i < foundSections.length - 1 ? foundSections[i + 1].pos : footerPos;
+        const norm = foundSections[i].sectionId;
+        const so = soMap[norm]?.sort_order ?? 999;
+        sectionParts.push({
+          id: norm,
+          html: pageHtml.substring(start, end),
+          sortOrder: so
+        });
+      }
+      
+      // Sort sections based on DB section_order
+      sectionParts.sort((a, b) => a.sortOrder - b.sortOrder);
+      
+      // Store debug info for output (remove in production)
+      
+      // Hide invisible sections via inline style
+      for (const part of sectionParts) {
+        const info = soMap[part.id];
+        if (info && !info.is_visible) {
+          part.html = part.html.replace(
+            new RegExp(`data-section-id="${part.id}"`),
+            `data-section-id="${part.id}" style="display:none"`
+          );
+        }
+      }
+      
+      // Reassemble HTML
+      pageHtml = beforeSections + sectionParts.map(p => p.html).join('') + afterSections;
+    }
+    
+    // ===== 7. SERVER-SIDE NAV LINKS INJECTION =====
+    // Replace hard-coded header nav and footer nav with DB values
+    const navBf = blockFeatures.find((b: any) => b.key === 'nav');
+    if (navBf && navBf.texts_ru && navBf.texts_ru.length > 0) {
+      const defaultTargets = ['about', 'services', 'calculator', 'warehouse', 'guarantee', 'faq', 'contact'];
+      const navLinks = navBf.nav_links || [];
+      const navTargetMap: Record<number, string> = {};
+      for (const nl of navLinks) {
+        navTargetMap[nl.idx] = nl.target || '';
+      }
+      
+      // Build nav items
+      const navItems: Array<{ru: string, am: string, target: string}> = [];
+      for (let i = 0; i < navBf.texts_ru.length; i++) {
+        const ru = navBf.texts_ru[i] || '';
+        const am = (navBf.texts_am && navBf.texts_am[i]) || '';
+        if (!ru && !am) continue;
+        let target = navTargetMap[i] || (i < defaultTargets.length ? defaultTargets[i] : '');
+        target = target.replace(/_/g, '-');
+        if (target === '_telegram' || target === '_cta') continue;
+        navItems.push({ ru, am, target });
+      }
+      
+      if (navItems.length > 0) {
+        // Build header nav HTML
+        let headerNavHtml = '';
+        for (const item of navItems) {
+          headerNavHtml += `    <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}">${item.ru}</a></li>\n`;
+        }
+        // Add mobile CTA
+        headerNavHtml += `    <li class="nav-mobile-cta"><a href="https://wa.me/37441888389" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> Написать нам</a></li>`;
+        
+        // Replace header nav links
+        const headerNavMatch = pageHtml.match(/<ul class="nav-links" id="navLinks">[\s\S]*?<\/ul>/);
+        if (headerNavMatch) {
+          pageHtml = pageHtml.replace(headerNavMatch[0], `<ul class="nav-links" id="navLinks">\n${headerNavHtml}\n  </ul>`);
+        }
+        
+        // Build footer nav HTML
+        let footerNavHtml = '';
+        for (const item of navItems) {
+          if (!item.target || item.target.charAt(0) === '_') continue;
+          footerNavHtml += `        <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}" data-no-rewrite="1">${item.ru}</a></li>\n`;
+        }
+        
+        // Replace footer nav links
+        const footerNavMatch = pageHtml.match(/<ul id="footerNavList">[\s\S]*?<\/ul>/);
+        if (footerNavMatch) {
+          pageHtml = pageHtml.replace(footerNavMatch[0], `<ul id="footerNavList">\n${footerNavHtml}      </ul>`);
+        }
+      }
+    }
+  }
+  
+  // Clean up globals
+  const soCount = (globalThis as any).__sectionOrderCount || 0;
+  delete (globalThis as any).__sectionOrderCount;
+  const reorderDebug = (globalThis as any).__reorderDebug || '';
+  delete (globalThis as any).__reorderDebug;
+  
+  // Add marker so client-side JS knows server already handled reordering
+  if (sectionOrder.length > 0) {
+    pageHtml = pageHtml.replace('<html lang="ru"', '<html lang="ru" data-server-ordered="1"');
+  }
   
   return c.html(pageHtml);
 })
