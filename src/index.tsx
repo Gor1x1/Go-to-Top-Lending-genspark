@@ -1314,15 +1314,19 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .contact-card i.fab{font-size:2rem;color:var(--purple);margin-bottom:12px}
 .contact-card h4{font-size:1rem;font-weight:600;margin-bottom:4px}
 .contact-card p{font-size:0.82rem;color:var(--text-muted);line-height:1.5}
-.footer{padding:48px 0 24px;border-top:1px solid var(--border);margin-top:0;opacity:0;transition:opacity 0.5s ease}
+.footer{padding:60px 0 28px;border-top:1px solid var(--border);margin-top:0;opacity:0;transition:opacity 0.5s ease;background:var(--bg-surface)}
 section[style*="display: none"],section[style*="display:none"],div[style*="display: none"],div[style*="display:none"]{margin:0!important;padding:0!important;height:0!important;overflow:hidden!important;min-height:0!important;border:0!important}
 .footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:48px;margin-bottom:40px}
-.footer-brand p{color:var(--text-muted);font-size:0.88rem;margin-top:12px;line-height:1.7}
-.footer-col h4{font-size:0.82rem;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;color:var(--text-muted);margin-bottom:16px}
+.footer-brand{position:relative}
+.footer-brand .logo{margin-bottom:16px}
+.footer-brand p{color:var(--text-muted);font-size:0.88rem;margin-top:0;line-height:1.8}
+.footer-col h4{font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:1.5px;color:var(--purple);margin-bottom:20px;position:relative;padding-bottom:10px}
+.footer-col h4::after{content:'';position:absolute;bottom:0;left:0;width:24px;height:2px;background:var(--purple);border-radius:2px}
 .footer-col ul{list-style:none}
-.footer-col li{margin-bottom:10px}
-.footer-col a{color:var(--text-sec);font-size:0.88rem;transition:var(--t)}
-.footer-col a:hover{color:var(--purple)}
+.footer-col li{margin-bottom:12px}
+.footer-col a{color:var(--text-sec);font-size:0.88rem;transition:var(--t);display:inline-flex;align-items:center;gap:8px}
+.footer-col a:hover{color:var(--purple);transform:translateX(4px)}
+.footer-col a i{font-size:1rem;width:20px;text-align:center}
 .footer-social-btn:hover{transform:scale(1.15)}
 .footer-bottom{display:flex;justify-content:space-between;align-items:center;padding-top:24px;border-top:1px solid var(--border);font-size:0.78rem;color:var(--text-muted)}
 .tg-float{position:fixed;bottom:86px;right:24px;z-index:999;display:flex;align-items:center;gap:12px;padding:14px 24px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white;border-radius:50px;box-shadow:0 8px 30px rgba(139,92,246,0.4);transition:var(--t);font-weight:600;font-size:0.88rem}
@@ -2549,29 +2553,29 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="logo"><img src="/static/img/logo-gototop.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
-      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայաստանում: Իրական գնումներ իրական մարդկանցով սեփական պահեստից Երևանում:">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
+      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայաստանում: Իրական գնումներ իրական մարդկանցով սեփական պահեստից Երևանում:" data-no-rewrite="1">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
     </div>
-    <div class="footer-col">
-      <h4 data-ru="Навигация" data-am="Նավիգացիա">Навигация</h4>
-      <ul>
-        <li><a href="#services" data-ru="Услуги и цены" data-am="Ծառայություններ և գներ">Услуги и цены</a></li>
-        <li><a href="#calculator" data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</a></li>
-        <li><a href="#warehouse" data-ru="Наш склад" data-am="Մեր պահեստը">Наш склад</a></li>
-        <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
-        <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
+    <div class="footer-col" id="footerNavCol">
+      <h4 data-ru="Навигация" data-am="Նավիգացիա" data-no-rewrite="1">Навигация</h4>
+      <ul id="footerNavList">
+        <li><a href="#services" data-ru="Услуги и цены" data-am="Ծառայություններ և գներ" data-no-rewrite="1">Услуги и цены</a></li>
+        <li><a href="#calculator" data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1">Калькулятор</a></li>
+        <li><a href="#warehouse" data-ru="Наш склад" data-am="Մեր պահեստը" data-no-rewrite="1">Наш склад</a></li>
+        <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ" data-no-rewrite="1">Гарантии</a></li>
+        <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ" data-no-rewrite="1">FAQ</a></li>
       </ul>
     </div>
-    <div class="footer-col">
-      <h4 data-ru="Контакты" data-am="Կոնտակտներ">Контакты</h4>
+    <div class="footer-col" id="footerContactCol">
+      <h4 data-ru="Контакты" data-am="Կոնտակտներ" data-no-rewrite="1">Контакты</h4>
       <ul>
-        <li><a href="https://t.me/goo_to_top" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Ադմինիստրատոր">Администратор</span></a></li>
-        <li><a href="https://t.me/suport_admin_2" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Менеджер" data-am="Մենեջեր">Менеджер</span></a></li>
+        <li><a href="https://t.me/goo_to_top" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Ադմինիստրատոր" data-no-rewrite="1">Администратор</span></a></li>
+        <li><a href="https://t.me/suport_admin_2" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Менеджер" data-am="Մենեջեր" data-no-rewrite="1">Менеджер</span></a></li>
       </ul>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>© 2026 Go to Top. <span data-ru="Все права защищены" data-am="Բոլոր իրավունքները պաշտպանված են">Все права защищены</span></span>
-    <span data-ru="Ереван, Армения" data-am="Երևան, Հայաստան">Ереван, Армения</span>
+    <span>© 2026 Go to Top. <span data-ru="Все права защищены" data-am="Բոլոր իրավունքները պաշտպանված են" data-no-rewrite="1">Все права защищены</span></span>
+    <span data-ru="Ереван, Армения" data-am="Երևան, Հայաստան" data-no-rewrite="1">Ереван, Армения</span>
   </div>
 </div>
 </footer>
@@ -2579,13 +2583,13 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <!-- FLOATING TG BUTTON -->
 <a href="https://t.me/goo_to_top" target="_blank" class="tg-float">
   <i class="fab fa-telegram"></i>
-  <span data-ru="Написать нам" data-am="Գրել մեզ">Написать нам</span>
+  <span data-ru="Написать нам" data-am="Գրել մեզ" data-no-rewrite="1">Написать нам</span>
 </a>
 
 <!-- FLOATING CALC BUTTON -->
 <a href="#calculator" class="calc-float" id="calcFloatBtn">
   <i class="fas fa-calculator"></i>
-  <span data-ru="Калькулятор" data-am="Հաշվիչ">Հաշվիչ</span>
+  <span data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1">Հաշվիչ</span>
 </a>
 
 <!-- LIGHTBOX -->
@@ -4603,6 +4607,35 @@ switchLang = function(l) {
             }
           }
           console.log('[DB] Nav links applied:', dbNavItems.length, 'items');
+          
+          // ===== SYNC FOOTER NAVIGATION with header nav =====
+          // Footer nav mirrors header nav dynamically — what you add in admin nav appears in footer
+          var footerNavList = document.getElementById('footerNavList');
+          if (footerNavList && dbNavItems.length > 0) {
+            var footerNavHtml = '';
+            var footerNavCount = 0;
+            for (var fni = 0; fni < dbNavItems.length; fni++) {
+              var fnItem = dbNavItems[fni];
+              // Skip items without section target (CTA buttons like _telegram, _cta)
+              if (!fnItem.target || fnItem.target.charAt(0) === '_') continue;
+              var fnText = lang === 'am' && fnItem.am ? fnItem.am : fnItem.ru;
+              footerNavHtml += '<li><a href="#' + fnItem.target + '" data-ru="' + fnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (fnItem.am||'').replace(/"/g,'&quot;') + '">' + fnText + '</a></li>';
+              footerNavCount++;
+            }
+            footerNavList.innerHTML = footerNavHtml;
+            // Add smooth scroll to footer nav links
+            footerNavList.querySelectorAll('a[href^="#"]').forEach(function(a) {
+              a.addEventListener('click', function(e) {
+                e.preventDefault();
+                var href = this.getAttribute('href');
+                if (href && href.length > 1) {
+                  var t = document.getElementById(href.substring(1)) || document.querySelector('[data-section-id="' + href.substring(1) + '"]');
+                  if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+              });
+            });
+            console.log('[DB] Footer nav synced with header:', footerNavCount, 'items');
+          }
         }
       }
       
@@ -5029,13 +5062,12 @@ async function checkRefCode() {
     var contacts = [];
     try { contacts = JSON.parse(f.contacts_json || '[]'); } catch(e) {}
     if (contacts.length > 0) {
-      var cols = footer.querySelectorAll('.footer-col');
-      var contactCol = cols.length >= 2 ? cols[cols.length - 1] : null;
+      var contactCol = document.getElementById('footerContactCol');
       if (contactCol) {
-        var chtml = '<h4 data-ru="Контакты" data-am="Կontakner">' + (lang==='am' ? 'Կontakner' : 'Контакты') + '</h4><ul>';
+        var chtml = '<h4 data-ru="Контакты" data-am="\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580">' + (lang==='am' ? '\u053f\u0578\u0576\u057f\u0561\u056f\u057f\u0576\u0565\u0580' : 'Контакты') + '</h4><ul>';
         for (var i = 0; i < contacts.length; i++) {
           var c = contacts[i];
-          chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> ' + (c.name_ru || '') + '</a></li>';
+          chtml += '<li><a href="' + (c.url || '#') + '" target="_blank"><i class="' + (c.icon || 'fab fa-telegram') + '"></i> <span' + (c.name_am ? ' data-ru="' + (c.name_ru||'').replace(/"/g,'&quot;') + '" data-am="' + c.name_am.replace(/"/g,'&quot;') + '"' : '') + '>' + (lang === 'am' && c.name_am ? c.name_am : (c.name_ru || '')) + '</span></a></li>';
         }
         chtml += '</ul>';
         contactCol.innerHTML = chtml;
@@ -5727,23 +5759,40 @@ async function checkRefCode() {
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
     
-    // Track current section via data-section-id to skip calculator
+    // Track current section via data-section-id to skip calculator and elements outside sections
     let currentTextSection = '';
+    let textSectionDepth = 0;
     
     const rewritten = new HTMLRewriter()
       .on('[data-section-id]', {
         element(el) {
           currentTextSection = el.getAttribute('data-section-id') || '';
+          textSectionDepth++;
+          el.onEndTag(() => {
+            textSectionDepth--;
+            if (textSectionDepth <= 0) {
+              currentTextSection = '';
+              textSectionDepth = 0;
+            }
+          });
         }
       })
+      // Skip floating buttons and footer — their text comes from blockFeatures/footer API, not textMap
+      // NOTE: HTMLRewriter does NOT support compound selectors like '.tg-float [data-ru]'
+      // Instead, we use data-no-rewrite="1" attribute directly on elements in HTML
       // Process all elements with data-ru attribute
       .on('[data-ru]', {
         element(el) {
+          // Skip elements marked with data-no-rewrite (floating buttons)
+          if (el.getAttribute('data-no-rewrite') === '1') return;
           const currentRu = el.getAttribute('data-ru') || '';
           if (!currentRu) return;
           
           // Skip replacement inside calculator section
           if (currentTextSection === 'calculator') return;
+          
+          // Skip elements outside any section (e.g. floating buttons after footer)
+          if (!currentTextSection || textSectionDepth <= 0) return;
           
           // Look up this element's data-ru text in textMap
           const replacement = textMap[currentRu];
