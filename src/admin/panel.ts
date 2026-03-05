@@ -10752,7 +10752,7 @@ function renderSiteBlocks() {
             if (ph.url) h += '<img src="' + escHtml(ph.url) + '" style="width:48px;height:48px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
             h += '<input class="input" id="sb_photo_' + b.id + '_' + phi + '" value="' + escHtml(ph.url || '') + '" placeholder="URL фото" style="flex:1;font-size:0.78rem;color:#60a5fa;min-width:150px" onchange="sbAutoSave(' + b.id + ')">';
             h += '<label class="btn btn-outline" style="padding:4px 10px;font-size:0.68rem;cursor:pointer;white-space:nowrap"><i class="fas fa-upload" style="margin-right:3px"></i>Загр.<input type="file" accept="image/*" style="display:none" onchange="sbUploadPhoto(this,' + b.id + ',&apos;gallery&apos;,' + phi + ')"></label>';
-            h += '<input class="input" id="sb_photocap_' + b.id + '_' + phi + '" value="' + escHtml(ph.caption || '') + '" placeholder="Подпись" style="width:140px;font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')">';
+            h += '<div style="display:flex;gap:4px;flex:1;min-width:200px"><input class="input" id="sb_photocap_' + b.id + '_' + phi + '" value="' + escHtml(ph.caption || ph.caption_ru || '') + '" placeholder="Подпись RU" style="flex:1;font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"><input class="input" id="sb_photocap_am_' + b.id + '_' + phi + '" value="' + escHtml(ph.caption_am || '') + '" placeholder="Подпись AM" style="flex:1;font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
             h += '<button class="tier-del-btn" onclick="sbRemovePhoto(' + b.id + ',' + phi + ')"><i class="fas fa-times"></i></button>';
             h += '</div>';
           }
@@ -10790,6 +10790,25 @@ function renderSiteBlocks() {
           h += 'На всю ширину экрана (моб.)</label>';
           h += '</div>';
           
+          // ── Swipe hint text (reviews blocks only) ──
+          if (isReviewsBlock) {
+            var swipeOpts = opts || {};
+            h += '<div style="margin-top:14px;padding:12px;background:rgba(245,158,11,0.06);border:1px solid rgba(245,158,11,0.15);border-radius:8px">';
+            h += '<div style="font-size:0.72rem;color:#F59E0B;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-hand-pointer" style="margin-right:4px"></i>Кнопка «Листайте для просмотра»</div>';
+            h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px">';
+            if (showRu) {
+              h += '<div><div style="font-size:0.68rem;color:#3b82f6;margin-bottom:3px;font-weight:600">Текст RU</div>';
+              h += '<input class="input" id="sb_swipehint_ru_' + b.id + '" value="' + escHtml(swipeOpts.swipe_hint_ru || '') + '" placeholder="Листайте для просмотра" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+            }
+            if (showAm) {
+              h += '<div><div style="font-size:0.68rem;color:#f59e0b;margin-bottom:3px;font-weight:600">Текст AM</div>';
+              h += '<input class="input" id="sb_swipehint_am_' + b.id + '" value="' + escHtml(swipeOpts.swipe_hint_am || '') + '" placeholder="\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u056c\u0578\u0582" style="font-size:0.82rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+            }
+            h += '</div>';
+            h += '<div style="font-size:0.65rem;color:#64748b;margin-top:6px"><i class="fas fa-info-circle" style="margin-right:3px"></i>Оставьте пустым для текста по умолчанию</div>';
+            h += '</div>';
+          }
+
           h += '</details></div>';
         }
         h += '<div style="margin-bottom:16px">';
@@ -11401,7 +11420,7 @@ function sbAddPhoto(blockId) {
   var opts = {};
   try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
   if (!Array.isArray(opts.photos)) opts.photos = [];
-  opts.photos.push({ url: '', caption: '' });
+  opts.photos.push({ url: '', caption: '', caption_ru: '', caption_am: '' });
   b.custom_html = JSON.stringify(opts);
   render();
 }
@@ -11480,7 +11499,7 @@ async function sbUploadPhoto(input, blockId, target, idx) {
       if (typeof idx === 'number' && idx < opts.photos.length) {
         opts.photos[idx].url = url;
       } else {
-        opts.photos.push({ url: url, caption: '' });
+        opts.photos.push({ url: url, caption: '', caption_ru: '', caption_am: '' });
       }
     }
     b.custom_html = JSON.stringify(opts);
@@ -11521,7 +11540,7 @@ async function sbUploadPhotoBatch(input, blockId) {
       var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token }, body: formData });
       var result = await resp.json();
       if (result.success) {
-        opts.photos.push({ url: result.url || result.data_url, caption: '' });
+        opts.photos.push({ url: result.url || result.data_url, caption: '', caption_ru: '', caption_am: '' });
       }
     } catch(e) {}
   }
@@ -11895,9 +11914,12 @@ async function sbSaveBlock(id) {
     for (var phi = 0; phi < existingPhotos.length; phi++) {
       var phUrlEl = document.getElementById('sb_photo_' + id + '_' + phi);
       var phCapEl = document.getElementById('sb_photocap_' + id + '_' + phi);
+      var phCapAmEl = document.getElementById('sb_photocap_am_' + id + '_' + phi);
       newPhotos.push({
         url: phUrlEl ? phUrlEl.value : (existingPhotos[phi].url || ''),
-        caption: phCapEl ? phCapEl.value : (existingPhotos[phi].caption || '')
+        caption: phCapEl ? phCapEl.value : (existingPhotos[phi].caption || existingPhotos[phi].caption_ru || ''),
+        caption_ru: phCapEl ? phCapEl.value : (existingPhotos[phi].caption_ru || existingPhotos[phi].caption || ''),
+        caption_am: phCapAmEl ? phCapAmEl.value : (existingPhotos[phi].caption_am || '')
       });
     }
     blockOpts.photos = newPhotos;
@@ -11917,6 +11939,12 @@ async function sbSaveBlock(id) {
     if (psRadius) blockOpts.photo_settings.border_radius = parseInt(psRadius.value);
     if (psFW) blockOpts.photo_settings.full_width_mobile = psFW.checked;
   }
+
+  // Collect swipe hint text (reviews blocks)
+  var swipeHintRuEl = document.getElementById('sb_swipehint_ru_' + id);
+  var swipeHintAmEl = document.getElementById('sb_swipehint_am_' + id);
+  if (swipeHintRuEl) blockOpts.swipe_hint_ru = swipeHintRuEl.value || '';
+  if (swipeHintAmEl) blockOpts.swipe_hint_am = swipeHintAmEl.value || '';
   
   b.custom_html = JSON.stringify(blockOpts);
 

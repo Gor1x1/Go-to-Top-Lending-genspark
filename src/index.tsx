@@ -184,6 +184,9 @@ app.get('/api/site-data', async (c) => {
             element_order: blockOpts.element_order || [],
             // Photo display settings
             photo_settings: blockOpts.photo_settings || {},
+            // Swipe hint text (reviews blocks)
+            swipe_hint_ru: blockOpts.swipe_hint_ru || '',
+            swipe_hint_am: blockOpts.swipe_hint_am || '',
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -4035,7 +4038,9 @@ switchLang = function(l) {
               var carId = 'rvCar_' + (bf.key || 'reviews');
               var cH = '<div class="rv-track" id="' + carId + '_track">';
               validPhotos.forEach(function(p, pi) {
-                var captionText = p.caption || '';
+                var captionRu = p.caption_ru || p.caption || '';
+                var captionAm = p.caption_am || '';
+                var captionText = lang === 'am' && captionAm ? captionAm : captionRu;
                 if (!captionText) {
                   // Default trust-building descriptions
                   var defaultCaptions = [
@@ -4051,7 +4056,7 @@ switchLang = function(l) {
                 cH += '<div class="rv-slide">' +
                   '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
                   '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="' + (pi === 0 ? 'eager' : 'lazy') + '" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
-                  '<div class="rv-caption"><div class="rv-caption-text"><i class="fas fa-quote-left" style="font-size:0.7em;margin-right:6px;opacity:0.5;vertical-align:top"></i>' + captionText + '</div></div>' +
+                  '<div class="rv-caption"><div class="rv-caption-text" data-ru="' + captionRu.replace(/"/g,'&quot;') + '" data-am="' + captionAm.replace(/"/g,'&quot;') + '"><i class="fas fa-quote-left" style="font-size:0.7em;margin-right:6px;opacity:0.5;vertical-align:top"></i>' + captionText + '</div></div>' +
                 '</div>';
               });
               cH += '</div>';
@@ -4069,7 +4074,10 @@ switchLang = function(l) {
               }
               dotsH += '</div>';
               if (validPhotos.length > 1) {
-                dotsH += '<div class="rv-swipe-hint"><i class="fas fa-hand-pointer" style="color:var(--purple,#8B5CF6)"></i> <span data-ru="\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430" data-am="\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u043b\u0578\u0582">' + (lang === 'am' ? '\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u043b\u0578\u0582' : '\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430') + '</span> <i class="fas fa-arrow-right" style="font-size:0.75rem;animation:rvSwipeHint 2s ease-in-out infinite"></i></div>';
+                var swipeHintRu = bf.swipe_hint_ru || '\u041b\u0438\u0441\u0442\u0430\u0439\u0442\u0435 \u0434\u043b\u044f \u043f\u0440\u043e\u0441\u043c\u043e\u0442\u0440\u0430';
+                var swipeHintAm = bf.swipe_hint_am || '\u054d\u0561\u0570\u0565\u0581\u0580\u0565\u0584 \u0564\u056b\u057f\u0565\u056c\u0578\u0582';
+                var swipeHintText = lang === 'am' ? swipeHintAm : swipeHintRu;
+                dotsH += '<div class="rv-swipe-hint"><i class="fas fa-hand-pointer" style="color:var(--purple,#8B5CF6)"></i> <span data-ru="' + swipeHintRu.replace(/"/g,'&quot;') + '" data-am="' + swipeHintAm.replace(/"/g,'&quot;') + '">' + swipeHintText + '</span> <i class="fas fa-arrow-right" style="font-size:0.75rem;animation:rvSwipeHint 2s ease-in-out infinite"></i></div>';
               }
               dotsDiv.innerHTML = dotsH;
               // Place into DOM (NO counter text — removed per user request)
