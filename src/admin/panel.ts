@@ -10700,6 +10700,52 @@ function renderSiteBlocks() {
         h += '</details></div>';
         } // end hasSocials
 
+        // ── Footer Contacts section (only for footer block) ──
+        if (b.block_key === 'footer') {
+          var ftContacts = [];
+          try { ftContacts = JSON.parse((data.footer || {}).contacts_json || '[]'); } catch(e) { ftContacts = []; }
+          if (!Array.isArray(ftContacts)) ftContacts = [];
+          
+          h += '<div style="margin-bottom:16px">';
+          h += '<details' + (ftContacts.length > 0 ? ' open' : '') + '><summary style="font-size:0.85rem;font-weight:700;color:#94a3b8;cursor:pointer;margin-bottom:8px"><i class="fas fa-address-book" style="color:#F59E0B;margin-right:6px"></i>\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b (\u0444\u0443\u0442\u0435\u0440) <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + ftContacts.length + ')</span></summary>';
+          
+          h += '<div style="padding:10px;background:rgba(245,158,11,0.04);border:1px solid rgba(245,158,11,0.12);border-radius:8px;margin-bottom:10px">';
+          h += '<div style="font-size:0.72rem;font-weight:700;color:#F59E0B;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-info-circle" style="margin-right:4px"></i>\u042d\u0442\u0438 \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u044b \u043e\u0442\u043e\u0431\u0440\u0430\u0436\u0430\u044e\u0442\u0441\u044f \u0432 \u0444\u0443\u0442\u0435\u0440\u0435 \u043d\u0430\u0434 \u0441\u043e\u0446\u0441\u0435\u0442\u044f\u043c\u0438</div>';
+          
+          var ctIcons = [
+            {v:'fab fa-telegram',l:'Telegram'},{v:'fab fa-whatsapp',l:'WhatsApp'},{v:'fas fa-phone',l:'\u0422\u0435\u043b\u0435\u0444\u043e\u043d'},
+            {v:'fas fa-envelope',l:'Email'},{v:'fab fa-instagram',l:'Instagram'},{v:'fab fa-viber',l:'Viber'},
+            {v:'fas fa-map-marker-alt',l:'\u0410\u0434\u0440\u0435\u0441'},{v:'fas fa-globe',l:'\u0421\u0430\u0439\u0442'}
+          ];
+          
+          h += '<div id="ftBlockContactsList">';
+          for (var fci = 0; fci < ftContacts.length; fci++) {
+            var fc = ftContacts[fci];
+            h += '<div style="display:grid;grid-template-columns:28px 110px 1fr 1fr 1fr 24px;gap:6px;align-items:center;margin-bottom:6px;padding:8px;background:#1a2236;border-radius:8px;border:1px solid #293548">';
+            // Icon preview
+            h += '<i class="' + (fc.icon || 'fab fa-telegram') + '" style="color:#F59E0B;font-size:1.1rem;text-align:center"></i>';
+            // Type select
+            h += '<select class="input" id="ftbc_icon_' + fci + '" style="font-size:0.75rem;padding:4px 6px" onchange="ftBlockContactChanged()">';
+            for (var cii = 0; cii < ctIcons.length; cii++) {
+              h += '<option value="' + ctIcons[cii].v + '"' + (fc.icon === ctIcons[cii].v ? ' selected' : '') + '>' + ctIcons[cii].l + '</option>';
+            }
+            h += '</select>';
+            // Name RU
+            h += '<input class="input" id="ftbc_name_ru_' + fci + '" value="' + escHtml(fc.name_ru || '') + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU" style="font-size:0.75rem;padding:4px 8px" onchange="ftBlockContactChanged()">';
+            // Name AM
+            h += '<input class="input" id="ftbc_name_am_' + fci + '" value="' + escHtml(fc.name_am || '') + '" placeholder="\u0531\u0576\u057e\u0561\u0576\u0578\u0582\u0574 AM" style="font-size:0.75rem;padding:4px 8px;border-color:rgba(245,158,11,0.3)" onchange="ftBlockContactChanged()">';
+            // URL
+            h += '<input class="input" id="ftbc_url_' + fci + '" value="' + escHtml(fc.url || '') + '" placeholder="https://t.me/... \u0438\u043b\u0438 +374..." style="font-size:0.75rem;padding:4px 8px;color:#60a5fa" onchange="ftBlockContactChanged()">';
+            // Delete
+            h += '<button class="tier-del-btn" style="width:22px;height:22px;font-size:0.65rem" onclick="ftBlockContactRemove(' + fci + ')"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+          }
+          h += '</div>';
+          h += '<button class="btn btn-outline" style="padding:3px 10px;font-size:0.72rem;margin-top:4px" onclick="ftBlockContactAdd()"><i class="fas fa-plus" style="margin-right:4px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u043a\u043e\u043d\u0442\u0430\u043a\u0442</button>';
+          h += '</div>';
+          h += '</details></div>';
+        }
+
         // ── Block Photos section (only for blocks that have photos by design) ──
         var isTickerBlock = (b.block_key === 'ticker' || b.block_type === 'ticker');
         var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
@@ -11413,6 +11459,74 @@ function sbRemoveSocial(blockId, idx) {
   b.social_links = socials;
   render();
   sbAutoSave(blockId);
+}
+
+// ── Footer block contacts (stored in footer_settings.contacts_json) ──
+function _collectFtBlockContacts() {
+  var contacts = [];
+  var list = document.getElementById('ftBlockContactsList');
+  if (!list) return contacts;
+  var idx = 0;
+  while (true) {
+    var iconEl = document.getElementById('ftbc_icon_' + idx);
+    if (!iconEl) break;
+    contacts.push({
+      icon: iconEl.value,
+      name_ru: (document.getElementById('ftbc_name_ru_' + idx) || {}).value || '',
+      name_am: (document.getElementById('ftbc_name_am_' + idx) || {}).value || '',
+      url: (document.getElementById('ftbc_url_' + idx) || {}).value || ''
+    });
+    idx++;
+  }
+  return contacts;
+}
+
+function ftBlockContactChanged() {
+  var contacts = _collectFtBlockContacts();
+  if (!data.footer) data.footer = {};
+  data.footer.contacts_json = JSON.stringify(contacts);
+  // Auto-save footer contacts
+  _saveFtBlockContacts(contacts);
+}
+
+function ftBlockContactAdd() {
+  var contacts = _collectFtBlockContacts();
+  contacts.push({ icon: 'fab fa-telegram', name_ru: '', name_am: '', url: '' });
+  if (!data.footer) data.footer = {};
+  data.footer.contacts_json = JSON.stringify(contacts);
+  render();
+}
+
+function ftBlockContactRemove(idx) {
+  var contacts = _collectFtBlockContacts();
+  contacts.splice(idx, 1);
+  if (!data.footer) data.footer = {};
+  data.footer.contacts_json = JSON.stringify(contacts);
+  render();
+  _saveFtBlockContacts(contacts);
+}
+
+function _saveFtBlockContacts(contacts) {
+  var f = data.footer || {};
+  api('/footer', {
+    method: 'PUT',
+    body: JSON.stringify({
+      brand_text_ru: f.brand_text_ru || '',
+      brand_text_am: f.brand_text_am || '',
+      contacts_json: JSON.stringify(contacts),
+      socials_json: f.socials_json || '[]',
+      nav_links_json: f.nav_links_json || '[]',
+      custom_html: f.custom_html || '',
+      copyright_ru: f.copyright_ru || '',
+      copyright_am: f.copyright_am || '',
+      location_ru: f.location_ru || '',
+      location_am: f.location_am || ''
+    })
+  }).then(function() {
+    showToast('\u041a\u043e\u043d\u0442\u0430\u043a\u0442\u044b \u0444\u0443\u0442\u0435\u0440\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b', 'success');
+  }).catch(function(e) {
+    showToast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043a\u043e\u043d\u0442\u0430\u043a\u0442\u043e\u0432', 'error');
+  });
 }
 
 // ── Add photo to block ──
