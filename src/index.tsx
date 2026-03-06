@@ -952,6 +952,14 @@ app.get('/', async (c) => {
   c.header('Pragma', 'no-cache');
   c.header('Expires', '0');
   
+  // Detect language early for all SSR needs (nav, OG tags, etc.)
+  const reqPath = new URL(c.req.url).pathname;
+  const pathLang = reqPath === '/am' ? 'am' : (reqPath === '/ru' ? 'ru' : '');
+  const urlLang = pathLang || new URL(c.req.url).searchParams.get('lang') || '';
+  const acceptLang = (c.req.header('Accept-Language') || '').toLowerCase();
+  const isArmenian = urlLang === 'am' || urlLang === 'hy' || 
+    (!urlLang && (acceptLang.startsWith('hy') || acceptLang.includes('hy-am')));
+  
   // Build textMap from DB so we can inject current texts into HTML server-side
   // Strategy: Match seed items to DB items per section using content-aware alignment
   // (not just positional matching, which breaks when DB has fewer items than seed)
@@ -1881,7 +1889,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
     <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
     <li><a href="#contact" data-ru="Контакты" data-am="Կոնտակտներ">Контакты</a></li>
-    <li class="nav-mobile-cta"><a href="https://wa.me/37441888389" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> Написать нам</a></li>
+    <li class="nav-mobile-cta"><a href="https://wa.me/37441888389" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">Написать нам</span></a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
@@ -4610,8 +4618,14 @@ switchLang = function(l) {
             if (fb0.url) mobCta.setAttribute('href', fb0.url);
             var mcIcon = mobCta.querySelector('i');
             if (mcIcon) mcIcon.className = resolveIcon(fb0.icon, fb0.url);
+            var mcSpan = mobCta.querySelector('span');
             var mcText = lang === 'am' && fb0.text_am ? fb0.text_am : (fb0.text_ru || '');
-            if (mcText) { mobCta.setAttribute('data-ru', fb0.text_ru || ''); mobCta.setAttribute('data-am', fb0.text_am || ''); }
+            if (mcSpan) {
+              if (mcText) { mcSpan.textContent = mcText; mcSpan.setAttribute('data-ru', fb0.text_ru || ''); mcSpan.setAttribute('data-am', fb0.text_am || ''); mcSpan.setAttribute('data-no-rewrite', '1'); }
+            } else if (mcText) {
+              // Fallback: update <a> directly if no <span>
+              mobCta.setAttribute('data-ru', fb0.text_ru || ''); mobCta.setAttribute('data-am', fb0.text_am || '');
+            }
             if (typeof updateMessengerIcon === 'function') updateMessengerIcon(mobCta, fb0.url);
           }
         }
@@ -6407,8 +6421,15 @@ async function checkRefCode() {
         for (const item of navItems) {
           headerNavHtml += `    <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}">${item.ru}</a></li>\n`;
         }
-        // Add mobile CTA
-        headerNavHtml += `    <li class="nav-mobile-cta"><a href="https://wa.me/37441888389" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> Написать нам</a></li>`;
+        // Add mobile CTA (use floating_tg block data if available for correct URL and text)
+        const floatBf = blockFeatures.find((b: any) => b.key === 'floating_tg');
+        const floatBtn = floatBf?.buttons?.[0];
+        const mobCtaUrl = floatBtn?.url || 'https://wa.me/37441888389';
+        const mobCtaRu = floatBtn?.text_ru || 'Написать нам';
+        const mobCtaAm = floatBtn?.text_am || 'Գրել հիմա';
+        const mobCtaIcon = floatBtn?.icon || 'fab fa-whatsapp';
+        const mobCtaText = isArmenian ? mobCtaAm : mobCtaRu;
+        headerNavHtml += `    <li class="nav-mobile-cta"><a href="${mobCtaUrl}" target="_blank" class="btn btn-primary"><i class="${mobCtaIcon}"></i> <span data-ru="${mobCtaRu.replace(/"/g,'&quot;')}" data-am="${mobCtaAm.replace(/"/g,'&quot;')}" data-no-rewrite="1">${mobCtaText}</span></a></li>`;
         
         // Replace header nav links
         const headerNavMatch = pageHtml.match(/<ul class="nav-links" id="navLinks">[\s\S]*?<\/ul>/);
@@ -6445,15 +6466,7 @@ async function checkRefCode() {
     const baseUrl = new URL(c.req.url).origin;
     const seoImageAbsolute = seoImage.startsWith('http') ? seoImage : (seoImage ? baseUrl + (seoImage.startsWith('/') ? '' : '/') + seoImage : '');
     
-    // Detect language from URL path /am or /ru, then ?lang= param, then Accept-Language
-    const reqPath = new URL(c.req.url).pathname;
-    const pathLang = reqPath === '/am' ? 'am' : (reqPath === '/ru' ? 'ru' : '');
-    const urlLang = pathLang || new URL(c.req.url).searchParams.get('lang') || '';
-    const acceptLang = (c.req.header('Accept-Language') || '').toLowerCase();
-    const isArmenian = urlLang === 'am' || urlLang === 'hy' || 
-      (!urlLang && (acceptLang.startsWith('hy') || acceptLang.includes('hy-am')));
-    
-    // Pick text by language (with RU fallback)
+    // Pick text by language (with RU fallback) — isArmenian already defined at top of handler
     const ogTitle = (isArmenian && seoTextsAm[0]) ? seoTextsAm[0] : (seoTextsRu[0] || '');
     const ogDesc = (isArmenian && seoTextsAm[1]) ? seoTextsAm[1] : (seoTextsRu[1] || '');
     
