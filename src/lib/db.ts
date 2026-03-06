@@ -856,6 +856,40 @@ async function runSeeds(db: D1Database): Promise<void> {
       }
     }
   } catch (e) { console.log('[DB] Services siteBlocks fix skipped:', e); }
+
+  // v26c: Fix guarantee section — admin changed "Реальные аккаунты" to "Нулевой риск" here too
+  try {
+    const gRow = await db.prepare("SELECT content_json FROM site_content WHERE section_key = 'guarantee'").first();
+    if (gRow) {
+      const items = JSON.parse(gRow.content_json as string || '[]');
+      const needsFix = items.some((it: any) => (it.ru || '') === 'Нулевой риск блокировки');
+      if (needsFix) {
+        const gSeed = SEED_CONTENT_SECTIONS.find((s: any) => s.key === 'guarantee');
+        if (gSeed) {
+          await db.prepare("UPDATE site_content SET content_json = ? WHERE section_key = 'guarantee'")
+            .bind(JSON.stringify(gSeed.items)).run();
+          console.log('[DB] Guarantee section site_content reset to seed');
+        }
+      }
+    }
+  } catch (e) { console.log('[DB] Guarantee fix skipped:', e); }
+
+  try {
+    const gsbRow = await db.prepare("SELECT texts_ru FROM site_blocks WHERE block_key = 'guarantee'").first();
+    if (gsbRow) {
+      const textsRu = JSON.parse(gsbRow.texts_ru as string || '[]');
+      if (textsRu.some((t: string) => t === 'Нулевой риск блокировки')) {
+        const gSeed = SEED_CONTENT_SECTIONS.find((s: any) => s.key === 'guarantee');
+        if (gSeed) {
+          const newRu = gSeed.items.map((it: any) => it.ru);
+          const newAm = gSeed.items.map((it: any) => it.am);
+          await db.prepare("UPDATE site_blocks SET texts_ru = ?, texts_am = ? WHERE block_key = 'guarantee'")
+            .bind(JSON.stringify(newRu), JSON.stringify(newAm)).run();
+          console.log('[DB] Guarantee site_blocks texts reset to seed');
+        }
+      }
+    }
+  } catch (e) { console.log('[DB] Guarantee siteBlocks fix skipped:', e); }
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====
