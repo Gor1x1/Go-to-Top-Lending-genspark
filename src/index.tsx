@@ -2598,7 +2598,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="logo"><img src="/static/img/logo-gototop.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
-      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայաստանում: Իրական գնումներ իրական մարդկանցով սեփական պահեստից Երևանում:" data-no-rewrite="1">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с собственного склада в Ереване.</p>
+      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с человеческим поведенческим фактором." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայ վաճառողների համար: Իրական գնումներ իրական մարդկանցով բնական մարդկային վարքագիծ:" data-no-rewrite="1">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с человеческим поведенческим фактором.</p>
     </div>
     <div class="footer-col" id="footerNavCol">
       <h4 data-ru="Навигация" data-am="Նավիգացիա" data-no-rewrite="1">Навигация</h4>
