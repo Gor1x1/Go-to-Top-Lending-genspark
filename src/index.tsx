@@ -3462,12 +3462,18 @@ function updateTelegramLinks() {
 // Override switchLang to always use latest data-ru/data-am and update Telegram links
 switchLang = function(l) {
   lang = l;
+  localStorage.setItem('gtt_lang', l);
   document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.lang === l); });
   document.querySelectorAll('[data-' + l + ']').forEach(function(el) {
     var t = el.getAttribute('data-' + l);
     if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
+  // Update URL path to /am or /ru (without page reload) so shared links carry language
+  var newPath = l === 'am' ? '/am' : '/ru';
+  if (window.location.pathname !== newPath) {
+    history.replaceState(null, '', newPath + window.location.hash);
+  }
   // Re-apply Telegram links with correct language message templates
   updateTelegramLinks();
 };
