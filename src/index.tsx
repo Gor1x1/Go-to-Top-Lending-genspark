@@ -5585,6 +5585,10 @@ async function checkRefCode() {
     pdfBtn.disabled = true;
     pdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Загрузка...');
 
+    /* Open blank tab BEFORE async fetch — this is in a synchronous click handler context,
+       so popup blockers won't block it. We'll redirect this tab to the PDF URL after fetch completes. */
+    var pdfTab = window.open('about:blank', '_blank');
+
     fetch('/api/generate-pdf', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
@@ -5592,13 +5596,17 @@ async function checkRefCode() {
     }).then(function(r){ return r.json(); }).then(function(data) {
       pdfBtn.disabled = false;
       pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + _getPdfBtnLabel();
-      /* Navigate to PDF page — works on ALL devices: Android WebView, iOS Safari, Desktop */
-      /* CRITICAL: Use window.location.href instead of window.open() — popup blockers on iOS Safari
-         and Android browsers (Chrome, Samsung Internet, WebView) block window.open() called
-         inside async callbacks (fetch .then). location.href is never blocked. */
       var pdfUrl = (data && data.url) ? data.url : ((data && data.leadId) ? '/pdf/' + data.leadId : null);
       if (pdfUrl) {
-        window.location.href = pdfUrl;
+        /* Redirect the pre-opened tab to PDF page — data on main site is preserved */
+        if (pdfTab && !pdfTab.closed) {
+          pdfTab.location.href = window.location.origin + pdfUrl;
+        } else {
+          /* Fallback: if popup was blocked, open in same tab */
+          window.location.href = pdfUrl;
+        }
+      } else if (pdfTab && !pdfTab.closed) {
+        pdfTab.close();
       }
     }).catch(function(e){
       console.error('PDF error:', e);
