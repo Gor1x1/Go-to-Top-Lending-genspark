@@ -4289,6 +4289,20 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     LEFT JOIN expense_categories ec ON e.category_id = ec.id
     LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
     WHERE e.is_active = 1`).first();
+  // Commission data for this period
+  let periodCommissions = 0;
+  let periodCommByMethod: any[] = [];
+  try {
+    const commRes = await db.prepare(`SELECT pm.name_ru, pm.commission_pct, COUNT(*) as count, 
+      COALESCE(SUM(l.total_amount),0) as total_base,
+      COALESCE(SUM(l.commission_amount),0) as total_commission
+      FROM leads l JOIN payment_methods pm ON l.payment_method_id = pm.id
+      WHERE l.commission_amount > 0 AND strftime('%Y-%m', l.created_at) = ?
+      GROUP BY l.payment_method_id ORDER BY total_commission DESC`).bind(periodKey).all();
+    periodCommByMethod = commRes.results || [];
+    for (const r of periodCommByMethod) { periodCommissions += Number((r as any).total_commission) || 0; }
+  } catch {}
+
   // Build P&L cascade (before taxes)
   const revenueServices = snap ? (snap.revenue_services as number || 0) : 0;
   const revenueArticles = snap ? (snap.revenue_articles as number || 0) : 0;
@@ -4402,6 +4416,9 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     loan_load_on_revenue: revenue > 0 ? Math.round(totalLoanPaymentsPeriod / revenue * 10000) / 100 : 0,
     loan_load_on_profit: netProfit > 0 ? Math.round(totalLoanMonthlyPlan / netProfit * 10000) / 100 : 0,
     tax_rules: taxRules.results || [],
+    // Commission data
+    commissions_total: periodCommissions,
+    commissions_by_method: periodCommByMethod,
     _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
 }

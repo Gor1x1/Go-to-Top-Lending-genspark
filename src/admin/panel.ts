@@ -438,14 +438,28 @@ function previewSite() {
 
 // ===== DASHBOARD =====
 function renderDashboard() {
-  const s = data.stats;
-  const a = s.analytics || {};
-  const daily = a.daily || [];
-  const refs = a.referrers || [];
-  const langs = a.languages || [];
-  const ld = s.leads || {};
-  const db = s.dashboard || {};
-  const stb = db.status_breakdown || {};
+  var s = data.stats || {};
+  // If dashboard data not loaded yet (bulk-data doesn't include it), load /stats async
+  if (!s.dashboard && !s._dashLoading) {
+    s._dashLoading = true;
+    api('/stats').then(function(fullStats) {
+      if (fullStats && !fullStats.error) {
+        // Merge full stats into data.stats
+        data.stats = fullStats;
+        data.stats._dashLoaded = true;
+      }
+      s._dashLoading = false;
+      render();
+    });
+    return '<div style="padding:32px;text-align:center"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:16px;color:#a78bfa"><i class="fas fa-tachometer-alt" style="margin-right:8px"></i>Дашборд</h1><div style="margin-top:40px"><i class="fas fa-spinner fa-spin" style="font-size:2rem;color:#8B5CF6"></i><div style="color:#94a3b8;margin-top:12px">Загрузка данных дашборда...</div></div></div>';
+  }
+  var a = s.analytics || {};
+  var daily = a.daily || [];
+  var refs = a.referrers || [];
+  var langs = a.languages || [];
+  var ld = s.leads || {};
+  var db = s.dashboard || {};
+  var stb = db.status_breakdown || {};
   
   // Helper: format amount
   function fa(v) { return Number(v || 0).toLocaleString('ru-RU') + ' ֏'; }
@@ -475,7 +489,7 @@ function renderDashboard() {
   
   // ===== ALERTS =====
   if (ld.new > 0) {
-    h += '<div style="background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px 24px;margin-bottom:20px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.2s" onclick="navigate(\'leads\')" onmouseover="this.style.transform=\'translateY(-1px)\'" onmouseout="this.style.transform=\'\'">' +
+    h += '<div style="background:linear-gradient(135deg,rgba(239,68,68,0.15),rgba(239,68,68,0.05));border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:16px 24px;margin-bottom:20px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all 0.2s" onclick="navigate(&apos;leads&apos;)" onmouseover="this.style.transform=&apos;translateY(-1px)&apos;" onmouseout="this.style.transform=&apos;&apos;">' +
       '<div style="width:42px;height:42px;border-radius:50%;background:rgba(239,68,68,0.2);display:flex;align-items:center;justify-content:center"><i class="fas fa-bell" style="color:#EF4444;font-size:1.1rem"></i></div>' +
       '<div style="flex:1"><strong style="color:#f87171;font-size:1rem">' + ld.new + ' новых заявок ожидают обработки!</strong><div style="color:#94a3b8;font-size:0.82rem;margin-top:2px">Нажмите, чтобы перейти к лидам</div></div>' +
       '<i class="fas fa-chevron-right" style="color:#f87171"></i></div>';
@@ -559,7 +573,7 @@ function renderDashboard() {
     var sk = statusOrder[si];
     var sv = stb[sk] || { count: 0, amount: 0 };
     var barW = maxCount > 0 ? Math.max(8, Math.round((sv.count / maxCount) * 100)) : 8;
-    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer" onclick="navigate(\'leads\')">' +
+    h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;cursor:pointer" onclick="navigate(&apos;leads&apos;)">' +
       '<div style="width:120px;font-size:0.78rem;color:#94a3b8;white-space:nowrap">' + (statusLabels[sk] || sk) + '</div>' +
       '<div style="flex:1;background:#1e293b;border-radius:6px;height:28px;position:relative;overflow:hidden">' +
         '<div style="width:' + barW + '%;height:100%;background:' + (statusColors[sk] || '#8B5CF6') + '30;border-radius:6px;transition:width 0.5s"></div>' +
@@ -573,7 +587,7 @@ function renderDashboard() {
   // --- RIGHT: RECENT LEADS ---
   h += '<div class="card" style="padding:20px">';
   h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-weight:700;font-size:0.95rem"><i class="fas fa-clock" style="color:#F59E0B;margin-right:8px"></i>Последние заявки</h3>';
-  h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="navigate(\'leads\')">Все лиды →</button></div>';
+  h += '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="navigate(&apos;leads&apos;)">Все лиды →</button></div>';
   var recent = db.recent_leads || [];
   if (recent.length === 0) {
     h += '<div style="text-align:center;color:#64748b;padding:20px;font-size:0.85rem">Нет заявок</div>';
@@ -4320,6 +4334,11 @@ function renderPnlCascade(p) {
   }
   h += pnlRow('\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b', -(p.refunds||0), {indent:1, color:'#EF4444', sub:true});
   h += pnlRow('\u0427\u0438\u0441\u0442\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430', p.net_revenue, {indent:1, color:'#22C55E', sub:true, ytd:ytd.net_revenue});
+  // Commissions (informational — paid by client, not company expense)
+  if (p.commissions_total > 0) {
+    h += pnlRow('+ \u041a\u043e\u043c\u0438\u0441\u0441\u0438\u0438 \u0437\u0430 \u043e\u043f\u043b\u0430\u0442\u0443 (\u043a\u043b\u0438\u0435\u043d\u0442)' + tip('\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u044f \u0431\u0430\u043d\u043a\u0430/\u043f\u043b\u0430\u0442\u0451\u0436\u043d\u043e\u0439 \u0441\u0438\u0441\u0442\u0435\u043c\u044b, \u043e\u043f\u043b\u0430\u0447\u0435\u043d\u043d\u0430\u044f \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u043c \u0441\u0432\u0435\u0440\u0445 \u0441\u0443\u043c\u043c\u044b \u0437\u0430\u043a\u0430\u0437\u0430. \u041d\u0435 \u0432\u043b\u0438\u044f\u0435\u0442 \u043d\u0430 \u043f\u0440\u0438\u0431\u044b\u043b\u044c \u043a\u043e\u043c\u043f\u0430\u043d\u0438\u0438.'), p.commissions_total, {indent:1, color:'#3B82F6', sub:true, icon:'fa-credit-card'});
+    h += pnlRow('= \u0418\u0442\u043e\u0433\u043e \u043a \u043e\u043f\u043b\u0430\u0442\u0435 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u043c' + tip('\u0421\u0443\u043c\u043c\u0430 \u0437\u0430\u043a\u0430\u0437\u0430 + \u043a\u043e\u043c\u0438\u0441\u0441\u0438\u044f. \u042d\u0442\u043e \u0442\u043e, \u0447\u0442\u043e \u043a\u043b\u0438\u0435\u043d\u0442 \u0440\u0435\u0430\u043b\u044c\u043d\u043e \u043f\u043b\u0430\u0442\u0438\u0442.'), (p.revenue||0) + (p.commissions_total||0), {indent:1, color:'#a78bfa', sub:true, icon:'fa-calculator'});
+  }
   // COGS
   h += pnlRow('\u2212 \u0421\u0435\u0431\u0435\u0441\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c / \u041a\u043e\u043c\u043c\u0435\u0440\u0447. (COGS)' + tip('\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435 \u0437\u0430\u0442\u0440\u0430\u0442\u044b \u0438\u0437 \u0431\u043b\u043e\u043a\u0430 \u0417\u0430\u0442\u0440\u0430\u0442\u044b (is_marketing=0)'), p.cogs, {indent:1, color:'#F59E0B', icon:'fa-truck', mom:mom.cogs, momPct:mp.cogs, ytd:ytd.cogs});
   // Gross
@@ -5798,6 +5817,9 @@ function renderPnlSummary(p) {
   h += '<div style="margin-bottom:12px;padding:10px 14px;background:rgba(34,197,94,0.06);border-radius:8px;border:1px solid rgba(34,197,94,0.15)">';
   h += '<div style="font-size:0.82rem;color:#22C55E;font-weight:700;margin-bottom:8px"><i class="fas fa-arrow-down" style="margin-right:6px"></i>\\u041f\\u041e\\u0421\\u0422\\u0423\\u041f\\u041b\\u0415\\u041d\\u0418\\u042f</div>';
   h += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.85rem"><span style="color:#94a3b8">\\u0412\\u044b\\u0440\\u0443\\u0447\\u043a\\u0430</span><span style="color:#22C55E;font-weight:700">' + fmtAmt(revenue) + '</span></div>';
+  if ((p.commissions_total || 0) > 0) {
+    h += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.85rem"><span style="color:#94a3b8"><i class="fas fa-credit-card" style="margin-right:6px;color:#3B82F6;font-size:0.7rem"></i>\\u041a\\u043e\\u043c\\u0438\\u0441\\u0441\\u0438\\u0438 (\\u043e\\u043f\\u043b. \\u043a\\u043b\\u0438\\u0435\\u043d\\u0442\\u043e\\u043c)</span><span style="color:#3B82F6;font-weight:700">+' + fmtAmt(p.commissions_total) + '</span></div>';
+  }
   if (p.other_income > 0) {
     h += '<div style="display:flex;justify-content:space-between;padding:4px 0;font-size:0.85rem"><span style="color:#94a3b8">\\u041f\\u0440\\u043e\\u0447\\u0438\\u0435 \\u0434\\u043e\\u0445\\u043e\\u0434\\u044b</span><span style="color:#22C55E;font-weight:700">' + fmtAmt(p.other_income) + '</span></div>';
   }
@@ -6791,6 +6813,41 @@ function renderBizCostsV2(d, sd, fin) {
     h += '</div>';
   }
 
+  // ===== COMMISSION BLOCK IN COSTS =====
+  var commDataCost = d.commission_data || {};
+  var byMethodCost = commDataCost.by_method || [];
+  h += '<div style="margin-top:24px">';
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-credit-card" style="color:#3B82F6;margin-right:8px"></i>Комиссии за способы оплаты</h3>';
+  h += '<div class="card" style="padding:20px;border:1px solid rgba(59,130,246,0.2)">';
+  h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:12px"><i class="fas fa-info-circle" style="margin-right:6px;color:#3B82F6"></i>Комиссия оплачивается клиентом сверх суммы заказа. Не является расходом компании, но важна для понимания реальной стоимости для клиента.</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
+  h += '<div style="padding:14px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">Итого комиссий</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6">' + fmtAmt(commDataCost.total_commission || 0) + '</div></div>';
+  h += '<div style="padding:14px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">С методом оплаты</div><div style="font-size:1.3rem;font-weight:800;color:#22C55E">' + fmtNum(commDataCost.leads_with_method || 0) + '</div></div>';
+  h += '<div style="padding:14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">Без метода оплаты</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B">' + fmtNum(commDataCost.leads_without_method || 0) + '</div></div>';
+  h += '</div>';
+  if (byMethodCost.length > 0) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="background:#1e293b;border-bottom:2px solid #334155">' +
+      '<th style="padding:8px 12px;text-align:left;color:#94a3b8">Способ оплаты</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">%</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">Лидов</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">База</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">Комиссия</th>' +
+      '</tr></thead><tbody>';
+    for (var cci = 0; cci < byMethodCost.length; cci++) {
+      var ccm = byMethodCost[cci];
+      h += '<tr style="border-bottom:1px solid #1e293b">' +
+        '<td style="padding:8px 12px;color:#e2e8f0;font-weight:600"><i class="fas fa-credit-card" style="margin-right:6px;color:#3B82F6;font-size:0.7rem"></i>' + escHtml(ccm.name_ru) + '</td>' +
+        '<td style="padding:8px;text-align:center;color:#94a3b8">' + ccm.pct + '%</td>' +
+        '<td style="padding:8px;text-align:center;color:#e2e8f0;font-weight:600">' + fmtNum(ccm.count) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:#94a3b8;white-space:nowrap">' + fmtAmt(ccm.total_base) + '</td>' +
+        '<td style="padding:8px;text-align:right;color:#3B82F6;font-weight:700;white-space:nowrap">' + fmtAmt(ccm.total_commission) + '</td></tr>';
+    }
+    h += '</tbody></table>';
+  } else {
+    h += '<div style="text-align:center;color:#64748b;padding:12px;font-size:0.82rem"><i class="fas fa-info-circle" style="margin-right:6px"></i>\u041d\u0435\u0442 \u043b\u0438\u0434\u043e\u0432 \u0441 \u043a\u043e\u043c\u0438\u0441\u0441\u0438\u0435\u0439 \u0432 \u0440\u0430\u0431\u043e\u0447\u0438\u0445 \u0441\u0442\u0430\u0442\u0443\u0441\u0430\u0445 \u0437\u0430 \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0439 \u043f\u0435\u0440\u0438\u043e\u0434</div>';
+  }
+  h += '</div></div>';
+
   return h;
 }
 
@@ -7109,6 +7166,21 @@ function renderBizFunnelV2(d, sd, fin) {
       h += '</tbody></table></div></div>';
     }
     h += '</div>';
+  }
+
+  // ===== COMMISSION SUMMARY IN FUNNEL =====
+  var commDataFun = d.commission_data || {};
+  var totalCommFun = commDataFun.total_commission || 0;
+  if (totalCommFun > 0 || (commDataFun.leads_with_method || 0) > 0) {
+    h += '<div class="card" style="margin-top:20px;padding:20px;border:1px solid rgba(59,130,246,0.2)">';
+    h += '<h3 style="font-weight:700;margin-bottom:12px;font-size:0.95rem"><i class="fas fa-credit-card" style="color:#3B82F6;margin-right:8px"></i>Влияние комиссий на стоимость для клиента</h3>';
+    var funnelTurnover = Number(fin.turnover || 0);
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">';
+    h += '<div style="padding:14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">\u041e\u0431\u043e\u0440\u043e\u0442 (base)</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + fmtAmt(funnelTurnover) + '</div></div>';
+    h += '<div style="padding:14px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u0438</div><div style="font-size:1.2rem;font-weight:800;color:#3B82F6">+' + fmtAmt(totalCommFun) + '</div></div>';
+    h += '<div style="padding:14px;background:rgba(16,185,129,0.08);border:1px solid rgba(16,185,129,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">\u0418\u0442\u043e\u0433\u043e \u043a \u043e\u043f\u043b\u0430\u0442\u0435 \u043a\u043b\u0438\u0435\u043d\u0442\u0430\u043c\u0438</div><div style="font-size:1.2rem;font-weight:800;color:#10B981">' + fmtAmt(funnelTurnover + totalCommFun) + '</div></div>';
+    h += '<div style="padding:14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">\u041b\u0438\u0434\u043e\u0432 \u0441 \u043e\u043f\u043b\u0430\u0442\u043e\u0439</div><div style="font-size:1.2rem;font-weight:800;color:#F59E0B">' + fmtNum(commDataFun.leads_with_method || 0) + '</div></div>';
+    h += '</div></div>';
   }
 
   return h;
@@ -8008,6 +8080,40 @@ function renderBizPeriodsV2(d, sd, fin) {
     }
   } else {
     h += '<div class="card" style="padding:24px;text-align:center;color:#475569"><i class="fas fa-info-circle" style="margin-right:8px"></i>\u0417\u0430\u043a\u0440\u043e\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439 \u043c\u0435\u0441\u044f\u0446 \u0447\u0442\u043e\u0431\u044b \u0443\u0432\u0438\u0434\u0435\u0442\u044c \u0441\u0440\u0430\u0432\u043d\u0435\u043d\u0438\u0435</div>';
+  }
+  h += '</div>';
+
+  // ===== COMMISSION TREND IN PERIODS =====
+  var commDataPer = d.commission_data || {};
+  var totalCommPer = commDataPer.total_commission || 0;
+  h += '<div class="card" style="margin-top:20px;padding:20px;border:1px solid rgba(59,130,246,0.2)">';
+  h += '<h3 style="font-weight:700;margin-bottom:12px;font-size:0.95rem"><i class="fas fa-credit-card" style="color:#3B82F6;margin-right:8px"></i>\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u0438 \u0437\u0430 \u0441\u043f\u043e\u0441\u043e\u0431\u044b \u043e\u043f\u043b\u0430\u0442\u044b</h3>';
+  h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">';
+  h += '<div style="padding:12px;background:rgba(59,130,246,0.08);border-radius:8px"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">\u0418\u0442\u043e\u0433\u043e \u043a\u043e\u043c\u0438\u0441\u0441\u0438\u0439</div><div style="font-size:1.2rem;font-weight:800;color:#3B82F6">' + fmtAmt(totalCommPer) + '</div></div>';
+  h += '<div style="padding:12px;background:rgba(34,197,94,0.08);border-radius:8px"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">\u041b\u0438\u0434\u043e\u0432 \u0441 \u043e\u043f\u043b\u0430\u0442\u043e\u0439</div><div style="font-size:1.2rem;font-weight:800;color:#22C55E">' + fmtNum(commDataPer.leads_with_method || 0) + '</div></div>';
+  h += '<div style="padding:12px;background:rgba(245,158,11,0.08);border-radius:8px"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">\u0411\u0435\u0437 \u043c\u0435\u0442\u043e\u0434\u0430 \u043e\u043f\u043b\u0430\u0442\u044b</div><div style="font-size:1.2rem;font-weight:800;color:#F59E0B">' + fmtNum(commDataPer.leads_without_method || 0) + '</div></div>';
+  var avgCommPer = (commDataPer.leads_with_method || 0) > 0 ? Math.round(totalCommPer / commDataPer.leads_with_method) : 0;
+  h += '<div style="padding:12px;background:rgba(139,92,246,0.08);border-radius:8px"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:2px">\u0421\u0440\u0435\u0434\u043d\u044f\u044f \u043a\u043e\u043c\u0438\u0441\u0441\u0438\u044f</div><div style="font-size:1.2rem;font-weight:800;color:#a78bfa">' + fmtAmt(avgCommPer) + '</div></div>';
+  h += '</div>';
+  var byMethodPer = commDataPer.by_method || [];
+  if (byMethodPer.length > 0) {
+    h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem;margin-top:12px"><thead><tr style="border-bottom:2px solid #334155">' +
+      '<th style="padding:8px 12px;text-align:left;color:#94a3b8">\u0421\u043f\u043e\u0441\u043e\u0431</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">%</th>' +
+      '<th style="padding:8px;text-align:center;color:#94a3b8">\u041b\u0438\u0434\u043e\u0432</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">\u0411\u0430\u0437\u0430</th>' +
+      '<th style="padding:8px;text-align:right;color:#94a3b8">\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u044f</th></tr></thead><tbody>';
+    for (var cpi = 0; cpi < byMethodPer.length; cpi++) {
+      var cpm = byMethodPer[cpi];
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:6px 12px;color:#e2e8f0;font-weight:600"><i class="fas fa-credit-card" style="margin-right:6px;color:#3B82F6;font-size:0.7rem"></i>' + escHtml(cpm.name_ru) + '</td>' +
+        '<td style="padding:6px 8px;text-align:center;color:#94a3b8">' + cpm.pct + '%</td>' +
+        '<td style="padding:6px 8px;text-align:center;color:#e2e8f0;font-weight:600">' + fmtNum(cpm.count) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#94a3b8">' + fmtAmt(cpm.total_base) + '</td>' +
+        '<td style="padding:6px 8px;text-align:right;color:#3B82F6;font-weight:700">' + fmtAmt(cpm.total_commission) + '</td></tr>';
+    }
+    h += '</tbody></table>';
+  } else {
+    h += '<div style="text-align:center;color:#64748b;padding:12px;font-size:0.82rem;margin-top:8px"><i class="fas fa-info-circle" style="margin-right:6px"></i>\u041d\u0435\u0442 \u0434\u0430\u043d\u043d\u044b\u0445 \u043e \u043a\u043e\u043c\u0438\u0441\u0441\u0438\u044f\u0445 \u0437\u0430 \u0432\u044b\u0431\u0440\u0430\u043d\u043d\u044b\u0439 \u043f\u0435\u0440\u0438\u043e\u0434</div>';
   }
   h += '</div>';
 
