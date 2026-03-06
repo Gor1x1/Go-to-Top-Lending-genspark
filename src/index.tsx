@@ -1094,6 +1094,14 @@ app.get('/', async (c) => {
       }
     } catch {}
 
+    // Load popup block for server-side popup injection (prevents stale hardcoded texts)
+    try {
+      const popupRow = await db.prepare("SELECT texts_ru, texts_am, buttons FROM site_blocks WHERE block_key = 'popup' AND is_visible = 1 LIMIT 1").first();
+      if (popupRow) {
+        (globalThis as any).__popupBlock = popupRow;
+      }
+    } catch {}
+
     // Save sectionOrder + blockFeatures for server-side reorder/injection
     // Query section_order and site_blocks directly (not from API scope)
     const soRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
@@ -4569,6 +4577,85 @@ switchLang = function(l) {
         console.log('[DB] Floating buttons applied from blockFeatures');
       }
       
+      // ===== APPLY POPUP TEXTS & BUTTON (separate from main loop which skips popup) =====
+      var popupBf = db.blockFeatures.find(function(b) { return b.key === 'popup' || b.block_type === 'popup'; });
+      if (popupBf) {
+        var popupCard = document.querySelector('.popup-card');
+        if (popupCard) {
+          // Map popup texts: [0]=heading, [1]=subtitle, [2]=label1, [3]=label2, [4]=label3, [5]=success title, [6]=success msg
+          var pTextsRu = popupBf.texts_ru || [];
+          var pTextsAm = popupBf.texts_am || [];
+          
+          // Update heading (h3)
+          var pH3 = popupCard.querySelector('h3');
+          if (pH3 && (pTextsRu[0] || pTextsAm[0])) {
+            if (pTextsRu[0]) pH3.setAttribute('data-ru', pTextsRu[0]);
+            if (pTextsAm[0]) pH3.setAttribute('data-am', pTextsAm[0]);
+            var pHeadTxt = lang === 'am' && pTextsAm[0] ? pTextsAm[0] : (pTextsRu[0] || '');
+            if (pHeadTxt) pH3.textContent = pHeadTxt;
+          }
+          
+          // Update subtitle (.popup-sub)
+          var pSub = popupCard.querySelector('.popup-sub');
+          if (pSub && (pTextsRu[1] || pTextsAm[1])) {
+            if (pTextsRu[1]) pSub.setAttribute('data-ru', pTextsRu[1]);
+            if (pTextsAm[1]) pSub.setAttribute('data-am', pTextsAm[1]);
+            var pSubTxt = lang === 'am' && pTextsAm[1] ? pTextsAm[1] : (pTextsRu[1] || '');
+            if (pSubTxt) pSub.textContent = pSubTxt;
+          }
+          
+          // Update form labels
+          var pLabels = popupCard.querySelectorAll('.pf-label');
+          for (var pli = 0; pli < pLabels.length && pli < 3; pli++) {
+            var ruIdx = pli + 2; // texts[2], texts[3], texts[4]
+            if (pTextsRu[ruIdx] || pTextsAm[ruIdx]) {
+              if (pTextsRu[ruIdx]) pLabels[pli].setAttribute('data-ru', pTextsRu[ruIdx]);
+              if (pTextsAm[ruIdx]) pLabels[pli].setAttribute('data-am', pTextsAm[ruIdx]);
+              var plTxt = lang === 'am' && pTextsAm[ruIdx] ? pTextsAm[ruIdx] : (pTextsRu[ruIdx] || '');
+              if (plTxt) pLabels[pli].textContent = plTxt;
+            }
+          }
+          
+          // Update success message
+          var pSuccH4 = popupCard.querySelector('.popup-success h4');
+          if (pSuccH4 && (pTextsRu[5] || pTextsAm[5])) {
+            if (pTextsRu[5]) pSuccH4.setAttribute('data-ru', pTextsRu[5]);
+            if (pTextsAm[5]) pSuccH4.setAttribute('data-am', pTextsAm[5]);
+            var psHTxt = lang === 'am' && pTextsAm[5] ? pTextsAm[5] : (pTextsRu[5] || '');
+            if (psHTxt) pSuccH4.textContent = psHTxt;
+          }
+          var pSuccP = popupCard.querySelector('.popup-success p');
+          if (pSuccP && (pTextsRu[6] || pTextsAm[6])) {
+            if (pTextsRu[6]) pSuccP.setAttribute('data-ru', pTextsRu[6]);
+            if (pTextsAm[6]) pSuccP.setAttribute('data-am', pTextsAm[6]);
+            var psPTxt = lang === 'am' && pTextsAm[6] ? pTextsAm[6] : (pTextsRu[6] || '');
+            if (psPTxt) pSuccP.textContent = psPTxt;
+          }
+          
+          // Update submit button from buttons array
+          if (popupBf.buttons && popupBf.buttons[0]) {
+            var pBtn = popupBf.buttons[0];
+            var pSubmit = popupCard.querySelector('form button[type="submit"], form .btn');
+            if (pSubmit) {
+              var pBtnSpan = pSubmit.querySelector('span[data-ru], span');
+              if (pBtnSpan) {
+                if (pBtn.text_ru) pBtnSpan.setAttribute('data-ru', pBtn.text_ru);
+                if (pBtn.text_am) pBtnSpan.setAttribute('data-am', pBtn.text_am);
+                var pBtnTxt = lang === 'am' && pBtn.text_am ? pBtn.text_am : (pBtn.text_ru || '');
+                if (pBtnTxt) pBtnSpan.textContent = pBtnTxt;
+              }
+              // Update icon
+              var pBtnIcon = pSubmit.querySelector('i');
+              if (pBtnIcon && pBtn.icon) pBtnIcon.className = resolveIcon(pBtn.icon, pBtn.url);
+              // Update URL for popup form submission
+              if (pBtn.url) window._tgPopupUrl = pBtn.url;
+            }
+          }
+          
+          console.log('[DB] Popup texts & button applied from blockFeatures');
+        }
+      }
+      
       // ===== APPLY CALCULATOR BUTTONS (separate from main loop which skips calculator) =====
       var calcBf = db.blockFeatures.find(function(b) { return b.key === 'calculator' || b.block_type === 'calculator'; });
       var calcCtaWrap = document.querySelector('.calc-cta');
@@ -6042,6 +6129,99 @@ async function checkRefCode() {
   
   // 5. Footer social links now injected INSIDE contacts column (step 2 above)
   // No separate block needed
+  
+  // ===== 5b. SERVER-SIDE POPUP INJECTION =====
+  // Update popup texts and button from site_blocks so admin changes are reflected immediately
+  // IMPORTANT: All replacements scoped to popupOverlay section to avoid touching other page elements
+  const popupBlock = (globalThis as any).__popupBlock;
+  delete (globalThis as any).__popupBlock;
+  if (popupBlock) {
+    let pTextsRu: string[] = [];
+    let pTextsAm: string[] = [];
+    let pButtons: any[] = [];
+    try { pTextsRu = JSON.parse(popupBlock.texts_ru as string || '[]'); } catch {}
+    try { pTextsAm = JSON.parse(popupBlock.texts_am as string || '[]'); } catch {}
+    try { pButtons = JSON.parse(popupBlock.buttons as string || '[]'); } catch {}
+    
+    // Extract popup section from HTML for scoped replacements
+    const popupStart = pageHtml.indexOf('id="popupOverlay"');
+    const popupScriptStart = pageHtml.indexOf('<script>', popupStart > 0 ? popupStart : 0);
+    if (popupStart > 0 && popupScriptStart > popupStart) {
+      let popupHtml = pageHtml.substring(popupStart, popupScriptStart);
+      
+      // Replace heading (h3)
+      if (pTextsRu[0]) {
+        const h3Match = popupHtml.match(/<h3 data-ru="[^"]*" data-am="[^"]*">[^<]*<\/h3>/);
+        if (h3Match) {
+          const escRu = pTextsRu[0].replace(/"/g, '&quot;');
+          const escAm = (pTextsAm[0] || '').replace(/"/g, '&quot;');
+          popupHtml = popupHtml.replace(h3Match[0], `<h3 data-ru="${escRu}" data-am="${escAm || escRu}">${pTextsRu[0]}</h3>`);
+        }
+      }
+      
+      // Replace subtitle (.popup-sub)
+      if (pTextsRu[1]) {
+        const subMatch = popupHtml.match(/<p class="popup-sub" data-ru="[^"]*" data-am="[^"]*">[^<]*<\/p>/);
+        if (subMatch) {
+          const escRu = pTextsRu[1].replace(/"/g, '&quot;');
+          const escAm = (pTextsAm[1] || '').replace(/"/g, '&quot;');
+          popupHtml = popupHtml.replace(subMatch[0], `<p class="popup-sub" data-ru="${escRu}" data-am="${escAm || escRu}">${pTextsRu[1]}</p>`);
+        }
+      }
+      
+      // Replace form labels (all 3 at once using counter)
+      {
+        let labelIdx = 0;
+        popupHtml = popupHtml.replace(/<label class="pf-label" data-ru="[^"]*" data-am="[^"]*">[^<]*<\/label>/g, (match) => {
+          const ruText = pTextsRu[labelIdx + 2] || '';
+          const amText = pTextsAm[labelIdx + 2] || '';
+          labelIdx++;
+          if (!ruText) return match;
+          const escRu = ruText.replace(/"/g, '&quot;');
+          const escAm = amText.replace(/"/g, '&quot;');
+          return `<label class="pf-label" data-ru="${escRu}" data-am="${escAm || escRu}">${ruText}</label>`;
+        });
+      }
+      
+      // Replace success heading (h4)
+      if (pTextsRu[5]) {
+        const succH4Match = popupHtml.match(/<h4 data-ru="[^"]*" data-am="[^"]*">[^<]*<\/h4>/);
+        if (succH4Match) {
+          const escRu = pTextsRu[5].replace(/"/g, '&quot;');
+          const escAm = (pTextsAm[5] || '').replace(/"/g, '&quot;');
+          popupHtml = popupHtml.replace(succH4Match[0], `<h4 data-ru="${escRu}" data-am="${escAm || escRu}">${pTextsRu[5]}</h4>`);
+        }
+      }
+      
+      // Replace success message (p after h4 in popup-success)
+      if (pTextsRu[6]) {
+        const succPIdx = popupHtml.indexOf('popup-success');
+        if (succPIdx > 0) {
+          const succArea = popupHtml.substring(succPIdx);
+          const succPMatch = succArea.match(/<p data-ru="[^"]*" data-am="[^"]*">[^<]*<\/p>/);
+          if (succPMatch) {
+            const escRu = pTextsRu[6].replace(/"/g, '&quot;');
+            const escAm = (pTextsAm[6] || '').replace(/"/g, '&quot;');
+            popupHtml = popupHtml.replace(succPMatch[0], `<p data-ru="${escRu}" data-am="${escAm || escRu}">${pTextsRu[6]}</p>`);
+          }
+        }
+      }
+      
+      // Replace submit button text
+      if (pButtons[0]) {
+        const btnSpanMatch = popupHtml.match(/<span data-ru="[^"]*" data-am="[^"]*">[^<]*<\/span>/);
+        if (btnSpanMatch) {
+          const escRu = (pButtons[0].text_ru || '').replace(/"/g, '&quot;');
+          const escAm = (pButtons[0].text_am || '').replace(/"/g, '&quot;');
+          popupHtml = popupHtml.replace(btnSpanMatch[0], `<span data-ru="${escRu}" data-am="${escAm || escRu}">${pButtons[0].text_ru || ''}</span>`);
+        }
+      }
+      
+      // Replace popup section in full HTML
+      const originalPopup = pageHtml.substring(popupStart, popupScriptStart);
+      pageHtml = pageHtml.replace(originalPopup, popupHtml);
+    }
+  }
   
   // ===== 6. SERVER-SIDE SECTION REORDERING =====
   // Reorder sections in HTML based on section_order from DB so the page loads with correct order instantly
