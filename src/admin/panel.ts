@@ -10276,6 +10276,64 @@ function renderSiteBlocks() {
         }
         h += '</div></details>';
 
+        // ── SEO / OPEN GRAPH EDITOR ──
+        var isSeoBlock = (b.block_key === 'seo_og' || b.block_type === 'seo');
+        if (isSeoBlock) {
+          h += '<div style="margin-bottom:16px;padding:16px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:10px">';
+          h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">' +
+            '<i class="fas fa-search" style="color:#10B981;font-size:1.2rem"></i>' +
+            '<h4 style="font-size:0.95rem;font-weight:700;color:#6ee7b7">SEO / Open Graph</h4>' +
+            '<span style="font-size:0.72rem;color:#475569;font-weight:400;margin-left:8px">Превью ссылки в Telegram, WhatsApp, Facebook</span>' +
+          '</div>';
+          
+          // Info box
+          h += '<div style="padding:8px 12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.12);border-radius:6px;margin-bottom:14px;display:flex;align-items:flex-start;gap:8px">' +
+            '<i class="fas fa-info-circle" style="color:#10B981;font-size:0.85rem;margin-top:2px"></i>' +
+            '<span style="font-size:0.75rem;color:#6ee7b7;line-height:1.4">Эти данные отображаются когда кто-то отправляет ссылку на сайт в мессенджере. После сохранения отправьте ссылку <b>@WebpageBot</b> в Telegram для обновления кэша.</span>' +
+          '</div>';
+          
+          var seoTitleRu = (textsRu[0] || '');
+          var seoTitleAm = (textsAm[0] || '');
+          var seoDescRu = (textsRu[1] || '');
+          var seoDescAm = (textsAm[1] || '');
+          var seoImage = (b.photo_url || '');
+          
+          // OG Title
+          h += '<div style="margin-bottom:12px">';
+          h += '<div style="font-size:0.72rem;color:#10B981;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок (og:title)</div>';
+          if (showRu) h += '<div style="margin-bottom:6px"><span class="sb-field-label ru" style="font-size:0.68rem;margin-bottom:2px;display:block">RU</span><input class="input" id="sb_tru_' + b.id + '_0" value="' + escHtml(seoTitleRu) + '" placeholder="Go to Top — Продвижение на Wildberries" style="font-size:0.85rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          if (showAm) h += '<div><span class="sb-field-label am" style="font-size:0.68rem;margin-bottom:2px;display:block">AM</span><input class="input" id="sb_tam_' + b.id + '_0" value="' + escHtml(seoTitleAm) + '" placeholder="Go to Top — Առdelays Wildberries-ում" style="font-size:0.85rem" onchange="sbAutoSave(' + b.id + ')"></div>';
+          h += '</div>';
+          
+          // OG Description
+          h += '<div style="margin-bottom:12px">';
+          h += '<div style="font-size:0.72rem;color:#10B981;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-align-left" style="margin-right:4px"></i>Описание (og:description)</div>';
+          if (showRu) h += '<div style="margin-bottom:6px"><span class="sb-field-label ru" style="font-size:0.68rem;margin-bottom:2px;display:block">RU</span><textarea class="input" id="sb_tru_' + b.id + '_1" rows="2" placeholder="Выкупы живыми людьми, отзывы с реальными фото..." style="font-size:0.85rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(seoDescRu) + '</textarea></div>';
+          if (showAm) h += '<div><span class="sb-field-label am" style="font-size:0.68rem;margin-bottom:2px;display:block">AM</span><textarea class="input" id="sb_tam_' + b.id + '_1" rows="2" placeholder="Անdelays մdelays..." style="font-size:0.85rem;line-height:1.4" onchange="sbAutoSave(' + b.id + ')">' + escHtml(seoDescAm) + '</textarea></div>';
+          h += '</div>';
+          
+          // OG Image
+          h += '<div style="margin-bottom:12px">';
+          h += '<div style="font-size:0.72rem;color:#10B981;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-image" style="margin-right:4px"></i>Картинка (og:image) <span style="font-weight:400;color:#475569;font-size:0.65rem">рекомендуемый размер: 1200×630px</span></div>';
+          h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
+          if (seoImage) h += '<img src="' + escHtml(seoImage) + '" style="width:120px;height:63px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
+          h += '<input class="input" id="sb_mainphoto_' + b.id + '" value="' + escHtml(seoImage) + '" placeholder="https://gototop.win/static/img/og-image-dark.png" style="flex:1;font-size:0.82rem;color:#6ee7b7;min-width:200px" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap;background:#10B981;border-color:#10B981"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить<input type="file" accept="image/*" style="display:none" onchange="sbUploadPhoto(this,' + b.id + ',&apos;main&apos;)"></label>';
+          h += '</div></div>';
+          
+          // Preview mockup
+          h += '<div style="margin-top:14px;padding:12px;background:#1a2236;border-radius:10px;border:1px solid #293548">';
+          h += '<div style="font-size:0.68rem;color:#475569;font-weight:600;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fab fa-telegram" style="margin-right:4px;color:#26A5E4"></i>Превью в Telegram</div>';
+          h += '<div style="background:#1e293b;border-radius:8px;overflow:hidden;max-width:360px">';
+          if (seoImage) h += '<img src="' + escHtml(seoImage) + '" style="width:100%;height:auto;max-height:180px;object-fit:cover" onerror="this.style.display=&apos;none&apos;">';
+          h += '<div style="padding:10px 12px">';
+          h += '<div style="font-size:0.82rem;font-weight:700;color:#e2e8f0;margin-bottom:4px">' + escHtml(seoTitleRu || 'Go to Top') + '</div>';
+          h += '<div style="font-size:0.72rem;color:#94a3b8;line-height:1.3">' + escHtml(seoDescRu || 'Описание сайта...') + '</div>';
+          h += '</div></div></div>';
+          
+          h += '</div>'; // end SEO block
+        }
+
         // ── CALCULATOR EDITOR (full — all texts + buttons + link) ──
         var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
         if (isCalcBlock) {
@@ -10538,8 +10596,8 @@ function renderSiteBlocks() {
           h += '</div>';
         }
 
-        // ── Skip detail sections for calculator blocks (they have their own compact editor above) ──
-        if (!isCalcBlock) {
+        // ── Skip detail sections for calculator/seo blocks (they have their own compact editor above) ──
+        if (!isCalcBlock && !isSeoBlock) {
 
         // ── Buttons section: compact view with link to "Быстрые сообщения" tab ──
         h += '<div style="margin-bottom:16px">';
@@ -10763,8 +10821,8 @@ function renderSiteBlocks() {
         var isCalcBlock = (b.block_key === 'calculator' || b.block_type === 'calculator');
         var isPopupOrFloat = (b.block_type === 'popup' || b.block_type === 'floating' || b.block_key === 'nav');
         var isReviewsBlock = (b.block_type === 'reviews');
-        // All block types support photos except calculator, ticker, popup, floating, nav
-        var hasPhotoSupport = !isTickerBlock && !isCalcBlock && !isPopupOrFloat;
+        // All block types support photos except calculator, ticker, popup, floating, nav, seo
+        var hasPhotoSupport = !isTickerBlock && !isCalcBlock && !isPopupOrFloat && !isSeoBlock;
         if (hasPhotoSupport) {
           var blockPhotos = [];
           try { blockPhotos = opts.photos || []; } catch(e) { blockPhotos = []; }
@@ -10876,7 +10934,7 @@ function renderSiteBlocks() {
         
         h += '</div>';
 
-        } // end if (!isCalcBlock) — skip detail sections for calculator
+        } // end if (!isCalcBlock && !isSeoBlock) — skip detail sections for calculator/seo
 
         // ── Footer: Save + Pro Tools ──
         // Character count stats
@@ -12074,6 +12132,12 @@ async function sbSaveBlock(id) {
   if (swipeHintAmEl) blockOpts.swipe_hint_am = swipeHintAmEl.value || '';
   
   b.custom_html = JSON.stringify(blockOpts);
+
+  // For SEO blocks, also save photo_url as a top-level field (used by SSR for OG image)
+  var isSeo = (b.block_key === 'seo_og' || b.block_type === 'seo');
+  if (isSeo && blockOpts.photo_url !== undefined) {
+    b.photo_url = blockOpts.photo_url;
+  }
 
   // Save to server
   var saveData = Object.assign({}, b);

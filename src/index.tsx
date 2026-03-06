@@ -1108,6 +1108,11 @@ app.get('/', async (c) => {
       if (popupRow) {
         (globalThis as any).__popupBlock = popupRow;
       }
+      // Load SEO/OG block for meta tag injection
+      const seoRow = await db.prepare("SELECT texts_ru, texts_am, photo_url FROM site_blocks WHERE block_key = 'seo_og' AND is_visible = 1 LIMIT 1").first();
+      if (seoRow) {
+        (globalThis as any).__seoOgBlock = seoRow;
+      }
     } catch {}
 
     // Save sectionOrder + blockFeatures for server-side reorder/injection
@@ -6400,6 +6405,65 @@ async function checkRefCode() {
           pageHtml = pageHtml.replace(footerNavMatch[0], `<ul id="footerNavList">\n${footerNavHtml}      </ul>`);
         }
       }
+    }
+  }
+  
+  // ===== 8. SERVER-SIDE SEO / OPEN GRAPH INJECTION =====
+  const seoBlock = (globalThis as any).__seoOgBlock;
+  delete (globalThis as any).__seoOgBlock;
+  if (seoBlock) {
+    let seoTextsRu: string[] = [];
+    let seoTextsAm: string[] = [];
+    try { seoTextsRu = JSON.parse(seoBlock.texts_ru || '[]'); } catch { seoTextsRu = []; }
+    try { seoTextsAm = JSON.parse(seoBlock.texts_am || '[]'); } catch { seoTextsAm = []; }
+    const seoImage = (seoBlock.photo_url || '').trim();
+    
+    // Replace og:title
+    if (seoTextsRu[0]) {
+      const escTitle = seoTextsRu[0].replace(/"/g, '&quot;');
+      pageHtml = pageHtml.replace(
+        /<meta property="og:title" content="[^"]*">/,
+        `<meta property="og:title" content="${escTitle}">`
+      );
+      pageHtml = pageHtml.replace(
+        /<meta name="twitter:title" content="[^"]*">/,
+        `<meta name="twitter:title" content="${escTitle}">`
+      );
+      // Also update <title> tag
+      pageHtml = pageHtml.replace(
+        /<title>[^<]*<\/title>/,
+        `<title>${seoTextsRu[0]}</title>`
+      );
+    }
+    
+    // Replace og:description
+    if (seoTextsRu[1]) {
+      const escDesc = seoTextsRu[1].replace(/"/g, '&quot;');
+      pageHtml = pageHtml.replace(
+        /<meta property="og:description" content="[^"]*">/,
+        `<meta property="og:description" content="${escDesc}">`
+      );
+      pageHtml = pageHtml.replace(
+        /<meta name="twitter:description" content="[^"]*">/,
+        `<meta name="twitter:description" content="${escDesc}">`
+      );
+      pageHtml = pageHtml.replace(
+        /<meta name="description" content="[^"]*">/,
+        `<meta name="description" content="${escDesc}">`
+      );
+    }
+    
+    // Replace og:image
+    if (seoImage) {
+      const escImg = seoImage.replace(/"/g, '&quot;');
+      pageHtml = pageHtml.replace(
+        /<meta property="og:image" content="[^"]*">/,
+        `<meta property="og:image" content="${escImg}">`
+      );
+      pageHtml = pageHtml.replace(
+        /<meta name="twitter:image" content="[^"]*">/,
+        `<meta name="twitter:image" content="${escImg}">`
+      );
     }
   }
   
