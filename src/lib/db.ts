@@ -806,6 +806,57 @@ async function runSeeds(db: D1Database): Promise<void> {
   // Referral codes: max_uses (0 = unlimited), paid_uses_count (counted from in_progress/checking/done leads)
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN max_uses INTEGER DEFAULT 0").run(); } catch {}
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN paid_uses_count INTEGER DEFAULT 0").run(); } catch {}
+
+  // v26: One-time fix — reset services section site_content to match updated seed
+  // Detects any of: old "Ребёнок модель", wrong "Нулевой риск блокировки",
+  // corrupted heading "г", missing "Активация ключевых слов", or old "Фото и видеосъёмка"
+  try {
+    const svcRow = await db.prepare("SELECT content_json FROM site_content WHERE section_key = 'services'").first();
+    if (svcRow) {
+      const items = JSON.parse(svcRow.content_json as string || '[]');
+      const needsFix = items.some((it: any) => {
+        const ru = (it.ru || '');
+        return ru.includes('Ребёнок модель') ||
+               ru.includes('Нулевой риск блокировки') ||
+               ru.includes('Фото и видеосъёмка') ||
+               ru === 'г';
+      }) || !items.some((it: any) => (it.ru || '').includes('Активация ключевых слов'));
+      if (needsFix) {
+        const { SEED_CONTENT_SECTIONS } = await import('../seed-data');
+        const svcSeed = SEED_CONTENT_SECTIONS.find((s: any) => s.key === 'services');
+        if (svcSeed) {
+          await db.prepare("UPDATE site_content SET content_json = ? WHERE section_key = 'services'")
+            .bind(JSON.stringify(svcSeed.items)).run();
+          console.log('[DB] Services section site_content reset to updated seed');
+        }
+      }
+    }
+  } catch (e) { console.log('[DB] Services fix skipped:', e); }
+
+  // v26b: Also fix site_blocks texts_ru/texts_am for services block to match new seed
+  try {
+    const sbRow = await db.prepare("SELECT texts_ru, texts_am FROM site_blocks WHERE block_key = 'services'").first();
+    if (sbRow) {
+      const textsRu = JSON.parse(sbRow.texts_ru as string || '[]');
+      const needsFix = textsRu.some((t: string) =>
+        t.includes('Ребёнок модель') ||
+        t.includes('Нулевой риск блокировки') ||
+        t.includes('Фото и видеосъёмка') ||
+        t === 'г'
+      ) || !textsRu.some((t: string) => t.includes('Активация ключевых слов'));
+      if (needsFix) {
+        const { SEED_CONTENT_SECTIONS } = await import('../seed-data');
+        const svcSeed = SEED_CONTENT_SECTIONS.find((s: any) => s.key === 'services');
+        if (svcSeed) {
+          const newTextsRu = svcSeed.items.map((it: any) => it.ru);
+          const newTextsAm = svcSeed.items.map((it: any) => it.am);
+          await db.prepare("UPDATE site_blocks SET texts_ru = ?, texts_am = ? WHERE block_key = 'services'")
+            .bind(JSON.stringify(newTextsRu), JSON.stringify(newTextsAm)).run();
+          console.log('[DB] Services site_blocks texts reset to updated seed');
+        }
+      }
+    }
+  } catch (e) { console.log('[DB] Services siteBlocks fix skipped:', e); }
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====

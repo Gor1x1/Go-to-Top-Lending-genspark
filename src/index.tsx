@@ -2087,16 +2087,16 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <div style="margin-top:20px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-success" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">Начать продвижение</span></a></div>
     </div>
     <div class="svc-card fade-up">
-      <div class="svc-icon"><i class="fas fa-camera"></i></div>
-      <h3 data-ru="Фото и видеосъёмка" data-am="Լուսանկարահանում և տեսանկարահանում">Фото и видеосъёмка</h3>
-      <p data-ru="Профессиональная съёмка товаров с моделями для карточек WB и отзывов." data-am="Մասնագիտական ապրանքների լուսանկարահանում մոդելներով WB քարտերի և կարծիքների համար:">Профессиональная съёмка товаров с моделями для карточек WB и отзывов.</p>
+      <div class="svc-icon"><i class="fas fa-key"></i></div>
+      <h3 data-ru="Активация ключевых слов" data-am="Բանալի բառերի ակտիվացում">Активация ключевых слов</h3>
+      <p data-ru="Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере." data-am="Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգоրիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որоնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։">Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере.</p>
       <ul class="svc-features">
-        <li><i class="fas fa-check"></i> <span data-ru="Женские и мужские модели" data-am="Կանացի և տղամարդկանցի մոդելներ">Женские и мужские модели</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Предметная съёмка" data-am="Առարկայական լուսանկարահանում">Предметная съёмка</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Видеообзоры товаров" data-am="Ապրանքների տեսանյութներ">Видеообзоры товаров</span></li>
-        <li><i class="fas fa-check"></i> <span data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">Ребёнок модель (до 14 лет)</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Органический трафик — резкий рост" data-am="Օրգանիկ տրաֆիկի կտրուկ աճ">Органический трафик — резкий рост</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Укрепление позиций новыми ключевыми словами" data-am="Դիրքերի ամրապնդում նոր բանալի բառերով">Укрепление позиций новыми ключевыми словами</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Подключение к целевым и прибыльным запросам" data-am="Միացում թիրախային և եկամտաբեր հարցումներին">Подключение к целевым и прибыльным запросам</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Стабильные позиции без рекламы" data-am="Կայուն դիրքեր առանց գովազդի">Стабильные позиции без рекламы</span></li>
       </ul>
-      <div style="margin-top:20px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-camera"></i> <span data-ru="Заказать съёмку" data-am="Պատվիրել լուսանկար">Заказать съёмку</span></a></div>
+      <div style="margin-top:20px;text-align:center"><a href="https://t.me/goo_to_top" target="_blank" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-key"></i> <span data-ru="Активировать ключевые" data-am="Ակտիվացնել բանալիները">Активировать ключевые</span></a></div>
     </div>
   </div>
 </div>
