@@ -2806,9 +2806,14 @@ function closeMenu() {
 
 document.querySelectorAll('.nav-links a').forEach(function(a) {
   a.addEventListener('click', function(e) {
+    var href = this.getAttribute('href');
+    // Don't block external links (WhatsApp, Telegram, etc.)
+    if (this.getAttribute('target') === '_blank' || (href && href.startsWith('http'))) {
+      closeMenu();
+      return; // Let the browser handle the link normally
+    }
     e.preventDefault();
     closeMenu();
-    var href = this.getAttribute('href');
     if (href && href.startsWith('#')) {
       var target = document.querySelector(href);
       if (target) {
