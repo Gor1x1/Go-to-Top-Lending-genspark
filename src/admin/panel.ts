@@ -8103,23 +8103,23 @@ function collectPdfFields() {
     var ck = contentKeys[ci];
     var elId = ck === 'bank_details' ? 'pdf_bank' + sfx : ck === 'btn_order' ? 'pdf_btn_order' + sfx : ck === 'btn_download' ? 'pdf_btn_dl' + sfx : 'pdf_' + ck + sfx;
     var el = document.getElementById(elId);
-    if (el) t[ck + sfx] = (el as HTMLInputElement).value;
+    if (el) t[ck + sfx] = el.value;
   }
   // Language-specific table label fields
   var labelKeys = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
   for (var lki = 0; lki < labelKeys.length; lki++) {
     var lkKey = labelKeys[lki] + sfx;
     var lkEl = document.getElementById('pdf_' + lkKey);
-    if (lkEl) t[lkKey] = (lkEl as HTMLInputElement).value;
+    if (lkEl) t[lkKey] = lkEl.value;
   }
   // Shared (non-language) fields — always visible
-  var sharedMap: Record<string, string> = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
+  var sharedMap = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
   var sKeys = Object.keys(sharedMap);
   for (var si = 0; si < sKeys.length; si++) {
     var sEl = document.getElementById(sKeys[si]);
-    if (sEl) t[sharedMap[sKeys[si]]] = (sEl as HTMLInputElement).value;
+    if (sEl) t[sharedMap[sKeys[si]]] = sEl.value;
   }
-  var qrEl = document.getElementById('pdf_qr') as HTMLInputElement;
+  var qrEl = document.getElementById('pdf_qr');
   if (qrEl) t['show_qr'] = qrEl.checked ? 1 : 0;
 }
 
@@ -8315,20 +8315,20 @@ async function savePdfTemplate() {
     var bdEl = document.getElementById('pdf_btn_dl' + sfx);
     var tEl = document.getElementById('pdf_terms' + sfx);
     var bkEl = document.getElementById('pdf_bank' + sfx);
-    payload['header' + sfx] = hEl ? (hEl as HTMLInputElement).value : (t['header' + sfx] || '');
-    payload['intro' + sfx] = iEl ? (iEl as HTMLInputElement).value : (t['intro' + sfx] || '');
-    payload['outro' + sfx] = oEl ? (oEl as HTMLInputElement).value : (t['outro' + sfx] || '');
-    payload['footer' + sfx] = fEl ? (fEl as HTMLInputElement).value : (t['footer' + sfx] || '');
-    payload['btn_order' + sfx] = boEl ? (boEl as HTMLInputElement).value : (t['btn_order' + sfx] || '');
-    payload['btn_download' + sfx] = bdEl ? (bdEl as HTMLInputElement).value : (t['btn_download' + sfx] || '');
-    payload['terms' + sfx] = tEl ? (tEl as HTMLInputElement).value : (t['terms' + sfx] || '');
-    payload['bank_details' + sfx] = bkEl ? (bkEl as HTMLInputElement).value : (t['bank_details' + sfx] || '');
+    payload['header' + sfx] = hEl ? hEl.value : (t['header' + sfx] || '');
+    payload['intro' + sfx] = iEl ? iEl.value : (t['intro' + sfx] || '');
+    payload['outro' + sfx] = oEl ? oEl.value : (t['outro' + sfx] || '');
+    payload['footer' + sfx] = fEl ? fEl.value : (t['footer' + sfx] || '');
+    payload['btn_order' + sfx] = boEl ? boEl.value : (t['btn_order' + sfx] || '');
+    payload['btn_download' + sfx] = bdEl ? bdEl.value : (t['btn_download' + sfx] || '');
+    payload['terms' + sfx] = tEl ? tEl.value : (t['terms' + sfx] || '');
+    payload['bank_details' + sfx] = bkEl ? bkEl.value : (t['bank_details' + sfx] || '');
     // Save table label fields
     var labelKeys = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
     for (var lki = 0; lki < labelKeys.length; lki++) {
       var lkKey = labelKeys[lki] + sfx;
       var lkEl = document.getElementById('pdf_' + lkKey);
-      payload[lkKey] = lkEl ? (lkEl as HTMLInputElement).value : (t[lkKey] || '');
+      payload[lkKey] = lkEl ? lkEl.value : (t[lkKey] || '');
     }
   }
   // Shared fields
