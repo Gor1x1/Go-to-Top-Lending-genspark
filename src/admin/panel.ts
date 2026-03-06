@@ -11689,6 +11689,11 @@ async function sbUploadPhoto(input, blockId, target, idx) {
       }
     }
     b.custom_html = JSON.stringify(opts);
+    // For SEO blocks, also sync photo_url to top-level field (used by SSR for OG image)
+    var isSeoUpload = (b.block_key === 'seo_og' || b.block_type === 'seo');
+    if (isSeoUpload && target === 'main') {
+      b.photo_url = url;
+    }
     // Direct save to server (no debounce — immediate)
     var saveData = Object.assign({}, b);
     saveData.social_links = JSON.stringify(b.social_links || []);

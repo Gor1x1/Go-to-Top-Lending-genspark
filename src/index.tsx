@@ -1109,8 +1109,15 @@ app.get('/', async (c) => {
         (globalThis as any).__popupBlock = popupRow;
       }
       // Load SEO/OG block for meta tag injection
-      const seoRow = await db.prepare("SELECT texts_ru, texts_am, photo_url FROM site_blocks WHERE block_key = 'seo_og' AND is_visible = 1 LIMIT 1").first();
+      const seoRow = await db.prepare("SELECT texts_ru, texts_am, photo_url, custom_html FROM site_blocks WHERE block_key = 'seo_og' AND is_visible = 1 LIMIT 1").first();
       if (seoRow) {
+        // Fallback: if photo_url column is empty, try custom_html JSON
+        if (!seoRow.photo_url && seoRow.custom_html) {
+          try {
+            const opts = JSON.parse(seoRow.custom_html as string);
+            if (opts.photo_url) (seoRow as any).photo_url = opts.photo_url;
+          } catch {}
+        }
         (globalThis as any).__seoOgBlock = seoRow;
       }
     } catch {}
@@ -6418,9 +6425,19 @@ async function checkRefCode() {
     try { seoTextsAm = JSON.parse(seoBlock.texts_am || '[]'); } catch { seoTextsAm = []; }
     const seoImage = (seoBlock.photo_url || '').trim();
     
+    // Detect language: ?lang= query param > Accept-Language header > default 'ru'
+    const urlLang = new URL(c.req.url).searchParams.get('lang');
+    const acceptLang = (c.req.header('Accept-Language') || '').toLowerCase();
+    const isArmenian = urlLang === 'am' || urlLang === 'hy' || 
+      (!urlLang && (acceptLang.startsWith('hy') || acceptLang.includes('hy-am')));
+    
+    // Pick text by language (with RU fallback)
+    const ogTitle = (isArmenian && seoTextsAm[0]) ? seoTextsAm[0] : (seoTextsRu[0] || '');
+    const ogDesc = (isArmenian && seoTextsAm[1]) ? seoTextsAm[1] : (seoTextsRu[1] || '');
+    
     // Replace og:title
-    if (seoTextsRu[0]) {
-      const escTitle = seoTextsRu[0].replace(/"/g, '&quot;');
+    if (ogTitle) {
+      const escTitle = ogTitle.replace(/"/g, '&quot;');
       pageHtml = pageHtml.replace(
         /<meta property="og:title" content="[^"]*">/,
         `<meta property="og:title" content="${escTitle}">`
@@ -6432,13 +6449,13 @@ async function checkRefCode() {
       // Also update <title> tag
       pageHtml = pageHtml.replace(
         /<title>[^<]*<\/title>/,
-        `<title>${seoTextsRu[0]}</title>`
+        `<title>${ogTitle}</title>`
       );
     }
     
     // Replace og:description
-    if (seoTextsRu[1]) {
-      const escDesc = seoTextsRu[1].replace(/"/g, '&quot;');
+    if (ogDesc) {
+      const escDesc = ogDesc.replace(/"/g, '&quot;');
       pageHtml = pageHtml.replace(
         /<meta property="og:description" content="[^"]*">/,
         `<meta property="og:description" content="${escDesc}">`
@@ -6463,6 +6480,14 @@ async function checkRefCode() {
       pageHtml = pageHtml.replace(
         /<meta name="twitter:image" content="[^"]*">/,
         `<meta name="twitter:image" content="${escImg}">`
+      );
+    }
+    
+    // Update og:locale based on detected language
+    if (isArmenian) {
+      pageHtml = pageHtml.replace(
+        /<meta property="og:locale" content="[^"]*">/,
+        `<meta property="og:locale" content="hy_AM">`
       );
     }
   }
