@@ -1139,13 +1139,13 @@ app.get('/', async (c) => {
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
 <meta name="description" content="Go to Top — продвижение карточек на Wildberries под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
-<meta property="og:title" content="Go to Top — Продвижение на Wildberries">
-<meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии. Собственный склад в Ереване. Более 1000 аккаунтов.">
+<meta property="og:title" content="Go to Top — Առաջխաղdelays Wildberries- delays">
+<meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://gototop.win">
-<meta property="og:image" content="https://gototop.win/static/img/logo-gototop.png">
-<meta property="og:image:width" content="512">
-<meta property="og:image:height" content="512">
+<meta property="og:image" content="https://gototop.win/static/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Go to Top - логотип">
 <meta property="og:site_name" content="Go to Top">
 <meta property="og:locale" content="ru_RU">
@@ -1156,7 +1156,7 @@ app.get('/', async (c) => {
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
-<meta name="twitter:image" content="https://gototop.win/static/img/logo-gototop.png">
+<meta name="twitter:image" content="https://gototop.win/static/img/og-image.png">
 <link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">
