@@ -263,8 +263,14 @@ app.post('/api/lead', async (c) => {
     // Get next lead number
     const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
     const nextNum = ((lastLead?.max_num as number) || 0) + 1;
-    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, referral_code, user_agent) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'form', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200)).run();
+    // Build auto-notes from contact form data
+    const notesParts: string[] = [];
+    if (body.product) notesParts.push(`Товар: ${body.product}`);
+    if (body.service) notesParts.push(`Услуга: ${body.service}`);
+    if (body.message) notesParts.push(`Комментарий: ${body.message}`);
+    const autoNotes = notesParts.join(' | ');
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, referral_code, user_agent, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'form', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200), autoNotes).run();
     notifyTelegram(db, { ...body, source: 'form' });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
@@ -283,9 +289,11 @@ app.post('/api/popup-lead', async (c) => {
     // Get next lead number
     const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
     const nextNum = ((lastLead?.max_num as number) || 0) + 1;
-    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'popup', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200)).run();
-    notifyTelegram(db, { ...body, source: 'popup' });
+    // Build notes from popup form data (buyouts, reviews)
+    const autoNotes = body.notes || '';
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent, notes) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'popup', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200), autoNotes).run();
+    notifyTelegram(db, { ...body, source: 'popup', message: autoNotes });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
     console.error('Popup lead error:', e);
@@ -2662,6 +2670,10 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <h3 data-ru="Повысь рейтинг магазина прямо сейчас!" data-am="Բարձրացրեք խանութի վարկանիշը հիմա!">Повысь рейтинг магазина прямо сейчас!</h3>
       <p class="popup-sub" data-ru="Выкупы живыми людьми, отзывы с фото, профессиональные фотосессии. Узнайте сколько это стоит!" data-am="Անձնական մենեջերը կկապվի ձեզ և կպատրաստի անհատական հաշվարկ">Персональный менеджер свяжется с вами и подготовит индивидуальный расчёт</p>
       <form id="popupForm">
+        <div class="pf-group">
+          <label class="pf-label" data-ru="Ваше имя" data-am="Ձեր անունը" data-no-rewrite="1">Ваше имя</label>
+          <input class="pf-input" type="text" id="popupName" required placeholder="Имя / Անուն">
+        </div>
         <div class="pf-row">
           <div class="pf-group">
             <label class="pf-label" data-ru="Сколько выкупов нужно?" data-am="Քանի գնում է պետք։">Сколько выкупов нужно?</label>
@@ -2673,12 +2685,12 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
           </div>
         </div>
         <div class="pf-group">
-          <label class="pf-label" data-ru="Ваш Telegram или телефон" data-am="Ձեր Telegram-ը կամ հեռախոսը">Ваш Telegram или телефон</label>
+          <label class="pf-label" data-ru="Ваш Telegram или телефон" data-am="Ձեր Telegram-ը կամ հեռախосը">Ваш Telegram или телефон</label>
           <input class="pf-input" type="text" id="popupContact" required placeholder="@username или +374...">
         </div>
         <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:12px">
-          <i class="fab fa-telegram"></i>
-          <span data-ru="Получить расчёт в Telegram" data-am="Ստանալ հաշվարկ Telegram-ով">Получить расчёт в Telegram</span>
+          <i class="fas fa-paper-plane"></i>
+          <span data-ru="Получить мою стратегию" data-am="Ստանալ իմ ռազմավարությունը">Получить мою стратегию</span>
         </button>
       </form>
     </div>
@@ -3116,26 +3128,32 @@ console.log('[Popup] Timer set, will fire in 5s (with retry at 6s, 8s)');
 /* Form submit */
 document.getElementById('popupForm').addEventListener('submit', function(e) {
   e.preventDefault();
+  var popupName = (document.getElementById('popupName') || {}).value || '';
   var buyouts = document.getElementById('popupBuyouts').value;
   var reviews = document.getElementById('popupReviews').value;
   var contact = document.getElementById('popupContact').value;
+  /* Build auto-notes from form data */
+  var autoNotes = (lang === 'am'
+    ? 'Գնումներ: ' + buyouts + ' | Կարծիքներ: ' + reviews
+    : 'Выкупов: ' + buyouts + ' | Отзывов: ' + reviews);
+  var btn = this.querySelector('button[type=submit]');
+  var orig = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Отправка...');
   fetch('/api/popup-lead', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({buyouts:buyouts, reviews:reviews, contact:contact, lang:lang, ts: new Date().toISOString()})
-  }).catch(function(){});
-  var msg = lang === 'am' 
-    ? 'Հայտ Go to Top կայքից:\\n\\nԳնումներ: ' + buyouts + '\\nԿարծիքներ: ' + reviews + '\\nԿապ: ' + contact
-    : 'Заявка с сайта Go to Top:\\n\\nВыкупов: ' + buyouts + '\\nОтзывов: ' + reviews + '\\nКонтакт: ' + contact;
-  var popupTgUrl = window._tgPopupUrl || 'https://t.me/suport_admin_2';
-  var isWaPopup = popupTgUrl.includes('wa.me') || popupTgUrl.includes('whatsapp');
-  if (isWaPopup) {
-    window.open(popupTgUrl + (popupTgUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msg), '_blank');
-  } else {
-    window.open(popupTgUrl + '?text=' + encodeURIComponent(msg), '_blank');
-  }
-  document.getElementById('popupFormWrap').style.display = 'none';
-  document.getElementById('popupSuccess').style.display = 'block';
-  setTimeout(hidePopup, 3000);
+    body: JSON.stringify({name:popupName, buyouts:buyouts, reviews:reviews, contact:contact, lang:lang, notes:autoNotes, ts: new Date().toISOString()})
+  }).then(function(r){ return r.json(); }).then(function() {
+    btn.disabled = false;
+    document.getElementById('popupFormWrap').style.display = 'none';
+    document.getElementById('popupSuccess').style.display = 'block';
+    setTimeout(hidePopup, 3000);
+  }).catch(function() {
+    btn.disabled = false;
+    document.getElementById('popupFormWrap').style.display = 'none';
+    document.getElementById('popupSuccess').style.display = 'block';
+    setTimeout(hidePopup, 3000);
+  });
 });
 
 /* ===== FORM SUBMIT ===== */
@@ -4614,7 +4632,7 @@ switchLang = function(l) {
           }
           
           // Update form labels
-          var pLabels = popupCard.querySelectorAll('.pf-label');
+          var pLabels = popupCard.querySelectorAll('.pf-label:not([data-no-rewrite])');
           for (var pli = 0; pli < pLabels.length && pli < 3; pli++) {
             var ruIdx = pli + 2; // texts[2], texts[3], texts[4]
             if (pTextsRu[ruIdx] || pTextsAm[ruIdx]) {
