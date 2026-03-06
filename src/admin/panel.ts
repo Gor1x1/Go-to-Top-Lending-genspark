@@ -8089,6 +8089,40 @@ async function deleteTgBot(id) {
 
 // ===== PDF TEMPLATE =====
 var pdfLangTab = 'ru'; // 'ru', 'am', 'en'
+
+// Collect current PDF field values from DOM into data.pdfTemplate
+// Must be called BEFORE render() to preserve unsaved edits when switching tabs
+function collectPdfFields() {
+  if (!data.pdfTemplate) data.pdfTemplate = {};
+  var t = data.pdfTemplate;
+  var lang = pdfLangTab;
+  var sfx = '_' + lang;
+  // Language-specific content fields
+  var contentKeys = ['header', 'intro', 'outro', 'footer', 'terms', 'bank_details', 'btn_order', 'btn_download'];
+  for (var ci = 0; ci < contentKeys.length; ci++) {
+    var ck = contentKeys[ci];
+    var elId = ck === 'bank_details' ? 'pdf_bank' + sfx : ck === 'btn_order' ? 'pdf_btn_order' + sfx : ck === 'btn_download' ? 'pdf_btn_dl' + sfx : 'pdf_' + ck + sfx;
+    var el = document.getElementById(elId);
+    if (el) t[ck + sfx] = (el as HTMLInputElement).value;
+  }
+  // Language-specific table label fields
+  var labelKeys = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
+  for (var lki = 0; lki < labelKeys.length; lki++) {
+    var lkKey = labelKeys[lki] + sfx;
+    var lkEl = document.getElementById('pdf_' + lkKey);
+    if (lkEl) t[lkKey] = (lkEl as HTMLInputElement).value;
+  }
+  // Shared (non-language) fields — always visible
+  var sharedMap: Record<string, string> = { 'pdf_company': 'company_name', 'pdf_phone': 'company_phone', 'pdf_email': 'company_email', 'pdf_address': 'company_address', 'pdf_website': 'company_website', 'pdf_inn': 'company_inn', 'pdf_order_tg': 'order_telegram_url', 'pdf_prefix': 'invoice_prefix', 'pdf_accent': 'accent_color' };
+  var sKeys = Object.keys(sharedMap);
+  for (var si = 0; si < sKeys.length; si++) {
+    var sEl = document.getElementById(sKeys[si]);
+    if (sEl) t[sharedMap[sKeys[si]]] = (sEl as HTMLInputElement).value;
+  }
+  var qrEl = document.getElementById('pdf_qr') as HTMLInputElement;
+  if (qrEl) t['show_qr'] = qrEl.checked ? 1 : 0;
+}
+
 function renderPdfTemplate() {
   var t = data.pdfTemplate || {};
   var h = '<div style="padding:24px 28px;max-width:1400px;margin:0 auto">';
@@ -8112,7 +8146,7 @@ function renderPdfTemplate() {
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var li = 0; li < pdfLangs.length; li++) {
     var pl = pdfLangs[li];
-    h += '<button class="tab-btn' + (pdfLangTab === pl.id ? ' active' : '') + '" onclick="pdfLangTab=&apos;' + pl.id + '&apos;;render()" style="padding:10px 20px;border-left:3px solid ' + pl.color + '"><i class="fas fa-globe" style="margin-right:6px;color:' + pl.color + '"></i>' + pl.label + '</button>';
+    h += '<button class="tab-btn' + (pdfLangTab === pl.id ? ' active' : '') + '" onclick="collectPdfFields();pdfLangTab=&apos;' + pl.id + '&apos;;render()" style="padding:10px 20px;border-left:3px solid ' + pl.color + '"><i class="fas fa-globe" style="margin-right:6px;color:' + pl.color + '"></i>' + pl.label + '</button>';
   }
   h += '</div></div>';
   
@@ -8264,11 +8298,15 @@ async function deletePdfLead(id) {
 }
 
 async function savePdfTemplate() {
+  // First collect current visible fields into data.pdfTemplate
+  collectPdfFields();
+  var t = data.pdfTemplate || {};
   var payload = {};
   var langs = ['ru', 'am', 'en'];
   for (var li = 0; li < langs.length; li++) {
     var l = langs[li];
     var sfx = '_' + l;
+    // For each field: use DOM value if present, otherwise use data.pdfTemplate value
     var hEl = document.getElementById('pdf_header' + sfx);
     var iEl = document.getElementById('pdf_intro' + sfx);
     var oEl = document.getElementById('pdf_outro' + sfx);
@@ -8277,20 +8315,20 @@ async function savePdfTemplate() {
     var bdEl = document.getElementById('pdf_btn_dl' + sfx);
     var tEl = document.getElementById('pdf_terms' + sfx);
     var bkEl = document.getElementById('pdf_bank' + sfx);
-    if (hEl) payload['header' + sfx] = hEl.value;
-    if (iEl) payload['intro' + sfx] = iEl.value;
-    if (oEl) payload['outro' + sfx] = oEl.value;
-    if (fEl) payload['footer' + sfx] = fEl.value;
-    if (boEl) payload['btn_order' + sfx] = boEl.value;
-    if (bdEl) payload['btn_download' + sfx] = bdEl.value;
-    if (tEl) payload['terms' + sfx] = tEl.value;
-    if (bkEl) payload['bank_details' + sfx] = bkEl.value;
+    payload['header' + sfx] = hEl ? (hEl as HTMLInputElement).value : (t['header' + sfx] || '');
+    payload['intro' + sfx] = iEl ? (iEl as HTMLInputElement).value : (t['intro' + sfx] || '');
+    payload['outro' + sfx] = oEl ? (oEl as HTMLInputElement).value : (t['outro' + sfx] || '');
+    payload['footer' + sfx] = fEl ? (fEl as HTMLInputElement).value : (t['footer' + sfx] || '');
+    payload['btn_order' + sfx] = boEl ? (boEl as HTMLInputElement).value : (t['btn_order' + sfx] || '');
+    payload['btn_download' + sfx] = bdEl ? (bdEl as HTMLInputElement).value : (t['btn_download' + sfx] || '');
+    payload['terms' + sfx] = tEl ? (tEl as HTMLInputElement).value : (t['terms' + sfx] || '');
+    payload['bank_details' + sfx] = bkEl ? (bkEl as HTMLInputElement).value : (t['bank_details' + sfx] || '');
     // Save table label fields
     var labelKeys = ['label_service','label_qty','label_price','label_sum','label_total','label_subtotal','label_client','label_date','label_invoice','label_back','order_message'];
     for (var lki = 0; lki < labelKeys.length; lki++) {
       var lkKey = labelKeys[lki] + sfx;
       var lkEl = document.getElementById('pdf_' + lkKey);
-      if (lkEl) payload[lkKey] = lkEl.value;
+      payload[lkKey] = lkEl ? (lkEl as HTMLInputElement).value : (t[lkKey] || '');
     }
   }
   // Shared fields
@@ -10131,7 +10169,7 @@ function renderSiteBlocks() {
   h += '<div style="display:flex;gap:8px;margin-bottom:20px;flex-wrap:wrap">';
   for (var sti = 0; sti < sbTabs.length; sti++) {
     var st = sbTabs[sti];
-    h += '<button class="tab-btn' + (sbActiveTab === st.id ? ' active' : '') + '" onclick="sbActiveTab=&apos;' + st.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + st.icon + '" style="margin-right:6px"></i>' + st.label + (st.count >= 0 ? ' <span style="opacity:0.6;font-size:0.75rem;margin-left:4px">(' + st.count + ')</span>' : '') + '</button>';
+    h += '<button class="tab-btn' + (sbActiveTab === st.id ? ' active' : '') + '" onclick="collectPdfFields();sbActiveTab=&apos;' + st.id + '&apos;;render()" style="padding:10px 20px"><i class="fas ' + st.icon + '" style="margin-right:6px"></i>' + st.label + (st.count >= 0 ? ' <span style="opacity:0.6;font-size:0.75rem;margin-left:4px">(' + st.count + ')</span>' : '') + '</button>';
   }
   h += '</div>';
 
