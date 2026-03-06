@@ -10651,15 +10651,12 @@ function renderSiteBlocks() {
         // ── Social Section Settings (header, subtitle, layout, icon size, offsets) ──
         var socOpts = opts.social_settings || {};
         h += '<div style="padding:10px;background:rgba(16,185,129,0.04);border:1px solid rgba(16,185,129,0.12);border-radius:8px;margin-bottom:10px">';
-        h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок и описание</div>';
+        h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-heading" style="margin-right:4px"></i>Заголовок</div>';
         h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:6px">';
         if (showRu) h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:2px">Заголовок (RU)</div><input class="input" id="sb_soctitle_ru_' + b.id + '" value="' + escHtml(socOpts.title_ru || '') + '" placeholder="Мы в соц. сетях" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         if (showAm) h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:2px">Заголовок (AM)</div><input class="input" id="sb_soctitle_am_' + b.id + '" value="' + escHtml(socOpts.title_am || '') + '" placeholder="Հետdelays մեզ" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div>';
-        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">';
-        if (showRu) h += '<div><div style="font-size:0.68rem;color:#8B5CF6;margin-bottom:2px">Подзаголовок (RU)</div><input class="input" id="sb_socsubtitle_ru_' + b.id + '" value="' + escHtml(socOpts.subtitle_ru || '') + '" placeholder="Подпишитесь и будьте в курсе" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-        if (showAm) h += '<div><div style="font-size:0.68rem;color:#F59E0B;margin-bottom:2px">Подзаголовок (AM)</div><input class="input" id="sb_socsubtitle_am_' + b.id + '" value="' + escHtml(socOpts.subtitle_am || '') + '" placeholder="AM подзаголовок" style="font-size:0.78rem" onchange="sbAutoSave(' + b.id + ')"></div>';
-        h += '</div>';
+        // Subtitle fields removed — only title is shown for social section
         
         h += '<div style="font-size:0.72rem;font-weight:700;color:#10B981;margin-bottom:6px;margin-top:8px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-sliders-h" style="margin-right:4px"></i>Визуальные настройки</div>';
         h += '<div style="display:grid;grid-template-columns:80px 100px 100px;gap:6px;margin-bottom:6px">';
@@ -11984,14 +11981,13 @@ async function sbSaveBlock(id) {
   var socGap = document.getElementById('sb_socgap_' + id);
   var socAlign = document.getElementById('sb_socalign_' + id);
   var socPos = document.getElementById('sb_socpos_' + id);
-  var socSubRu = document.getElementById('sb_socsubtitle_ru_' + id);
-  var socSubAm = document.getElementById('sb_socsubtitle_am_' + id);
   if (socTitleRu || socTitleAm || socGap) {
     if (!blockOpts.social_settings) blockOpts.social_settings = {};
     if (socTitleRu) blockOpts.social_settings.title_ru = socTitleRu.value;
     if (socTitleAm) blockOpts.social_settings.title_am = socTitleAm.value;
-    if (socSubRu) blockOpts.social_settings.subtitle_ru = socSubRu.value;
-    if (socSubAm) blockOpts.social_settings.subtitle_am = socSubAm.value;
+    // Subtitle removed from UI — clear any old values
+    blockOpts.social_settings.subtitle_ru = '';
+    blockOpts.social_settings.subtitle_am = '';
     if (socGap) blockOpts.social_settings.gap = parseInt(socGap.value) || 8;
     if (socAlign) blockOpts.social_settings.align = socAlign.value || 'center';
     if (socPos) blockOpts.social_settings.position = socPos.value || 'bottom';

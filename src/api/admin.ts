@@ -1841,6 +1841,45 @@ api.post('/site-blocks/:id/sync-to-site', authMiddleware, async (c) => {
     return c.json({ success: true, synced: 'calculator' });
   }
   
+  // For footer block, sync texts to footer_settings table
+  if (blockType === 'footer' || blockKey === 'footer') {
+    const fTextsRu = JSON.parse(block.texts_ru as string || '[]');
+    const fTextsAm = JSON.parse(block.texts_am as string || '[]');
+    // footer texts_ru layout: [0]=brand, [1]=nav_title, [2..N-4]=nav_items, [N-3]=contact_admin, [N-2]=contact_manager, [N-1]=copyright, [N]=location
+    // Map: texts_ru[0] → brand_text, last 2 → copyright, location
+    const brandRu = fTextsRu[0] || '';
+    const brandAm = fTextsAm[0] || '';
+    const copyrightRu = fTextsRu.length >= 2 ? (fTextsRu[fTextsRu.length - 2] || '') : '';
+    const copyrightAm = fTextsAm.length >= 2 ? (fTextsAm[fTextsAm.length - 2] || '') : '';
+    const locationRu = fTextsRu.length >= 1 ? (fTextsRu[fTextsRu.length - 1] || '') : '';
+    const locationAm = fTextsAm.length >= 1 ? (fTextsAm[fTextsAm.length - 1] || '') : '';
+    
+    const fExists = await db.prepare('SELECT id FROM footer_settings LIMIT 1').first();
+    if (fExists) {
+      await db.prepare('UPDATE footer_settings SET brand_text_ru=?, brand_text_am=?, copyright_ru=?, copyright_am=?, location_ru=?, location_am=?, updated_at=CURRENT_TIMESTAMP WHERE id=?')
+        .bind(brandRu, brandAm, copyrightRu, copyrightAm, locationRu, locationAm, fExists.id).run();
+    }
+    
+    // Also sync nav links from footer block to navigation
+    // texts_ru[1] = nav title, texts_ru[2..N-4] = nav items
+    // Parse custom_html for nav_links targets
+    let fOpts: any = {};
+    try { fOpts = JSON.parse(block.custom_html as string || '{}'); } catch {}
+    const navLinks = fOpts.nav_links || [];
+    
+    // Update navigation block if it exists
+    const navBlock = await db.prepare("SELECT id, texts_ru, texts_am, custom_html FROM site_blocks WHERE block_key = 'nav' LIMIT 1").first();
+    if (navBlock) {
+      // Footer nav items are at indices 2 to N-4 (between nav_title and contact/copyright/location)
+      const navItemsRu = fTextsRu.slice(2, fTextsRu.length - 4);
+      const navItemsAm = fTextsAm.slice(2, fTextsAm.length - 4);
+      if (navItemsRu.length > 0) {
+        await db.prepare('UPDATE site_blocks SET texts_ru=?, texts_am=? WHERE id=?')
+          .bind(JSON.stringify(navItemsRu), JSON.stringify(navItemsAm), navBlock.id).run();
+      }
+    }
+  }
+  
   // For regular sections, sync to site_content
   const textsRu = JSON.parse(block.texts_ru as string || '[]');
   const textsAm = JSON.parse(block.texts_am as string || '[]');

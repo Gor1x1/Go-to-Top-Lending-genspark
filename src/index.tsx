@@ -2598,7 +2598,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="logo"><img src="/static/img/logo-gototop.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
-      <p data-ru="Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с человеческим поведенческим фактором." data-am="Ապահով ապրանքների առաջխաղացում Wildberries-ում Հայ վաճառողների համար: Իրական գնումներ իրական մարդկանցով բնական մարդկային վարքագիծ:" data-no-rewrite="1">Безопасное продвижение товаров на Wildberries в Армении. Реальные выкупы живыми людьми с человеческим поведенческим фактором.</p>
+      <p data-ru="Безопасное продвижение на Wildberries для армянских продавцов. Реальные покупки с аккаунтов с историей и естественным человеческим поведением. Поднимите ваш товар в ТОП-позиции — зарабатывайте больше." data-am="Անվտանգ առաջխաղացում Wildberries-ում հայ վաճառողների համար։ Իրական գնումներ պատմություն ունեցող հաշիվներով և բնական մարդկային վարքագծով։  Բարձրացրե՛ք ձեր ապրանքը TOP դիրքեր՝ վաստակե՛ք ավելի շատ" data-no-rewrite="1">Безопасное продвижение на Wildberries для армянских продавцов. Реальные покупки с аккаунтов с историей и естественным человеческим поведением. Поднимите ваш товар в ТОП-позиции — зарабатывайте больше.</p>
     </div>
     <div class="footer-col" id="footerNavCol">
       <h4 data-ru="Навигация" data-am="Նավիգացիա" data-no-rewrite="1">Навигация</h4>
@@ -4315,11 +4315,9 @@ switchLang = function(l) {
           socDiv.style.cssText = 'display:flex;flex-direction:column;align-items:' + (socAlign === 'center' ? 'center' : socAlign === 'right' ? 'flex-end' : 'flex-start') + ';padding:16px 0;margin-top:12px';
           
           var socH = '';
-          // Title
+          // Title (subtitle removed - only title shown)
           var socTitle = lang === 'am' ? (ss.title_am || ss.title_ru || '') : (ss.title_ru || '');
-          var socSubtitle = lang === 'am' ? (ss.subtitle_am || ss.subtitle_ru || '') : (ss.subtitle_ru || '');
           if (socTitle) socH += '<div style="font-size:1.1rem;font-weight:700;color:var(--text-primary,#fff);margin-bottom:4px">' + socTitle + '</div>';
-          if (socSubtitle) socH += '<div style="font-size:0.85rem;color:var(--text-secondary,#999);margin-bottom:10px">' + socSubtitle + '</div>';
           
           // Icons row
           socH += '<div style="display:flex;gap:' + socGap + 'px;justify-content:' + (justifyMap[socAlign] || 'center') + ';align-items:flex-start;flex-wrap:wrap">';
