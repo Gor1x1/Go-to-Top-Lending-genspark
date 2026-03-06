@@ -1,6 +1,7 @@
 /**
  * Database initialization and helpers
  */
+import { SEED_CONTENT_SECTIONS } from '../seed-data';
 
 const SCHEMA = `
 CREATE TABLE IF NOT EXISTS users (
@@ -822,7 +823,6 @@ async function runSeeds(db: D1Database): Promise<void> {
                ru === 'г';
       }) || !items.some((it: any) => (it.ru || '').includes('Активация ключевых слов'));
       if (needsFix) {
-        const { SEED_CONTENT_SECTIONS } = await import('../seed-data');
         const svcSeed = SEED_CONTENT_SECTIONS.find((s: any) => s.key === 'services');
         if (svcSeed) {
           await db.prepare("UPDATE site_content SET content_json = ? WHERE section_key = 'services'")
@@ -845,7 +845,6 @@ async function runSeeds(db: D1Database): Promise<void> {
         t === 'г'
       ) || !textsRu.some((t: string) => t.includes('Активация ключевых слов'));
       if (needsFix) {
-        const { SEED_CONTENT_SECTIONS } = await import('../seed-data');
         const svcSeed = SEED_CONTENT_SECTIONS.find((s: any) => s.key === 'services');
         if (svcSeed) {
           const newTextsRu = svcSeed.items.map((it: any) => it.ru);
