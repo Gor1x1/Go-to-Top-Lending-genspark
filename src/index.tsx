@@ -2592,7 +2592,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       </div>
       <div class="form-group"><label data-ru="Комментарий (необязательно)" data-am="Մեկնաբանություն (ոչ պարտադիր)">Комментарий (необязательно)</label><textarea id="formMessage" placeholder="Опишите ваш товар..."></textarea></div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
-        <i class="fab fa-telegram"></i>
+        <i class="fas fa-paper-plane"></i>
         <span data-ru="Отправить заявку" data-am="Ուղարկել հայտը">Отправить заявку</span>
       </button>
     </form>
@@ -3147,34 +3147,43 @@ function submitForm(e) {
   var service = document.getElementById('formService');
   var serviceText = service.options[service.selectedIndex].textContent;
   var message = document.getElementById('formMessage').value;
-  var msg = '';
-  if (lang === 'am') {
-    msg = 'Ողջույն! Հայտ Go to Top կայքից:\\n\\n';
-    msg += 'Անուն: ' + name + '\\nԿապ: ' + contact + '\\n';
-    if (product) msg += 'Ապրանք: ' + product + '\\n';
-    msg += 'Ծառայություն: ' + serviceText + '\\n';
-    if (message) msg += 'Մեկնաբանություն: ' + message;
-  } else {
-    msg = 'Здравствуйте! Заявка с сайта Go to Top:\\n\\n';
-    msg += 'Имя: ' + name + '\\nКонтакт: ' + contact + '\\n';
-    if (product) msg += 'Товар: ' + product + '\\n';
-    msg += 'Услуга: ' + serviceText + '\\n';
-    if (message) msg += 'Комментарий: ' + message;
-  }
-  fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, ts: new Date().toISOString()}) }).catch(function(){});
-  var tgUrl = window._tgContactUrl || 'https://t.me/suport_admin_2';
-  var isWaContact = tgUrl.includes('wa.me') || tgUrl.includes('whatsapp');
-  if (isWaContact) {
-    window.open(tgUrl + (tgUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msg), '_blank');
-  } else {
-    window.open(tgUrl + '?text=' + encodeURIComponent(msg), '_blank');
-  }
+
   var btn = e.target.querySelector('button[type=submit]');
   var orig = btn.innerHTML;
-  btn.innerHTML = '<i class="fas fa-check"></i> Отправлено!';
-  btn.style.background = 'var(--success)';
-  setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; }, 3000);
-  e.target.reset();
+  btn.disabled = true;
+  btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Отправка...');
+
+  fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, ts: new Date().toISOString()}) })
+  .then(function(r){ return r.json(); })
+  .then(function(data) {
+    btn.disabled = false;
+    /* Show success overlay on the form */
+    var formCard = document.querySelector('.form-card');
+    if (formCard) {
+      var overlay = document.createElement('div');
+      overlay.style.cssText = 'position:absolute;inset:0;background:rgba(15,10,26,0.95);display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:inherit;z-index:10;animation:fadeIn 0.3s ease';
+      overlay.innerHTML = '<div style="width:80px;height:80px;border-radius:50%;background:linear-gradient(135deg,#10B981,#059669);display:flex;align-items:center;justify-content:center;margin-bottom:20px;box-shadow:0 0 30px rgba(16,185,129,0.4)"><i class="fas fa-check" style="font-size:2rem;color:white"></i></div>' +
+        '<div style="font-size:1.3rem;font-weight:800;color:#e2e8f0;margin-bottom:8px">' + (lang === 'am' ? 'Հայտը ուղարկված է!' : 'Заявка отправлена!') + '</div>' +
+        '<div style="font-size:0.95rem;color:#94a3b8;text-align:center;max-width:300px">' + (lang === 'am' ? 'Մենեջերը կկապվի ձեզ հետ մոտակա ժամանակին:' : 'Менеджер свяжется с вами в ближайшее время.') + '</div>';
+      formCard.style.position = 'relative';
+      formCard.appendChild(overlay);
+      setTimeout(function() {
+        overlay.style.opacity = '0';
+        overlay.style.transition = 'opacity 0.3s';
+        setTimeout(function() { overlay.remove(); }, 300);
+      }, 4000);
+    }
+    btn.innerHTML = '<i class="fas fa-check" style="color:#10B981"></i> ' + (lang === 'am' ? 'Ուղարկված է!' : 'Отправлено!');
+    btn.style.background = 'linear-gradient(135deg,#10B981,#059669)';
+    setTimeout(function() { btn.innerHTML = orig; btn.style.background = ''; }, 4000);
+    e.target.reset();
+  })
+  .catch(function(err) {
+    console.error('Lead error:', err);
+    btn.disabled = false;
+    btn.innerHTML = orig;
+    btn.style.background = '';
+  });
 }
 
 /* ===== SCROLL ANIMATIONS ===== */

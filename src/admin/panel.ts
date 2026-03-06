@@ -2439,6 +2439,18 @@ function renderLeads() {
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон:</div>' +
         '<input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..."></div></div>';
 
+      // --- 1b. PRODUCT, SERVICE & CLIENT COMMENT (from contact form) ---
+      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-box" style="margin-right:4px;color:#fb923c"></i>Товар (WB):</div>' +
+        '<input class="input" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-concierge-bell" style="margin-right:4px;color:#60a5fa"></i>Интересует:</div>' +
+        '<input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано" readonly></div></div>';
+      if (l.message) {
+        h += '<div style="margin-top:10px">' +
+          '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-comment-alt" style="margin-right:4px;color:#c084fc"></i>Комментарий клиента:</div>' +
+          '<div style="font-size:0.85rem;color:#cbd5e1;padding:10px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.15);border-radius:8px;line-height:1.5;white-space:pre-wrap">' + escHtml(l.message) + '</div></div>';
+      }
+
       // --- 2. TELEGRAM GROUP & TZ LINKS ---
       h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Telegram группа:</div>' +
@@ -3226,9 +3238,10 @@ async function removeLeadService(leadId, serviceIndex) {
 
 // Save all lead changes: name + contact + notes + telegram + tz + refund + recalculate total
 async function saveLeadAll(leadId) {
-  // 1. Save name + contact + notes + telegram_group + tz_link + refund_amount
+  // 1. Save name + contact + product + notes + telegram_group + tz_link + refund_amount
   var nameEl = document.getElementById('lead-name-' + leadId);
   var contactEl = document.getElementById('lead-contact-' + leadId);
+  var productEl = document.getElementById('lead-product-' + leadId);
   var notesEl = document.getElementById('lead-notes-' + leadId);
   var tgEl = document.getElementById('lead-tg-' + leadId);
   var tzEl = document.getElementById('lead-tz-' + leadId);
@@ -3237,6 +3250,7 @@ async function saveLeadAll(leadId) {
   var updateData = {};
   if (nameEl) updateData.name = nameEl.value;
   if (contactEl) updateData.contact = contactEl.value;
+  if (productEl) updateData.product = productEl.value;
   if (notesEl) updateData.notes = notesEl.value;
   if (tgEl) updateData.telegram_group = tgEl.value;
   if (tzEl) updateData.tz_link = tzEl.value;
@@ -3248,6 +3262,7 @@ async function saveLeadAll(leadId) {
     if (lead) {
       if (nameEl) lead.name = nameEl.value;
       if (contactEl) lead.contact = contactEl.value;
+      if (productEl) lead.product = productEl.value;
       if (notesEl) lead.notes = notesEl.value;
       if (tgEl) lead.telegram_group = tgEl.value;
       if (tzEl) lead.tz_link = tzEl.value;
