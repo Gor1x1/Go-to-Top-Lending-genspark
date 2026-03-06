@@ -3936,7 +3936,7 @@ switchLang = function(l) {
         return ic || 'fas fa-link';
       }
       db.blockFeatures.forEach(function(bf) {
-        if (bf.key === 'floating_tg' || bf.key === 'footer' || bf.block_type === 'floating' || bf.block_type === 'footer' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup') return;
+        if (bf.key === 'floating_tg' || bf.key === 'footer' || bf.key === 'seo_og' || bf.block_type === 'floating' || bf.block_type === 'footer' || bf.block_type === 'calculator' || bf.block_type === 'navigation' || bf.block_type === 'ticker' || bf.block_type === 'popup' || bf.block_type === 'seo') return;
         
         // ── SLOT COUNTER BLOCK TYPE — create counter bar instead of section ──
         if (bf.block_type === 'slot_counter') {
