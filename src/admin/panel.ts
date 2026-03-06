@@ -2459,10 +2459,9 @@ function renderLeads() {
         if (refMatch) discPct = Number(refMatch.discount_percent || 0);
       }
       var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
-      // Payment method info for card summary
+      // Payment method info for card summary — use saved commission_amount for accuracy
       var cardPmMatch = ensureArray(data.paymentMethods).find(function(m) { return m.id == l.payment_method_id; });
-      var cardPmPct = cardPmMatch ? Number(cardPmMatch.commission_pct) : 0;
-      var cardPmComm = cardPmPct > 0 ? Math.round(leadAmt * cardPmPct / 100) : 0;
+      var cardPmComm = Number(l.commission_amount || 0);
       h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0 || cardPmMatch) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
@@ -2475,9 +2474,20 @@ function renderLeads() {
       // Right side: status + total + date + actions
       h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:200px">';
       
+      var leadCommission = Number(l.commission_amount || 0);
+      var leadFinalTotal = leadAmt + leadCommission;
+      h += '<div id="lead-total-' + l.id + '">';
       if (leadAmt > 0) {
-        h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+        if (leadCommission > 0) {
+          h += '<div style="text-align:right">' +
+            '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + Number(leadAmt).toLocaleString('ru-RU') + ' ֏</div>' +
+            '<div style="font-size:1.3rem;font-weight:900;color:#22C55E;white-space:nowrap">' + Number(leadFinalTotal).toLocaleString('ru-RU') + '&nbsp;֏</div>' +
+            '<div style="font-size:0.68rem;color:#3B82F6;font-weight:600">+' + Number(leadCommission).toLocaleString('ru-RU') + ' ֏ комиссия</div></div>';
+        } else {
+          h += '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+        }
       }
+      h += '</div>';
       
       // Status selector — 6 statuses
       h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.82rem" onchange="updateLeadStatus(' + l.id + ', this.value)">' +
@@ -2546,7 +2556,7 @@ function renderLeads() {
       var pmMethods = ensureArray(data.paymentMethods);
       h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-credit-card" style="margin-right:4px;color:#3B82F6"></i>Способ оплаты:</div>' +
-        '<select class="input" id="lead-pm-' + l.id + '" style="font-size:0.85rem;padding:8px;border-color:rgba(59,130,246,0.3)" onchange="previewCommission(' + l.id + ')">' +
+        '<select class="input" id="lead-pm-' + l.id + '" style="font-size:0.85rem;padding:8px;border-color:rgba(59,130,246,0.3)" onchange="applyPaymentMethod(' + l.id + ')">' +
         '<option value="">— Не выбран —</option>';
       for (var pmi = 0; pmi < pmMethods.length; pmi++) {
         var pm = pmMethods[pmi];
@@ -2798,27 +2808,59 @@ async function removeLeadRefCode(leadId) {
   }
 }
 
-function previewCommission(leadId) {
+async function applyPaymentMethod(leadId) {
   var sel = document.getElementById('lead-pm-' + leadId);
   var preview = document.getElementById('lead-pm-preview-' + leadId);
-  if (!sel || !preview) return;
-  var pmId = sel.value;
+  if (!sel) return;
+  var pmId = sel.value ? Number(sel.value) : null;
+  
+  // Show loading state
+  if (preview) preview.innerHTML = '<div style="font-size:0.78rem;color:#3B82F6;padding:8px"><i class="fas fa-spinner fa-spin" style="margin-right:4px"></i>Пересчёт...</div>';
+  
+  // 1. Save payment method & get commission
+  var res = await api('/leads/' + leadId + '/payment-method', { method:'PUT', body: JSON.stringify({ payment_method_id: pmId }) });
+  var commAmt = Number((res && res.commission_amount) || 0);
+  
+  // 2. Update local data
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (lead) {
+    lead.payment_method_id = pmId;
+    lead.commission_amount = commAmt;
+  }
+  
+  // 3. Update preview in payment method section
   var pmMethods = ensureArray(data.paymentMethods);
   var pmMatch = pmMethods.find(function(m) { return m.id == pmId; });
-  // Find lead total_amount
-  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
   var pmBase = Number(lead && lead.total_amount || 0);
-  if (pmMatch) {
-    var pmPct = Number(pmMatch.commission_pct);
-    var pmComm = Math.round(pmBase * pmPct / 100);
-    var pmFinal = pmBase + pmComm;
-    preview.innerHTML = '<div style="font-size:0.78rem;padding:8px;line-height:1.6">' +
-      '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
-      '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmPct + '%: +' + Number(pmComm).toLocaleString('ru-RU') + ' ֏</div>' +
-      '<div style="color:#22C55E;font-weight:700">К оплате: ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏</div></div>';
-  } else {
-    preview.innerHTML = '<div style="font-size:0.78rem;color:#64748b;padding:8px">Выберите способ оплаты для расчёта комиссии</div>';
+  var pmFinal = pmBase + commAmt;
+  
+  if (preview) {
+    if (pmMatch && commAmt > 0) {
+      preview.innerHTML = '<div style="font-size:0.78rem;padding:8px;line-height:1.6">' +
+        '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
+        '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmMatch.commission_pct + '%: +' + Number(commAmt).toLocaleString('ru-RU') + ' ֏</div>' +
+        '<div style="color:#22C55E;font-weight:700;font-size:0.9rem">К оплате: ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏ ✓</div></div>';
+    } else if (pmMatch) {
+      preview.innerHTML = '<div style="font-size:0.78rem;padding:8px;color:#22C55E;font-weight:600"><i class="fas fa-check" style="margin-right:4px"></i>' + escHtml(pmMatch.name_ru) + ' — без комиссии ✓</div>';
+    } else {
+      preview.innerHTML = '<div style="font-size:0.78rem;color:#64748b;padding:8px">Способ оплаты не выбран</div>';
+    }
   }
+  
+  // 4. Update total amount display on lead card (right side)
+  var totalEl = document.getElementById('lead-total-' + leadId);
+  if (totalEl && pmBase > 0) {
+    if (commAmt > 0) {
+      totalEl.innerHTML = '<div style="text-align:right">' +
+        '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</div>' +
+        '<div style="font-size:1.3rem;font-weight:900;color:#22C55E;white-space:nowrap">' + Number(pmFinal).toLocaleString('ru-RU') + '&nbsp;֏</div>' +
+        '<div style="font-size:0.68rem;color:#3B82F6;font-weight:600">+' + Number(commAmt).toLocaleString('ru-RU') + ' ֏ комиссия</div></div>';
+    } else {
+      totalEl.innerHTML = '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(pmBase).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+    }
+  }
+  
+  toast(pmMatch ? 'Способ оплаты: ' + pmMatch.name_ru + (commAmt > 0 ? ' (+' + Number(commAmt).toLocaleString('ru-RU') + ' ֏ = ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏)' : '') : 'Способ оплаты сброшен');
 }
 
 function getAssigneeName(id) {
@@ -3403,10 +3445,12 @@ async function saveLeadAll(leadId) {
     var lead2 = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
     if (lead2) lead2.payment_method_id = pmVal;
   }
-  // 2. Recalculate total (articles + services)
+  // 2. Recalculate total (articles + services + commission)
   var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   if (res && res.success) {
-    toast('Все изменения сохранены. Итого: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏');
+    var commAmt2 = Number(res.commission_amount || 0);
+    var finalAmt = Number(res.total_amount) + commAmt2;
+    toast('Сохранено. Итого: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏' + (commAmt2 > 0 ? ' + комиссия ' + Number(commAmt2).toLocaleString('ru-RU') + ' ֏ = ' + Number(finalAmt).toLocaleString('ru-RU') + ' ֏' : ''));
   } else {
     toast('Данные сохранены');
   }

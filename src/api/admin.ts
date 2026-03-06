@@ -1188,8 +1188,22 @@ api.put('/leads/:id/payment-method', authMiddleware, async (c) => {
   const id = c.req.param('id');
   const d = await c.req.json();
   try { await db.prepare("SELECT payment_method_id FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN payment_method_id INTEGER DEFAULT NULL").run(); } catch {} }
+  try { await db.prepare("SELECT commission_amount FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN commission_amount REAL DEFAULT 0").run(); } catch {} }
   await db.prepare('UPDATE leads SET payment_method_id = ? WHERE id = ?').bind(d.payment_method_id, id).run();
-  return c.json({ success: true });
+  
+  // Compute commission immediately
+  let commissionAmount = 0;
+  if (d.payment_method_id) {
+    const lead = await db.prepare('SELECT total_amount FROM leads WHERE id = ?').bind(id).first();
+    const pmRow = await db.prepare('SELECT commission_pct FROM payment_methods WHERE id = ? AND is_active = 1').bind(d.payment_method_id).first();
+    if (lead && pmRow) {
+      const base = Number(lead.total_amount) || 0;
+      const pct = Number(pmRow.commission_pct) || 0;
+      commissionAmount = pct > 0 ? Math.round(base * pct / 100) : 0;
+    }
+  }
+  await db.prepare('UPDATE leads SET commission_amount = ? WHERE id = ?').bind(commissionAmount, id).run();
+  return c.json({ success: true, commission_amount: commissionAmount });
 });
 
 // ===== SLOT COUNTER (multiple) =====
@@ -2155,7 +2169,22 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   
   const totalAmount = subtotalAmount - discountAmount;
   
-  // Update lead total_amount and calc_data (for PDF)
+  // Compute commission from payment method
+  let commissionAmount = 0;
+  const pmId = leadRow.payment_method_id;
+  if (pmId) {
+    try {
+      const pmRow = await db.prepare('SELECT commission_pct FROM payment_methods WHERE id = ? AND is_active = 1').bind(pmId).first();
+      if (pmRow) {
+        const pct = Number(pmRow.commission_pct) || 0;
+        if (pct > 0) {
+          commissionAmount = Math.round(totalAmount * pct / 100);
+        }
+      }
+    } catch {}
+  }
+  
+  // Update lead total_amount, commission_amount and calc_data (for PDF)
   const calcData = JSON.stringify({
     items: allItems,
     subtotal: subtotalAmount,
@@ -2168,12 +2197,14 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     discountAmount: discountAmount,
     freeServices: refFreeServices
   });
-  await db.prepare('UPDATE leads SET total_amount = ?, calc_data = ? WHERE id = ?')
-    .bind(totalAmount, calcData, leadId).run();
+  // Ensure commission_amount column exists
+  try { await db.prepare("SELECT commission_amount FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN commission_amount REAL DEFAULT 0").run(); } catch {} }
+  await db.prepare('UPDATE leads SET total_amount = ?, commission_amount = ?, calc_data = ? WHERE id = ?')
+    .bind(totalAmount, commissionAmount, calcData, leadId).run();
   // Set source to calculator_pdf so PDF route works — update regardless of current source
   await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND source != 'calculator_pdf'").bind(leadId).run();
   await updateLeadArticlesCount(db, Number(leadId));
-  return c.json({ success: true, total_amount: totalAmount, articles_count: articles.length, calc_data: JSON.parse(calcData) });
+  return c.json({ success: true, total_amount: totalAmount, commission_amount: commissionAmount, articles_count: articles.length, calc_data: JSON.parse(calcData) });
 });
 
 // ===== LEAD ARTICLES (WB артикулы привязанные к лидам) =====
@@ -3243,12 +3274,13 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // ===== COMMISSION ANALYTICS =====
     let commissionData: any = { total_commission: 0, by_method: [], leads_with_method: 0, leads_without_method: 0 };
     try {
-      // Ensure payment_method_id column exists
+      // Ensure columns exist
       try { await db.prepare("SELECT payment_method_id FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN payment_method_id INTEGER DEFAULT NULL").run(); } catch {} }
+      try { await db.prepare("SELECT commission_amount FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN commission_amount REAL DEFAULT 0").run(); } catch {} }
       
       // Get all leads with payment methods (turnover statuses only)
       const pmLeads = await db.prepare(
-        "SELECT l.payment_method_id, l.total_amount, pm.name_ru, pm.name_am, pm.commission_pct FROM leads l LEFT JOIN payment_methods pm ON l.payment_method_id = pm.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter
+        "SELECT l.payment_method_id, l.total_amount, l.commission_amount, pm.name_ru, pm.name_am, pm.commission_pct FROM leads l LEFT JOIN payment_methods pm ON l.payment_method_id = pm.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter
       ).bind(...dateParams).all().catch(() => ({ results: [] }));
       
       const methodStats: Record<number, { name_ru: string; name_am: string; pct: number; count: number; total_base: number; total_commission: number }> = {};
@@ -3257,12 +3289,12 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       let withoutMethod = 0;
       
       for (const row of (pmLeads.results || [])) {
-        if (row.payment_method_id && row.commission_pct) {
+        if (row.payment_method_id) {
           withMethod++;
           const pmId = Number(row.payment_method_id);
           const base = Number(row.total_amount) || 0;
+          const comm = Number(row.commission_amount) || 0;
           const pct = Number(row.commission_pct) || 0;
-          const comm = Math.round(base * pct / 100);
           totalCommission += comm;
           if (!methodStats[pmId]) {
             methodStats[pmId] = { name_ru: (row.name_ru as string) || '', name_am: (row.name_am as string) || '', pct, count: 0, total_base: 0, total_commission: 0 };
