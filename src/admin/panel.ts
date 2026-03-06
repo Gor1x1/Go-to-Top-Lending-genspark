@@ -108,7 +108,7 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [], loanSettings: { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 } };
+let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [], loanSettings: { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 }, paymentMethods: [] };
 
 // ===== TOKEN AUTO-REFRESH (every 6 hours) =====
 var _tokenRefreshInterval = null;
@@ -300,6 +300,7 @@ async function loadData() {
     data.expenses = bulk.expenses || [];
     data.periodSnapshots = bulk.periodSnapshots || [];
     data.vacations = bulk.vacations || [];
+    data.paymentMethods = bulk.paymentMethods || [];
     data.onlineUsers = bulk.online || [];
     if (bulk.leadArticles) { for (var k in bulk.leadArticles) { data.leadArticles[k] = bulk.leadArticles[k]; } }
     data.taxPayments = bulk.taxPayments || [];
@@ -343,6 +344,7 @@ async function loadData() {
     data.expenses = (expensesData && expensesData.expenses) || [];
     try { var snapshotsData = await api('/period-snapshots'); data.periodSnapshots = (snapshotsData && snapshotsData.snapshots) || []; } catch(e) { data.periodSnapshots = []; }
     try { var vacData = await api('/vacations'); data.vacations = (vacData && vacData.vacations) || []; } catch(e) { data.vacations = []; }
+    try { var pmData = await api('/payment-methods'); data.paymentMethods = (pmData && pmData.methods) || []; } catch(e) { data.paymentMethods = []; }
     try { var onlineData = await api('/activity/online'); data.onlineUsers = (onlineData && onlineData.online) || []; } catch(e) { data.onlineUsers = []; }
     var leadsWithArticles = ((data.leads && data.leads.leads) || []).filter(function(l) { return l.articles_count > 0; });
     if (leadsWithArticles.length > 0) {
@@ -2009,6 +2011,41 @@ function renderSettings() {
   
   // DATA RESET — only for main_admin
   if (isMainAdmin) {
+    // ===== PAYMENT METHODS MANAGEMENT =====
+    h += '<div class="card" style="max-width:800px;margin-bottom:20px;border:1px solid rgba(59,130,246,0.3)">' +
+      '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-credit-card" style="color:#3B82F6;margin-right:8px"></i>Способы оплаты и комиссии</h3>' +
+      '<p style="color:#94a3b8;font-size:0.82rem;margin-bottom:16px">Управление способами оплаты для клиентов. Комиссия автоматически прибавляется к итоговой сумме в PDF-инвойсе.</p>';
+    var pmList = ensureArray(data.paymentMethods);
+    if (pmList.length > 0) {
+      h += '<table style="width:100%;border-collapse:collapse;font-size:0.85rem;margin-bottom:16px"><thead><tr style="background:#1e293b;border-bottom:2px solid #334155">' +
+        '<th style="padding:10px 12px;text-align:left;color:#94a3b8">Название (RU)</th>' +
+        '<th style="padding:10px 12px;text-align:left;color:#94a3b8">Название (AM)</th>' +
+        '<th style="padding:10px 12px;text-align:center;color:#94a3b8">Комиссия %</th>' +
+        '<th style="padding:10px 12px;text-align:center;color:#94a3b8">Порядок</th>' +
+        '<th style="padding:10px 12px;width:100px"></th></tr></thead><tbody>';
+      for (var pmi2 = 0; pmi2 < pmList.length; pmi2++) {
+        var pm2 = pmList[pmi2];
+        h += '<tr style="border-bottom:1px solid #334155">' +
+          '<td style="padding:8px 12px"><input class="input" id="pm_name_ru_' + pm2.id + '" value="' + escHtml(pm2.name_ru || '') + '" style="font-size:0.82rem;padding:6px 8px"></td>' +
+          '<td style="padding:8px 12px"><input class="input" id="pm_name_am_' + pm2.id + '" value="' + escHtml(pm2.name_am || '') + '" style="font-size:0.82rem;padding:6px 8px"></td>' +
+          '<td style="padding:8px 12px;text-align:center"><input class="input" type="number" min="0" max="100" step="0.1" id="pm_pct_' + pm2.id + '" value="' + (pm2.commission_pct || 0) + '" style="width:80px;font-size:0.82rem;padding:6px 8px;text-align:center"></td>' +
+          '<td style="padding:8px 12px;text-align:center"><input class="input" type="number" min="0" id="pm_sort_' + pm2.id + '" value="' + (pm2.sort_order || 0) + '" style="width:60px;font-size:0.82rem;padding:6px 8px;text-align:center"></td>' +
+          '<td style="padding:8px 12px;text-align:center;white-space:nowrap">' +
+            '<button class="btn btn-primary" style="padding:4px 10px;font-size:0.75rem;margin-right:4px" onclick="savePaymentMethod(' + pm2.id + ')"><i class="fas fa-save"></i></button>' +
+            '<button class="btn btn-danger" style="padding:4px 10px;font-size:0.75rem" onclick="deletePaymentMethod(' + pm2.id + ')"><i class="fas fa-trash"></i></button>' +
+          '</td></tr>';
+      }
+      h += '</tbody></table>';
+    } else {
+      h += '<div style="padding:16px;text-align:center;color:#64748b;font-size:0.85rem"><i class="fas fa-info-circle" style="margin-right:6px"></i>Нет способов оплаты. Добавьте первый.</div>';
+    }
+    h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b">' +
+      '<input class="input" id="new_pm_name_ru" placeholder="Название (RU)" style="flex:1;min-width:150px;font-size:0.82rem;padding:6px 8px">' +
+      '<input class="input" id="new_pm_name_am" placeholder="Название (AM)" style="flex:1;min-width:150px;font-size:0.82rem;padding:6px 8px">' +
+      '<input class="input" type="number" min="0" max="100" step="0.1" id="new_pm_pct" placeholder="%" style="width:70px;font-size:0.82rem;padding:6px 8px;text-align:center">' +
+      '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem;white-space:nowrap" onclick="addPaymentMethod()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
+    '</div></div>';
+
     h += '<div class="card" style="max-width:800px;margin-top:24px;border:1px solid rgba(239,68,68,0.3)">' +
       '<h3 style="font-weight:700;margin-bottom:8px;color:#f87171"><i class="fas fa-exclamation-triangle" style="margin-right:8px"></i>Сброс данных</h3>' +
       '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px;line-height:1.5">Очистка операционных данных перед запуском. Выберите категории для удаления.</p>' +
@@ -2143,6 +2180,38 @@ async function saveAdminProfile() {
     if (resultEl) resultEl.innerHTML = '<span style="color:#10B981"><i class="fas fa-check"></i> Сохранено</span>';
     setTimeout(function() { if (resultEl) resultEl.innerHTML = ''; }, 3000);
   } else { toast(res?.error || 'Ошибка сохранения', 'error'); }
+}
+
+// ===== PAYMENT METHODS CRUD =====
+async function addPaymentMethod() {
+  var nameRu = document.getElementById('new_pm_name_ru').value.trim();
+  var nameAm = document.getElementById('new_pm_name_am').value.trim();
+  var pct = parseFloat(document.getElementById('new_pm_pct').value) || 0;
+  if (!nameRu) { toast('Введите название', 'error'); return; }
+  var sortOrder = ensureArray(data.paymentMethods).length + 1;
+  await api('/payment-methods', { method: 'POST', body: JSON.stringify({ name_ru: nameRu, name_am: nameAm || nameRu, commission_pct: pct, sort_order: sortOrder }) });
+  toast('Способ оплаты добавлен');
+  try { var pmData = await api('/payment-methods'); data.paymentMethods = (pmData && pmData.methods) || []; } catch(e) { }
+  render();
+}
+
+async function savePaymentMethod(id) {
+  var nameRu = document.getElementById('pm_name_ru_' + id).value.trim();
+  var nameAm = document.getElementById('pm_name_am_' + id).value.trim();
+  var pct = parseFloat(document.getElementById('pm_pct_' + id).value) || 0;
+  var sort = parseInt(document.getElementById('pm_sort_' + id).value) || 0;
+  await api('/payment-methods/' + id, { method: 'PUT', body: JSON.stringify({ name_ru: nameRu, name_am: nameAm, commission_pct: pct, sort_order: sort, is_active: 1 }) });
+  toast('Сохранено');
+  try { var pmData = await api('/payment-methods'); data.paymentMethods = (pmData && pmData.methods) || []; } catch(e) { }
+  render();
+}
+
+async function deletePaymentMethod(id) {
+  if (!confirm('Удалить этот способ оплаты?')) return;
+  await api('/payment-methods/' + id, { method: 'DELETE' });
+  toast('Способ оплаты удалён');
+  try { var pmData = await api('/payment-methods'); data.paymentMethods = (pmData && pmData.methods) || []; } catch(e) { }
+  render();
 }
 
 async function loadDataCounts() {
@@ -2390,12 +2459,17 @@ function renderLeads() {
         if (refMatch) discPct = Number(refMatch.discount_percent || 0);
       }
       var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
-      h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
+      // Payment method info for card summary
+      var cardPmMatch = ensureArray(data.paymentMethods).find(function(m) { return m.id == l.payment_method_id; });
+      var cardPmPct = cardPmMatch ? Number(cardPmMatch.commission_pct) : 0;
+      var cardPmComm = cardPmPct > 0 ? Math.round(leadAmt * cardPmPct / 100) : 0;
+      h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0 || cardPmMatch) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (discAmt > 0 ? '<span style="font-size:0.72rem;color:#8B5CF6;font-weight:600"><i class="fas fa-gift" style="margin-right:3px"></i>Скидка: -' + Number(discAmt).toLocaleString('ru-RU') + ' ֏ (' + discPct + '%)</span>' : '') +
               (refundAmt > 0 ? '<span style="font-size:0.72rem;color:#f87171;font-weight:600"><i class="fas fa-undo-alt" style="margin-right:3px"></i>Возврат: -' + Number(refundAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (l.referral_code ? '<span style="font-size:0.72rem;color:#10B981;font-weight:600"><i class="fas fa-tag" style="margin-right:3px"></i>' + escHtml(l.referral_code) + '</span>' : '') +
+              (cardPmMatch ? '<span style="font-size:0.72rem;color:#3B82F6;font-weight:600"><i class="fas fa-credit-card" style="margin-right:3px"></i>' + escHtml(cardPmMatch.name_ru) + (cardPmComm > 0 ? ' +' + Number(cardPmComm).toLocaleString('ru-RU') + ' ֏' : '') + '</span>' : '') +
             '</div>' : '');
       
       // Right side: status + total + date + actions
@@ -2466,6 +2540,35 @@ function renderLeads() {
         '<div style="display:flex;align-items:flex-end">' +
         (refundVal > 0 ? '<div style="font-size:0.78rem;color:#f87171;font-weight:600;padding:8px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Возврат: ' + Number(refundVal).toLocaleString('ru-RU') + ' ֏ (из суммы выкупов)</div>' : '<div style="font-size:0.78rem;color:#64748b;padding:8px">Сумма вычитается из стоимости выкупов</div>') +
         '</div></div>';
+
+      // --- 2.7. PAYMENT METHOD (commission) ---
+      var pmId = l.payment_method_id || '';
+      var pmMethods = ensureArray(data.paymentMethods);
+      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
+        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-credit-card" style="margin-right:4px;color:#3B82F6"></i>Способ оплаты:</div>' +
+        '<select class="input" id="lead-pm-' + l.id + '" style="font-size:0.85rem;padding:8px;border-color:rgba(59,130,246,0.3)" onchange="previewCommission(' + l.id + ')">' +
+        '<option value="">— Не выбран —</option>';
+      for (var pmi = 0; pmi < pmMethods.length; pmi++) {
+        var pm = pmMethods[pmi];
+        h += '<option value="' + pm.id + '"' + (pmId == pm.id ? ' selected' : '') + '>' + escHtml(pm.name_ru) + ' (' + pm.commission_pct + '%)</option>';
+      }
+      h += '</select></div>';
+      // Commission preview
+      var pmMatch = pmMethods.find(function(m) { return m.id == pmId; });
+      var pmPct = pmMatch ? Number(pmMatch.commission_pct) : 0;
+      var pmBase = Number(l.total_amount || 0);
+      var pmCommission = pmPct > 0 ? Math.round(pmBase * pmPct / 100) : 0;
+      var pmFinal = pmBase + pmCommission;
+      h += '<div id="lead-pm-preview-' + l.id + '" style="display:flex;align-items:flex-end">';
+      if (pmMatch) {
+        h += '<div style="font-size:0.78rem;padding:8px;line-height:1.6">' +
+          '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
+          '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmPct + '%: +' + Number(pmCommission).toLocaleString('ru-RU') + ' ֏</div>' +
+          '<div style="color:#22C55E;font-weight:700">К оплате: ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏</div></div>';
+      } else {
+        h += '<div style="font-size:0.78rem;color:#64748b;padding:8px">Выберите способ оплаты для расчёта комиссии</div>';
+      }
+      h += '</div></div>';
 
       // --- 3. NOTES (at top, above services) ---
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
@@ -2692,6 +2795,29 @@ async function removeLeadRefCode(leadId) {
     toast('Промокод убран, обновите страницу');
     await loadData();
     render();
+  }
+}
+
+function previewCommission(leadId) {
+  var sel = document.getElementById('lead-pm-' + leadId);
+  var preview = document.getElementById('lead-pm-preview-' + leadId);
+  if (!sel || !preview) return;
+  var pmId = sel.value;
+  var pmMethods = ensureArray(data.paymentMethods);
+  var pmMatch = pmMethods.find(function(m) { return m.id == pmId; });
+  // Find lead total_amount
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  var pmBase = Number(lead && lead.total_amount || 0);
+  if (pmMatch) {
+    var pmPct = Number(pmMatch.commission_pct);
+    var pmComm = Math.round(pmBase * pmPct / 100);
+    var pmFinal = pmBase + pmComm;
+    preview.innerHTML = '<div style="font-size:0.78rem;padding:8px;line-height:1.6">' +
+      '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
+      '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmPct + '%: +' + Number(pmComm).toLocaleString('ru-RU') + ' ֏</div>' +
+      '<div style="color:#22C55E;font-weight:700">К оплате: ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏</div></div>';
+  } else {
+    preview.innerHTML = '<div style="font-size:0.78rem;color:#64748b;padding:8px">Выберите способ оплаты для расчёта комиссии</div>';
   }
 }
 
@@ -3247,6 +3373,7 @@ async function saveLeadAll(leadId) {
   var tzEl = document.getElementById('lead-tz-' + leadId);
   var refundEl = document.getElementById('lead-refund-' + leadId);
   var refCodeEl = document.getElementById('lead-refcode-' + leadId);
+  var pmEl = document.getElementById('lead-pm-' + leadId);
   var updateData = {};
   if (nameEl) updateData.name = nameEl.value;
   if (contactEl) updateData.contact = contactEl.value;
@@ -3268,6 +3395,13 @@ async function saveLeadAll(leadId) {
       if (tzEl) lead.tz_link = tzEl.value;
       if (refundEl) lead.refund_amount = parseFloat(refundEl.value) || 0;
     }
+  }
+  // 2a. Save payment method
+  if (pmEl) {
+    var pmVal = pmEl.value ? Number(pmEl.value) : null;
+    await api('/leads/' + leadId + '/payment-method', { method:'PUT', body: JSON.stringify({ payment_method_id: pmVal }) });
+    var lead2 = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+    if (lead2) lead2.payment_method_id = pmVal;
   }
   // 2. Recalculate total (articles + services)
   var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
@@ -6002,6 +6136,41 @@ function renderBizOverviewV2(d, sd, fin) {
       h += '<div style="display:flex;justify-content:space-between;margin-top:4px;font-size:0.65rem;color:#475569"><span>' + (daily[0]?.day||'').slice(5) + '</span><span>' + (daily[daily.length-1]?.day||'').slice(5) + '</span></div>';
     }
     h += '</div></div>';
+  }
+
+  // ===== COMMISSION ANALYTICS BLOCK =====
+  var commData = d.commission_data || {};
+  var byMethod = commData.by_method || [];
+  if (byMethod.length > 0 || commData.total_commission > 0) {
+    h += '<div class="card" style="margin-top:20px;border:1px solid rgba(59,130,246,0.3)">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px"><i class="fas fa-credit-card" style="color:#3B82F6;margin-right:8px"></i>Комиссии за способы оплаты</h3>';
+    // Summary KPIs
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:16px">';
+    h += '<div style="padding:14px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">Итого комиссий</div><div style="font-size:1.4rem;font-weight:800;color:#3B82F6">' + fmtAmt(commData.total_commission || 0) + '</div></div>';
+    h += '<div style="padding:14px;background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">С методом оплаты</div><div style="font-size:1.4rem;font-weight:800;color:#22C55E">' + fmtNum(commData.leads_with_method || 0) + '</div></div>';
+    h += '<div style="padding:14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px"><div style="font-size:0.78rem;color:#94a3b8;margin-bottom:4px">Без метода оплаты</div><div style="font-size:1.4rem;font-weight:800;color:#F59E0B">' + fmtNum(commData.leads_without_method || 0) + '</div></div>';
+    h += '</div>';
+    // Breakdown table
+    if (byMethod.length > 0) {
+      h += '<table style="width:100%;border-collapse:collapse;font-size:0.82rem"><thead><tr style="background:#1e293b;border-bottom:2px solid #334155">' +
+        '<th style="padding:10px 12px;text-align:left;color:#94a3b8">Способ оплаты</th>' +
+        '<th style="padding:10px 12px;text-align:center;color:#94a3b8">Комиссия %</th>' +
+        '<th style="padding:10px 12px;text-align:center;color:#94a3b8">Лидов</th>' +
+        '<th style="padding:10px 12px;text-align:right;color:#94a3b8">База (сумма заказов)</th>' +
+        '<th style="padding:10px 12px;text-align:right;color:#94a3b8">Комиссия</th>' +
+        '</tr></thead><tbody>';
+      for (var ci = 0; ci < byMethod.length; ci++) {
+        var cm = byMethod[ci];
+        h += '<tr style="border-bottom:1px solid #334155">' +
+          '<td style="padding:8px 12px;color:#e2e8f0;font-weight:600"><i class="fas fa-credit-card" style="margin-right:6px;color:#3B82F6"></i>' + escHtml(cm.name_ru) + '</td>' +
+          '<td style="padding:8px 12px;text-align:center;color:#94a3b8">' + cm.pct + '%</td>' +
+          '<td style="padding:8px 12px;text-align:center;color:#e2e8f0;font-weight:600">' + fmtNum(cm.count) + '</td>' +
+          '<td style="padding:8px 12px;text-align:right;color:#94a3b8;white-space:nowrap">' + fmtAmt(cm.total_base) + '</td>' +
+          '<td style="padding:8px 12px;text-align:right;color:#3B82F6;font-weight:700;white-space:nowrap">' + fmtAmt(cm.total_commission) + '</td></tr>';
+      }
+      h += '</tbody></table>';
+    }
+    h += '</div>';
   }
 
   return h;

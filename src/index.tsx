@@ -569,7 +569,27 @@ app.get('/pdf/:id', async (c) => {
     const servicesBase = calcData.servicesSubtotal || svcSubtotal || subtotal;
     const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(servicesBase) * calcDiscountPercent / 100) : 0;
     const afterDiscount = calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal);
-    const finalTotal = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
+    const beforeCommission = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
+    
+    // Load payment method commission
+    let pmName = '';
+    let pmNameAm = '';
+    let pmNameEn = '';
+    let pmCommissionPct = 0;
+    let pmCommissionAmt = 0;
+    if (lead.payment_method_id) {
+      try {
+        const pmRow = await db.prepare('SELECT * FROM payment_methods WHERE id = ? AND is_active = 1').bind(lead.payment_method_id).first();
+        if (pmRow) {
+          pmName = (pmRow.name_ru as string) || '';
+          pmNameAm = (pmRow.name_am as string) || pmName;
+          pmNameEn = pmName; // fallback
+          pmCommissionPct = Number(pmRow.commission_pct) || 0;
+          pmCommissionAmt = pmCommissionPct > 0 ? Math.round(beforeCommission * pmCommissionPct / 100) : 0;
+        }
+      } catch {}
+    }
+    const finalTotal = beforeCommission + pmCommissionAmt;
     const totalFormatted = finalTotal.toLocaleString('ru-RU');
     
     let rows = '';
@@ -771,7 +791,8 @@ app.get('/pdf/:id', async (c) => {
       + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + (isEn ? 'Subtotal:' : isAm ? '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:') + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
       + (calcDiscountAmount > 0 && articleItems.length === 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
-      + ((calcDiscountAmount > 0 || refundAmount > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0422\u041e\u0413\u041e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
+      + (pmCommissionAmt > 0 ? '<tr style="background:#eff6ff"><td colspan="4" style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:600"><i class="fas fa-credit-card" style="margin-right:4px"></i>' + (isEn ? 'Payment commission' : isAm ? '\u054e\u0573\u0561\u0580\u0574\u0561\u0576 \u0574\u056b\u057b\u0576\u0578\u0580\u0564\u0561\u057e\u0573\u0561\u0580' : '\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u044f \u0437\u0430 \u043e\u043f\u043b\u0430\u0442\u0443') + ' (' + (isAm ? pmNameAm : pmName) + ' ' + pmCommissionPct + '%):</td><td style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:700;font-size:15px;white-space:nowrap">+' + pmCommissionAmt.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
+      + ((calcDiscountAmount > 0 || refundAmount > 0 || pmCommissionAmt > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0422\u041e\u0413\u041e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'
       + (outro ? '<div class="outro">' + outro + '</div>' : '')
       + (terms ? '<div class="terms-box"><div class="terms-title"><i class="fas fa-gavel" style="margin-right:4px"></i>' + L.terms + '</div>' + terms + '</div>' : '')

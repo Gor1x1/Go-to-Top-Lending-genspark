@@ -134,7 +134,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
   // Ensure DB migrations are applied (critical for new tables like tax_rules)
   try { await initDatabase(db); } catch {}
   try {
-    const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations] = await Promise.all([
+    const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations, paymentMethods] = await Promise.all([
       db.prepare('SELECT * FROM site_content ORDER BY sort_order').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM calculator_tabs ORDER BY sort_order').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM calculator_services ORDER BY tab_id, sort_order').all().catch(() => ({results:[]})),
@@ -156,7 +156,8 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare('SELECT * FROM expense_frequency_types ORDER BY name').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM expenses ORDER BY id DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM period_snapshots ORDER BY date_from DESC').all().catch(() => ({results:[]})),
-      db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all().catch(() => ({results:[]}))
+      db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY sort_order').all().catch(() => ({results:[]}))
     ]);
     // P&L related data (parallel, with fallback for new tables)
     const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData, loanSettingsMode, loanSettingsPct, loanSettingsExtraPct] = await Promise.all([
@@ -234,6 +235,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       expenses: expenses.results || [],
       periodSnapshots: periodSnapshots.results || [],
       vacations: vacations.results || [],
+      paymentMethods: paymentMethods.results || [],
       online: onlineRes.results || [],
       leadArticles: leadArticles,
       taxPayments: taxPayments.results || [],
@@ -1146,6 +1148,48 @@ api.put('/pdf-template', authMiddleware, async (c) => {
   // Return updated record so frontend can verify the save
   const updated = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
   return c.json({ success: true, data: updated });
+});
+
+// ===== PAYMENT METHODS =====
+api.get('/payment-methods', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  try { await db.prepare("SELECT payment_method_id FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN payment_method_id INTEGER DEFAULT NULL").run(); } catch {} }
+  const rows = await db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY sort_order').all();
+  return c.json({ methods: rows.results || [] });
+});
+
+api.post('/payment-methods', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  await db.prepare('INSERT INTO payment_methods (name_ru, name_am, commission_pct, sort_order) VALUES (?,?,?,?)')
+    .bind(d.name_ru || '', d.name_am || '', d.commission_pct ?? 0, d.sort_order ?? 99).run();
+  return c.json({ success: true });
+});
+
+api.put('/payment-methods/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  await db.prepare('UPDATE payment_methods SET name_ru=?, name_am=?, commission_pct=?, sort_order=?, is_active=? WHERE id=?')
+    .bind(d.name_ru ?? '', d.name_am ?? '', d.commission_pct ?? 0, d.sort_order ?? 0, d.is_active ?? 1, id).run();
+  return c.json({ success: true });
+});
+
+api.delete('/payment-methods/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  await db.prepare('UPDATE payment_methods SET is_active = 0 WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+// Update lead payment method
+api.put('/leads/:id/payment-method', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const d = await c.req.json();
+  try { await db.prepare("SELECT payment_method_id FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN payment_method_id INTEGER DEFAULT NULL").run(); } catch {} }
+  await db.prepare('UPDATE leads SET payment_method_id = ? WHERE id = ?').bind(d.payment_method_id, id).run();
+  return c.json({ success: true });
 });
 
 // ===== SLOT COUNTER (multiple) =====
@@ -3196,6 +3240,49 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       }
     } catch {}
 
+    // ===== COMMISSION ANALYTICS =====
+    let commissionData: any = { total_commission: 0, by_method: [], leads_with_method: 0, leads_without_method: 0 };
+    try {
+      // Ensure payment_method_id column exists
+      try { await db.prepare("SELECT payment_method_id FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN payment_method_id INTEGER DEFAULT NULL").run(); } catch {} }
+      
+      // Get all leads with payment methods (turnover statuses only)
+      const pmLeads = await db.prepare(
+        "SELECT l.payment_method_id, l.total_amount, pm.name_ru, pm.name_am, pm.commission_pct FROM leads l LEFT JOIN payment_methods pm ON l.payment_method_id = pm.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter
+      ).bind(...dateParams).all().catch(() => ({ results: [] }));
+      
+      const methodStats: Record<number, { name_ru: string; name_am: string; pct: number; count: number; total_base: number; total_commission: number }> = {};
+      let totalCommission = 0;
+      let withMethod = 0;
+      let withoutMethod = 0;
+      
+      for (const row of (pmLeads.results || [])) {
+        if (row.payment_method_id && row.commission_pct) {
+          withMethod++;
+          const pmId = Number(row.payment_method_id);
+          const base = Number(row.total_amount) || 0;
+          const pct = Number(row.commission_pct) || 0;
+          const comm = Math.round(base * pct / 100);
+          totalCommission += comm;
+          if (!methodStats[pmId]) {
+            methodStats[pmId] = { name_ru: (row.name_ru as string) || '', name_am: (row.name_am as string) || '', pct, count: 0, total_base: 0, total_commission: 0 };
+          }
+          methodStats[pmId].count++;
+          methodStats[pmId].total_base += base;
+          methodStats[pmId].total_commission += comm;
+        } else {
+          withoutMethod++;
+        }
+      }
+      
+      commissionData = {
+        total_commission: totalCommission,
+        by_method: Object.entries(methodStats).map(([id, s]) => ({ id: Number(id), ...s })),
+        leads_with_method: withMethod,
+        leads_without_method: withoutMethod,
+      };
+    } catch {}
+
     return c.json({
       status_data: statusData,
       financial: {
@@ -3226,6 +3313,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       weekly_data: weeklyData,
       month_daily_data: monthDailyData,
       ltv_data: ltvData,
+      commission_data: commissionData,
       total_leads: totalLeadsCount,
       date_from: dateFrom,
       date_to: dateTo,
