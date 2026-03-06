@@ -10482,6 +10482,8 @@ function renderSiteBlocks() {
             h += '</div>';
           }
           h += '</div>';
+        } else if (isSeoBlock) {
+          // SEO block has its own dedicated editor above — skip generic texts
         } else {
           // ── Semantic text pairs (for non-ticker blocks) ──
           h += '<div style="margin-bottom:16px">';

@@ -2751,10 +2751,21 @@ function switchLang(l) {
     if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
+  // Update URL path to /am or /ru (without page reload) so shared links carry language
+  var newPath = l === 'am' ? '/am' : '/ru';
+  if (window.location.pathname !== newPath) {
+    history.replaceState(null, '', newPath + window.location.hash);
+  }
 }
 
 /* ===== INIT: apply default language on load ===== */
 (function initLang() {
+  // Detect language from URL path /am or /ru
+  var pathLang = window.location.pathname === '/am' ? 'am' : (window.location.pathname === '/ru' ? 'ru' : '');
+  if (pathLang) {
+    lang = pathLang;
+    localStorage.setItem('gtt_lang', pathLang);
+  }
   switchLang(lang);
 })();
 
@@ -6424,9 +6435,14 @@ async function checkRefCode() {
     try { seoTextsRu = JSON.parse(seoBlock.texts_ru || '[]'); } catch { seoTextsRu = []; }
     try { seoTextsAm = JSON.parse(seoBlock.texts_am || '[]'); } catch { seoTextsAm = []; }
     const seoImage = (seoBlock.photo_url || '').trim();
+    // Make image URL absolute (Telegram needs full URL)
+    const baseUrl = new URL(c.req.url).origin;
+    const seoImageAbsolute = seoImage.startsWith('http') ? seoImage : (seoImage ? baseUrl + (seoImage.startsWith('/') ? '' : '/') + seoImage : '');
     
-    // Detect language: ?lang= query param > Accept-Language header > default 'ru'
-    const urlLang = new URL(c.req.url).searchParams.get('lang');
+    // Detect language from URL path /am or /ru, then ?lang= param, then Accept-Language
+    const reqPath = new URL(c.req.url).pathname;
+    const pathLang = reqPath === '/am' ? 'am' : (reqPath === '/ru' ? 'ru' : '');
+    const urlLang = pathLang || new URL(c.req.url).searchParams.get('lang') || '';
     const acceptLang = (c.req.header('Accept-Language') || '').toLowerCase();
     const isArmenian = urlLang === 'am' || urlLang === 'hy' || 
       (!urlLang && (acceptLang.startsWith('hy') || acceptLang.includes('hy-am')));
@@ -6471,8 +6487,8 @@ async function checkRefCode() {
     }
     
     // Replace og:image
-    if (seoImage) {
-      const escImg = seoImage.replace(/"/g, '&quot;');
+    if (seoImageAbsolute) {
+      const escImg = seoImageAbsolute.replace(/"/g, '&quot;');
       pageHtml = pageHtml.replace(
         /<meta property="og:image" content="[^"]*">/,
         `<meta property="og:image" content="${escImg}">`
@@ -6489,6 +6505,13 @@ async function checkRefCode() {
         /<meta property="og:locale" content="[^"]*">/,
         `<meta property="og:locale" content="hy_AM">`
       );
+      // Update og:url to include /am path
+      pageHtml = pageHtml.replace(
+        /<meta property="og:url" content="[^"]*">/,
+        `<meta property="og:url" content="https://gototop.win/am">`
+      );
+      // Set html lang
+      pageHtml = pageHtml.replace('<html lang="ru"', '<html lang="hy"');
     }
   }
   
@@ -6504,6 +6527,24 @@ async function checkRefCode() {
   }
   
   return c.html(pageHtml);
+})
+
+// Language-specific routes: /am and /ru — rewrite to / with lang query param
+// These must render the SAME page (not redirect) so Telegram/WhatsApp see OG tags
+app.get('/am', async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = '/';
+  url.searchParams.set('lang', 'am');
+  const newReq = new Request(url.href, c.req.raw);
+  return app.fetch(newReq, c.env, c.executionCtx);
+})
+
+app.get('/ru', async (c) => {
+  const url = new URL(c.req.url);
+  url.pathname = '/';
+  url.searchParams.set('lang', 'ru');
+  const newReq = new Request(url.href, c.req.raw);
+  return app.fetch(newReq, c.env, c.executionCtx);
 })
 
 export default app
