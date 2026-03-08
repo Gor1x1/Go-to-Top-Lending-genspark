@@ -11120,27 +11120,15 @@ function renderSiteBlocks() {
               var navLinks = (navOpts && navOpts.nav_links) || [];
               var curTarget = '';
               for (var nli = 0; nli < navLinks.length; nli++) { if (navLinks[nli].idx === ti) { curTarget = navLinks[nli].target || ''; break; } }
-              // Only main site sections — clean list without copies, counters, tickers etc.
-              var navSectionsList = [
-                { id: 'hero', label: 'Главная (Hero)' },
-                { id: 'wb-banner', label: 'Баннер WB' },
-                { id: 'stats-bar', label: 'Статистика' },
-                { id: 'about', label: 'О компании' },
-                { id: 'services', label: 'Наши услуги' },
-                { id: 'buyout-detail', label: 'Услуга выкупа' },
-                { id: 'why-buyouts', label: 'Почему это работает' },
-                { id: 'fifty-vs-fifty', label: '50/50 — Честный формат' },
-                { id: 'client-reviews', label: 'Отзывы клиентов' },
-                { id: 'wb-official', label: 'Официально (WB)' },
-                { id: 'calculator', label: 'Калькулятор' },
-                { id: 'process', label: 'Как мы работаем' },
-                { id: 'warehouse', label: 'Наш склад' },
-                { id: 'guarantee', label: 'Гарантия безопасности' },
-                { id: 'comparison', label: 'Сравнение' },
-                { id: 'important', label: 'Важно знать' },
-                { id: 'faq', label: 'FAQ' },
-                { id: 'contact', label: 'Связаться с нами' }
-              ];
+              // Dynamic section list built from all site blocks (auto-includes new sections)
+              var navSkipTypes = { ticker: true, nav: true, seo_og: true, popup: true, floating_buttons: true };
+              var navSectionsList = [];
+              var _allNavBlocks = data.siteBlocks || [];
+              for (var _nbi = 0; _nbi < _allNavBlocks.length; _nbi++) {
+                var _nb = _allNavBlocks[_nbi];
+                if (navSkipTypes[_nb.block_type] || navSkipTypes[_nb.block_key]) continue;
+                navSectionsList.push({ id: _nb.block_key, label: (_nb.title_ru || _nb.block_key) });
+              }
               h += '<div style="margin-top:6px;display:flex;align-items:center;gap:8px">';
               h += '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600;white-space:nowrap"><i class="fas fa-link" style="margin-right:4px"></i>Ссылка на секцию:</span>';
               h += '<select class="input" id="sb_navlink_' + b.id + '_' + ti + '" style="flex:1;font-size:0.78rem;padding:4px 8px;background:#1a2236;border:1px solid #293548;color:#60a5fa;border-radius:6px" onchange="sbSetNavLink(' + b.id + ',' + ti + ',this.value)">';
@@ -12026,6 +12014,24 @@ function sbMoveText(blockId, idx, direction) {
     b.images[idx] = b.images[newIdx];
     b.images[newIdx] = tmpImg;
   }
+  // Swap text_styles
+  if (b.text_styles && b.text_styles.length > Math.max(idx, newIdx)) {
+    var tmpStyle = b.text_styles[idx];
+    b.text_styles[idx] = b.text_styles[newIdx];
+    b.text_styles[newIdx] = tmpStyle;
+  }
+  // For nav block: swap nav_links indices so links follow their headings
+  if (b.block_key === 'nav') {
+    var navOpts = {};
+    try { navOpts = typeof b.custom_html === 'string' ? JSON.parse(b.custom_html || '{}') : (b.custom_html || {}); } catch(e) { navOpts = {}; }
+    if (navOpts.nav_links) {
+      for (var nri = 0; nri < navOpts.nav_links.length; nri++) {
+        if (navOpts.nav_links[nri].idx === idx) navOpts.nav_links[nri].idx = newIdx;
+        else if (navOpts.nav_links[nri].idx === newIdx) navOpts.nav_links[nri].idx = idx;
+      }
+      b.custom_html = JSON.stringify(navOpts);
+    }
+  }
   render();
   sbAutoSave(blockId);
 }
@@ -12095,6 +12101,26 @@ function sbDrop(e, type, blockId, targetIdx) {
     moveItem(b.texts_ru, fromIdx, targetIdx);
     moveItem(b.texts_am, fromIdx, targetIdx);
     moveItem(b.images, fromIdx, targetIdx);
+    // Also move text_styles
+    if (b.text_styles) moveItem(b.text_styles, fromIdx, targetIdx);
+    // For nav block: reindex nav_links so links follow their headings after drag
+    if (b.block_key === 'nav') {
+      var dNavOpts = {};
+      try { dNavOpts = typeof b.custom_html === 'string' ? JSON.parse(b.custom_html || '{}') : (b.custom_html || {}); } catch(e) { dNavOpts = {}; }
+      if (dNavOpts.nav_links) {
+        for (var dnri = 0; dnri < dNavOpts.nav_links.length; dnri++) {
+          var oldNIdx = dNavOpts.nav_links[dnri].idx;
+          if (oldNIdx === fromIdx) {
+            dNavOpts.nav_links[dnri].idx = targetIdx;
+          } else if (fromIdx < targetIdx && oldNIdx > fromIdx && oldNIdx <= targetIdx) {
+            dNavOpts.nav_links[dnri].idx = oldNIdx - 1;
+          } else if (fromIdx > targetIdx && oldNIdx >= targetIdx && oldNIdx < fromIdx) {
+            dNavOpts.nav_links[dnri].idx = oldNIdx + 1;
+          }
+        }
+        b.custom_html = JSON.stringify(dNavOpts);
+      }
+    }
   } else if (type === 'btn') {
     // Reorder buttons
     if (b.buttons && b.buttons.length > fromIdx) {
