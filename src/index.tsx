@@ -303,24 +303,8 @@ app.post('/api/popup-lead', async (c) => {
   }
 })
 
-// API endpoint for button-click auto-lead (creates lead when CTA button clicked)
-app.post('/api/button-lead', async (c) => {
-  try {
-    const db = c.env.DB;
-    await initDatabase(db);
-    const body = await c.req.json();
-    const ua = c.req.header('User-Agent') || '';
-    const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
-    const nextNum = ((lastLead?.max_num as number) || 0) + 1;
-    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'button_click', body.name||'', body.contact||'', body.button_text||'', body.section||'', body.message||'', body.lang||'ru', ua.substring(0,200)).run();
-    notifyTelegram(db, { name: body.name||'(кнопка)', contact: body.contact||'', source: 'button_click', message: `Кнопка: ${body.button_text||''}. Секция: ${body.section||''}` });
-    return c.json({ success: true, lead_number: nextNum });
-  } catch (e) {
-    console.error('Button lead error:', e);
-    return c.json({ error: 'Failed' }, 500);
-  }
-})
+// NOTE: /api/button-lead endpoint REMOVED — button clicks should NOT create leads.
+// Leads are only created from: /api/lead (contact form), /api/popup-lead (popup form), /api/generate-pdf (calculator).
 
 app.get('/api/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() })
@@ -3806,30 +3790,10 @@ switchLang = function(l) {
       console.log('[DB] Telegram data loaded and applied:', Object.keys(db.telegram).length, 'messages');
     }
     
-    // ===== 3b. TRACK BUTTON CLICKS -> AUTO-CREATE LEAD =====
-    document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a.btn-primary, a.cta-btn').forEach(function(a) {
-      if (a.dataset._trackAttached) return;
-      a.dataset._trackAttached = '1';
-      a.addEventListener('click', function() {
-        try {
-          var section = '';
-          var parent = a.closest('[data-section-id]');
-          if (parent) section = parent.getAttribute('data-section-id') || '';
-          var btnText = '';
-          var span = a.querySelector('span[data-ru]');
-          if (span) btnText = span.getAttribute('data-ru') || span.textContent || '';
-          else btnText = a.textContent || '';
-          btnText = btnText.trim().substring(0, 100);
-          if (!btnText || btnText.length < 2) return;
-          fetch('/api/button-lead', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ button_text: btnText, section: section, lang: lang, name: '(button click)', contact: '' })
-          }).catch(function(){});
-        } catch(e) {}
-      });
-    });
-    console.log('[DB] Button click tracking attached');
+    // ===== 3b. BUTTON CLICKS — no lead tracking =====
+    // Button clicks only open messenger links, NO auto-lead creation.
+    // Leads come only from: contact form, popup form, calculator PDF.
+    console.log('[DB] Button click lead-tracking DISABLED (leads only from forms & calculator)');
     
     // ===== 3c. DYNAMIC TICKER FROM DB =====
     if (db.tickerItems && db.tickerItems.length > 0) {
