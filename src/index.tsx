@@ -1312,6 +1312,9 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .calc-total{display:flex;justify-content:space-between;align-items:center;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple)}
 .calc-total-label{font-size:1.1rem;font-weight:600}
 .calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:nowrap}
+.calc-old-price{font-size:1rem;font-weight:600;color:var(--text-sec);text-decoration:line-through;opacity:0.7;margin-right:6px}
+.calc-discount-line{font-size:0.82rem;color:var(--success);font-weight:600;margin-top:2px}
+.calc-total-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .calc-cta{margin-top:24px;text-align:center}
 .buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
 .buyout-tier-info strong{color:var(--accent)}
@@ -2371,7 +2374,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     </div>
     <div class="calc-total">
       <div class="calc-total-label" data-ru="Итого:" data-am="Ընդամենը:">Итого:</div>
-      <div class="calc-total-value" id="calcTotal">0 ֏</div>
+      <div class="calc-total-value" id="calcTotal" data-total="0">0 ֏</div>
     </div>
     <!-- Referral code field -->
     <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
@@ -3376,12 +3379,41 @@ function recalcDynamic() {
     }
   });
   // Apply referral discount
+  var subtotalBeforeDiscount = total;
   var discountAmount = 0;
   if (typeof _refDiscount !== 'undefined' && _refDiscount > 0 && total > 0) {
     discountAmount = Math.round(total * _refDiscount / 100);
     total = total - discountAmount;
   }
-  document.getElementById('calcTotal').textContent = formatNum(total) + ' ֏';
+  var calcTotalEl = document.getElementById('calcTotal');
+  calcTotalEl.setAttribute('data-total', total);
+  if (discountAmount > 0 && subtotalBeforeDiscount > 0) {
+    calcTotalEl.innerHTML = '<div class="calc-total-prices">' +
+      '<span class="calc-old-price">' + formatNum(subtotalBeforeDiscount) + ' ֏</span>' +
+      '<span>' + formatNum(total) + ' ֏</span>' +
+      '</div>' +
+      '<div class="calc-discount-line"><i class="fas fa-gift" style="margin-right:4px"></i>' +
+      (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573) + ': -' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(discountAmount) + ' \u058f (-' + _refDiscount + '%)</div>';
+  } else {
+    calcTotalEl.textContent = formatNum(total) + ' ֏';
+  }
+  // Update promo result with live discount amount
+  var refResultEl = document.getElementById('refResult');
+  if (refResultEl && refResultEl.style.display !== 'none' && _refDiscount > 0) {
+    var _amActivated = String.fromCharCode(0x054a,0x0580,0x0578,0x0574,0x0578,0x056f,0x0578,0x0564,0x0568,0x20,0x0561,0x056f,0x057f,0x056b,0x057e,0x0561,0x0581,0x057e,0x0561,0x056e,0x20,0x0567,0x21);
+    var _amDiscount = String.fromCharCode(0x0536,0x0565,0x0572,0x0573,0x3a,0x20);
+    var promoMsg = lang === 'am'
+      ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>' + _amActivated
+      : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0430\u043a\u0442\u0438\u0432\u0438\u0440\u043e\u0432\u0430\u043d!';
+    promoMsg += '<br><span style="font-size:0.85rem;font-weight:700;color:var(--success)">';
+    if (subtotalBeforeDiscount > 0) {
+      promoMsg += (lang === 'am' ? _amDiscount + '-' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(discountAmount) + ' \u058f (-' + _refDiscount + '%)';
+    } else {
+      promoMsg += (lang === 'am' ? _amDiscount : '\u0421\u043a\u0438\u0434\u043a\u0430: ') + _refDiscount + '%';
+    }
+    promoMsg += '</span>';
+    refResultEl.innerHTML = promoMsg;
+  }
   var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || 'https://t.me/goo_to_top';
   var greeting = lang === 'am' ? 'Ողջույն! Ուզում եմ պատվիրել:' : 'Здравствуйте! Хочу заказать:';
   var totalLabel = lang === 'am' ? 'Ընդամենը:' : 'Итого:';
@@ -5320,16 +5352,15 @@ async function checkRefCode() {
     if (data.valid) {
       _refDiscount = data.discount_percent || 0;
       _refFreeReviews = data.free_reviews || 0;
-      var msg = lang === 'am' 
-        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Պրոմոկոդը ակտիվացված է!'
-        : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Промокод активирован!';
-      if (_refDiscount > 0) msg += (lang === 'am' ? ' Զեղճ: ' : ' Скидка: ') + _refDiscount + '%';
-      if (_refFreeReviews > 0) msg += (lang === 'am' ? ' + ' + _refFreeReviews + ' անվճար կարծիքներ' : ' + ' + _refFreeReviews + ' бесплатных отзывов');
-      if (data.description) msg += '<br><span style="font-size:0.8rem;color:var(--text-sec)">' + data.description + '</span>';
+      // Show activation — recalcDynamic() will update with live discount amount
       result.style.display = 'block';
       result.style.background = 'rgba(16,185,129,0.1)';
       result.style.border = '1px solid rgba(16,185,129,0.3)';
       result.style.color = 'var(--success)';
+      var msg = lang === 'am' 
+        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Պրոմոկոդը ակտիվացված է!'
+        : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Промокод активирован!';
+      if (_refFreeReviews > 0) msg += (lang === 'am' ? ' + ' + _refFreeReviews + ' անվճար կարծիքներ' : ' + ' + _refFreeReviews + ' бесплатных отзывов');
       result.innerHTML = msg;
       recalcDynamic();
     } else if (data.reason === 'limit_reached') {
@@ -5709,7 +5740,7 @@ async function checkRefCode() {
       return;
     }
 
-    var totalVal = totalEl.textContent.replace(/[^0-9]/g, '');
+    var totalVal = totalEl.getAttribute('data-total') || totalEl.textContent.replace(/[^0-9]/g, '');
     var refCode = '';
     var refInput = document.getElementById('refCodeInput');
     if (refInput) refCode = refInput.value || '';
