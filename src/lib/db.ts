@@ -480,8 +480,10 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_total_am TEXT DEFAULT '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_total_en TEXT DEFAULT 'TOTAL:'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_ru TEXT DEFAULT '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:'").run(); } catch {}
-  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_am TEXT DEFAULT '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0440\u0561\u056f:'").run(); } catch {}
+  try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_am TEXT DEFAULT '\u0535\u0576\u0569\u0561\u0570\u0561\u0577\u057e\u0561\u0580\u056f:'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_subtotal_en TEXT DEFAULT 'Subtotal:'").run(); } catch {}
+  // Fix wrong Armenian subtotal default (Ենdelays -> Delays)
+  try { await db.prepare("UPDATE pdf_templates SET label_subtotal_am = '\u0535\u0576\u0569\u0561\u0570\u0561\u0577\u057e\u0561\u0580\u056f:' WHERE label_subtotal_am = '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0440\u0561\u056f:'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_client_ru TEXT DEFAULT '\u041a\u043b\u0438\u0435\u043d\u0442:'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_client_am TEXT DEFAULT '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:'").run(); } catch {}
   try { await db.prepare("ALTER TABLE pdf_templates ADD COLUMN label_client_en TEXT DEFAULT 'Client:'").run(); } catch {}

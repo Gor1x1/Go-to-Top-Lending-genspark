@@ -8731,7 +8731,7 @@ function renderPdfTemplate() {
     { key: 'label_price', label: '\u0426\u0435\u043d\u0430', def_ru: '\u0426\u0435\u043d\u0430', def_am: '\u0533\u056b\u0576', def_en: 'Price' },
     { key: 'label_sum', label: '\u0421\u0443\u043c\u043c\u0430', def_ru: '\u0421\u0443\u043c\u043c\u0430', def_am: '\u0533\u0578\u0582\u0574\u0561\u0580', def_en: 'Total' },
     { key: 'label_total', label: '\u0418\u0422\u041e\u0413\u041e', def_ru: '\u0418\u0422\u041e\u0413\u041e:', def_am: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', def_en: 'TOTAL:' },
-    { key: 'label_subtotal', label: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433', def_ru: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:', def_am: '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0440\u0561\u056f:', def_en: 'Subtotal:' },
+    { key: 'label_subtotal', label: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433', def_ru: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:', def_am: '\u0535\u0576\u0569\u0561\u0570\u0561\u0577\u057e\u0561\u0580\u056f:', def_en: 'Subtotal:' },
     { key: 'label_client', label: '\u041a\u043b\u0438\u0435\u043d\u0442', def_ru: '\u041a\u043b\u0438\u0435\u043d\u0442:', def_am: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', def_en: 'Client:' },
     { key: 'label_date', label: '\u0414\u0430\u0442\u0430', def_ru: '\u0414\u0430\u0442\u0430:', def_am: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', def_en: 'Date:' },
     { key: 'label_invoice', label: '\u0417\u0430\u044f\u0432\u043a\u0430', def_ru: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', def_am: '\u0540\u0561\u0575\u057f \u2116', def_en: 'Invoice #' },

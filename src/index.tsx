@@ -433,8 +433,8 @@ app.post('/api/generate-pdf', async (c) => {
 
     // Build labels ONLY in current language (no mixing)
     const L = isAm
-      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', dl: '\ud83d\udce5 \u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c PDF' }
-      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', dl: '\ud83d\udce5 \u0421\u043a\u0430\u0447\u0430\u0442\u044c PDF' };
+      ? { svc: '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576', qty: '\u0554\u0561\u0576\u0561\u056f', price: '\u0533\u056b\u0576', sum: '\u0533\u0578\u0582\u0574\u0561\u0580', total: '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:', subtotal: '\u0535\u0576\u0569\u0561\u0570\u0561\u0577\u057e\u0561\u0580\u056f:', client: '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:', date: '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:', id: '\u0540\u0561\u0575\u057f \u2116', dl: '\ud83d\udce5 \u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c PDF' }
+      : { svc: '\u0423\u0441\u043b\u0443\u0433\u0430', qty: '\u041a\u043e\u043b-\u0432\u043e', price: '\u0426\u0435\u043d\u0430', sum: '\u0421\u0443\u043c\u043c\u0430', total: '\u0418\u0422\u041e\u0413\u041e:', subtotal: '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:', client: '\u041a\u043b\u0438\u0435\u043d\u0442:', date: '\u0414\u0430\u0442\u0430:', id: '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116', dl: '\ud83d\udce5 \u0421\u043a\u0430\u0447\u0430\u0442\u044c PDF' };
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><style>' +
       '*{margin:0;padding:0;box-sizing:border-box}' +
@@ -539,6 +539,23 @@ app.get('/pdf/:id', async (c) => {
     const companyLogo = tpl.company_logo_url || '';
     const companyWebsite = tpl.company_website || '';
     const companyInn = tpl.company_inn || '';
+    
+    const L = {
+      svc: tpl['label_service' + lSuffix] || (isEn ? 'Service' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576' : '\u0423\u0441\u043b\u0443\u0433\u0430'),
+      qty: tpl['label_qty' + lSuffix] || (isEn ? 'Qty' : isAm ? '\u0554\u0561\u0576\u0561\u056f' : '\u041a\u043e\u043b-\u0432\u043e'),
+      price: tpl['label_price' + lSuffix] || (isEn ? 'Price' : isAm ? '\u0533\u056b\u0576' : '\u0426\u0565\u043d\u0430'),
+      sum: tpl['label_sum' + lSuffix] || (isEn ? 'Total' : isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430'),
+      total: tpl['label_total' + lSuffix] || (isEn ? 'TOTAL:' : isAm ? '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:' : '\u0418\u0422\u041e\u0413\u041e:'),
+      subtotal: tpl['label_subtotal' + lSuffix] || (isEn ? 'Subtotal:' : isAm ? '\u0535\u0576\u0569\u0561\u0570\u0561\u0577\u057e\u0561\u0580\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:'),
+      client: tpl['label_client' + lSuffix] || (isEn ? 'Client:' : isAm ? '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:' : '\u041a\u043b\u0438\u0435\u043d\u0442:'),
+      date: tpl['label_date' + lSuffix] || (isEn ? 'Date:' : isAm ? '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:' : '\u0414\u0430\u0442\u0430:'),
+      id: tpl['label_invoice' + lSuffix] || (isEn ? 'Invoice #' : isAm ? '\u0540\u0561\u0575\u057f \u2116' : '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116'),
+      back: tpl['label_back' + lSuffix] || (isEn ? 'Back' : isAm ? '\u0540\u0561\u0577\u057e\u056b\u0579' : '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443'),
+      num: '\u2116',
+      terms: tpl['terms' + lSuffix] ? (isEn ? 'Terms & Conditions' : isAm ? '\u054a\u0561\u0575\u0574\u0561\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u043e\u0432\u0438\u044f') : '',
+      bank: isEn ? 'Bank Details' : isAm ? '\u0532\u0561\u0576\u056f\u0561\u0575\u056b\u0576 \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580' : '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b',
+      inn: isEn ? 'Reg. No.' : isAm ? '\u0540\u054e\u0540\u0540' : '\u0418\u041d\u041d'
+    };
     
     // Separate items into services and articles
     const serviceItems = items.filter((i: any) => !i.wb_article);
@@ -645,7 +662,7 @@ app.get('/pdf/:id', async (c) => {
     if (articleItems.length > 0) {
       // Services subtotal and discount (before articles)
       if (serviceItems.length > 0) {
-        rows += '<tr style="background:#f8fafc"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#64748b">' + (isEn ? 'Services subtotal:' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580 \u0565\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0443\u0441\u043b\u0443\u0433:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;white-space:nowrap">' + svcSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+        rows += '<tr style="background:#f8fafc"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#64748b">' + (isEn ? 'Services subtotal:' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580 ' + L.subtotal : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0443\u0441\u043b\u0443\u0433:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;white-space:nowrap">' + svcSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
       }
       if (calcDiscountAmount > 0 && serviceItems.length > 0) {
         const svcAfterDisc = svcSubtotal - calcDiscountAmount;
@@ -662,25 +679,9 @@ app.get('/pdf/:id', async (c) => {
           '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(art.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
           '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(art.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
       }
-      rows += '<tr style="background:#FEF3C7;opacity:0.8"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#92400E">' + (isEn ? 'Articles subtotal:' : isAm ? '\u0531\u0580\u057f\u056b\u056f\u0578\u0582\u056c\u0576\u0565\u0580 \u0565\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;color:#92400E;white-space:nowrap">' + artSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      rows += '<tr style="background:#FEF3C7;opacity:0.8"><td colspan="4" style="padding:10px 12px;text-align:right;font-weight:600;color:#92400E">' + (isEn ? 'Articles subtotal:' : isAm ? '\u0531\u0580\u057f\u056b\u056f\u0578\u0582\u056c\u0576\u0565\u0580 ' + L.subtotal : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433 \u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b:') + '</td><td style="padding:10px 12px;text-align:right;font-weight:700;color:#92400E;white-space:nowrap">' + artSubtotal.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
     
-    const L = {
-      svc: tpl['label_service' + lSuffix] || (isEn ? 'Service' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576' : '\u0423\u0441\u043b\u0443\u0433\u0430'),
-      qty: tpl['label_qty' + lSuffix] || (isEn ? 'Qty' : isAm ? '\u0554\u0561\u0576\u0561\u056f' : '\u041a\u043e\u043b-\u0432\u043e'),
-      price: tpl['label_price' + lSuffix] || (isEn ? 'Price' : isAm ? '\u0533\u056b\u0576' : '\u0426\u0565\u043d\u0430'),
-      sum: tpl['label_sum' + lSuffix] || (isEn ? 'Total' : isAm ? '\u0533\u0578\u0582\u0574\u0561\u0580' : '\u0421\u0443\u043c\u043c\u0430'),
-      total: tpl['label_total' + lSuffix] || (isEn ? 'TOTAL:' : isAm ? '\u0538\u0546\u0534\u0531\u0544\u0535\u0546\u0538:' : '\u0418\u0422\u041e\u0413\u041e:'),
-      client: tpl['label_client' + lSuffix] || (isEn ? 'Client:' : isAm ? '\u0540\u0561\u0573\u0561\u056d\u0578\u0580\u0564:' : '\u041a\u043b\u0438\u0435\u043d\u0442:'),
-      date: tpl['label_date' + lSuffix] || (isEn ? 'Date:' : isAm ? '\u0531\u0574\u057d\u0561\u0569\u056b\u057e:' : '\u0414\u0430\u0442\u0430:'),
-      id: tpl['label_invoice' + lSuffix] || (isEn ? 'Invoice #' : isAm ? '\u0540\u0561\u0575\u057f \u2116' : '\u0417\u0430\u044f\u0432\u043a\u0430 \u2116'),
-      back: tpl['label_back' + lSuffix] || (isEn ? 'Back' : isAm ? '\u0540\u0561\u0577\u057e\u056b\u0579' : '\u041a \u0440\u0430\u0441\u0447\u0451\u0442\u0443'),
-      num: '\u2116',
-      terms: tpl['terms' + lSuffix] ? (isEn ? 'Terms & Conditions' : isAm ? '\u054a\u0561\u0575\u0574\u0561\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u043e\u0432\u0438\u044f') : '',
-      bank: isEn ? 'Bank Details' : isAm ? '\u0532\u0561\u0576\u056f\u0561\u0575\u056b\u0576 \u057f\u057e\u0575\u0561\u056c\u0576\u0565\u0580' : '\u0411\u0430\u043d\u043a\u043e\u0432\u0441\u043a\u0438\u0435 \u0440\u0435\u043a\u0432\u0438\u0437\u0438\u0442\u044b',
-      inn: isEn ? 'Reg. No.' : isAm ? '\u0540\u054e\u0540\u0540' : '\u0418\u041d\u041d'
-    };
-
     const btnOrder = String(tpl['btn_order' + lSuffix] || (isEn ? 'Order Now' : isAm ? '\u054a\u0561\u057f\u057e\u056b\u0580\u0565\u056c \u0570\u056b\u0574\u0561' : '\u0417\u0430\u043a\u0430\u0437\u0430\u0442\u044c \u0441\u0435\u0439\u0447\u0430\u0441'));
     const btnDl = String(tpl['btn_download' + lSuffix] || (isEn ? 'Download' : isAm ? '\u0546\u0565\u0580\u0562\u0565\u057c\u0576\u0565\u056c' : '\u0421\u043a\u0430\u0447\u0430\u0442\u044c'));
     const messengerUrl = String(tpl.order_telegram_url || 'https://t.me/goo_to_top');
@@ -774,11 +775,11 @@ app.get('/pdf/:id', async (c) => {
       + (intro ? '<div class="intro">' + intro + '</div>' : '')
       + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (refDiscount > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + refDiscount + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em">' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
-      + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + (isEn ? 'Subtotal:' : isAm ? '\u0535\u0576\u0569\u0561\u0570\u0561\u0576\u0580\u0561\u056f:' : '\u041f\u043e\u0434\u0438\u0442\u043e\u0433:') + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
+      + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.subtotal + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
       + (calcDiscountAmount > 0 && articleItems.length === 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (pmCommissionAmt > 0 ? '<tr style="background:#eff6ff"><td colspan="4" style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:600"><i class="fas fa-credit-card" style="margin-right:4px"></i>' + (isEn ? 'Payment commission' : isAm ? '\u054e\u0573\u0561\u0580\u0574\u0561\u0576 \u0574\u056b\u057b\u0576\u0578\u0580\u0564\u0561\u057e\u0573\u0561\u0580' : '\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u044f \u0437\u0430 \u043e\u043f\u043b\u0430\u0442\u0443') + ' (' + (isAm ? pmNameAm : pmName) + ' ' + pmCommissionPct + '%):</td><td style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:700;font-size:15px;white-space:nowrap">+' + pmCommissionAmt.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
-      + ((calcDiscountAmount > 0 || refundAmount > 0 || pmCommissionAmt > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + (isEn ? 'Total:' : isAm ? '\u054e\u0565\u0580\u057b\u0576\u0561\u056f\u0561\u0576:' : '\u0418\u0422\u041e\u0413\u041e:') + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
+      + ((calcDiscountAmount > 0 || refundAmount > 0 || pmCommissionAmt > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + L.total + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'
       + (outro ? '<div class="outro">' + outro + '</div>' : '')
       + (terms ? '<div class="terms-box"><div class="terms-title"><i class="fas fa-gavel" style="margin-right:4px"></i>' + L.terms + '</div>' + terms + '</div>' : '')
