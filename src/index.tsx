@@ -187,6 +187,8 @@ app.get('/api/site-data', async (c) => {
             // Swipe hint text (reviews blocks)
             swipe_hint_ru: blockOpts.swipe_hint_ru || '',
             swipe_hint_am: blockOpts.swipe_hint_am || '',
+            // Contact cards (for contact block messenger links)
+            options: { contact_cards: blockOpts.contact_cards || null },
           });
       }
     } catch(bf) { /* blocks not yet imported */ }
@@ -4605,6 +4607,76 @@ switchLang = function(l) {
       });
       console.log('[DB] Block features applied:', db.blockFeatures.length, 'blocks');
       
+      // ===== APPLY CONTACT CARDS (update messenger links/icons in contact section) =====
+      var contactBf = db.blockFeatures.find(function(b) { return b.key === 'contact'; });
+      if (contactBf && contactBf.options && contactBf.options.contact_cards) {
+        var ccCards = contactBf.options.contact_cards;
+        var contactSection = document.getElementById('contact');
+        if (contactSection && ccCards.length > 0) {
+          var contactCardEls = contactSection.querySelectorAll('.contact-card');
+          for (var cci = 0; cci < ccCards.length && cci < contactCardEls.length; cci++) {
+            var ccData = ccCards[cci];
+            var ccEl = contactCardEls[cci];
+            // Update URL
+            if (ccData.url) ccEl.setAttribute('href', ccData.url);
+            // Determine icon: auto-detect from URL or use manual override
+            var ccIcon = 'fab fa-telegram';
+            if (ccData.icon && ccData.icon !== 'auto') {
+              ccIcon = ccData.icon;
+            } else if (ccData.url) {
+              if (ccData.url.indexOf('wa.me') >= 0 || ccData.url.indexOf('whatsapp') >= 0) ccIcon = 'fab fa-whatsapp';
+              else if (ccData.url.indexOf('viber') >= 0) ccIcon = 'fab fa-viber';
+              else if (ccData.url.indexOf('instagram') >= 0) ccIcon = 'fab fa-instagram';
+              else if (ccData.url.indexOf('t.me') >= 0 || ccData.url.indexOf('telegram') >= 0) ccIcon = 'fab fa-telegram';
+              else if (ccData.url.indexOf('mailto:') >= 0) ccIcon = 'fas fa-envelope';
+              else if (ccData.url.indexOf('tel:') >= 0) ccIcon = 'fas fa-phone';
+            }
+            // Update icon element
+            var ccIconEl = ccEl.querySelector('i.fab, i.fas');
+            if (ccIconEl) ccIconEl.className = ccIcon;
+          }
+          console.log('[DB] Contact cards updated:', ccCards.length, 'cards');
+        }
+      }
+
+      // Also update footer contact links (Администратор / Менеджер) from same contact_cards data
+      if (contactBf && contactBf.options && contactBf.options.contact_cards) {
+        var footerContactLinks = document.querySelectorAll('footer a[href*="t.me/"], footer a[href*="wa.me/"]');
+        var ccCards2 = contactBf.options.contact_cards;
+        // Footer has Admin link first, Manager link second — match by order
+        var footerAdminLink = null, footerManagerLink = null;
+        for (var fli = 0; fli < footerContactLinks.length; fli++) {
+          var flSpan = footerContactLinks[fli].querySelector('span[data-ru]');
+          if (flSpan) {
+            var flRu = flSpan.getAttribute('data-ru') || '';
+            if (flRu.indexOf('Администратор') >= 0 || flRu.indexOf('Админ') >= 0) footerAdminLink = footerContactLinks[fli];
+            else if (flRu.indexOf('Менеджер') >= 0) footerManagerLink = footerContactLinks[fli];
+          }
+        }
+        if (footerAdminLink && ccCards2[0]) {
+          footerAdminLink.setAttribute('href', ccCards2[0].url || footerAdminLink.getAttribute('href'));
+          var fai = footerAdminLink.querySelector('i');
+          if (fai && ccCards2[0].url) {
+            var faIcon = 'fab fa-telegram';
+            if (ccCards2[0].icon && ccCards2[0].icon !== 'auto') faIcon = ccCards2[0].icon;
+            else if (ccCards2[0].url.indexOf('wa.me') >= 0) faIcon = 'fab fa-whatsapp';
+            else if (ccCards2[0].url.indexOf('viber') >= 0) faIcon = 'fab fa-viber';
+            fai.className = faIcon;
+          }
+        }
+        if (footerManagerLink && ccCards2[1]) {
+          footerManagerLink.setAttribute('href', ccCards2[1].url || footerManagerLink.getAttribute('href'));
+          var fmi = footerManagerLink.querySelector('i');
+          if (fmi && ccCards2[1].url) {
+            var fmIcon = 'fab fa-telegram';
+            if (ccCards2[1].icon && ccCards2[1].icon !== 'auto') fmIcon = ccCards2[1].icon;
+            else if (ccCards2[1].url.indexOf('wa.me') >= 0) fmIcon = 'fab fa-whatsapp';
+            else if (ccCards2[1].url.indexOf('viber') >= 0) fmIcon = 'fab fa-viber';
+            fmi.className = fmIcon;
+          }
+        }
+      }
+
       // ===== APPLY FLOATING BUTTONS (separate from main loop which skips floating_tg) =====
       var floatBf = db.blockFeatures.find(function(b) { return b.key === 'floating_tg'; });
       if (floatBf && floatBf.buttons && floatBf.buttons.length > 0) {

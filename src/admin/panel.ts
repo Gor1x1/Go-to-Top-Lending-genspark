@@ -11281,6 +11281,66 @@ function renderSiteBlocks() {
         var opts = {};
         try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
 
+        // ── Contact Cards section (only for 'contact' block) ──
+        if (b.block_key === 'contact') {
+          var contactCards = opts.contact_cards || [
+            { url: 'https://t.me/goo_to_top', icon: 'fab fa-telegram' },
+            { url: 'https://t.me/suport_admin_2', icon: 'fab fa-telegram' }
+          ];
+          // Ensure contact_cards stored in opts
+          if (!opts.contact_cards) { opts.contact_cards = contactCards; b.custom_html = JSON.stringify(opts); }
+          
+          h += '<div style="margin-top:14px">';
+          h += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">';
+          h += '<div style="font-size:0.82rem;font-weight:700;color:#a78bfa"><i class="fas fa-address-card" style="margin-right:6px"></i>Карточки контактов <span style="color:#475569;font-weight:400;font-size:0.72rem">(Администратор / Менеджер)</span></div>';
+          h += '<button class="btn btn-outline" style="padding:3px 10px;font-size:0.72rem" onclick="sbAddContactCard(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>';
+          h += '</div>';
+          h += '<div style="font-size:0.70rem;color:#64748b;margin-bottom:10px;padding:6px 10px;background:#0f172a;border-radius:6px;border-left:3px solid #8B5CF6"><i class="fas fa-info-circle" style="margin-right:4px;color:#8B5CF6"></i>Ссылки карточек «Администратор» и «Менеджер» на странице контактов. Иконка мессенджера определяется автоматически по URL (Telegram, WhatsApp, Viber и т.д.)</div>';
+          
+          for (var cci = 0; cci < contactCards.length; cci++) {
+            var cc = contactCards[cci];
+            // Auto-detect icon from URL
+            var ccDetectedIcon = 'fab fa-telegram';
+            if (cc.url && cc.url.indexOf('wa.me') >= 0) ccDetectedIcon = 'fab fa-whatsapp';
+            else if (cc.url && cc.url.indexOf('viber') >= 0) ccDetectedIcon = 'fab fa-viber';
+            else if (cc.url && cc.url.indexOf('instagram') >= 0) ccDetectedIcon = 'fab fa-instagram';
+            else if (cc.url && (cc.url.indexOf('t.me') >= 0 || cc.url.indexOf('telegram') >= 0)) ccDetectedIcon = 'fab fa-telegram';
+            var ccIcon = cc.icon || ccDetectedIcon;
+            
+            h += '<div style="margin-bottom:10px;padding:12px 14px;background:#1a2236;border-radius:10px;border:1px solid #293548;position:relative">';
+            h += '<div style="display:flex;align-items:center;gap:4px;margin-bottom:8px"><i class="' + escHtml(ccIcon) + '" style="color:#8B5CF6;font-size:1.1rem"></i><span style="font-size:0.78rem;font-weight:600;color:#e2e8f0">Карточка #' + (cci + 1) + '</span></div>';
+            // URL field
+            h += '<div style="margin-bottom:8px"><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>URL мессенджера (иконка определяется автоматически)</div>';
+            h += '<input class="input" id="sb_ccurl_' + b.id + '_' + cci + '" value="' + escHtml(cc.url || '') + '" placeholder="https://t.me/username или https://wa.me/374..." style="font-size:0.82rem;color:#60a5fa" onchange="sbUpdateContactCard(' + b.id + ',' + cci + ');sbAutoSave(' + b.id + ')"></div>';
+            // Icon override (optional)
+            var ccIconOptions = [
+              {v:'auto',l:'Авто (по URL)',c:'#8B5CF6'},
+              {v:'fab fa-telegram',l:'Telegram',c:'#26A5E4'},
+              {v:'fab fa-whatsapp',l:'WhatsApp',c:'#25D366'},
+              {v:'fab fa-viber',l:'Viber',c:'#7360F2'},
+              {v:'fab fa-instagram',l:'Instagram',c:'#E4405F'},
+              {v:'fab fa-facebook-messenger',l:'Messenger',c:'#006AFF'},
+              {v:'fas fa-phone',l:'Телефон',c:'#10B981'},
+              {v:'fas fa-envelope',l:'Email',c:'#F59E0B'}
+            ];
+            var ccCurrentIcon = cc.icon || 'auto';
+            h += '<div style="display:grid;grid-template-columns:180px 1fr;gap:8px">';
+            h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px"><i class="' + escHtml(ccIcon) + '" style="margin-right:4px;color:#8B5CF6"></i>Иконка</div>';
+            h += '<select class="input" id="sb_ccicon_' + b.id + '_' + cci + '" style="font-size:0.78rem" onchange="sbUpdateContactCard(' + b.id + ',' + cci + ');sbAutoSave(' + b.id + ')">';
+            for (var ccii = 0; ccii < ccIconOptions.length; ccii++) {
+              h += '<option value="' + ccIconOptions[ccii].v + '"' + (ccCurrentIcon === ccIconOptions[ccii].v ? ' selected' : '') + '>' + ccIconOptions[ccii].l + '</option>';
+            }
+            h += '</select></div>';
+            h += '<div><div style="font-size:0.68rem;color:#475569;margin-bottom:3px">Предпросмотр иконки</div>';
+            h += '<div style="padding:6px 12px;background:#0f172a;border-radius:8px;text-align:center"><i class="' + escHtml(ccIcon) + '" style="font-size:1.6rem;color:#8B5CF6"></i></div></div>';
+            h += '</div>';
+            // Delete button
+            h += '<button class="tier-del-btn" style="position:absolute;top:8px;right:8px" onclick="sbRemoveContactCard(' + b.id + ',' + cci + ')" title="Удалить карточку"><i class="fas fa-times"></i></button>';
+            h += '</div>';
+          }
+          h += '</div>';
+        }
+
         // ── Social Links section (integrated in block as single unit) ──
         var socials = [];
         if (Array.isArray(b.social_links)) { socials = b.social_links; }
@@ -11595,6 +11655,46 @@ function sbSetTextRole(blockId, textIdx, role) {
   console.log('[Admin] Text role set:', blockId, textIdx, role);
   // Trigger auto-save to persist any changes
   sbAutoSave(blockId);
+}
+
+// ── Contact Cards functions (for contact block messenger links) ──
+function sbAddContactCard(blockId) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  if (!opts.contact_cards) opts.contact_cards = [];
+  opts.contact_cards.push({ url: 'https://t.me/', icon: 'auto' });
+  b.custom_html = JSON.stringify(opts);
+  render();
+  sbAutoSave(blockId);
+}
+
+function sbRemoveContactCard(blockId, idx) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  if (!opts.contact_cards) return;
+  opts.contact_cards.splice(idx, 1);
+  b.custom_html = JSON.stringify(opts);
+  render();
+  sbAutoSave(blockId);
+}
+
+function sbUpdateContactCard(blockId, idx) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b) return;
+  var opts = {};
+  try { opts = JSON.parse(b.custom_html || '{}'); } catch(e) { opts = {}; }
+  if (!opts.contact_cards || !opts.contact_cards[idx]) return;
+  var urlEl = document.getElementById('sb_ccurl_' + blockId + '_' + idx);
+  var iconEl = document.getElementById('sb_ccicon_' + blockId + '_' + idx);
+  if (urlEl) opts.contact_cards[idx].url = urlEl.value;
+  if (iconEl) opts.contact_cards[idx].icon = iconEl.value;
+  b.custom_html = JSON.stringify(opts);
+  // Re-render to update icon preview
+  render();
 }
 
 // ── Move element in section order (reorder block content on site) ──
@@ -12716,6 +12816,19 @@ async function sbSaveBlock(id) {
   var swipeHintAmEl = document.getElementById('sb_swipehint_am_' + id);
   if (swipeHintRuEl) blockOpts.swipe_hint_ru = swipeHintRuEl.value || '';
   if (swipeHintAmEl) blockOpts.swipe_hint_am = swipeHintAmEl.value || '';
+
+  // Collect contact cards (for contact block)
+  if (b.block_key === 'contact' && blockOpts.contact_cards) {
+    var newCC = [];
+    for (var ccIdx = 0; ccIdx < blockOpts.contact_cards.length; ccIdx++) {
+      var ccUrlEl = document.getElementById('sb_ccurl_' + id + '_' + ccIdx);
+      var ccIconEl = document.getElementById('sb_ccicon_' + id + '_' + ccIdx);
+      var ccUrl = ccUrlEl ? ccUrlEl.value : (blockOpts.contact_cards[ccIdx].url || '');
+      var ccIcon = ccIconEl ? ccIconEl.value : (blockOpts.contact_cards[ccIdx].icon || 'auto');
+      newCC.push({ url: ccUrl, icon: ccIcon });
+    }
+    blockOpts.contact_cards = newCC;
+  }
   
   b.custom_html = JSON.stringify(blockOpts);
 
