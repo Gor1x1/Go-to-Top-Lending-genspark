@@ -1439,10 +1439,27 @@ function renderCalculator() {
   }
   
   // ===== PACKAGES SECTION =====
+  var pkgTitleRu = (data.settings && data.settings.packages_title_ru) || '\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b';
+  var pkgTitleAm = (data.settings && data.settings.packages_title_am) || '\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580';
+  var pkgSubRu = (data.settings && data.settings.packages_subtitle_ru) || '';
+  var pkgSubAm = (data.settings && data.settings.packages_subtitle_am) || '';
   h += '<div style="margin-top:32px;padding-top:24px;border-top:2px solid #334155">' +
     '<h2 style="font-size:1.4rem;font-weight:700;margin-bottom:8px"><i class="fas fa-box-open" style="color:#f59e0b;margin-right:10px"></i>\u041f\u0430\u043a\u0435\u0442\u044b \u0443\u0441\u043b\u0443\u0433</h2>' +
-    '<p style="color:#94a3b8;margin-bottom:16px">\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0442\u044b \u0443\u0441\u043b\u0443\u0433 \u0441\u043e \u0441\u043a\u0438\u0434\u043a\u043e\u0439. \u041a\u043b\u0438\u0435\u043d\u0442 \u043c\u043e\u0436\u0435\u0442 \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442 + \u0434\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438.</p>' +
-    '<button class="btn btn-primary" onclick="addNewPackage()" style="margin-bottom:16px"><i class="fas fa-plus" style="margin-right:6px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442</button>';
+    '<p style="color:#94a3b8;margin-bottom:16px">\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0442\u044b \u0443\u0441\u043b\u0443\u0433 \u0441\u043e \u0441\u043a\u0438\u0434\u043a\u043e\u0439. \u041a\u043b\u0438\u0435\u043d\u0442 \u043c\u043e\u0436\u0435\u0442 \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442 + \u0434\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438.</p>';
+  // Editable title & subtitle for the packages section on the frontend
+  h += '<div class="card" style="margin-bottom:16px;padding:16px;border:1px dashed #f59e0b40">' +
+    '<div style="font-size:0.78rem;color:#f59e0b;font-weight:600;margin-bottom:10px"><i class="fas fa-heading" style="margin-right:6px"></i>\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a \u0438 \u043f\u043e\u0434\u0437\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a \u043d\u0430 \u0441\u0430\u0439\u0442\u0435</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+      '<div><label style="font-size:0.7rem;color:#64748b;display:block;margin-bottom:3px">\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (RU)</label><input class="input" id="pkgSectionTitleRu" value="' + escHtml(pkgTitleRu) + '" placeholder="\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b"></div>' +
+      '<div><label style="font-size:0.7rem;color:#64748b;display:block;margin-bottom:3px">\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (AM)</label><input class="input" id="pkgSectionTitleAm" value="' + escHtml(pkgTitleAm) + '" placeholder="\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px">' +
+      '<div><label style="font-size:0.7rem;color:#64748b;display:block;margin-bottom:3px">\u041f\u043e\u0434\u0437\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (RU)</label><input class="input" id="pkgSectionSubRu" value="' + escHtml(pkgSubRu) + '" placeholder="\u041e\u043f\u0438\u0448\u0438\u0442\u0435 \u043f\u0440\u0435\u0438\u043c\u0443\u0449\u0435\u0441\u0442\u0432\u0430 \u043f\u0430\u043a\u0435\u0442\u043e\u0432..."></div>' +
+      '<div><label style="font-size:0.7rem;color:#64748b;display:block;margin-bottom:3px">\u041f\u043e\u0434\u0437\u0430\u0433\u043e\u043b\u043e\u0432\u043e\u043a (AM)</label><input class="input" id="pkgSectionSubAm" value="' + escHtml(pkgSubAm) + '" placeholder="\u0553\u0561\u0569\u0565\u0569\u0576\u0565\u0580\u056b \u0576\u056f\u0561\u0580\u0561\u0563\u0580\u0578\u0582\u0569\u0575\u0578\u0582\u0576..."></div>' +
+    '</div>' +
+    '<button class="btn btn-success" style="padding:6px 14px;font-size:0.8rem" onclick="savePkgSectionTitles()"><i class="fas fa-save" style="margin-right:4px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0437\u0430\u0433\u043e\u043b\u043e\u0432\u043a\u0438</button>' +
+  '</div>';
+  h += '<button class="btn btn-primary" onclick="addNewPackage()" style="margin-bottom:16px"><i class="fas fa-plus" style="margin-right:6px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442</button>';
   
   var pkgs = data.calcPackages || [];
   if (pkgs.length === 0) {
@@ -1918,6 +1935,29 @@ function renderPkgItemRow(idx, svcs, selectedId, qty) {
     '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(&apos;' + rowId + '&apos;).remove();recalcPkgTotals()" title="Удалить"><i class="fas fa-times"></i></button>' +
   '</div>';
   return h;
+}
+
+async function savePkgSectionTitles() {
+  var titleRu = (document.getElementById('pkgSectionTitleRu') as any)?.value || '';
+  var titleAm = (document.getElementById('pkgSectionTitleAm') as any)?.value || '';
+  var subRu = (document.getElementById('pkgSectionSubRu') as any)?.value || '';
+  var subAm = (document.getElementById('pkgSectionSubAm') as any)?.value || '';
+  try {
+    await api('/settings', { method: 'PUT', body: JSON.stringify({
+      packages_title_ru: titleRu,
+      packages_title_am: titleAm,
+      packages_subtitle_ru: subRu,
+      packages_subtitle_am: subAm
+    })});
+    if (!data.settings) data.settings = {};
+    data.settings.packages_title_ru = titleRu;
+    data.settings.packages_title_am = titleAm;
+    data.settings.packages_subtitle_ru = subRu;
+    data.settings.packages_subtitle_am = subAm;
+    toast('\u0417\u0430\u0433\u043e\u043b\u043e\u0432\u043a\u0438 \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b');
+  } catch(e) {
+    toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f', 'error');
+  }
 }
 
 function addPkgItem() {
@@ -4682,6 +4722,12 @@ function renderPnlCascade(p) {
   
   // Revenue
   h += pnlRow('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (Revenue)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0443\u0441\u043b\u0443\u0433 \u0438\u0437 \u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432'), p.revenue, {bold:true, color:'#22C55E', icon:'fa-coins', mom:mom.revenue, momPct:mp.revenue, ytd:ytd.revenue});
+  // Package revenue breakdown in cascade
+  var pnlPkgRev = Number((analyticsData && analyticsData.packages_total_revenue) || 0);
+  var pnlPkgCnt = Number((analyticsData && analyticsData.packages_total_count) || 0);
+  if (pnlPkgRev > 0) {
+    h += pnlRow('  \u0438\u0437 \u043d\u0438\u0445 \u043f\u0430\u043a\u0435\u0442\u044b (' + pnlPkgCnt + ' \u0448\u0442)' + tip('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u043e\u0442 \u043f\u0440\u043e\u0434\u0430\u0436\u0438 \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0443\u0441\u043b\u0443\u0433. \u0412\u0445\u043e\u0434\u0438\u0442 \u0432 \u043e\u0431\u0449\u0443\u044e \u0432\u044b\u0440\u0443\u0447\u043a\u0443.'), pnlPkgRev, {indent:2, color:'#F59E0B', sub:true, icon:'fa-box-open'});
+  }
   // Discount impact (from promo codes)
   var pnlDiscCost = Number((analyticsData && analyticsData.total_discount_cost) || 0);
   var pnlDiscLeads = Number((analyticsData && analyticsData.total_discount_leads) || 0);
@@ -6468,6 +6514,39 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<div style="font-size:0.65rem;color:#475569;margin-top:4px">\u0412\u044b\u0447\u0442\u0435\u043d\u043e \u0438\u0437 \u0432\u044b\u043a\u0443\u043f\u043e\u0432</div></div>';
   h += '</div>';
   h += '</div>';
+
+  // ---- SECTION: Package Sales Summary ----
+  var pkgTotal = Number(d.packages_total_revenue || 0);
+  var pkgCount = Number(d.packages_total_count || 0);
+  var pkgList = d.packages || [];
+  if (pkgCount > 0 || pkgList.length > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-box-open" style="color:#F59E0B;margin-right:8px"></i>\u041f\u0430\u043a\u0435\u0442\u044b \u2014 \u043f\u0440\u043e\u0434\u0430\u0436\u0438</h3>';
+    h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:14px;margin-bottom:16px">';
+    h += '<div class="card" style="padding:16px;border-left:3px solid #F59E0B"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-shopping-cart" style="margin-right:4px;color:#F59E0B"></i>\u041f\u0440\u043e\u0434\u0430\u043d\u043e \u043f\u0430\u043a\u0435\u0442\u043e\u0432</div><div style="font-size:1.6rem;font-weight:800;color:#F59E0B">' + pkgCount + '</div></div>';
+    h += '<div class="card" style="padding:16px;border-left:3px solid #8B5CF6"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-coins" style="margin-right:4px;color:#8B5CF6"></i>\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u043e\u0442 \u043f\u0430\u043a\u0435\u0442\u043e\u0432</div><div style="font-size:1.6rem;font-weight:800;color:#a78bfa">' + fmtAmt(pkgTotal) + '</div></div>';
+    var avgPkgChk = pkgCount > 0 ? Math.round(pkgTotal / pkgCount) : 0;
+    h += '<div class="card" style="padding:16px;border-left:3px solid #22C55E"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-receipt" style="margin-right:4px;color:#22C55E"></i>\u0421\u0440. \u0447\u0435\u043a \u043f\u0430\u043a\u0435\u0442\u0430</div><div style="font-size:1.6rem;font-weight:800;color:#22C55E">' + fmtAmt(avgPkgChk) + '</div></div>';
+    var pkgPctOfRev = turnover > 0 ? ((pkgTotal / turnover) * 100).toFixed(1) : '0';
+    h += '<div class="card" style="padding:16px;border-left:3px solid #3B82F6"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-percentage" style="margin-right:4px;color:#3B82F6"></i>\u0414\u043e\u043b\u044f \u0432 \u043e\u0431\u043e\u0440\u043e\u0442\u0435</div><div style="font-size:1.6rem;font-weight:800;color:#3B82F6">' + pkgPctOfRev + '%</div></div>';
+    h += '</div>';
+    // Package table
+    if (pkgList.length > 0) {
+      h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+      h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">\u041f\u0430\u043a\u0435\u0442</th><th style="padding:10px;text-align:center;color:#94a3b8">\u041f\u0440\u043e\u0434\u0430\u043d\u043e</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0414\u043e\u043b\u044f</th></tr></thead><tbody>';
+      for (var pki2 = 0; pki2 < pkgList.length; pki2++) {
+        var pkS = pkgList[pki2];
+        var pkPct = pkgTotal > 0 ? ((Number(pkS.revenue) / pkgTotal) * 100).toFixed(1) : '0';
+        var pkBarW = pkgTotal > 0 ? Math.round((Number(pkS.revenue) / pkgTotal) * 100) : 0;
+        h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:10px 16px;font-weight:600"><i class="fas fa-box-open" style="color:#F59E0B;margin-right:6px"></i>' + escHtml(pkS.package_name || '') + '</td>';
+        h += '<td style="padding:10px;text-align:center;font-weight:700;color:#F59E0B">' + (pkS.count||0) + '</td>';
+        h += '<td style="padding:10px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(Number(pkS.revenue)||0) + '</td>';
+        h += '<td style="padding:10px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + pkBarW + '%;height:100%;background:#F59E0B;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600">' + pkPct + '%</span></div></td></tr>';
+      }
+      h += '</tbody></table></div>';
+    }
+    h += '</div>';
+  }
 
   // ---- SECTION: Referral & Discount Impact ----
   var promoD = d.promo_costs || {};

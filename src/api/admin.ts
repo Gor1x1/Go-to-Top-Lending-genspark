@@ -146,7 +146,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare('SELECT * FROM telegram_bot_config ORDER BY id').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM pdf_templates ORDER BY id DESC LIMIT 1').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM slot_counter ORDER BY id').all().catch(() => ({results:[]})),
-      db.prepare('SELECT * FROM site_settings ORDER BY id DESC LIMIT 1').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM site_settings').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM footer_settings ORDER BY id DESC LIMIT 1').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM photo_blocks ORDER BY sort_order').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM users ORDER BY id').all().catch(() => ({results:[]})),
@@ -218,7 +218,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       telegramBot: telegramBot.results || [],
       pdfTemplate: pdfTemplate.results?.[0] || {},
       slotCounters: slotCounter.results || [],
-      settings: settings.results?.[0] || {},
+      settings: (() => { const m: Record<string, string> = {}; for (const r of (settings.results || [])) { m[r.key as string] = r.value as string; } return m; })(),
       footer: footer.results?.[0] || {},
       photoBlocks: photoBlocks.results || [],
       users: users.results || [],
@@ -2891,6 +2891,10 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount, assigned_to, referral_code, name, created_at FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
     let totalRefunds = 0;
     const leadsById: Record<number, any> = {};
+    // Package analytics data
+    const pkgStats: Record<string, { count: number; revenue: number; package_name: string }> = {};
+    let totalPkgRevenue = 0;
+    let totalPkgCount = 0;
     for (const lead of (allLeads.results || [])) {
       const st = lead.status as string || 'new';
       const lid = Number(lead.id);
@@ -2907,8 +2911,20 @@ api.get('/business-analytics', authMiddleware, async (c) => {
             }
           }
         }
+        // Track package usage (for turnover statuses only)
+        if (cd.package && turnoverStatuses.includes(st)) {
+          const pName = cd.package.name_ru || cd.package.name || 'Unknown';
+          const pId = String(cd.package.package_id || pName);
+          const pPrice = Number(cd.package.package_price || 0);
+          if (!pkgStats[pId]) pkgStats[pId] = { count: 0, revenue: 0, package_name: pName };
+          pkgStats[pId].count++;
+          pkgStats[pId].revenue += pPrice;
+          totalPkgRevenue += pPrice;
+          totalPkgCount++;
+        }
       } catch {}
     }
+    const packagesList = Object.values(pkgStats).sort((a, b) => b.revenue - a.revenue);
 
     // Articles totals from lead_articles table (single source of truth for articles)
     try {
@@ -3517,6 +3533,9 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       month_daily_data: monthDailyData,
       ltv_data: ltvData,
       commission_data: commissionData,
+      packages: packagesList,
+      packages_total_revenue: totalPkgRevenue,
+      packages_total_count: totalPkgCount,
       total_leads: totalLeadsCount,
       date_from: dateFrom,
       date_to: dateTo,

@@ -204,6 +204,13 @@ app.get('/api/site-data', async (c) => {
     } catch(bf) { /* blocks not yet imported */ }
 
     // Set Cache-Control to no-cache so edits appear instantly
+    // Load site settings (package titles, etc.)
+    let siteSettings: Record<string, string> = {};
+    try {
+      const settingsRes = await db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%'").all();
+      for (const row of (settingsRes.results || [])) { siteSettings[row.key as string] = row.value as string; }
+    } catch {}
+
     c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
     c.header('Pragma', 'no-cache');
     c.header('Expires', '0');
@@ -215,6 +222,7 @@ app.get('/api/site-data', async (c) => {
       packages: packagesData,
       telegram,
       scripts,
+      settings: siteSettings,
       sectionOrder: (function() {
         // Deduplicate sectionOrder: keep only one entry per normalized ID (hyphen version wins)
         var seen = {};
@@ -514,7 +522,11 @@ app.get('/pdf/:id', async (c) => {
     try { calcData = JSON.parse(lead.calc_data as string); } catch { calcData = { items: [], total: 0 }; }
     const items = calcData.items || [];
     const total = calcData.total || 0;
-    const subtotal = calcData.subtotal || total;
+    // Always compute services subtotal from items to avoid double-counting package price
+    // (older leads may have subtotal = total which already includes package)
+    let computedSvcSubtotal = 0;
+    for (const ci of items) { computedSvcSubtotal += Number(ci.subtotal || 0); }
+    const subtotal = computedSvcSubtotal > 0 ? computedSvcSubtotal : (calcData.servicesSubtotal || calcData.subtotal || total);
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
     const refundAmount = Number(lead.refund_amount) || 0;
@@ -1191,6 +1203,22 @@ app.get('/', async (c) => {
       });
     }
     (globalThis as any).__blockFeatures = bfArr;
+
+    // Load packages for SSR (instant display without waiting for client-side JS)
+    try {
+      const ssrPkgs = await db.prepare('SELECT * FROM calculator_packages WHERE is_active = 1 ORDER BY sort_order, id').all();
+      const ssrPkgItems = await db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all();
+      const ssrItemsByPkg: Record<number, any[]> = {};
+      for (const it of (ssrPkgItems.results || [])) { const pid = it.package_id as number; if (!ssrItemsByPkg[pid]) ssrItemsByPkg[pid] = []; ssrItemsByPkg[pid].push(it); }
+      const ssrPkgList = (ssrPkgs.results || []).map((p: any) => ({ ...p, items: ssrItemsByPkg[p.id] || [] }));
+      const ssrSettings: Record<string, string> = {};
+      try {
+        const setRes = await db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%'").all();
+        for (const r of (setRes.results || [])) { ssrSettings[r.key as string] = r.value as string; }
+      } catch {}
+      (globalThis as any).__ssrPackages = ssrPkgList;
+      (globalThis as any).__ssrPkgSettings = ssrSettings;
+    } catch { (globalThis as any).__ssrPackages = []; }
   } catch (e) {
     // If DB fails, serve original HTML without modifications
   }
@@ -1330,22 +1358,28 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .calc-tab:hover:not(.active){border-color:var(--purple);color:var(--text)}
 .calc-group{display:none}
 .calc-group.active{display:block}
-.calc-packages{margin-bottom:24px}
-.calc-packages-title{font-size:1rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
-.calc-packages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
-.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:var(--t);position:relative;overflow:hidden}
-.calc-pkg-card:hover{border-color:var(--purple);transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.15)}
-.calc-pkg-card.selected{border-color:#f59e0b;background:rgba(245,158,11,0.05);box-shadow:0 0 0 3px rgba(245,158,11,0.2)}
-.calc-pkg-card .pkg-badge{position:absolute;top:8px;right:8px;background:var(--purple);color:white;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700}
-.calc-pkg-card .pkg-popular{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#f97316)}
-.calc-pkg-card .pkg-name{font-weight:700;font-size:0.95rem;margin-bottom:4px}
-.calc-pkg-card .pkg-desc{font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;line-height:1.4}
-.calc-pkg-card .pkg-prices{display:flex;align-items:baseline;gap:6px;margin-bottom:8px}
-.calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.8rem}
-.calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.1rem;color:#f59e0b}
-.calc-pkg-card .pkg-discount{background:#059669;color:white;font-size:0.65rem;padding:2px 6px;border-radius:8px;font-weight:700}
-.calc-pkg-card .pkg-items{font-size:0.75rem;color:var(--text-muted);line-height:1.5}
-.calc-pkg-card .pkg-items i{color:#22c55e;margin-right:4px;font-size:0.65rem}
+.calc-packages{margin-bottom:28px;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(249,115,22,0.02));border:1px solid rgba(245,158,11,0.15);border-radius:16px}
+.calc-packages-header{text-align:center;margin-bottom:20px}
+.calc-packages-title{font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--text)}
+.calc-packages-subtitle{font-size:0.85rem;color:var(--text-muted);margin-top:6px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5}
+.calc-packages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;justify-items:center}
+.calc-packages-grid.single-pkg{grid-template-columns:1fr;max-width:400px;margin:0 auto}
+.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;width:100%;display:flex;flex-direction:column}
+.calc-pkg-card:hover{border-color:#f59e0b;transform:translateY(-3px);box-shadow:0 12px 30px rgba(245,158,11,0.12)}
+.calc-pkg-card.selected{border-color:#f59e0b;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(249,115,22,0.03));box-shadow:0 0 0 3px rgba(245,158,11,0.2),0 8px 20px rgba(245,158,11,0.1)}
+.calc-pkg-card.selected::after{content:'\u2713';position:absolute;top:12px;left:12px;width:24px;height:24px;background:#f59e0b;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700}
+.calc-pkg-card .pkg-badge{position:absolute;top:12px;right:12px;background:linear-gradient(135deg,#8B5CF6,#a78bfa);color:white;font-size:0.7rem;padding:4px 10px;border-radius:12px;font-weight:700;letter-spacing:0.3px}
+.calc-pkg-card .pkg-popular{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#f97316,#ef4444)}
+.calc-pkg-card .pkg-name{font-weight:700;font-size:1rem;margin-bottom:6px;margin-top:4px;line-height:1.3}
+.calc-pkg-card .pkg-desc{font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;flex-grow:1}
+.calc-pkg-card .pkg-prices{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.85rem}
+.calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.25rem;color:#f59e0b}
+.calc-pkg-card .pkg-discount{background:linear-gradient(135deg,#059669,#10B981);color:white;font-size:0.7rem;padding:3px 8px;border-radius:10px;font-weight:700}
+.calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.7;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
+.calc-pkg-card .pkg-items div{display:flex;align-items:center;gap:4px}
+.calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0}
+@media(max-width:600px){.calc-packages{padding:16px}.calc-packages-grid{grid-template-columns:1fr;gap:12px}.calc-packages-grid.single-pkg{max-width:100%}.calc-pkg-card{padding:16px}.calc-pkg-card .pkg-name{font-size:0.95rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -3822,8 +3856,19 @@ switchLang = function(l) {
       var pkgsContainer = document.getElementById('calcPackages');
       if (pkgsContainer && db.packages && db.packages.length > 0) {
         window._calcPackages = db.packages;
-        var ph = '<div class="calc-packages-title"><i class="fas fa-box-open" style="color:#f59e0b"></i> <span data-ru="\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b" data-am="\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580">' + (lang==='am' ? '\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580' : '\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b') + '</span></div>';
-        ph += '<div class="calc-packages-grid">';
+        // Title and subtitle from settings (editable in admin)
+        var pkgTitleRu = (db.settings && db.settings.packages_title_ru) || '\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b';
+        var pkgTitleAm = (db.settings && db.settings.packages_title_am) || '\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580';
+        var pkgSubRu = (db.settings && db.settings.packages_subtitle_ru) || '';
+        var pkgSubAm = (db.settings && db.settings.packages_subtitle_am) || '';
+        var isSingle = db.packages.length === 1;
+        var ph = '<div class="calc-packages-header">';
+        ph += '<div class="calc-packages-title"><i class="fas fa-box-open" style="color:#f59e0b"></i> <span data-ru="' + escCalc(pkgTitleRu) + '" data-am="' + escCalc(pkgTitleAm) + '">' + (lang==='am' ? pkgTitleAm : pkgTitleRu) + '</span></div>';
+        if (pkgSubRu || pkgSubAm) {
+          ph += '<div class="calc-packages-subtitle" data-ru="' + escCalc(pkgSubRu) + '" data-am="' + escCalc(pkgSubAm) + '">' + (lang==='am' ? (pkgSubAm||pkgSubRu) : pkgSubRu) + '</div>';
+        }
+        ph += '</div>';
+        ph += '<div class="calc-packages-grid' + (isSingle ? ' single-pkg' : '') + '">';
         for (var pki = 0; pki < db.packages.length; pki++) {
           var pk = db.packages[pki];
           var pkDisc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
@@ -3841,14 +3886,14 @@ switchLang = function(l) {
             ph += '<span class="pkg-old-price">' + formatNum(pk.original_price) + ' \u058f</span>';
           }
           ph += '<span class="pkg-new-price">' + formatNum(pk.package_price) + ' \u058f</span>';
-          if (pkDisc > 0) ph += '<span class="pkg-discount">-' + pkDisc + '%</span>';
+          if (pkDisc > 0) ph += '<span class="pkg-discount">\u2212' + pkDisc + '%</span>';
           ph += '</div>';
           if (pk.items && pk.items.length > 0) {
             ph += '<div class="pkg-items">';
             for (var pii = 0; pii < pk.items.length; pii++) {
               var pi2 = pk.items[pii];
               var piName = lang==='am' ? (pi2.service_name_am || pi2.service_name_ru || '') : (pi2.service_name_ru || '');
-              ph += '<div><i class="fas fa-check"></i>' + escCalc(piName) + ' \u00d7 ' + (pi2.quantity || 1) + '</div>';
+              ph += '<div><i class="fas fa-check-circle"></i> ' + escCalc(piName) + ' \u00d7 ' + (pi2.quantity || 1) + '</div>';
             }
             ph += '</div>';
           }
@@ -6274,6 +6319,58 @@ async function checkRefCode() {
       pageHtml = pageHtml.replace('</head>', styleTag);
     }
   }
+  
+  // ===== SERVER-SIDE PACKAGE RENDERING (instant display) =====
+  try {
+    const ssrPkgs = (globalThis as any).__ssrPackages || [];
+    if (ssrPkgs.length > 0) {
+      const ssrPkgSets = (globalThis as any).__ssrPkgSettings || {};
+      const titleRu = ssrPkgSets.packages_title_ru || '\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b';
+      const titleAm = ssrPkgSets.packages_title_am || '\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580';
+      const subRu = ssrPkgSets.packages_subtitle_ru || '';
+      const subAm = ssrPkgSets.packages_subtitle_am || '';
+      const isSingle = ssrPkgs.length === 1;
+      const esc = (s: string) => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const fmtN = (n: number) => Number(n).toLocaleString('ru-RU');
+      let pkgHtml = '<div class="calc-packages-header">';
+      pkgHtml += '<div class="calc-packages-title"><i class="fas fa-box-open" style="color:#f59e0b"></i> <span data-ru="' + esc(titleRu) + '" data-am="' + esc(titleAm) + '">' + esc(titleRu) + '</span></div>';
+      if (subRu) {
+        pkgHtml += '<div class="calc-packages-subtitle" data-ru="' + esc(subRu) + '" data-am="' + esc(subAm) + '">' + esc(subRu) + '</div>';
+      }
+      pkgHtml += '</div>';
+      pkgHtml += '<div class="calc-packages-grid' + (isSingle ? ' single-pkg' : '') + '">';
+      for (const pk of ssrPkgs) {
+        const disc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
+        pkgHtml += '<div class="calc-pkg-card" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
+        if (pk.is_popular) pkgHtml += '<div class="pkg-popular"></div>';
+        if (pk.badge_ru) pkgHtml += '<div class="pkg-badge" data-ru="' + esc(pk.badge_ru) + '" data-am="' + esc(pk.badge_am || '') + '">' + esc(pk.badge_ru) + '</div>';
+        pkgHtml += '<div class="pkg-name" data-ru="' + esc(pk.name_ru) + '" data-am="' + esc(pk.name_am || '') + '">' + esc(pk.name_ru) + '</div>';
+        if (pk.description_ru) pkgHtml += '<div class="pkg-desc" data-ru="' + esc(pk.description_ru) + '" data-am="' + esc(pk.description_am || '') + '">' + esc(pk.description_ru) + '</div>';
+        pkgHtml += '<div class="pkg-prices">';
+        if (pk.original_price > 0 && pk.original_price > pk.package_price) {
+          pkgHtml += '<span class="pkg-old-price">' + fmtN(pk.original_price) + ' \u058f</span>';
+        }
+        pkgHtml += '<span class="pkg-new-price">' + fmtN(pk.package_price) + ' \u058f</span>';
+        if (disc > 0) pkgHtml += '<span class="pkg-discount">\u2212' + disc + '%</span>';
+        pkgHtml += '</div>';
+        if (pk.items && pk.items.length > 0) {
+          pkgHtml += '<div class="pkg-items">';
+          for (const pi of pk.items) {
+            pkgHtml += '<div><i class="fas fa-check-circle"></i> ' + esc(pi.service_name_ru || '') + ' \u00d7 ' + (pi.quantity || 1) + '</div>';
+          }
+          pkgHtml += '</div>';
+        }
+        pkgHtml += '</div>';
+      }
+      pkgHtml += '</div>';
+      // Also inject _calcPackages data for selectPackage() to work
+      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';</scr' + 'ipt>';
+      pageHtml = pageHtml.replace(
+        '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
+        '<div class="calc-packages" id="calcPackages">' + pkgHtml + '</div>'
+      );
+    }
+  } catch {}
   
   // Use HTMLRewriter to replace texts by matching data-ru attribute values against textMap
   // Skip calculator section: its texts are managed via site_blocks.texts_ru,
