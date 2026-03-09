@@ -1809,7 +1809,7 @@ function renderPkgItemRow(idx, svcs, selectedId, qty) {
   }
   h += '</select>' +
     '<input class="input pkg-qty-input" type="number" value="' + (qty || 1) + '" min="1" max="999" style="width:70px;padding:6px 10px;font-size:0.85rem;text-align:center" title="\u041a\u043e\u043b-\u0432\u043e">' +
-    '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(\'' + rowId + '\').remove()" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-times"></i></button>' +
+    '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(&apos;' + rowId + '&apos;).remove()" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-times"></i></button>' +
   '</div>';
   return h;
 }
@@ -1821,15 +1821,15 @@ function addPkgItem() {
 }
 
 async function savePackage(pkgId) {
-  var nameRu = (document.getElementById('pkg_name_ru') as HTMLInputElement)?.value?.trim() || '';
-  var nameAm = (document.getElementById('pkg_name_am') as HTMLInputElement)?.value?.trim() || '';
+  var nameRu = (document.getElementById('pkg_name_ru'))?.value?.trim() || '';
+  var nameAm = (document.getElementById('pkg_name_am'))?.value?.trim() || '';
   if (!nameRu) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU', 'error'); return; }
   
   var items = [];
   var rows = document.querySelectorAll('#pkg_items_list > div');
   for (var i = 0; i < rows.length; i++) {
-    var sel = rows[i].querySelector('.pkg-svc-select') as HTMLSelectElement;
-    var qtyIn = rows[i].querySelector('.pkg-qty-input') as HTMLInputElement;
+    var sel = rows[i].querySelector('.pkg-svc-select');
+    var qtyIn = rows[i].querySelector('.pkg-qty-input');
     var svcId = parseInt(sel?.value || '0');
     var qty = parseInt(qtyIn?.value || '1') || 1;
     if (svcId > 0) items.push({ service_id: svcId, quantity: qty });
@@ -1840,14 +1840,14 @@ async function savePackage(pkgId) {
   var payload = {
     name_ru: nameRu,
     name_am: nameAm,
-    description_ru: (document.getElementById('pkg_desc_ru') as HTMLTextAreaElement)?.value || '',
-    description_am: (document.getElementById('pkg_desc_am') as HTMLTextAreaElement)?.value || '',
-    original_price: parseInt((document.getElementById('pkg_original_price') as HTMLInputElement)?.value || '0') || 0,
-    package_price: parseInt((document.getElementById('pkg_package_price') as HTMLInputElement)?.value || '0') || 0,
-    badge_ru: (document.getElementById('pkg_badge_ru') as HTMLInputElement)?.value || '',
-    badge_am: (document.getElementById('pkg_badge_am') as HTMLInputElement)?.value || '',
-    is_popular: (document.getElementById('pkg_is_popular') as HTMLInputElement)?.checked ? 1 : 0,
-    is_active: (document.getElementById('pkg_is_active') as HTMLInputElement)?.checked ? 1 : 0,
+    description_ru: (document.getElementById('pkg_desc_ru'))?.value || '',
+    description_am: (document.getElementById('pkg_desc_am'))?.value || '',
+    original_price: parseInt((document.getElementById('pkg_original_price'))?.value || '0') || 0,
+    package_price: parseInt((document.getElementById('pkg_package_price'))?.value || '0') || 0,
+    badge_ru: (document.getElementById('pkg_badge_ru'))?.value || '',
+    badge_am: (document.getElementById('pkg_badge_am'))?.value || '',
+    is_popular: (document.getElementById('pkg_is_popular'))?.checked ? 1 : 0,
+    is_active: (document.getElementById('pkg_is_active'))?.checked ? 1 : 0,
     sort_order: pkgId ? ((data.calcPackages || []).find(function(p) { return p.id === pkgId; })?.sort_order || 0) : (data.calcPackages || []).length,
     items: items
   };
