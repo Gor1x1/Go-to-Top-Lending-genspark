@@ -134,7 +134,7 @@ api.get('/bulk-data', authMiddleware, async (c) => {
   // Ensure DB migrations are applied (critical for new tables like tax_rules)
   try { await initDatabase(db); } catch {}
   try {
-    const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations, paymentMethods] = await Promise.all([
+    const [content, calcTabs, calcServices, telegram, scripts, referrals, sectionOrder, leads, telegramBot, pdfTemplate, slotCounter, settings, footer, photoBlocks, users, siteBlocks, companyRoles, expenseCategories, expenseFreqTypes, expenses, periodSnapshots, vacations, paymentMethods, calcPackages, calcPackageItems] = await Promise.all([
       db.prepare('SELECT * FROM site_content ORDER BY sort_order').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM calculator_tabs ORDER BY sort_order').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM calculator_services ORDER BY tab_id, sort_order').all().catch(() => ({results:[]})),
@@ -157,7 +157,9 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       db.prepare('SELECT * FROM expenses ORDER BY id DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM period_snapshots ORDER BY date_from DESC').all().catch(() => ({results:[]})),
       db.prepare('SELECT * FROM employee_vacations ORDER BY start_date DESC').all().catch(() => ({results:[]})),
-      db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY sort_order').all().catch(() => ({results:[]}))
+      db.prepare('SELECT * FROM payment_methods WHERE is_active = 1 ORDER BY sort_order').all().catch(() => ({results:[]})),
+      db.prepare('SELECT * FROM calculator_packages ORDER BY sort_order, id').all().catch(() => ({results:[]})),
+      db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id ORDER BY pi.id').all().catch(() => ({results:[]}))
     ]);
     // P&L related data (parallel, with fallback for new tables)
     const [taxPayments, assetsData, loansData, loanPaymentsData, dividendsData, otherIEData, taxRulesData, loanSettingsMode, loanSettingsPct, loanSettingsExtraPct] = await Promise.all([
@@ -236,6 +238,11 @@ api.get('/bulk-data', authMiddleware, async (c) => {
       periodSnapshots: periodSnapshots.results || [],
       vacations: vacations.results || [],
       paymentMethods: paymentMethods.results || [],
+      calcPackages: (() => {
+        const pkgItems: Record<number, any[]> = {};
+        for (const it of (calcPackageItems.results || [])) { const pid = it.package_id as number; if (!pkgItems[pid]) pkgItems[pid] = []; pkgItems[pid].push(it); }
+        return (calcPackages.results || []).map((p: any) => ({ ...p, items: pkgItems[p.id] || [] }));
+      })(),
       online: onlineRes.results || [],
       leadArticles: leadArticles,
       taxPayments: taxPayments.results || [],
@@ -391,6 +398,68 @@ api.put('/calc-services-reorder', authMiddleware, async (c) => {
     } else {
       await db.prepare('UPDATE calculator_services SET sort_order = ? WHERE id = ?').bind(o.sort_order, o.id).run();
     }
+  }
+  return c.json({ success: true });
+});
+
+// ===== CALCULATOR PACKAGES =====
+api.get('/calc-packages', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const packages = await db.prepare('SELECT * FROM calculator_packages ORDER BY sort_order, id').all();
+  const items = await db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id ORDER BY pi.id').all();
+  const itemsByPkg: Record<number, any[]> = {};
+  for (const it of items.results) {
+    const pid = it.package_id as number;
+    if (!itemsByPkg[pid]) itemsByPkg[pid] = [];
+    itemsByPkg[pid].push(it);
+  }
+  const result = (packages.results || []).map((p: any) => ({ ...p, items: itemsByPkg[p.id] || [] }));
+  return c.json(result);
+});
+
+api.post('/calc-packages', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const d = await c.req.json();
+  const res = await db.prepare(`INSERT INTO calculator_packages (name_ru, name_am, description_ru, description_am, original_price, package_price, badge_ru, badge_am, is_popular, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.is_popular?1:0, d.sort_order||0, d.is_active!==undefined?d.is_active:1).run();
+  const pkgId = res.meta?.last_row_id;
+  if (pkgId && d.items && Array.isArray(d.items)) {
+    for (const item of d.items) {
+      await db.prepare('INSERT INTO calculator_package_items (package_id, service_id, quantity) VALUES (?,?,?)').bind(pkgId, item.service_id, item.quantity||1).run();
+    }
+  }
+  return c.json({ success: true, id: pkgId });
+});
+
+api.put('/calc-packages/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = parseInt(c.req.param('id'));
+  const d = await c.req.json();
+  await db.prepare(`UPDATE calculator_packages SET name_ru=?, name_am=?, description_ru=?, description_am=?, original_price=?, package_price=?, badge_ru=?, badge_am=?, is_popular=?, sort_order=?, is_active=? WHERE id=?`)
+    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.is_popular?1:0, d.sort_order||0, d.is_active!==undefined?d.is_active:1, id).run();
+  // Replace items
+  await db.prepare('DELETE FROM calculator_package_items WHERE package_id = ?').bind(id).run();
+  if (d.items && Array.isArray(d.items)) {
+    for (const item of d.items) {
+      await db.prepare('INSERT INTO calculator_package_items (package_id, service_id, quantity) VALUES (?,?,?)').bind(id, item.service_id, item.quantity||1).run();
+    }
+  }
+  return c.json({ success: true });
+});
+
+api.delete('/calc-packages/:id', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = parseInt(c.req.param('id'));
+  await db.prepare('DELETE FROM calculator_package_items WHERE package_id = ?').bind(id).run();
+  await db.prepare('DELETE FROM calculator_packages WHERE id = ?').bind(id).run();
+  return c.json({ success: true });
+});
+
+api.put('/calc-packages-reorder', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { order } = await c.req.json();
+  for (const o of order) {
+    await db.prepare('UPDATE calculator_packages SET sort_order = ? WHERE id = ?').bind(o.sort_order, o.id).run();
   }
   return c.json({ success: true });
 });
@@ -971,6 +1040,22 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
   } catch {}
   const serviceList = Object.entries(serviceStats).map(([name, s]) => ({ name, ...s })).sort((a, b) => b.revenue - a.revenue);
   
+  // Package popularity from calc_data
+  const packageStats: Record<string, { count: number; revenue: number; package_name: string }> = {};
+  for (const lead of allLeadsResults) {
+    try {
+      const cd = JSON.parse((lead.calc_data as string) || '{}');
+      if (cd.package) {
+        const pName = cd.package.name || 'Unknown';
+        const pId = String(cd.package.package_id || pName);
+        if (!packageStats[pId]) packageStats[pId] = { count: 0, revenue: 0, package_name: pName };
+        packageStats[pId].count++;
+        packageStats[pId].revenue += Number(cd.package.package_price || 0);
+      }
+    } catch {}
+  }
+  const packageList = Object.values(packageStats).sort((a, b) => b.revenue - a.revenue);
+  
   // Conversion funnel
   const statusCounts = {
     new: (byStatus.new?.count || 0),
@@ -1027,6 +1112,7 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
     by_assignee: byAssignee,
     daily: dailyResults,
     services: serviceList,
+    packages: packageList,
     status_amounts: statusAmounts,
     conversion_rate: conversionRate,
     avg_check: avgCheck,

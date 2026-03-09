@@ -411,6 +411,31 @@ CREATE TABLE IF NOT EXISTS uploads (
   block_id INTEGER,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
+
+CREATE TABLE IF NOT EXISTS calculator_packages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name_ru TEXT NOT NULL DEFAULT '',
+  name_am TEXT NOT NULL DEFAULT '',
+  description_ru TEXT DEFAULT '',
+  description_am TEXT DEFAULT '',
+  original_price INTEGER DEFAULT 0,
+  package_price INTEGER NOT NULL DEFAULT 0,
+  badge_ru TEXT DEFAULT '',
+  badge_am TEXT DEFAULT '',
+  is_popular INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  is_active INTEGER DEFAULT 1,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS calculator_package_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  package_id INTEGER NOT NULL,
+  service_id INTEGER NOT NULL,
+  quantity INTEGER NOT NULL DEFAULT 1,
+  FOREIGN KEY (package_id) REFERENCES calculator_packages(id) ON DELETE CASCADE,
+  FOREIGN KEY (service_id) REFERENCES calculator_services(id) ON DELETE CASCADE
+);
 `;
 
 let dbInitialized = false;
@@ -864,6 +889,21 @@ export async function getCalcTabs(db: D1Database): Promise<any[]> {
 export async function getCalcServices(db: D1Database): Promise<any[]> {
   const res = await db.prepare('SELECT * FROM calculator_services WHERE is_active = 1 ORDER BY tab_id, sort_order').all();
   return res.results;
+}
+
+export async function getCalcPackages(db: D1Database): Promise<any[]> {
+  const packages = await db.prepare('SELECT * FROM calculator_packages WHERE is_active = 1 ORDER BY sort_order').all();
+  const items = await db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am, cs.price as service_price, cs.price_type, cs.price_tiers_json FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all();
+  const itemsByPkg: Record<number, any[]> = {};
+  for (const it of items.results) {
+    const pid = it.package_id as number;
+    if (!itemsByPkg[pid]) itemsByPkg[pid] = [];
+    itemsByPkg[pid].push(it);
+  }
+  return (packages.results || []).map((p: any) => ({
+    ...p,
+    items: itemsByPkg[p.id] || []
+  }));
 }
 
 export async function getTelegramMessages(db: D1Database): Promise<Record<string, any>> {

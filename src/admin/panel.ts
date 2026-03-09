@@ -108,7 +108,7 @@ let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
 let currentUser = JSON.parse(localStorage.getItem('gtt_user') || 'null');
 let rolesConfig = JSON.parse(localStorage.getItem('gtt_roles') || 'null');
-let data = { content: [], calcTabs: [], calcServices: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [], loanSettings: { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 }, paymentMethods: [] };
+let data = { content: [], calcTabs: [], calcServices: [], calcPackages: [], telegram: [], scripts: [], stats: {}, referrals: [], sectionOrder: [], leads: { leads: [], total: 0 }, telegramBot: [], pdfTemplate: {}, slotCounters: [], settings: {}, footer: {}, photoBlocks: [], users: [], siteBlocks: [], leadsAnalytics: null, leadComments: {}, leadArticles: {}, companyRoles: [], expenseCategories: [], expenseFreqTypes: [], expenses: [], periodSnapshots: [], taxPayments: [], assets: [], loans: [], loanPayments: [], dividends: [], otherIncomeExpenses: [], loanSettings: { repayment_mode: 'standard', aggressive_pct: 10, standard_extra_pct: 0 }, paymentMethods: [] };
 
 // ===== TOKEN AUTO-REFRESH (every 6 hours) =====
 var _tokenRefreshInterval = null;
@@ -218,6 +218,24 @@ function toast(msg, type = 'success') {
   setTimeout(() => el.remove(), 3000);
 }
 
+function showModal(innerHtml) {
+  closeModal();
+  var overlay = document.createElement('div');
+  overlay.id = '_adminModal';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.6);z-index:9998;display:flex;align-items:center;justify-content:center;padding:24px';
+  overlay.onclick = function(e) { if (e.target === overlay) closeModal(); };
+  var box = document.createElement('div');
+  box.style.cssText = 'background:#0f172a;border:1px solid #334155;border-radius:12px;padding:24px;max-width:700px;width:100%;max-height:85vh;overflow-y:auto;box-shadow:0 25px 50px rgba(0,0,0,0.5)';
+  box.innerHTML = innerHtml;
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+}
+
+function closeModal() {
+  var m = document.getElementById('_adminModal');
+  if (m) m.remove();
+}
+
 // ===== LOGIN =====
 function renderLogin() {
   return '<div class="login-bg"><div class="card" style="width:400px;max-width:90vw">' +
@@ -269,6 +287,7 @@ async function loadData() {
     data.content = bulk.content || [];
     data.calcTabs = bulk.calcTabs || [];
     data.calcServices = bulk.calcServices || [];
+    data.calcPackages = bulk.calcPackages || [];
     data.telegram = bulk.telegram || [];
     data.scripts = bulk.scripts || [];
     data.stats = bulk.stats || {};
@@ -321,14 +340,15 @@ async function loadData() {
     data.stats = stats || {};
     data.settings = settings || {};
     data.sectionOrder = sectionOrder || [];
-    var [content, tabs, services, telegram, scripts, referrals, leads, telegramBot, pdfTemplate, slotCounterRes, footerData, photoBlocksData, siteBlocksData, expenseCategoriesData, expenseFreqTypesData, expensesData] = await Promise.all([
+    var [content, tabs, services, telegram, scripts, referrals, leads, telegramBot, pdfTemplate, slotCounterRes, footerData, photoBlocksData, siteBlocksData, expenseCategoriesData, expenseFreqTypesData, expensesData, calcPackagesData] = await Promise.all([
       api('/content'), api('/calc-tabs'), api('/calc-services'), api('/telegram'), api('/scripts'), api('/referrals'),
       api('/leads?limit=200'), api('/telegram-bot'), api('/pdf-template'), api('/slot-counter'), api('/footer'), api('/photo-blocks'),
-      api('/site-blocks'), api('/expense-categories'), api('/expense-frequency-types'), api('/expenses')
+      api('/site-blocks'), api('/expense-categories'), api('/expense-frequency-types'), api('/expenses'), api('/calc-packages')
     ]);
     data.content = content || [];
     data.calcTabs = tabs || [];
     data.calcServices = services || [];
+    data.calcPackages = calcPackagesData || [];
     data.telegram = telegram || [];
     data.scripts = scripts || [];
     data.referrals = referrals || [];
@@ -1417,6 +1437,64 @@ function renderCalculator() {
       '<button class="btn btn-primary" onclick="addNewSection()"><i class="fas fa-folder-plus" style="margin-right:6px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b</button></div>';
   }
   
+  // ===== PACKAGES SECTION =====
+  h += '<div style="margin-top:32px;padding-top:24px;border-top:2px solid #334155">' +
+    '<h2 style="font-size:1.4rem;font-weight:700;margin-bottom:8px"><i class="fas fa-box-open" style="color:#f59e0b;margin-right:10px"></i>\u041f\u0430\u043a\u0435\u0442\u044b \u0443\u0441\u043b\u0443\u0433</h2>' +
+    '<p style="color:#94a3b8;margin-bottom:16px">\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043a\u043e\u043c\u043f\u043b\u0435\u043a\u0442\u044b \u0443\u0441\u043b\u0443\u0433 \u0441\u043e \u0441\u043a\u0438\u0434\u043a\u043e\u0439. \u041a\u043b\u0438\u0435\u043d\u0442 \u043c\u043e\u0436\u0435\u0442 \u0432\u044b\u0431\u0440\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442 + \u0434\u043e\u043f\u043e\u043b\u043d\u0438\u0442\u0435\u043b\u044c\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438.</p>' +
+    '<button class="btn btn-primary" onclick="addNewPackage()" style="margin-bottom:16px"><i class="fas fa-plus" style="margin-right:6px"></i>\u0421\u043e\u0437\u0434\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442</button>';
+  
+  var pkgs = data.calcPackages || [];
+  if (pkgs.length === 0) {
+    h += '<div class="card" style="text-align:center;padding:32px"><i class="fas fa-box-open" style="font-size:2.5rem;color:#475569;margin-bottom:12px"></i>' +
+      '<p style="color:#94a3b8">\u041f\u0430\u043a\u0435\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442. \u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439!</p></div>';
+  } else {
+    for (var pi = 0; pi < pkgs.length; pi++) {
+      var pkg = pkgs[pi];
+      var discount = pkg.original_price > 0 ? Math.round((1 - pkg.package_price / pkg.original_price) * 100) : 0;
+      h += '<div class="card" style="margin-bottom:16px;border-left:3px solid ' + (pkg.is_active ? '#f59e0b' : '#475569') + '">';
+      
+      // Header
+      h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">' +
+        '<i class="fas fa-box-open" style="color:#f59e0b;font-size:1.1rem"></i>' +
+        '<span style="font-weight:700;font-size:1rem">' + escHtml(pkg.name_ru || '\u0411\u0435\u0437 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f') + '</span>' +
+        (pkg.badge_ru ? '<span class="badge badge-purple">' + escHtml(pkg.badge_ru) + '</span>' : '') +
+        (pkg.is_popular ? '<span class="badge" style="background:#f59e0b;color:#000">\u2B50 \u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0439</span>' : '') +
+        '<span style="margin-left:auto;font-size:0.85rem;color:#94a3b8">' + (pkg.is_active ? '\u2705 \u0410\u043a\u0442\u0438\u0432\u0435\u043d' : '\u274c \u041d\u0435\u0430\u043a\u0442\u0438\u0432\u0435\u043d') + '</span>' +
+        '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="editPackage(' + pkg.id + ')"><i class="fas fa-edit"></i></button>' +
+        '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deletePackage(' + pkg.id + ')"><i class="fas fa-trash"></i></button>' +
+      '</div>';
+      
+      // Price info
+      h += '<div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.9rem;flex-wrap:wrap">';
+      if (pkg.original_price > 0) {
+        h += '<div style="color:#94a3b8;text-decoration:line-through">\u0411\u0435\u0437 \u043f\u0430\u043a\u0435\u0442\u0430: ' + Number(pkg.original_price).toLocaleString('ru-RU') + ' \u058f</div>';
+      }
+      h += '<div style="font-weight:700;color:#f59e0b;font-size:1rem">\u0426\u0435\u043d\u0430 \u043f\u0430\u043a\u0435\u0442\u0430: ' + Number(pkg.package_price).toLocaleString('ru-RU') + ' \u058f</div>';
+      if (discount > 0) {
+        h += '<span class="badge" style="background:#059669;font-size:0.8rem">-' + discount + '% \u0441\u043a\u0438\u0434\u043a\u0430</span>';
+      }
+      h += '</div>';
+      
+      // Items list
+      if (pkg.items && pkg.items.length > 0) {
+        h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">';
+        for (var ii = 0; ii < pkg.items.length; ii++) {
+          var pi2 = pkg.items[ii];
+          h += '<span style="background:#1e293b;padding:4px 10px;border-radius:6px;font-size:0.8rem;color:#e2e8f0">' +
+            '<i class="fas fa-check" style="color:#22c55e;margin-right:4px;font-size:0.7rem"></i>' +
+            escHtml(pi2.service_name_ru || '\u0423\u0441\u043b\u0443\u0433\u0430 #' + pi2.service_id) + ' \u00d7 ' + (pi2.quantity || 1) +
+          '</span>';
+        }
+        h += '</div>';
+      }
+      
+      h += '</div>';
+    }
+  }
+  
+  h += '</div>';
+  // end packages section
+  
   h += '</div>';
   return h;
 }
@@ -1651,6 +1729,144 @@ async function deleteCalcTab(id) {
   if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u0440\u0430\u0437\u0434\u0435\u043b \u0438 \u0432\u0441\u0435 \u0435\u0433\u043e \u0443\u0441\u043b\u0443\u0433\u0438?')) return;
   await api('/calc-tabs/' + id, { method: 'DELETE' });
   toast('\u0420\u0430\u0437\u0434\u0435\u043b \u0443\u0434\u0430\u043b\u0451\u043d');
+  await loadData(); render();
+}
+
+// ===== CALCULATOR PACKAGES =====
+function addNewPackage() {
+  openPackageModal(null);
+}
+
+function editPackage(pkgId) {
+  var pkg = (data.calcPackages || []).find(function(p) { return p.id === pkgId; });
+  if (!pkg) { toast('\u041f\u0430\u043a\u0435\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d', 'error'); return; }
+  openPackageModal(pkg);
+}
+
+function openPackageModal(pkg) {
+  var isEdit = !!pkg;
+  var svcs = data.calcServices || [];
+  var items = isEdit ? (pkg.items || []) : [];
+  
+  var html = '<div style="max-height:80vh;overflow-y:auto;padding:4px">' +
+    '<h2 style="margin-bottom:16px;font-size:1.3rem;font-weight:700"><i class="fas fa-box-open" style="color:#f59e0b;margin-right:8px"></i>' + (isEdit ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442' : '\u041d\u043e\u0432\u044b\u0439 \u043f\u0430\u043a\u0435\u0442') + '</h2>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU</label>' +
+        '<input class="input" id="pkg_name_ru" value="' + escHtml(isEdit ? pkg.name_ru : '') + '" placeholder="\u041f\u0430\u043a\u0435\u0442 \u0421\u0442\u0430\u0440\u0442"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 AM</label>' +
+        '<input class="input" id="pkg_name_am" value="' + escHtml(isEdit ? pkg.name_am : '') + '" placeholder="\u054d\u057f\u0561\u0580\u057f \u0583\u0561\u0569\u0565\u0569"></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 RU</label>' +
+        '<textarea class="input" id="pkg_desc_ru" rows="2" placeholder="\u041b\u0443\u0447\u0448\u0438\u0439 \u0441\u0442\u0430\u0440\u0442 \u0434\u043b\u044f \u043d\u043e\u0432\u044b\u0445 \u043f\u0440\u043e\u0434\u0430\u0432\u0446\u043e\u0432">' + escHtml(isEdit ? pkg.description_ru || '' : '') + '</textarea></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 AM</label>' +
+        '<textarea class="input" id="pkg_desc_am" rows="2" placeholder="\u053c\u0561\u057e\u0561\u0563\u0578\u0582\u0575\u0576 \u0574\u0565\u056f\u0576\u0561\u0580\u056f\u0568...">' + escHtml(isEdit ? pkg.description_am || '' : '') + '</textarea></div>' +
+    '</div>' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0426\u0435\u043d\u0430 \u0431\u0435\u0437 \u043f\u0430\u043a\u0435\u0442\u0430 \u058f</label>' +
+        '<input class="input" type="number" id="pkg_original_price" value="' + (isEdit ? pkg.original_price || 0 : 0) + '" placeholder="20000"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0426\u0435\u043d\u0430 \u043f\u0430\u043a\u0435\u0442\u0430 \u058f</label>' +
+        '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" placeholder="15000" style="border-color:#f59e0b"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0411\u0435\u0439\u0434\u0436 RU</label>' +
+        '<input class="input" id="pkg_badge_ru" value="' + escHtml(isEdit ? pkg.badge_ru || '' : '') + '" placeholder="\u0425\u0438\u0442"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0411\u0435\u0439\u0434\u0436 AM</label>' +
+        '<input class="input" id="pkg_badge_am" value="' + escHtml(isEdit ? pkg.badge_am || '' : '') + '" placeholder="\u0540\u056b\u0569"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:16px;margin-bottom:16px">' +
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_popular" ' + (isEdit && pkg.is_popular ? 'checked' : '') + '> <span style="font-size:0.85rem">\u2B50 \u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0439</span></label>' +
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_active" ' + (isEdit ? (pkg.is_active ? 'checked' : '') : 'checked') + '> <span style="font-size:0.85rem">\u0410\u043a\u0442\u0438\u0432\u0435\u043d</span></label>' +
+    '</div>' +
+    '<h3 style="font-size:1rem;font-weight:700;margin-bottom:10px"><i class="fas fa-list-check" style="color:#22c55e;margin-right:6px"></i>\u0423\u0441\u043b\u0443\u0433\u0438 \u0432 \u043f\u0430\u043a\u0435\u0442\u0435</h3>' +
+    '<div id="pkg_items_list" style="margin-bottom:12px">';
+  
+  // Existing items
+  for (var ii = 0; ii < items.length; ii++) {
+    var it = items[ii];
+    html += renderPkgItemRow(ii, svcs, it.service_id, it.quantity);
+  }
+  
+  html += '</div>' +
+    '<button class="btn btn-outline" style="width:100%;padding:8px;font-size:0.85rem;border-style:dashed;margin-bottom:20px" onclick="addPkgItem()">' +
+      '<i class="fas fa-plus" style="margin-right:6px;color:#22c55e"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u0443\u0433\u0443</button>' +
+    '<div style="display:flex;gap:10px;justify-content:flex-end;padding-top:16px;border-top:1px solid #334155">' +
+      '<button class="btn btn-outline" onclick="closeModal()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
+      '<button class="btn btn-primary" onclick="savePackage(' + (isEdit ? pkg.id : 'null') + ')"><i class="fas fa-save" style="margin-right:6px"></i>' + (isEdit ? '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' : '\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button>' +
+    '</div></div>';
+  
+  showModal(html);
+}
+
+var _pkgItemCounter = 100;
+function renderPkgItemRow(idx, svcs, selectedId, qty) {
+  _pkgItemCounter++;
+  var rowId = 'pkgItem_' + _pkgItemCounter;
+  var h = '<div id="' + rowId + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+    '<select class="input pkg-svc-select" style="flex:1;padding:6px 10px;font-size:0.85rem">';
+  h += '<option value="">-- \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443 --</option>';
+  for (var si = 0; si < svcs.length; si++) {
+    var s = svcs[si];
+    h += '<option value="' + s.id + '" ' + (selectedId == s.id ? 'selected' : '') + '>' + escHtml(s.name_ru) + ' (' + Number(s.price).toLocaleString('ru-RU') + ' \u058f)</option>';
+  }
+  h += '</select>' +
+    '<input class="input pkg-qty-input" type="number" value="' + (qty || 1) + '" min="1" max="999" style="width:70px;padding:6px 10px;font-size:0.85rem;text-align:center" title="\u041a\u043e\u043b-\u0432\u043e">' +
+    '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(\'' + rowId + '\').remove()" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-times"></i></button>' +
+  '</div>';
+  return h;
+}
+
+function addPkgItem() {
+  var list = document.getElementById('pkg_items_list');
+  if (!list) return;
+  list.insertAdjacentHTML('beforeend', renderPkgItemRow(list.children.length, data.calcServices || [], '', 1));
+}
+
+async function savePackage(pkgId) {
+  var nameRu = (document.getElementById('pkg_name_ru') as HTMLInputElement)?.value?.trim() || '';
+  var nameAm = (document.getElementById('pkg_name_am') as HTMLInputElement)?.value?.trim() || '';
+  if (!nameRu) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU', 'error'); return; }
+  
+  var items = [];
+  var rows = document.querySelectorAll('#pkg_items_list > div');
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('.pkg-svc-select') as HTMLSelectElement;
+    var qtyIn = rows[i].querySelector('.pkg-qty-input') as HTMLInputElement;
+    var svcId = parseInt(sel?.value || '0');
+    var qty = parseInt(qtyIn?.value || '1') || 1;
+    if (svcId > 0) items.push({ service_id: svcId, quantity: qty });
+  }
+  
+  if (items.length === 0) { toast('\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b 1 \u0443\u0441\u043b\u0443\u0433\u0443', 'error'); return; }
+  
+  var payload = {
+    name_ru: nameRu,
+    name_am: nameAm,
+    description_ru: (document.getElementById('pkg_desc_ru') as HTMLTextAreaElement)?.value || '',
+    description_am: (document.getElementById('pkg_desc_am') as HTMLTextAreaElement)?.value || '',
+    original_price: parseInt((document.getElementById('pkg_original_price') as HTMLInputElement)?.value || '0') || 0,
+    package_price: parseInt((document.getElementById('pkg_package_price') as HTMLInputElement)?.value || '0') || 0,
+    badge_ru: (document.getElementById('pkg_badge_ru') as HTMLInputElement)?.value || '',
+    badge_am: (document.getElementById('pkg_badge_am') as HTMLInputElement)?.value || '',
+    is_popular: (document.getElementById('pkg_is_popular') as HTMLInputElement)?.checked ? 1 : 0,
+    is_active: (document.getElementById('pkg_is_active') as HTMLInputElement)?.checked ? 1 : 0,
+    sort_order: pkgId ? ((data.calcPackages || []).find(function(p) { return p.id === pkgId; })?.sort_order || 0) : (data.calcPackages || []).length,
+    items: items
+  };
+  
+  if (pkgId) {
+    await api('/calc-packages/' + pkgId, { method: 'PUT', body: JSON.stringify(payload) });
+    toast('\u041f\u0430\u043a\u0435\u0442 \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d');
+  } else {
+    await api('/calc-packages', { method: 'POST', body: JSON.stringify(payload) });
+    toast('\u041f\u0430\u043a\u0435\u0442 \u0441\u043e\u0437\u0434\u0430\u043d');
+  }
+  closeModal();
+  await loadData(); render();
+}
+
+async function deletePackage(pkgId) {
+  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u043e\u0442 \u043f\u0430\u043a\u0435\u0442?')) return;
+  await api('/calc-packages/' + pkgId, { method: 'DELETE' });
+  toast('\u041f\u0430\u043a\u0435\u0442 \u0443\u0434\u0430\u043b\u0451\u043d');
   await loadData(); render();
 }
 
@@ -6960,6 +7176,43 @@ function renderBizFunnelV2(d, sd, fin) {
       h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600">' + svcPctV + '%</span></div></td></tr>';
     }
     h += '</tbody></table></div></div>';
+  }
+
+  // ---- SECTION: Package sales analytics ----
+  var packages = d.packages || [];
+  if (packages.length > 0) {
+    h += '<div style="margin-bottom:32px">';
+    h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-box-open" style="color:#F59E0B;margin-right:8px"></i>\u041f\u0440\u043e\u0434\u0430\u0436\u0438 \u043f\u0430\u043a\u0435\u0442\u043e\u0432</h3>';
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">#</th><th style="padding:10px;text-align:left;color:#94a3b8">\u041f\u0430\u043a\u0435\u0442</th><th style="padding:10px;text-align:center;color:#94a3b8">\u041f\u0440\u043e\u0434\u0430\u043d\u043e</th><th style="padding:10px;text-align:right;color:#94a3b8">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</th><th style="padding:10px;text-align:right;color:#94a3b8">%</th></tr></thead><tbody>';
+    var totalPkgRev = packages.reduce(function(a, p) { return a + (Number(p.revenue)||0); }, 0);
+    for (var pki = 0; pki < packages.length; pki++) {
+      var pkStat = packages[pki];
+      var pkPct = totalPkgRev > 0 ? ((Number(pkStat.revenue) / totalPkgRev) * 100).toFixed(1) : '0';
+      var pkBarW = totalPkgRev > 0 ? Math.round((Number(pkStat.revenue) / totalPkgRev) * 100) : 0;
+      h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;color:#64748b">' + (pki+1) + '</td>';
+      h += '<td style="padding:8px;font-weight:600"><i class="fas fa-box-open" style="color:#F59E0B;margin-right:4px"></i>' + escHtml(pkStat.package_name || 'Unknown') + '</td>';
+      h += '<td style="padding:8px;text-align:center;font-weight:700;color:#F59E0B">' + (pkStat.count||0) + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:700;color:#a78bfa">' + fmtAmt(Number(pkStat.revenue)||0) + '</td>';
+      h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:60px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + pkBarW + '%;height:100%;background:#F59E0B;border-radius:3px"></div></div><span style="font-size:0.75rem;font-weight:600">' + pkPct + '%</span></div></td></tr>';
+    }
+    h += '</tbody></table></div>';
+    // Total package revenue summary
+    h += '<div style="display:flex;gap:16px;margin-top:12px;flex-wrap:wrap">';
+    h += '<div class="card" style="padding:14px 20px;flex:1;min-width:160px;border-left:3px solid #F59E0B;background:rgba(245,158,11,0.05)">';
+    h += '<div style="font-size:0.72rem;color:#94a3b8">\u0412\u0441\u0435\u0433\u043e \u043f\u0440\u043e\u0434\u0430\u043d\u043e \u043f\u0430\u043a\u0435\u0442\u043e\u0432</div>';
+    h += '<div style="font-size:1.4rem;font-weight:800;color:#F59E0B">' + packages.reduce(function(a, p) { return a + (Number(p.count)||0); }, 0) + '</div>';
+    h += '</div>';
+    h += '<div class="card" style="padding:14px 20px;flex:1;min-width:160px;border-left:3px solid #8B5CF6;background:rgba(139,92,246,0.05)">';
+    h += '<div style="font-size:0.72rem;color:#94a3b8">\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u043e\u0442 \u043f\u0430\u043a\u0435\u0442\u043e\u0432</div>';
+    h += '<div style="font-size:1.4rem;font-weight:800;color:#8B5CF6">' + fmtAmt(totalPkgRev) + '</div>';
+    h += '</div>';
+    var avgPkgCheck = packages.reduce(function(a, p) { return a + (Number(p.count)||0); }, 0);
+    h += '<div class="card" style="padding:14px 20px;flex:1;min-width:160px;border-left:3px solid #22C55E;background:rgba(34,197,94,0.05)">';
+    h += '<div style="font-size:0.72rem;color:#94a3b8">\u0421\u0440. \u0447\u0435\u043a \u043f\u0430\u043a\u0435\u0442\u0430</div>';
+    h += '<div style="font-size:1.4rem;font-weight:800;color:#22C55E">' + fmtAmt(avgPkgCheck > 0 ? Math.round(totalPkgRev / avgPkgCheck) : 0) + '</div>';
+    h += '</div></div>';
+    h += '</div>';
   }
 
   // ---- SECTION: Referral Conversion Comparison ----

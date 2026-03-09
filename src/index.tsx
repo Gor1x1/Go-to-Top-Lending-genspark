@@ -86,6 +86,16 @@ app.get('/api/site-data', async (c) => {
       ORDER BY cs.tab_id, cs.sort_order
     `).all();
     
+    // Load calculator packages with items
+    let packagesData: any[] = [];
+    try {
+      const pkgsRes = await db.prepare('SELECT * FROM calculator_packages WHERE is_active = 1 ORDER BY sort_order, id').all();
+      const pkgItemsRes = await db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am, cs.price as service_price, cs.price_type, cs.price_tiers_json FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all();
+      const itemsByPkg: Record<number, any[]> = {};
+      for (const it of pkgItemsRes.results) { const pid = it.package_id as number; if (!itemsByPkg[pid]) itemsByPkg[pid] = []; itemsByPkg[pid].push(it); }
+      packagesData = (pkgsRes.results || []).map((p: any) => ({ ...p, items: itemsByPkg[p.id] || [] }));
+    } catch {}
+    
     // Load telegram messages
     const tgRes = await db.prepare('SELECT * FROM telegram_messages WHERE is_active = 1 ORDER BY sort_order').all();
     const telegram: Record<string, any> = {};
@@ -202,6 +212,7 @@ app.get('/api/site-data', async (c) => {
       textMap, // original_ru -> {ru, am} for changed texts only
       tabs: tabsRes.results,
       services: svcsRes.results,
+      packages: packagesData,
       telegram,
       scripts,
       sectionOrder: (function() {
@@ -224,7 +235,7 @@ app.get('/api/site-data', async (c) => {
     });
   } catch (e: any) {
     // If DB not initialized yet, return empty — frontend will use hardcoded fallback
-    return c.json({ content: {}, textMap: {}, tabs: [], services: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], tickerItems: null, footerSocials: null, _ts: Date.now() });
+    return c.json({ content: {}, textMap: {}, tabs: [], services: [], packages: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], tickerItems: null, footerSocials: null, _ts: Date.now() });
   }
 });
 
@@ -340,12 +351,15 @@ app.post('/api/generate-pdf', async (c) => {
     const clientName = body.clientName || '';
     const clientContact = body.clientContact || '';
     const referralCode = body.referralCode || '';
+    const packageData = body.package || null; // { package_id, name, name_ru, name_am, package_price, original_price, items }
 
     // Calculate subtotal from items (before any discount)
     let subtotal = 0;
     for (const item of items) { subtotal += Number(item.subtotal || 0); }
     // If frontend sent total that matches subtotal, use subtotal; otherwise total might already include discount
     const frontendTotal = Number(total) || 0;
+    // Package price is added on top (not subject to discount)
+    const packagePrice = packageData ? (Number(packageData.package_price) || 0) : 0;
     
     // Load referral code details and compute discount
     let discountPercent = 0;
@@ -373,8 +387,9 @@ app.post('/api/generate-pdf', async (c) => {
       } catch {}
     }
     
-    // Final total = subtotal - discount
-    const finalTotal = discountAmount > 0 ? (subtotal - discountAmount) : frontendTotal;
+    // Final total = (subtotal - discount) + packagePrice
+    const servicesAfterDiscount = discountAmount > 0 ? (subtotal - discountAmount) : subtotal;
+    const finalTotal = discountAmount > 0 ? (servicesAfterDiscount + packagePrice) : frontendTotal;
 
     // Run template fetch and lead number in parallel for speed
     const [tplRow, lastLead] = await Promise.all([
@@ -408,7 +423,8 @@ app.post('/api/generate-pdf', async (c) => {
       referralCode, 
       discountPercent, 
       discountAmount,
-      freeServices 
+      freeServices,
+      package: packageData || undefined
     });
     const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(nextNum, 'calculator_pdf', clientName, clientContact, calcDataJson, lang, referralCode, ua.substring(0,200), finalTotal).run();
@@ -426,6 +442,7 @@ app.post('/api/generate-pdf', async (c) => {
       '\ud83d\udcb0 ' + Number(finalTotal).toLocaleString('ru-RU') + ' \u058f'
     ];
     if (referralCode) tgLines.push('\ud83c\udff7 ' + (isAm ? '\u054a\u0580\u0578\u0574\u0578: ' : '\u041f\u0440\u043e\u043c\u043e: ') + referralCode + (discountPercent > 0 ? ' (-' + discountPercent + '%, -' + discountAmount.toLocaleString('ru-RU') + ' \u058f)' : ''));
+    if (packageData) tgLines.push('\ud83d\udce6 ' + (isAm ? '\u0553\u0561\u0569\u0565\u0569: ' : '\u041f\u0430\u043a\u0435\u0442: ') + (packageData.name || packageData.name_ru || '') + ' = ' + Number(packagePrice).toLocaleString('ru-RU') + ' \u058f');
     tgLines.push((isAm ? '\ud83d\udcc4 \u0550\u0561\u0577\u057e\u0561\u0580\u056f:' : '\ud83d\udcc4 \u0420\u0430\u0441\u0447\u0451\u0442:'));
     for (const it of items) { tgLines.push('  \u2022 ' + it.name + ' \u00d7 ' + it.qty + ' = ' + Number(it.subtotal).toLocaleString('ru-RU') + ' \u058f'); }
     // Fire and forget — don't wait for TG notification
@@ -502,6 +519,9 @@ app.get('/pdf/:id', async (c) => {
     const clientContact = (lead.contact as string) || '';
     const refundAmount = Number(lead.refund_amount) || 0;
     const referralCode = (lead.referral_code as string) || calcData.referralCode || '';
+    const pkgData = calcData.package || null;
+    const pkgPrice = pkgData ? (Number(pkgData.package_price) || 0) : 0;
+    const pkgOriginalPrice = pkgData ? (Number(pkgData.original_price) || 0) : 0;
     
     // Load referral code details if present (for showing discounts & free services in PDF)
     let refDiscount = 0;
@@ -571,7 +591,7 @@ app.get('/pdf/:id', async (c) => {
     // Always recalculate from services base to ensure correctness
     const servicesBase = calcData.servicesSubtotal || svcSubtotal || subtotal;
     const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(servicesBase) * calcDiscountPercent / 100) : 0;
-    const afterDiscount = calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal);
+    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + pkgPrice;
     const beforeCommission = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
     
     // Load payment method commission
@@ -774,12 +794,22 @@ app.get('/pdf/:id', async (c) => {
       + (clientName || clientContact ? '<div class="cli"><strong><i class="fas fa-user" style="margin-right:4px;color:' + accentColor + '"></i>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | <i class="fas fa-phone-alt" style="margin-right:4px;color:#10B981"></i>' + clientContact : '') + '</div>' : '')
       + (intro ? '<div class="intro">' + intro + '</div>' : '')
       + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (refDiscount > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + refDiscount + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em">' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
+      // Package block (if package was selected)
+      + (pkgData ? '<div style="margin-bottom:16px;padding:14px 18px;background:linear-gradient(135deg,#FEF3C710,#F59E0B12);border:2px solid #F59E0B40;border-radius:10px">'
+        + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><i class="fas fa-box-open" style="color:#F59E0B;font-size:1.1rem"></i><span style="font-weight:700;font-size:1rem;color:#B45309">' + (isEn ? 'Package' : isAm ? '\u0553\u0561\u0569\u0565\u0569' : '\u041f\u0430\u043a\u0435\u0442') + ': ' + (isAm ? (pkgData.name_am || pkgData.name_ru || pkgData.name || '') : (pkgData.name_ru || pkgData.name || '')) + '</span></div>'
+        + (pkgData.items && pkgData.items.length > 0 ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px">' + pkgData.items.map((pi: any) => '<span style="background:#FEF3C7;padding:3px 10px;border-radius:6px;font-size:0.8rem;color:#92400E"><i class="fas fa-check" style="color:#16a34a;margin-right:4px;font-size:0.7rem"></i>' + (isAm ? (pi.service_name_am || pi.service_name_ru || '') : (pi.service_name_ru || '')) + ' \u00d7 ' + (pi.quantity || 1) + '</span>').join('') + '</div>' : '')
+        + '<div style="display:flex;align-items:baseline;gap:10px">'
+        + (pkgOriginalPrice > 0 && pkgOriginalPrice > pkgPrice ? '<span style="text-decoration:line-through;color:#94a3b8;font-size:0.85rem">' + pkgOriginalPrice.toLocaleString('ru-RU') + '\u00a0\u058f</span>' : '')
+        + '<span style="font-weight:800;font-size:1.1rem;color:#F59E0B">' + pkgPrice.toLocaleString('ru-RU') + '\u00a0\u058f</span>'
+        + (pkgOriginalPrice > 0 && pkgOriginalPrice > pkgPrice ? '<span style="background:#059669;color:white;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:700">-' + Math.round((1 - pkgPrice / pkgOriginalPrice) * 100) + '%</span>' : '')
+        + '</div></div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
       + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.subtotal + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
+      + (pkgData ? '<tr style="background:#FFFBEB"><td colspan="4" style="padding:10px 12px;text-align:right;color:#B45309;font-weight:600"><i class="fas fa-box-open" style="margin-right:4px;color:#F59E0B"></i>' + (isEn ? 'Package' : isAm ? '\u0553\u0561\u0569\u0565\u0569' : '\u041f\u0430\u043a\u0435\u0442') + ': ' + (isAm ? (pkgData.name_am || pkgData.name_ru || pkgData.name || '') : (pkgData.name_ru || pkgData.name || '')) + '</td><td style="padding:10px 12px;text-align:right;color:#B45309;font-weight:700;font-size:15px;white-space:nowrap">+' + pkgPrice.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (calcDiscountAmount > 0 && articleItems.length === 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (pmCommissionAmt > 0 ? '<tr style="background:#eff6ff"><td colspan="4" style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:600"><i class="fas fa-credit-card" style="margin-right:4px"></i>' + (isEn ? 'Payment commission' : isAm ? '\u054e\u0573\u0561\u0580\u0574\u0561\u0576 \u0574\u056b\u057b\u0576\u0578\u0580\u0564\u0561\u057e\u0573\u0561\u0580' : '\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u044f \u0437\u0430 \u043e\u043f\u043b\u0430\u0442\u0443') + ' (' + (isAm ? pmNameAm : pmName) + ' ' + pmCommissionPct + '%):</td><td style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:700;font-size:15px;white-space:nowrap">+' + pmCommissionAmt.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
-      + ((calcDiscountAmount > 0 || refundAmount > 0 || pmCommissionAmt > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + L.total + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
+      + ((calcDiscountAmount > 0 || refundAmount > 0 || pmCommissionAmt > 0 || pkgPrice > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + L.total + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
       + '</tbody></table>'
       + (outro ? '<div class="outro">' + outro + '</div>' : '')
       + (terms ? '<div class="terms-box"><div class="terms-title"><i class="fas fa-gavel" style="margin-right:4px"></i>' + L.terms + '</div>' + terms + '</div>' : '')
@@ -1300,6 +1330,22 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .calc-tab:hover:not(.active){border-color:var(--purple);color:var(--text)}
 .calc-group{display:none}
 .calc-group.active{display:block}
+.calc-packages{margin-bottom:24px}
+.calc-packages-title{font-size:1rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.calc-packages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:12px;padding:16px;cursor:pointer;transition:var(--t);position:relative;overflow:hidden}
+.calc-pkg-card:hover{border-color:var(--purple);transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.15)}
+.calc-pkg-card.selected{border-color:#f59e0b;background:rgba(245,158,11,0.05);box-shadow:0 0 0 3px rgba(245,158,11,0.2)}
+.calc-pkg-card .pkg-badge{position:absolute;top:8px;right:8px;background:var(--purple);color:white;font-size:0.65rem;padding:2px 8px;border-radius:10px;font-weight:700}
+.calc-pkg-card .pkg-popular{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#f97316)}
+.calc-pkg-card .pkg-name{font-weight:700;font-size:0.95rem;margin-bottom:4px}
+.calc-pkg-card .pkg-desc{font-size:0.78rem;color:var(--text-muted);margin-bottom:8px;line-height:1.4}
+.calc-pkg-card .pkg-prices{display:flex;align-items:baseline;gap:6px;margin-bottom:8px}
+.calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.8rem}
+.calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.1rem;color:#f59e0b}
+.calc-pkg-card .pkg-discount{background:#059669;color:white;font-size:0.65rem;padding:2px 6px;border-radius:8px;font-weight:700}
+.calc-pkg-card .pkg-items{font-size:0.75rem;color:var(--text-muted);line-height:1.5}
+.calc-pkg-card .pkg-items i{color:#22c55e;margin-right:4px;font-size:0.65rem}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -2230,6 +2276,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <p class="section-sub" data-ru="Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram." data-am="Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:">Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.</p>
   </div>
   <div class="calc-wrap fade-up">
+    <div class="calc-packages" id="calcPackages" style="display:none"></div>
     <div class="calc-tabs">
       <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Գնումներ">Выкупы</div>
       <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Կարծիքներ">Отзывы</div>
@@ -3351,6 +3398,32 @@ function onTieredInput(svcId) {
   ccTiered(svcId, 0);
 }
 
+var _selectedPackageId = null;
+function selectPackage(pkgId) {
+  if (_selectedPackageId === pkgId) {
+    _selectedPackageId = null;
+  } else {
+    _selectedPackageId = pkgId;
+  }
+  // Update visual selection
+  document.querySelectorAll('.calc-pkg-card').forEach(function(c) {
+    if (parseInt(c.getAttribute('data-pkg-id')) === _selectedPackageId) {
+      c.classList.add('selected');
+    } else {
+      c.classList.remove('selected');
+    }
+  });
+  recalcDynamic();
+}
+
+function getSelectedPackage() {
+  if (!_selectedPackageId || !window._calcPackages) return null;
+  for (var i = 0; i < window._calcPackages.length; i++) {
+    if (window._calcPackages[i].id === _selectedPackageId) return window._calcPackages[i];
+  }
+  return null;
+}
+
 function recalcDynamic() {
   var total = 0, items = [];
   // ALL calc groups (not just active) — collect from all
@@ -3379,24 +3452,42 @@ function recalcDynamic() {
       items.push(labelText + ': ' + qty);
     }
   });
-  // Apply referral discount
+  // Add package price (discount NOT applied to packages)
+  var servicesTotal = total; // services subtotal before package
+  var selectedPkg = getSelectedPackage();
+  var packageAmount = 0;
+  if (selectedPkg) {
+    packageAmount = selectedPkg.package_price || 0;
+    total += packageAmount;
+  }
+  // Apply referral discount only to services, not to package
   var subtotalBeforeDiscount = total;
   var discountAmount = 0;
-  if (typeof _refDiscount !== 'undefined' && _refDiscount > 0 && total > 0) {
-    discountAmount = Math.round(total * _refDiscount / 100);
+  if (typeof _refDiscount !== 'undefined' && _refDiscount > 0 && servicesTotal > 0) {
+    discountAmount = Math.round(servicesTotal * _refDiscount / 100);
     total = total - discountAmount;
   }
   var calcTotalEl = document.getElementById('calcTotal');
   calcTotalEl.setAttribute('data-total', total);
+  // Store package data for PDF submission
+  if (selectedPkg) calcTotalEl.setAttribute('data-package', JSON.stringify({ package_id: selectedPkg.id, name: lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru, name_ru: selectedPkg.name_ru, name_am: selectedPkg.name_am, package_price: selectedPkg.package_price, original_price: selectedPkg.original_price, items: selectedPkg.items }));
+  else calcTotalEl.removeAttribute('data-package');
+  
+  var totalHtml = '';
+  if (selectedPkg && packageAmount > 0) {
+    totalHtml += '<div style="font-size:0.78rem;color:#f59e0b;margin-bottom:2px"><i class="fas fa-box-open" style="margin-right:4px"></i>' + (lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru) + ': ' + formatNum(packageAmount) + ' \u058f</div>';
+  }
   if (discountAmount > 0 && subtotalBeforeDiscount > 0) {
-    calcTotalEl.innerHTML = '<div class="calc-total-prices">' +
-      '<span class="calc-old-price">' + formatNum(subtotalBeforeDiscount) + ' ֏</span>' +
-      '<span>' + formatNum(total) + ' ֏</span>' +
+    calcTotalEl.innerHTML = totalHtml + '<div class="calc-total-prices">' +
+      '<span class="calc-old-price">' + formatNum(subtotalBeforeDiscount) + ' \u058f</span>' +
+      '<span>' + formatNum(total) + ' \u058f</span>' +
       '</div>' +
       '<div class="calc-discount-line"><i class="fas fa-gift" style="margin-right:4px"></i>' +
       (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573) + ': -' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(discountAmount) + ' \u058f (-' + _refDiscount + '%)</div>';
+  } else if (totalHtml) {
+    calcTotalEl.innerHTML = totalHtml + '<span>' + formatNum(total) + ' \u058f</span>';
   } else {
-    calcTotalEl.textContent = formatNum(total) + ' ֏';
+    calcTotalEl.textContent = formatNum(total) + ' \u058f';
   }
   // Update promo result with live discount amount
   var refResultEl = document.getElementById('refResult');
@@ -3725,6 +3816,48 @@ switchLang = function(l) {
           calcTotal.parentNode.insertBefore(group, calcTotal);
         });
         console.log('[DB] Calculator rebuilt:', db.services.length, 'services,', db.tabs.length, 'tabs');
+      }
+      
+      // ===== 2b. RENDER PACKAGES =====
+      var pkgsContainer = document.getElementById('calcPackages');
+      if (pkgsContainer && db.packages && db.packages.length > 0) {
+        window._calcPackages = db.packages;
+        var ph = '<div class="calc-packages-title"><i class="fas fa-box-open" style="color:#f59e0b"></i> <span data-ru="\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b" data-am="\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580">' + (lang==='am' ? '\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580' : '\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b') + '</span></div>';
+        ph += '<div class="calc-packages-grid">';
+        for (var pki = 0; pki < db.packages.length; pki++) {
+          var pk = db.packages[pki];
+          var pkDisc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
+          ph += '<div class="calc-pkg-card" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
+          if (pk.is_popular) ph += '<div class="pkg-popular"></div>';
+          if (pk.badge_ru || pk.badge_am) {
+            ph += '<div class="pkg-badge" data-ru="' + escCalc(pk.badge_ru || '') + '" data-am="' + escCalc(pk.badge_am || '') + '">' + (lang==='am' ? (pk.badge_am||pk.badge_ru) : pk.badge_ru) + '</div>';
+          }
+          ph += '<div class="pkg-name" data-ru="' + escCalc(pk.name_ru) + '" data-am="' + escCalc(pk.name_am) + '">' + (lang==='am' ? pk.name_am : pk.name_ru) + '</div>';
+          if (pk.description_ru || pk.description_am) {
+            ph += '<div class="pkg-desc" data-ru="' + escCalc(pk.description_ru || '') + '" data-am="' + escCalc(pk.description_am || '') + '">' + (lang==='am' ? (pk.description_am||pk.description_ru) : pk.description_ru) + '</div>';
+          }
+          ph += '<div class="pkg-prices">';
+          if (pk.original_price > 0 && pk.original_price > pk.package_price) {
+            ph += '<span class="pkg-old-price">' + formatNum(pk.original_price) + ' \u058f</span>';
+          }
+          ph += '<span class="pkg-new-price">' + formatNum(pk.package_price) + ' \u058f</span>';
+          if (pkDisc > 0) ph += '<span class="pkg-discount">-' + pkDisc + '%</span>';
+          ph += '</div>';
+          if (pk.items && pk.items.length > 0) {
+            ph += '<div class="pkg-items">';
+            for (var pii = 0; pii < pk.items.length; pii++) {
+              var pi2 = pk.items[pii];
+              var piName = lang==='am' ? (pi2.service_name_am || pi2.service_name_ru || '') : (pi2.service_name_ru || '');
+              ph += '<div><i class="fas fa-check"></i>' + escCalc(piName) + ' \u00d7 ' + (pi2.quantity || 1) + '</div>';
+            }
+            ph += '</div>';
+          }
+          ph += '</div>';
+        }
+        ph += '</div>';
+        pkgsContainer.innerHTML = ph;
+        pkgsContainer.style.display = '';
+        console.log('[DB] Packages rendered:', db.packages.length);
       }
     }
     
@@ -5735,9 +5868,9 @@ async function checkRefCode() {
       }
     });
 
-    if (!items.length) {
+    if (!items.length && !getSelectedPackage()) {
       errDiv.style.display = 'block';
-      errDiv.textContent = lang === 'am' ? 'Ընտրեք ծառայություններ (քանակ > 0)' : 'Выберите услуги (количество > 0)';
+      errDiv.textContent = lang === 'am' ? 'Ընտրեք ծառայություններ կամ փաթեթ' : 'Выберите услуги или пакет';
       return;
     }
 
@@ -5745,6 +5878,11 @@ async function checkRefCode() {
     var refCode = '';
     var refInput = document.getElementById('refCodeInput');
     if (refInput) refCode = refInput.value || '';
+    
+    // Get package data if selected
+    var pkgData = null;
+    var pkgAttr = totalEl.getAttribute('data-package');
+    if (pkgAttr) { try { pkgData = JSON.parse(pkgAttr); } catch(e) {} }
 
     pdfBtn.disabled = true;
     pdfBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Загрузка...');
@@ -5756,7 +5894,7 @@ async function checkRefCode() {
     fetch('/api/generate-pdf', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, clientName: clientName, clientContact: clientPhone, referralCode: refCode })
+      body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, clientName: clientName, clientContact: clientPhone, referralCode: refCode, package: pkgData })
     }).then(function(r){ return r.json(); }).then(function(data) {
       pdfBtn.disabled = false;
       pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + _getPdfBtnLabel();
