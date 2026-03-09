@@ -194,6 +194,7 @@ function setProgress(msg) {
 document.addEventListener('click', function(e) {
   var btn = e.target.closest('button, .btn');
   if (!btn || btn.disabled) return;
+  if (btn.getAttribute('data-no-spin')) return;
   var onclick = btn.getAttribute('onclick');
   if (!onclick) return;
   // Only auto-spin for save/delete/add/update operations
@@ -1757,7 +1758,7 @@ function openPackageModal(pkg) {
       '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📝 Название RU <span style="color:#EF4444">*</span></label>' +
         '<input class="input" id="pkg_name_ru" value="' + escHtml(isEdit ? pkg.name_ru : '') + '" placeholder="Пакет Старт"></div>' +
       '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📝 Название AM</label>' +
-        '<input class="input" id="pkg_name_am" value="' + escHtml(isEdit ? pkg.name_am : '') + '" placeholder="Ստdelays փdelays"></div>' +
+        '<input class="input" id="pkg_name_am" value="' + escHtml(isEdit ? pkg.name_am : '') + '" placeholder="\u054d\u057f\u0561\u0580\u057f \u0583\u0561\u0569\u0565\u0569"></div>' +
     '</div>' +
     
     // === Description fields ===
@@ -1765,7 +1766,7 @@ function openPackageModal(pkg) {
       '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📋 Описание RU</label>' +
         '<textarea class="input" id="pkg_desc_ru" rows="2" placeholder="Лучший старт для новых продавцов">' + escHtml(isEdit ? pkg.description_ru || '' : '') + '</textarea></div>' +
       '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📋 Описание AM</label>' +
-        '<textarea class="input" id="pkg_desc_am" rows="2" placeholder="Լavagouyn meknarkը...">' + escHtml(isEdit ? pkg.description_am || '' : '') + '</textarea></div>' +
+        '<textarea class="input" id="pkg_desc_am" rows="2" placeholder="\u053c\u0561\u057e\u0561\u0563\u0578\u0582\u0575\u0576 \u0574\u0565\u056f\u0576\u0561\u0580\u056f\u0568 \u0576\u0578\u0580 \u057e\u0561\u0573\u0561\u057c\u0578\u0572\u0576\u0565\u0580\u056b \u0570\u0561\u0574\u0561\u0580">' + escHtml(isEdit ? pkg.description_am || '' : '') + '</textarea></div>' +
     '</div>' +
     
     // === Services section ===
@@ -1778,7 +1779,7 @@ function openPackageModal(pkg) {
   }
   
   html += '</div>' +
-    '<button class="btn btn-outline" style="width:100%;padding:8px;font-size:0.85rem;border-style:dashed;margin-bottom:20px" onclick="addPkgItem()">' +
+    '<button class="btn btn-outline" data-no-spin="1" style="width:100%;padding:8px;font-size:0.85rem;border-style:dashed;margin-bottom:20px" onclick="addPkgItem()">' +
       '<i class="fas fa-plus" style="margin-right:6px;color:#22c55e"></i>Добавить услугу</button>' +
     
     // === AUTO-CALCULATED PRICE BLOCK ===

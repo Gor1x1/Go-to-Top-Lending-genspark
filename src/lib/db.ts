@@ -837,6 +837,35 @@ async function runSeeds(db: D1Database): Promise<void> {
   // v27: promo code applies to packages toggle
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN apply_to_packages INTEGER DEFAULT 0").run(); } catch {}
 
+  // v28: calculator packages tables (must be in migrations for existing production DBs)
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS calculator_packages (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name_ru TEXT NOT NULL DEFAULT '',
+      name_am TEXT NOT NULL DEFAULT '',
+      description_ru TEXT DEFAULT '',
+      description_am TEXT DEFAULT '',
+      original_price INTEGER DEFAULT 0,
+      package_price INTEGER NOT NULL DEFAULT 0,
+      badge_ru TEXT DEFAULT '',
+      badge_am TEXT DEFAULT '',
+      is_popular INTEGER DEFAULT 0,
+      sort_order INTEGER DEFAULT 0,
+      is_active INTEGER DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+  } catch {}
+  try {
+    await db.prepare(`CREATE TABLE IF NOT EXISTS calculator_package_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      package_id INTEGER NOT NULL,
+      service_id INTEGER NOT NULL,
+      quantity INTEGER NOT NULL DEFAULT 1,
+      FOREIGN KEY (package_id) REFERENCES calculator_packages(id) ON DELETE CASCADE,
+      FOREIGN KEY (service_id) REFERENCES calculator_services(id) ON DELETE CASCADE
+    )`).run();
+  } catch {}
+
   // v26/v26b/v26c: REMOVED — these one-time migrations were overwriting admin edits on every cold start.
   // Admin changes in site_blocks and site_content must ALWAYS be preserved.
   // The seed data is only for initial setup, never for overriding production data.
