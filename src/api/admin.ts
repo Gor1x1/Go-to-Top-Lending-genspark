@@ -718,18 +718,18 @@ api.get('/referrals', authMiddleware, async (c) => {
 
 api.post('/referrals', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const { code, description, discount_percent, free_reviews, max_uses } = await c.req.json();
-  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, free_reviews, max_uses) VALUES (?,?,?,?,?)')
-    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, max_uses || 0).run();
+  const { code, description, discount_percent, free_reviews, max_uses, apply_to_packages } = await c.req.json();
+  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, free_reviews, max_uses, apply_to_packages) VALUES (?,?,?,?,?,?)')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, max_uses || 0, apply_to_packages ? 1 : 0).run();
   return c.json({ success: true });
 });
 
 api.put('/referrals/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
-  const { code, description, discount_percent, free_reviews, is_active, max_uses } = await c.req.json();
-  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, free_reviews=?, is_active=?, max_uses=? WHERE id=?')
-    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, is_active ?? 1, max_uses || 0, id).run();
+  const { code, description, discount_percent, free_reviews, is_active, max_uses, apply_to_packages } = await c.req.json();
+  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, free_reviews=?, is_active=?, max_uses=?, apply_to_packages=? WHERE id=?')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, is_active ?? 1, max_uses || 0, apply_to_packages ? 1 : 0, id).run();
   return c.json({ success: true });
 });
 

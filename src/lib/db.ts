@@ -834,6 +834,8 @@ async function runSeeds(db: D1Database): Promise<void> {
   // Referral codes: max_uses (0 = unlimited), paid_uses_count (counted from in_progress/checking/done leads)
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN max_uses INTEGER DEFAULT 0").run(); } catch {}
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN paid_uses_count INTEGER DEFAULT 0").run(); } catch {}
+  // v27: promo code applies to packages toggle
+  try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN apply_to_packages INTEGER DEFAULT 0").run(); } catch {}
 
   // v26/v26b/v26c: REMOVED — these one-time migrations were overwriting admin edits on every cold start.
   // Admin changes in site_blocks and site_content must ALWAYS be preserved.

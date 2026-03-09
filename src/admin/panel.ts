@@ -1739,47 +1739,39 @@ function addNewPackage() {
 
 function editPackage(pkgId) {
   var pkg = (data.calcPackages || []).find(function(p) { return p.id === pkgId; });
-  if (!pkg) { toast('\u041f\u0430\u043a\u0435\u0442 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d', 'error'); return; }
+  if (!pkg) { toast('Пакет не найден', 'error'); return; }
   openPackageModal(pkg);
 }
 
+// ===== PACKAGE MODAL: professional, auto-calculating =====
 function openPackageModal(pkg) {
   var isEdit = !!pkg;
   var svcs = data.calcServices || [];
   var items = isEdit ? (pkg.items || []) : [];
   
-  var html = '<div style="max-height:80vh;overflow-y:auto;padding:4px">' +
-    '<h2 style="margin-bottom:16px;font-size:1.3rem;font-weight:700"><i class="fas fa-box-open" style="color:#f59e0b;margin-right:8px"></i>' + (isEdit ? '\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u043f\u0430\u043a\u0435\u0442' : '\u041d\u043e\u0432\u044b\u0439 \u043f\u0430\u043a\u0435\u0442') + '</h2>' +
+  var html = '<div style="max-height:82vh;overflow-y:auto;padding:4px">' +
+    '<h2 style="margin-bottom:20px;font-size:1.3rem;font-weight:700"><i class="fas fa-box-open" style="color:#f59e0b;margin-right:8px"></i>' + (isEdit ? 'Редактировать пакет' : 'Новый пакет') + '</h2>' +
+    
+    // === Name fields ===
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU</label>' +
-        '<input class="input" id="pkg_name_ru" value="' + escHtml(isEdit ? pkg.name_ru : '') + '" placeholder="\u041f\u0430\u043a\u0435\u0442 \u0421\u0442\u0430\u0440\u0442"></div>' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 AM</label>' +
-        '<input class="input" id="pkg_name_am" value="' + escHtml(isEdit ? pkg.name_am : '') + '" placeholder="\u054d\u057f\u0561\u0580\u057f \u0583\u0561\u0569\u0565\u0569"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📝 Название RU <span style="color:#EF4444">*</span></label>' +
+        '<input class="input" id="pkg_name_ru" value="' + escHtml(isEdit ? pkg.name_ru : '') + '" placeholder="Пакет Старт"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📝 Название AM</label>' +
+        '<input class="input" id="pkg_name_am" value="' + escHtml(isEdit ? pkg.name_am : '') + '" placeholder="Ստdelays փdelays"></div>' +
     '</div>' +
+    
+    // === Description fields ===
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 RU</label>' +
-        '<textarea class="input" id="pkg_desc_ru" rows="2" placeholder="\u041b\u0443\u0447\u0448\u0438\u0439 \u0441\u0442\u0430\u0440\u0442 \u0434\u043b\u044f \u043d\u043e\u0432\u044b\u0445 \u043f\u0440\u043e\u0434\u0430\u0432\u0446\u043e\u0432">' + escHtml(isEdit ? pkg.description_ru || '' : '') + '</textarea></div>' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435 AM</label>' +
-        '<textarea class="input" id="pkg_desc_am" rows="2" placeholder="\u053c\u0561\u057e\u0561\u0563\u0578\u0582\u0575\u0576 \u0574\u0565\u056f\u0576\u0561\u0580\u056f\u0568...">' + escHtml(isEdit ? pkg.description_am || '' : '') + '</textarea></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📋 Описание RU</label>' +
+        '<textarea class="input" id="pkg_desc_ru" rows="2" placeholder="Лучший старт для новых продавцов">' + escHtml(isEdit ? pkg.description_ru || '' : '') + '</textarea></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">📋 Описание AM</label>' +
+        '<textarea class="input" id="pkg_desc_am" rows="2" placeholder="Լavagouyn meknarkը...">' + escHtml(isEdit ? pkg.description_am || '' : '') + '</textarea></div>' +
     '</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0426\u0435\u043d\u0430 \u0431\u0435\u0437 \u043f\u0430\u043a\u0435\u0442\u0430 \u058f</label>' +
-        '<input class="input" type="number" id="pkg_original_price" value="' + (isEdit ? pkg.original_price || 0 : 0) + '" placeholder="20000"></div>' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0426\u0435\u043d\u0430 \u043f\u0430\u043a\u0435\u0442\u0430 \u058f</label>' +
-        '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" placeholder="15000" style="border-color:#f59e0b"></div>' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0411\u0435\u0439\u0434\u0436 RU</label>' +
-        '<input class="input" id="pkg_badge_ru" value="' + escHtml(isEdit ? pkg.badge_ru || '' : '') + '" placeholder="\u0425\u0438\u0442"></div>' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u0411\u0435\u0439\u0434\u0436 AM</label>' +
-        '<input class="input" id="pkg_badge_am" value="' + escHtml(isEdit ? pkg.badge_am || '' : '') + '" placeholder="\u0540\u056b\u0569"></div>' +
-    '</div>' +
-    '<div style="display:flex;gap:16px;margin-bottom:16px">' +
-      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_popular" ' + (isEdit && pkg.is_popular ? 'checked' : '') + '> <span style="font-size:0.85rem">\u2B50 \u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0439</span></label>' +
-      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_active" ' + (isEdit ? (pkg.is_active ? 'checked' : '') : 'checked') + '> <span style="font-size:0.85rem">\u0410\u043a\u0442\u0438\u0432\u0435\u043d</span></label>' +
-    '</div>' +
-    '<h3 style="font-size:1rem;font-weight:700;margin-bottom:10px"><i class="fas fa-list-check" style="color:#22c55e;margin-right:6px"></i>\u0423\u0441\u043b\u0443\u0433\u0438 \u0432 \u043f\u0430\u043a\u0435\u0442\u0435</h3>' +
+    
+    // === Services section ===
+    '<h3 style="font-size:1rem;font-weight:700;margin-bottom:10px"><i class="fas fa-list-check" style="color:#22c55e;margin-right:6px"></i>Услуги в пакете <span style="color:#EF4444">*</span></h3>' +
     '<div id="pkg_items_list" style="margin-bottom:12px">';
   
-  // Existing items
   for (var ii = 0; ii < items.length; ii++) {
     var it = items[ii];
     html += renderPkgItemRow(ii, svcs, it.service_id, it.quantity);
@@ -1787,29 +1779,142 @@ function openPackageModal(pkg) {
   
   html += '</div>' +
     '<button class="btn btn-outline" style="width:100%;padding:8px;font-size:0.85rem;border-style:dashed;margin-bottom:20px" onclick="addPkgItem()">' +
-      '<i class="fas fa-plus" style="margin-right:6px;color:#22c55e"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c \u0443\u0441\u043b\u0443\u0433\u0443</button>' +
+      '<i class="fas fa-plus" style="margin-right:6px;color:#22c55e"></i>Добавить услугу</button>' +
+    
+    // === AUTO-CALCULATED PRICE BLOCK ===
+    '<div id="pkg_price_block" style="background:#1a2236;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><i class="fas fa-calculator" style="color:#8B5CF6"></i><span style="font-weight:700;font-size:0.95rem">Цены и скидка</span></div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Сумма услуг (авто) ֏</label>' +
+          '<div id="pkg_original_display" style="font-size:1.3rem;font-weight:800;color:#94a3b8;padding:8px 0">0</div>' +
+          '<input type="hidden" id="pkg_original_price" value="' + (isEdit ? pkg.original_price || 0 : 0) + '">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета ֏ <span style="color:#EF4444">*</span></label>' +
+          '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" min="0" placeholder="15000" style="border-color:#f59e0b;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscount()">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка</label>' +
+          '<div id="pkg_discount_display" style="font-size:1.3rem;font-weight:800;color:#10B981;padding:8px 0">0%</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="pkg_savings_line" style="font-size:0.8rem;color:#64748b;display:none">Экономия клиента: <span id="pkg_savings_amount" style="color:#10B981;font-weight:700">0 ֏</span></div>' +
+    '</div>' +
+    
+    // === Badges and options ===
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">🏷️ Бейдж RU <span style="color:#64748b;font-weight:400">(авто или вручную)</span></label>' +
+        '<input class="input" id="pkg_badge_ru" value="' + escHtml(isEdit ? pkg.badge_ru || '' : '') + '" placeholder="Авто: -20%"></div>' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">🏷️ Бейдж AM <span style="color:#64748b;font-weight:400">(авто или вручную)</span></label>' +
+        '<input class="input" id="pkg_badge_am" value="' + escHtml(isEdit ? pkg.badge_am || '' : '') + '" placeholder="Авто: -20%"></div>' +
+    '</div>' +
+    '<div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">' +
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_popular" ' + (isEdit && pkg.is_popular ? 'checked' : '') + '> <span style="font-size:0.85rem">⭐ Популярный</span></label>' +
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_active" ' + (isEdit ? (pkg.is_active ? 'checked' : '') : 'checked') + '> <span style="font-size:0.85rem">✅ Активен</span></label>' +
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_auto_badge" checked> <span style="font-size:0.85rem">🔄 Авто-бейдж</span></label>' +
+    '</div>' +
+    
+    // === Footer buttons ===
     '<div style="display:flex;gap:10px;justify-content:flex-end;padding-top:16px;border-top:1px solid #334155">' +
-      '<button class="btn btn-outline" onclick="closeModal()">\u041e\u0442\u043c\u0435\u043d\u0430</button>' +
-      '<button class="btn btn-primary" onclick="savePackage(' + (isEdit ? pkg.id : 'null') + ')"><i class="fas fa-save" style="margin-right:6px"></i>' + (isEdit ? '\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c' : '\u0421\u043e\u0437\u0434\u0430\u0442\u044c') + '</button>' +
+      '<button class="btn btn-outline" onclick="closeModal()">Отмена</button>' +
+      '<button class="btn btn-primary" id="pkg_save_btn" onclick="savePackage(' + (isEdit ? pkg.id : 'null') + ')"><i class="fas fa-save" style="margin-right:6px"></i>' + (isEdit ? 'Сохранить' : 'Создать') + '</button>' +
     '</div></div>';
   
   showModal(html);
+  // Run initial calculation after modal is rendered
+  setTimeout(function() { recalcPkgTotals(); }, 50);
+}
+
+// Recalculate original price from selected services
+function recalcPkgTotals() {
+  var svcs = data.calcServices || [];
+  var svcMap = {};
+  for (var si = 0; si < svcs.length; si++) { svcMap[svcs[si].id] = svcs[si]; }
+  
+  var total = 0;
+  var rows = document.querySelectorAll('#pkg_items_list > div');
+  for (var i = 0; i < rows.length; i++) {
+    var sel = rows[i].querySelector('.pkg-svc-select');
+    var qtyIn = rows[i].querySelector('.pkg-qty-input');
+    var svcId = parseInt(sel ? sel.value : '0') || 0;
+    var qty = parseInt(qtyIn ? qtyIn.value : '1') || 1;
+    var svc = svcMap[svcId];
+    if (svc) {
+      total += svc.price * qty;
+      // Update inline price display
+      var priceEl = rows[i].querySelector('.pkg-item-price');
+      if (priceEl) priceEl.textContent = (svc.price * qty).toLocaleString('ru-RU') + ' ֏';
+    } else {
+      var priceEl2 = rows[i].querySelector('.pkg-item-price');
+      if (priceEl2) priceEl2.textContent = '—';
+    }
+  }
+  
+  // Update original price
+  var origEl = document.getElementById('pkg_original_price');
+  var origDisplay = document.getElementById('pkg_original_display');
+  if (origEl) origEl.value = total;
+  if (origDisplay) origDisplay.textContent = total.toLocaleString('ru-RU') + ' ֏';
+  
+  recalcPkgDiscount();
+}
+
+// Recalculate discount display
+function recalcPkgDiscount() {
+  var origEl = document.getElementById('pkg_original_price');
+  var priceEl = document.getElementById('pkg_package_price');
+  var discDisplay = document.getElementById('pkg_discount_display');
+  var savingsLine = document.getElementById('pkg_savings_line');
+  var savingsAmt = document.getElementById('pkg_savings_amount');
+  
+  var orig = parseInt(origEl ? origEl.value : '0') || 0;
+  var price = parseInt(priceEl ? priceEl.value : '0') || 0;
+  
+  if (orig > 0 && price > 0 && price < orig) {
+    var discPct = Math.round((1 - price / orig) * 100);
+    var savings = orig - price;
+    if (discDisplay) { discDisplay.textContent = '-' + discPct + '%'; discDisplay.style.color = '#10B981'; }
+    if (savingsLine) savingsLine.style.display = 'block';
+    if (savingsAmt) savingsAmt.textContent = savings.toLocaleString('ru-RU') + ' ֏';
+    
+    // Auto-fill badges if auto-badge is checked
+    var autoBadge = document.getElementById('pkg_auto_badge');
+    if (autoBadge && autoBadge.checked) {
+      var badgeRu = document.getElementById('pkg_badge_ru');
+      var badgeAm = document.getElementById('pkg_badge_am');
+      if (badgeRu) badgeRu.value = '-' + discPct + '%';
+      if (badgeAm) badgeAm.value = '-' + discPct + '%';
+    }
+  } else if (orig > 0 && price >= orig) {
+    if (discDisplay) { discDisplay.textContent = 'нет скидки'; discDisplay.style.color = '#EF4444'; }
+    if (savingsLine) savingsLine.style.display = 'none';
+  } else {
+    if (discDisplay) { discDisplay.textContent = '—'; discDisplay.style.color = '#64748b'; }
+    if (savingsLine) savingsLine.style.display = 'none';
+  }
 }
 
 var _pkgItemCounter = 100;
 function renderPkgItemRow(idx, svcs, selectedId, qty) {
   _pkgItemCounter++;
   var rowId = 'pkgItem_' + _pkgItemCounter;
-  var h = '<div id="' + rowId + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
-    '<select class="input pkg-svc-select" style="flex:1;padding:6px 10px;font-size:0.85rem">';
-  h += '<option value="">-- \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443 --</option>';
+  // Find current price for display
+  var itemTotal = '—';
   for (var si = 0; si < svcs.length; si++) {
-    var s = svcs[si];
-    h += '<option value="' + s.id + '" ' + (selectedId == s.id ? 'selected' : '') + '>' + escHtml(s.name_ru) + ' (' + Number(s.price).toLocaleString('ru-RU') + ' \u058f)</option>';
+    if (svcs[si].id == selectedId) { itemTotal = (svcs[si].price * (qty || 1)).toLocaleString('ru-RU') + ' ֏'; break; }
+  }
+  var h = '<div id="' + rowId + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
+    '<select class="input pkg-svc-select" style="flex:1;padding:6px 10px;font-size:0.85rem" onchange="recalcPkgTotals()">';
+  h += '<option value="">-- Выберите услугу --</option>';
+  for (var si2 = 0; si2 < svcs.length; si2++) {
+    var s = svcs[si2];
+    h += '<option value="' + s.id + '" ' + (selectedId == s.id ? 'selected' : '') + '>' + escHtml(s.name_ru) + ' (' + Number(s.price).toLocaleString('ru-RU') + ' ֏)</option>';
   }
   h += '</select>' +
-    '<input class="input pkg-qty-input" type="number" value="' + (qty || 1) + '" min="1" max="999" style="width:70px;padding:6px 10px;font-size:0.85rem;text-align:center" title="\u041a\u043e\u043b-\u0432\u043e">' +
-    '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(&apos;' + rowId + '&apos;).remove()" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-times"></i></button>' +
+    '<input class="input pkg-qty-input" type="number" value="' + (qty || 1) + '" min="1" max="999" style="width:70px;padding:6px 10px;font-size:0.85rem;text-align:center" title="Кол-во" oninput="recalcPkgTotals()">' +
+    '<span class="pkg-item-price" style="min-width:80px;text-align:right;font-size:0.82rem;color:#a78bfa;font-weight:600;white-space:nowrap">' + itemTotal + '</span>' +
+    '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(&apos;' + rowId + '&apos;).remove();recalcPkgTotals()" title="Удалить"><i class="fas fa-times"></i></button>' +
   '</div>';
   return h;
 }
@@ -1823,19 +1928,22 @@ function addPkgItem() {
 async function savePackage(pkgId) {
   var nameRu = (document.getElementById('pkg_name_ru'))?.value?.trim() || '';
   var nameAm = (document.getElementById('pkg_name_am'))?.value?.trim() || '';
-  if (!nameRu) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU', 'error'); return; }
+  if (!nameRu) { toast('Введите название RU', 'error'); return; }
   
   var items = [];
   var rows = document.querySelectorAll('#pkg_items_list > div');
   for (var i = 0; i < rows.length; i++) {
     var sel = rows[i].querySelector('.pkg-svc-select');
     var qtyIn = rows[i].querySelector('.pkg-qty-input');
-    var svcId = parseInt(sel?.value || '0');
-    var qty = parseInt(qtyIn?.value || '1') || 1;
+    var svcId = parseInt(sel ? sel.value : '0') || 0;
+    var qty = parseInt(qtyIn ? qtyIn.value : '1') || 1;
     if (svcId > 0) items.push({ service_id: svcId, quantity: qty });
   }
   
-  if (items.length === 0) { toast('\u0414\u043e\u0431\u0430\u0432\u044c\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b 1 \u0443\u0441\u043b\u0443\u0433\u0443', 'error'); return; }
+  if (items.length === 0) { toast('Добавьте хотя бы 1 услугу', 'error'); return; }
+  
+  var pkgPrice = parseInt((document.getElementById('pkg_package_price'))?.value || '0') || 0;
+  if (pkgPrice <= 0) { toast('Укажите цену пакета', 'error'); return; }
   
   var payload = {
     name_ru: nameRu,
@@ -1843,7 +1951,7 @@ async function savePackage(pkgId) {
     description_ru: (document.getElementById('pkg_desc_ru'))?.value || '',
     description_am: (document.getElementById('pkg_desc_am'))?.value || '',
     original_price: parseInt((document.getElementById('pkg_original_price'))?.value || '0') || 0,
-    package_price: parseInt((document.getElementById('pkg_package_price'))?.value || '0') || 0,
+    package_price: pkgPrice,
     badge_ru: (document.getElementById('pkg_badge_ru'))?.value || '',
     badge_am: (document.getElementById('pkg_badge_am'))?.value || '',
     is_popular: (document.getElementById('pkg_is_popular'))?.checked ? 1 : 0,
@@ -1852,22 +1960,46 @@ async function savePackage(pkgId) {
     items: items
   };
   
-  if (pkgId) {
-    await api('/calc-packages/' + pkgId, { method: 'PUT', body: JSON.stringify(payload) });
-    toast('\u041f\u0430\u043a\u0435\u0442 \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d');
-  } else {
-    await api('/calc-packages', { method: 'POST', body: JSON.stringify(payload) });
-    toast('\u041f\u0430\u043a\u0435\u0442 \u0441\u043e\u0437\u0434\u0430\u043d');
+  // Show loading state
+  var saveBtn = document.getElementById('pkg_save_btn');
+  var restoreBtn = null;
+  if (saveBtn) restoreBtn = btnLoading(saveBtn, 'Сохранение...');
+  
+  try {
+    if (pkgId) {
+      await api('/calc-packages/' + pkgId, { method: 'PUT', body: JSON.stringify(payload) });
+      toast('Пакет обновлён');
+    } else {
+      await api('/calc-packages', { method: 'POST', body: JSON.stringify(payload) });
+      toast('Пакет создан');
+    }
+    closeModal();
+    // Reload packages data from server to ensure fresh state
+    var freshPkgs = await api('/calc-packages');
+    if (freshPkgs && Array.isArray(freshPkgs)) {
+      data.calcPackages = freshPkgs;
+    } else {
+      await loadData();
+    }
+    render();
+  } catch(e) {
+    toast('Ошибка сохранения пакета', 'error');
+    if (restoreBtn) restoreBtn();
   }
-  closeModal();
-  await loadData(); render();
 }
 
 async function deletePackage(pkgId) {
-  if (!confirm('\u0423\u0434\u0430\u043b\u0438\u0442\u044c \u044d\u0442\u043e\u0442 \u043f\u0430\u043a\u0435\u0442?')) return;
+  if (!confirm('Удалить этот пакет?')) return;
   await api('/calc-packages/' + pkgId, { method: 'DELETE' });
-  toast('\u041f\u0430\u043a\u0435\u0442 \u0443\u0434\u0430\u043b\u0451\u043d');
-  await loadData(); render();
+  toast('Пакет удалён');
+  // Reload packages data from server
+  var freshPkgs = await api('/calc-packages');
+  if (freshPkgs && Array.isArray(freshPkgs)) {
+    data.calcPackages = freshPkgs;
+  } else {
+    await loadData();
+  }
+  render();
 }
 
 // ===== TELEGRAM MESSAGES =====
@@ -2226,6 +2358,8 @@ function renderReferrals() {
       '<div style="display:flex;align-items:end"><button class="btn btn-primary" style="width:100%;padding:10px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Создать</button></div>' +
     '</div>' +
     '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание (для кого этот код)</label><input class="input" id="new_ref_desc" placeholder="Блогер Иван, партнёр, VIP-клиент..."></div>' +
+    '<div style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="new_ref_apply_pkg"> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>Скидка распространяется на пакеты</span></label>' +
+    '<div style="font-size:0.7rem;color:#475569;margin-top:3px;margin-left:24px">Если включено — скидка промокода будет применяться и к цене пакета, а не только к отдельным услугам</div></div>' +
   '</div>';
   
   // ── Overall promo analytics summary ──
@@ -2270,7 +2404,8 @@ function renderReferrals() {
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" value="' + (ref.free_reviews || 0) + '" id="ref_free_' + ref.id + '" min="0"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Лимит использований (0=∞)</label><input class="input" type="number" value="' + (ref.max_uses || 0) + '" id="ref_max_' + ref.id + '" min="0"></div>' +
       '</div>' +
-      '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>';
+      '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>' +
+      '<div style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ref_apply_pkg_' + ref.id + '" ' + (ref.apply_to_packages ? 'checked' : '') + '> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>Скидка распространяется на пакеты</span></label></div>';
     
     // === Attached services section ===
     h += '<div style="margin-top:16px;border-top:1px solid #334155;padding-top:12px">' +
@@ -2330,7 +2465,9 @@ async function addReferral() {
   var disc = parseInt(discEl?.value || '0') || 0;
   var free = parseInt(freeEl?.value || '0') || 0;
   var maxUses = parseInt(maxEl?.value || '0') || 0;
-  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free, max_uses: maxUses }) });
+  var applyPkgEl = document.getElementById('new_ref_apply_pkg');
+  var applyPkg = applyPkgEl ? applyPkgEl.checked : false;
+  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free, max_uses: maxUses, apply_to_packages: applyPkg ? 1 : 0 }) });
   toast('Код "' + code.toUpperCase() + '" добавлен');
   // Clear form fields
   if (codeEl) codeEl.value = '';
@@ -2386,13 +2523,15 @@ async function removeRefService(refId, svcLinkId) {
 async function saveReferral(id) {
   var ref = data.referrals.find(function(r) { return r.id === id; });
   if (!ref) return;
+  var applyPkgEl = document.getElementById('ref_apply_pkg_' + id);
   await api('/referrals/' + id, { method: 'PUT', body: JSON.stringify({
     code: document.getElementById('ref_code_' + id).value,
     description: document.getElementById('ref_desc_' + id).value,
     discount_percent: parseInt(document.getElementById('ref_disc_' + id).value) || 0,
     free_reviews: parseInt(document.getElementById('ref_free_' + id).value) || 0,
     max_uses: parseInt(document.getElementById('ref_max_' + id)?.value) || 0,
-    is_active: ref.is_active
+    is_active: ref.is_active,
+    apply_to_packages: applyPkgEl ? (applyPkgEl.checked ? 1 : 0) : (ref.apply_to_packages || 0)
   }) });
   toast('Код сохранён');
   await loadData(); render();
