@@ -836,6 +836,10 @@ async function runSeeds(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN paid_uses_count INTEGER DEFAULT 0").run(); } catch {}
   // v27: promo code applies to packages toggle
   try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN apply_to_packages INTEGER DEFAULT 0").run(); } catch {}
+  // v27b: linked_packages JSON (list of package IDs this promo applies to, empty = none)
+  try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN linked_packages TEXT DEFAULT '[]'").run(); } catch {}
+  // v27c: linked_services JSON (list of service IDs this promo applies to, empty = all services)
+  try { await db.prepare("ALTER TABLE referral_codes ADD COLUMN linked_services TEXT DEFAULT '[]'").run(); } catch {}
 
   // v28: calculator packages tables (must be in migrations for existing production DBs)
   try {
@@ -869,6 +873,19 @@ async function runSeeds(db: D1Database): Promise<void> {
   // v26/v26b/v26c: REMOVED — these one-time migrations were overwriting admin edits on every cold start.
   // Admin changes in site_blocks and site_content must ALWAYS be preserved.
   // The seed data is only for initial setup, never for overriding production data.
+
+  // v27: Add crown_tier column for Gold/Silver/Bronze crown on package cards
+  try {
+    await db.prepare(`ALTER TABLE calculator_packages ADD COLUMN crown_tier TEXT DEFAULT ''`).run();
+  } catch {} // column already exists
+  // Migrate is_popular=1 to crown_tier='gold'
+  try {
+    await db.prepare(`UPDATE calculator_packages SET crown_tier = 'gold' WHERE is_popular = 1 AND (crown_tier IS NULL OR crown_tier = '')`).run();
+  } catch {}
+  // v28: Add use_tiered column for tiered pricing in package items
+  try {
+    await db.prepare(`ALTER TABLE calculator_package_items ADD COLUMN use_tiered INTEGER DEFAULT 0`).run();
+  } catch {} // column already exists
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====

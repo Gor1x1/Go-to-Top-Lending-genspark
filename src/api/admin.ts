@@ -420,12 +420,12 @@ api.get('/calc-packages', authMiddleware, async (c) => {
 api.post('/calc-packages', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  const res = await db.prepare(`INSERT INTO calculator_packages (name_ru, name_am, description_ru, description_am, original_price, package_price, badge_ru, badge_am, is_popular, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.is_popular?1:0, d.sort_order||0, d.is_active!==undefined?d.is_active:1).run();
+  const res = await db.prepare(`INSERT INTO calculator_packages (name_ru, name_am, description_ru, description_am, original_price, package_price, badge_ru, badge_am, is_popular, crown_tier, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.crown_tier?1:0, d.crown_tier||'', d.sort_order||0, d.is_active!==undefined?d.is_active:1).run();
   const pkgId = res.meta?.last_row_id;
   if (pkgId && d.items && Array.isArray(d.items)) {
     for (const item of d.items) {
-      await db.prepare('INSERT INTO calculator_package_items (package_id, service_id, quantity) VALUES (?,?,?)').bind(pkgId, item.service_id, item.quantity||1).run();
+      await db.prepare('INSERT INTO calculator_package_items (package_id, service_id, quantity, use_tiered) VALUES (?,?,?,?)').bind(pkgId, item.service_id, item.quantity||1, item.use_tiered?1:0).run();
     }
   }
   return c.json({ success: true, id: pkgId });
@@ -435,13 +435,13 @@ api.put('/calc-packages/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = parseInt(c.req.param('id'));
   const d = await c.req.json();
-  await db.prepare(`UPDATE calculator_packages SET name_ru=?, name_am=?, description_ru=?, description_am=?, original_price=?, package_price=?, badge_ru=?, badge_am=?, is_popular=?, sort_order=?, is_active=? WHERE id=?`)
-    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.is_popular?1:0, d.sort_order||0, d.is_active!==undefined?d.is_active:1, id).run();
+  await db.prepare(`UPDATE calculator_packages SET name_ru=?, name_am=?, description_ru=?, description_am=?, original_price=?, package_price=?, badge_ru=?, badge_am=?, is_popular=?, crown_tier=?, sort_order=?, is_active=? WHERE id=?`)
+    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.crown_tier?1:0, d.crown_tier||'', d.sort_order||0, d.is_active!==undefined?d.is_active:1, id).run();
   // Replace items
   await db.prepare('DELETE FROM calculator_package_items WHERE package_id = ?').bind(id).run();
   if (d.items && Array.isArray(d.items)) {
     for (const item of d.items) {
-      await db.prepare('INSERT INTO calculator_package_items (package_id, service_id, quantity) VALUES (?,?,?)').bind(id, item.service_id, item.quantity||1).run();
+      await db.prepare('INSERT INTO calculator_package_items (package_id, service_id, quantity, use_tiered) VALUES (?,?,?,?)').bind(id, item.service_id, item.quantity||1, item.use_tiered?1:0).run();
     }
   }
   return c.json({ success: true });
@@ -718,18 +718,18 @@ api.get('/referrals', authMiddleware, async (c) => {
 
 api.post('/referrals', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const { code, description, discount_percent, free_reviews, max_uses, apply_to_packages } = await c.req.json();
-  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, free_reviews, max_uses, apply_to_packages) VALUES (?,?,?,?,?,?)')
-    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, max_uses || 0, apply_to_packages ? 1 : 0).run();
+  const { code, description, discount_percent, max_uses, apply_to_packages, linked_packages, linked_services, is_active } = await c.req.json();
+  await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, max_uses, apply_to_packages, linked_packages, linked_services, is_active) VALUES (?,?,?,?,?,?,?,?)')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, max_uses || 0, apply_to_packages ? 1 : 0, JSON.stringify(linked_packages || []), JSON.stringify(linked_services || []), is_active ?? 1).run();
   return c.json({ success: true });
 });
 
 api.put('/referrals/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
-  const { code, description, discount_percent, free_reviews, is_active, max_uses, apply_to_packages } = await c.req.json();
-  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, free_reviews=?, is_active=?, max_uses=?, apply_to_packages=? WHERE id=?')
-    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, free_reviews || 0, is_active ?? 1, max_uses || 0, apply_to_packages ? 1 : 0, id).run();
+  const { code, description, discount_percent, is_active, max_uses, apply_to_packages, linked_packages, linked_services } = await c.req.json();
+  await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, is_active=?, max_uses=?, apply_to_packages=?, linked_packages=?, linked_services=? WHERE id=?')
+    .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, is_active ?? 1, max_uses || 0, apply_to_packages ? 1 : 0, JSON.stringify(linked_packages || []), JSON.stringify(linked_services || []), id).run();
   return c.json({ success: true });
 });
 

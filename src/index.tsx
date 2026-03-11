@@ -373,13 +373,28 @@ app.post('/api/generate-pdf', async (c) => {
     let discountPercent = 0;
     let discountAmount = 0;
     let freeServices: any[] = [];
+    let initLinkedPackages: number[] = [];
+    let initLinkedServices: number[] = [];
     if (referralCode) {
       try {
         const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
         if (refRow) {
           discountPercent = Number(refRow.discount_percent) || 0;
+          try { initLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { initLinkedPackages = []; }
+          try { initLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { initLinkedServices = []; }
           if (discountPercent > 0) {
-            discountAmount = Math.round(subtotal * discountPercent / 100);
+            // If linked_services is specified, only discount those services
+            if (initLinkedServices.length > 0) {
+              let linkedSubtotal = 0;
+              for (const item of items) {
+                if (item.service_id && initLinkedServices.indexOf(Number(item.service_id)) !== -1) {
+                  linkedSubtotal += Number(item.subtotal || 0);
+                }
+              }
+              discountAmount = Math.round(linkedSubtotal * discountPercent / 100);
+            } else {
+              discountAmount = Math.round(subtotal * discountPercent / 100);
+            }
           }
           // Load free services
           const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
@@ -395,9 +410,20 @@ app.post('/api/generate-pdf', async (c) => {
       } catch {}
     }
     
-    // Final total = (subtotal - discount) + packagePrice
+    // Package discount: if linked_packages includes selected package
+    let initPkgDiscount = 0;
+    if (discountPercent > 0 && packageData && initLinkedPackages.length > 0) {
+      const pkgId = packageData.package_id || packageData.id;
+      if (pkgId && initLinkedPackages.indexOf(Number(pkgId)) !== -1) {
+        initPkgDiscount = Math.round(packagePrice * discountPercent / 100);
+      }
+    }
+    
+    // Final total = servicesSubtotal - discount + packagePrice - packageDiscount
     const servicesAfterDiscount = discountAmount > 0 ? (subtotal - discountAmount) : subtotal;
-    const finalTotal = discountAmount > 0 ? (servicesAfterDiscount + packagePrice) : frontendTotal;
+    // Always compute finalTotal explicitly: services (after discount) + package price (after pkg discount)
+    // Never trust frontendTotal alone because it may already include packagePrice
+    const finalTotal = servicesAfterDiscount + packagePrice - initPkgDiscount;
 
     // Run template fetch and lead number in parallel for speed
     const [tplRow, lastLead] = await Promise.all([
@@ -491,7 +517,7 @@ app.post('/api/generate-pdf', async (c) => {
       (clientName || clientContact ? '<div class="cli"><strong>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | ' + clientContact : '') + '</div>' : '') +
       (intro ? '<div class="intro">' + intro + '</div>' : '') +
       '<table><thead><tr><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows +
-      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + Number(total).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr></tbody></table>' +
+      '<tr class="tr"><td colspan="3" style="padding:12px;text-align:right">' + L.total + '</td><td style="padding:12px;text-align:right;color:#8B5CF6;font-size:18px;white-space:nowrap">' + Number(finalTotal).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr></tbody></table>' +
       (outro ? '<div class="outro">' + outro + '</div>' : '') +
       (footer ? '<div class="ftr">' + footer + '</div>' : '') +
       '<a class="dlbar" onclick="cleanAndPrint()">' + L.dl + '</a>' +
@@ -522,11 +548,13 @@ app.get('/pdf/:id', async (c) => {
     try { calcData = JSON.parse(lead.calc_data as string); } catch { calcData = { items: [], total: 0 }; }
     const items = calcData.items || [];
     const total = calcData.total || 0;
-    // Always compute services subtotal from items to avoid double-counting package price
-    // (older leads may have subtotal = total which already includes package)
+    // Compute services subtotal ONLY from items array — never fall back to total
+    // because total may already include package price
     let computedSvcSubtotal = 0;
     for (const ci of items) { computedSvcSubtotal += Number(ci.subtotal || 0); }
-    const subtotal = computedSvcSubtotal > 0 ? computedSvcSubtotal : (calcData.servicesSubtotal || calcData.subtotal || total);
+    // Use computed subtotal from items, or servicesSubtotal from saved data, or plain subtotal
+    // NEVER fall back to total — total includes package price and would cause double-counting
+    const subtotal = computedSvcSubtotal > 0 ? computedSvcSubtotal : (calcData.servicesSubtotal || calcData.subtotal || 0);
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
     const refundAmount = Number(lead.refund_amount) || 0;
@@ -539,11 +567,15 @@ app.get('/pdf/:id', async (c) => {
     let refDiscount = 0;
     let refFreeServices: any[] = [];
     let refServiceDiscounts: any[] = [];
+    let refLinkedPackages: number[] = [];
+    let refLinkedServices: number[] = [];
     if (referralCode) {
       try {
         const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
         if (refRow) {
           refDiscount = Number(refRow.discount_percent) || 0;
+          try { refLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { refLinkedPackages = []; }
+          try { refLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { refLinkedServices = []; }
           const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
           for (const fs of (fsRes.results || [])) {
             if ((fs.discount_percent as number) === 0 || (fs.discount_percent as number) >= 100) {
@@ -598,12 +630,32 @@ app.get('/pdf/:id', async (c) => {
     for (const ai of articleItems) { artSubtotal += Number(ai.subtotal || 0); }
     
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    // Apply referral discount ONLY to services, NOT to WB articles
+    // Apply referral discount based on linked_services and linked_packages
     const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
-    // Always recalculate from services base to ensure correctness
-    const servicesBase = calcData.servicesSubtotal || svcSubtotal || subtotal;
-    const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(servicesBase) * calcDiscountPercent / 100) : 0;
-    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + pkgPrice;
+    // Calculate discount base: if linked_services specified, only those services
+    let discountBase = 0;
+    if (calcDiscountPercent > 0 && refLinkedServices.length > 0) {
+      // Only sum services that are in the linked list
+      for (const si of serviceItems) {
+        if (si.service_id && refLinkedServices.indexOf(Number(si.service_id)) !== -1) {
+          discountBase += Number(si.subtotal || 0);
+        }
+      }
+    } else {
+      // No filter — discount applies to all services
+      discountBase = svcSubtotal > 0 ? svcSubtotal : (calcData.servicesSubtotal || subtotal);
+    }
+    const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(discountBase) * calcDiscountPercent / 100) : 0;
+    // Package discount: only if linked_packages includes this package
+    let pkgDiscountAmount = 0;
+    if (calcDiscountPercent > 0 && pkgData && refLinkedPackages.length > 0) {
+      const pkgId = pkgData.package_id || pkgData.id;
+      if (pkgId && refLinkedPackages.indexOf(Number(pkgId)) !== -1) {
+        pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
+      }
+    }
+    // afterDiscount = services subtotal (minus discount if any) + package price (minus pkg discount if any)
+    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + pkgPrice - pkgDiscountAmount;
     const beforeCommission = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
     
     // Load payment method commission
@@ -816,12 +868,15 @@ app.get('/pdf/:id', async (c) => {
         + (pkgOriginalPrice > 0 && pkgOriginalPrice > pkgPrice ? '<span style="background:#059669;color:white;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:700">-' + Math.round((1 - pkgPrice / pkgOriginalPrice) * 100) + '%</span>' : '')
         + '</div></div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
-      + '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.subtotal + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>'
-      + (pkgData ? '<tr style="background:#FFFBEB"><td colspan="4" style="padding:10px 12px;text-align:right;color:#B45309;font-weight:600"><i class="fas fa-box-open" style="margin-right:4px;color:#F59E0B"></i>' + (isEn ? 'Package' : isAm ? '\u0553\u0561\u0569\u0565\u0569' : '\u041f\u0430\u043a\u0435\u0442') + ': ' + (isAm ? (pkgData.name_am || pkgData.name_ru || pkgData.name || '') : (pkgData.name_ru || pkgData.name || '')) + '</td><td style="padding:10px 12px;text-align:right;color:#B45309;font-weight:700;font-size:15px;white-space:nowrap">+' + pkgPrice.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
+      // Subtotal row: only show if there are actual service items (subtotal > 0)
+      + (Number(subtotal) > 0 ? '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.subtotal + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>' : '')
+      // Package row: show package price as addition if services exist, or as standalone
+      + (pkgData && Number(subtotal) > 0 ? '<tr style="background:#FFFBEB"><td colspan="4" style="padding:10px 12px;text-align:right;color:#B45309;font-weight:600"><i class="fas fa-box-open" style="margin-right:4px;color:#F59E0B"></i>' + (isEn ? 'Package' : isAm ? '\u0553\u0561\u0569\u0565\u0569' : '\u041f\u0430\u043a\u0435\u0442') + ': ' + (isAm ? (pkgData.name_am || pkgData.name_ru || pkgData.name || '') : (pkgData.name_ru || pkgData.name || '')) + '</td><td style="padding:10px 12px;text-align:right;color:#B45309;font-weight:700;font-size:15px;white-space:nowrap">+' + pkgPrice.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (calcDiscountAmount > 0 && articleItems.length === 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (refundAmount > 0 ? '<tr style="background:#fef2f2"><td colspan="4" style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:600">' + (isEn ? 'Refund:' : isAm ? '\u054e\u0565\u0580\u0561\u0564\u0561\u0580\u0571:' : '\u0412\u043e\u0437\u0432\u0440\u0430\u0442:') + '</td><td style="padding:10px 12px;text-align:right;color:#DC2626;font-weight:700;font-size:15px;white-space:nowrap">-' + Number(refundAmount).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (pmCommissionAmt > 0 ? '<tr style="background:#eff6ff"><td colspan="4" style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:600"><i class="fas fa-credit-card" style="margin-right:4px"></i>' + (isEn ? 'Payment commission' : isAm ? '\u054e\u0573\u0561\u0580\u0574\u0561\u0576 \u0574\u056b\u057b\u0576\u0578\u0580\u0564\u0561\u057e\u0573\u0561\u0580' : '\u041a\u043e\u043c\u0438\u0441\u0441\u0438\u044f \u0437\u0430 \u043e\u043f\u043b\u0430\u0442\u0443') + ' (' + (isAm ? pmNameAm : pmName) + ' ' + pmCommissionPct + '%):</td><td style="padding:10px 12px;text-align:right;color:#2563EB;font-weight:700;font-size:15px;white-space:nowrap">+' + pmCommissionAmt.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
-      + ((calcDiscountAmount > 0 || refundAmount > 0 || pmCommissionAmt > 0 || pkgPrice > 0) ? '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + L.total + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>' : '')
+      // TOTAL row: always show when there are adjustments (discount, refund, commission, package+services); for package-only, just show the total
+      + '<tr style="background:#f0fdf4"><td colspan="4" style="padding:12px;text-align:right;font-weight:800;font-size:15px">' + L.total + '</td><td style="padding:12px;text-align:right;color:#059669;font-weight:900;font-size:18px;white-space:nowrap">' + totalFormatted + '\u00a0\u058f</td></tr>'
       + '</tbody></table>'
       + (outro ? '<div class="outro">' + outro + '</div>' : '')
       + (terms ? '<div class="terms-box"><div class="terms-title"><i class="fas fa-gavel" style="margin-right:4px"></i>' + L.terms + '</div>' + terms + '</div>' : '')
@@ -898,12 +953,20 @@ app.post('/api/referral/check', async (c) => {
       }));
     } catch {}
     
+    // Parse linked_packages and linked_services
+    let linkedPackages: number[] = [];
+    let linkedServices: number[] = [];
+    try { linkedPackages = JSON.parse((row.linked_packages as string) || '[]'); } catch { linkedPackages = []; }
+    try { linkedServices = JSON.parse((row.linked_services as string) || '[]'); } catch { linkedServices = []; }
+    
     return c.json({
       valid: true,
       discount_percent: row.discount_percent,
-      free_reviews: row.free_reviews,
       description: row.description,
-      free_services: freeServices
+      free_services: freeServices,
+      linked_packages: linkedPackages,
+      linked_services: linkedServices,
+      apply_to_packages: row.apply_to_packages || 0
     });
   } catch { return c.json({ valid: false }); }
 })
@@ -1274,18 +1337,23 @@ a{text-decoration:none;color:inherit}
 img{max-width:100%;height:auto}
 .header{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 0;transition:var(--t);background:rgba(15,10,26,0.8);backdrop-filter:blur(20px);border-bottom:1px solid transparent;width:100%}
 .header.scrolled{border-bottom:1px solid var(--border);background:rgba(15,10,26,0.95)}
-.nav{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.nav{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:nowrap}
 .logo{display:flex;align-items:center;gap:12px}
 .logo img{height:44px;width:auto;border-radius:8px}
 .logo-text{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;white-space:nowrap}
-.nav-links{display:flex;align-items:center;gap:24px;list-style:none}
-.nav-links a{font-size:0.88rem;font-weight:500;color:var(--text-sec);transition:var(--t)}
+@media(max-width:1100px){.nav-links{gap:1px}.nav-links a{font-size:0.72rem;padding:4px 5px}.nav-cta{padding:6px 10px;font-size:0.72rem}.logo-text{font-size:1rem}}
+@media(max-width:1000px){.logo-text{display:none}.nav-links a{font-size:0.7rem;padding:4px 4px}.lang-btn{padding:5px 10px;font-size:0.72rem}}
+@media(max-width:900px){.nav-links{display:none}.hamburger{display:flex;z-index:10001;position:relative}.nav-right .nav-cta{display:none}}
+.nav-links{display:flex;align-items:center;gap:4px;list-style:none;flex:1;justify-content:center;min-width:0;flex-wrap:nowrap;overflow:hidden}
+.nav-links a{font-size:clamp(0.65rem,0.78vw,0.85rem);font-weight:500;color:var(--text-sec);transition:var(--t);white-space:nowrap;padding:5px 7px;border-radius:6px;text-overflow:ellipsis;overflow:hidden}
 .nav-links a:hover{color:var(--text)}
-.nav-right{display:flex;align-items:center;gap:12px}
+.nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .lang-switch{display:flex;background:var(--bg-card);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
-.lang-btn{padding:6px 14px;font-size:0.78rem;font-weight:600;cursor:pointer;transition:var(--t);background:transparent;border:none;color:var(--text-muted)}
-.lang-btn.active{background:var(--purple);color:white}
-.nav-cta{padding:10px 22px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white!important;border-radius:var(--r-sm);font-weight:600;font-size:0.88rem;transition:var(--t);display:flex;align-items:center;gap:8px}
+.lang-btn{padding:5px 10px;font-size:1.1rem;cursor:pointer;transition:var(--t);background:transparent;border:none;color:var(--text-muted);line-height:1;display:flex;align-items:center;justify-content:center}
+.lang-btn.active{background:var(--purple)}
+.lang-btn .lang-text{display:none}
+.lang-btn .lang-flag{font-size:1.2rem}
+.nav-cta{padding:8px 16px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white!important;border-radius:var(--r-sm);font-weight:600;font-size:clamp(0.72rem,0.8vw,0.88rem);transition:var(--t);display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0}
 .nav-cta:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.4)}
 .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:8px}
 .hamburger span{width:24px;height:2px;background:var(--text);transition:var(--t);border-radius:2px}
@@ -1293,6 +1361,19 @@ img{max-width:100%;height:auto}
 .hamburger.active span:nth-child(2){opacity:0}
 .hamburger.active span:nth-child(3){transform:rotate(-45deg) translate(5px,-5px)}
 .nav-mobile-cta{display:none}
+/* Bottom Navigation Bar - mobile only */
+.bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(15,10,26,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
+.bottom-nav-items{display:flex;justify-content:space-around;align-items:center;gap:2px}
+.bottom-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.62rem;font-weight:500;transition:var(--t);flex:1;min-width:0;cursor:pointer;background:none;border:none}
+.bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
+.bottom-nav-item i{font-size:1.1rem}
+.bottom-nav-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bottom-nav-more{position:relative}
+.bottom-nav-more-menu{display:none;position:absolute;bottom:100%;right:0;margin-bottom:8px;background:rgba(15,10,26,0.98);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:0 -8px 30px rgba(0,0,0,0.4)}
+.bottom-nav-more-menu.active{display:block}
+.bottom-nav-more-menu a{display:flex;align-items:center;gap:10px;padding:10px 14px;color:var(--text);font-size:0.88rem;font-weight:500;border-radius:8px;text-decoration:none;transition:var(--t)}
+.bottom-nav-more-menu a:hover{background:rgba(139,92,246,0.15);color:var(--purple)}
+.bottom-nav-more-menu a i{width:20px;text-align:center;color:var(--purple);font-size:0.9rem}
 .hero{padding:140px 0 80px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
 .hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start}
@@ -1329,6 +1410,7 @@ img{max-width:100%;height:auto}
 .section{padding:56px 0;opacity:0;transform:translateY(20px);transition:opacity 0.6s ease,transform 0.6s ease;overflow:visible}
 .section.section-revealed{opacity:1;transform:translateY(0)}
 html.server-injected .section,html.server-injected .ticker,html.server-injected .stats-bar,html.server-injected .wb-banner,html.server-injected .slot-counter-bar,html.server-injected .footer{opacity:1!important;transform:translateY(0)!important}
+html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!important}
 .section-dark{background:var(--bg-surface)}
 .section-header{text-align:center;margin-bottom:40px}
 /* Tighter header for reviews */
@@ -1358,28 +1440,51 @@ html.server-injected .section,html.server-injected .ticker,html.server-injected 
 .calc-tab:hover:not(.active){border-color:var(--purple);color:var(--text)}
 .calc-group{display:none}
 .calc-group.active{display:block}
-.calc-packages{margin-bottom:28px;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(249,115,22,0.02));border:1px solid rgba(245,158,11,0.15);border-radius:16px}
+.calc-packages{margin-bottom:28px;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(249,115,22,0.02));border:1px solid rgba(245,158,11,0.15);border-radius:16px;overflow:visible}
 .calc-packages-header{text-align:center;margin-bottom:20px}
 .calc-packages-title{font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--text)}
 .calc-packages-subtitle{font-size:0.85rem;color:var(--text-muted);margin-top:6px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5}
-.calc-packages-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;justify-items:center}
-.calc-packages-grid.single-pkg{grid-template-columns:1fr;max-width:400px;margin:0 auto}
-.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;width:100%;display:flex;flex-direction:column}
+.calc-packages-grid{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:nowrap;padding:20px 10px;overflow:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.calc-packages-grid::-webkit-scrollbar{display:none}
+.calc-packages-grid.single-pkg{max-width:400px;margin:0 auto}
+.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;flex:1 1 0;min-width:180px;max-width:280px;display:flex;flex-direction:column}
+
 .calc-pkg-card:hover{border-color:#f59e0b;transform:translateY(-3px);box-shadow:0 12px 30px rgba(245,158,11,0.12)}
 .calc-pkg-card.selected{border-color:#f59e0b;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(249,115,22,0.03));box-shadow:0 0 0 3px rgba(245,158,11,0.2),0 8px 20px rgba(245,158,11,0.1)}
-.calc-pkg-card.selected::after{content:'\u2713';position:absolute;top:12px;left:12px;width:24px;height:24px;background:#f59e0b;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.75rem;font-weight:700}
+.calc-pkg-card.selected::after{content:'\u2713';position:absolute;top:14px;left:14px;width:22px;height:22px;background:#f59e0b;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;z-index:10}
 .calc-pkg-card .pkg-badge{position:absolute;top:12px;right:12px;background:linear-gradient(135deg,#8B5CF6,#a78bfa);color:white;font-size:0.7rem;padding:4px 10px;border-radius:12px;font-weight:700;letter-spacing:0.3px}
-.calc-pkg-card .pkg-popular{position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,#f59e0b,#f97316,#ef4444)}
-.calc-pkg-card .pkg-name{font-weight:700;font-size:1rem;margin-bottom:6px;margin-top:4px;line-height:1.3}
+.calc-pkg-card .pkg-popular{position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#f59e0b,#f97316,#ef4444);z-index:4}
+.calc-pkg-card .pkg-crown{position:absolute;top:10px;right:10px;display:flex;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))}
+.calc-pkg-card .pkg-tier-badge{position:absolute;top:0;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:0.72rem;padding:4px 14px;border-radius:0 0 12px 12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(245,158,11,0.3)}
+.calc-pkg-card.pkg-crown-gold{border:2px solid rgba(255,215,0,0.35);border-top:4px solid #FFD700;box-shadow:0 0 12px rgba(255,215,0,0.1),0 0 24px rgba(255,215,0,0.05);z-index:3;padding:24px 22px;min-height:auto;background:linear-gradient(145deg,var(--bg-surface),rgba(255,215,0,0.03));transform:scale(1.03)}
+.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.08rem}
+.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}
+.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem}
+.calc-pkg-card.pkg-crown-gold .pkg-crown{display:none}
+.calc-pkg-card.pkg-crown-gold:hover{border-color:#FFD700;box-shadow:0 0 18px rgba(255,215,0,0.15),0 4px 16px rgba(255,215,0,0.1);transform:scale(1.03) translateY(-3px)}
+.calc-pkg-card.pkg-crown-gold::before{display:none}
+.calc-pkg-card.pkg-crown-silver{border:2px solid rgba(192,192,192,0.3);border-top:3px solid #C0C0C0;box-shadow:0 0 6px rgba(192,192,192,0.04);z-index:2;padding:20px 19px;min-height:auto;background:linear-gradient(145deg,var(--bg-surface),rgba(192,192,192,0.01))}
+.calc-pkg-card.pkg-crown-silver .pkg-name{font-size:1.02rem}
+.calc-pkg-card.pkg-crown-silver .pkg-new-price{font-size:1.28rem}
+.calc-pkg-card.pkg-crown-silver .pkg-crown{display:none}
+.calc-pkg-card.pkg-crown-silver:hover{border-color:#C0C0C0;box-shadow:0 6px 22px rgba(192,192,192,0.15);transform:translateY(-3px)}
+.calc-pkg-card.pkg-crown-silver::before{display:none}
+.calc-pkg-card.pkg-crown-bronze{border:2px solid rgba(205,127,50,0.25);border-top:3px solid #CD7F32;box-shadow:0 0 5px rgba(205,127,50,0.03);z-index:1;padding:20px 18px;min-height:auto}
+.calc-pkg-card.pkg-crown-bronze .pkg-name{font-size:1rem}
+.calc-pkg-card.pkg-crown-bronze .pkg-new-price{font-size:1.25rem}
+.calc-pkg-card.pkg-crown-bronze .pkg-crown{display:none}
+.calc-pkg-card.pkg-crown-bronze:hover{border-color:#CD7F32;box-shadow:0 5px 18px rgba(205,127,50,0.12);transform:translateY(-3px)}
+.calc-pkg-card.pkg-crown-bronze::before{display:none}
+.calc-pkg-card .pkg-name{font-weight:700;font-size:1rem;margin-bottom:6px;margin-top:18px;line-height:1.3}
 .calc-pkg-card .pkg-desc{font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;flex-grow:1}
 .calc-pkg-card .pkg-prices{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
 .calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.85rem}
 .calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.25rem;color:#f59e0b}
 .calc-pkg-card .pkg-discount{background:linear-gradient(135deg,#059669,#10B981);color:white;font-size:0.7rem;padding:3px 8px;border-radius:10px;font-weight:700}
-.calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.7;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
-.calc-pkg-card .pkg-items div{display:flex;align-items:center;gap:4px}
-.calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0}
-@media(max-width:600px){.calc-packages{padding:16px}.calc-packages-grid{grid-template-columns:1fr;gap:12px}.calc-packages-grid.single-pkg{max-width:100%}.calc-pkg-card{padding:16px}.calc-pkg-card .pkg-name{font-size:0.95rem}.calc-packages-title{font-size:1.05rem}}
+.calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
+.calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
+.calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:hidden;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow:visible;gap:12px;padding:12px 0;scrollbar-width:none;justify-content:flex-start;will-change:transform}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 72vw;max-width:72vw;min-width:0;padding:18px 16px;overflow:hidden}.calc-pkg-card.pkg-crown-gold{padding:20px 18px;min-height:auto;flex:0 0 74vw;max-width:74vw;transform:none;box-shadow:0 0 16px rgba(255,215,0,0.12),0 0 32px rgba(255,215,0,0.06)}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:17px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.95rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -1771,17 +1876,17 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .buyout-grid{grid-template-columns:1fr 1fr}
   .stats-grid{grid-template-columns:repeat(2,1fr)}
 }
-@media(max-width:768px){
-  .logo-text{display:none}
-  .nav-links{display:none;position:fixed;top:0;left:0;right:0;bottom:0;width:100%;height:100vh;background:rgba(15,10,26,0.98);flex-direction:column;justify-content:center;align-items:center;gap:28px;padding:80px 20px 20px;z-index:10000;overflow-y:auto}
-  .nav-links.active{display:flex !important}
-  .nav-links li{list-style:none;width:100%;text-align:center}
-  .nav-links a{font-size:1.3rem;display:block;padding:14px 20px;color:#fff;border-radius:12px;transition:background 0.2s;font-weight:600}
-  .nav-links a:hover,.nav-links a:active{background:rgba(139,92,246,0.2)}
-  .nav-mobile-cta{display:list-item;list-style:none;margin-top:16px;width:100%;text-align:center}
-  .nav-mobile-cta .btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;font-size:1.1rem;border-radius:12px;font-weight:700}
-  .hamburger{display:flex;z-index:10001;position:relative}
+@media(max-width:900px){
+  .nav-links{display:none!important}
+  .nav-mobile-cta{display:none!important}
+  .hamburger{display:none!important}
   .nav-right .nav-cta{display:none}
+  .bottom-nav{display:block}
+  body{padding-bottom:64px}
+  .tg-float{display:none!important}
+  .calc-float{display:none!important}
+}
+@media(max-width:768px){
   .hero{padding:110px 0 60px}
   .hero h1{font-size:1.9rem}
   .hero-stats{flex-wrap:wrap;gap:20px}
@@ -1803,10 +1908,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .form-card{padding:28px}
   .footer-grid{grid-template-columns:1fr}
   .footer-bottom{flex-direction:column;gap:8px;text-align:center}
-  .tg-float span{display:none}
-  .tg-float{padding:16px;border-radius:50%;bottom:76px}
-  .calc-float span{display:none}
-  .calc-float{padding:16px;border-radius:50%}
+  .tg-float{display:none!important}
+  .calc-float{display:none!important}
   .popup-card .pf-row{grid-template-columns:1fr}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
@@ -1984,8 +2087,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
-      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')">RU</button>
-      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')">AM</button>
+      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag">\u{1F1F7}\u{1F1FA}</span></button>
+      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag">\u{1F1E6}\u{1F1F2}</span></button>
     </div>
     <a href="https://wa.me/37441888389" target="_blank" class="nav-cta">
       <i class="fab fa-whatsapp"></i>
@@ -2699,9 +2802,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </div>
   <div class="form-card fade-up">
     <form id="leadForm" onsubmit="submitForm(event)">
-      <div class="form-group"><label data-ru="Ваше имя" data-am="Ձեր անունը">Ваше имя</label><input type="text" id="formName" required placeholder="Имя / Անուն"></div>
-      <div class="form-group"><label data-ru="Telegram / Телефон" data-am="Telegram / Հեռախոս">Telegram / Телефон</label><input type="text" id="formContact" required placeholder="@username / +374..."></div>
-      <div class="form-group"><label data-ru="Что продаёте на WB?" data-am="Ինչ եք վաճառում WB-ում։">Что продаёте на WB?</label><input type="text" id="formProduct" placeholder="Одежда, электроника..."></div>
+      <div class="form-group"><label data-ru="Ваше имя" data-am="Ձեր անունը">Ваше имя</label><input type="text" id="formName" required placeholder="Անուն" data-placeholder-ru="Имя" data-placeholder-am="Անուն"></div>
+      <div class="form-group"><label data-ru="Telegram / Телефон" data-am="Telegram / Հեռախոս">Telegram / Телефон</label><input type="text" id="formContact" required placeholder="@username / +374..." data-placeholder-ru="@username / +374..." data-placeholder-am="@username կամ +374..."></div>
+      <div class="form-group"><label data-ru="Что продаёте на WB?" data-am="Ինչ եք վաճառում WB-ում։">Что продаёте на WB?</label><input type="text" id="formProduct" placeholder="Одежда, электроника..." data-placeholder-ru="Одежда, электроника..." data-placeholder-am="Հագուստ, էլեկտրոնիկա..."></div>
       <div class="form-group"><label data-ru="Какие услуги интересуют?" data-am="Ինչ ծառայություններ են հետաքրքրում։">Какие услуги интересуют?</label>
         <select id="formService">
           <option value="buyouts" data-ru="Выкупы" data-am="Գնումներ">Выкупы</option>
@@ -2710,7 +2813,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
           <option value="complex" data-ru="Комплекс услуг" data-am="Ծառայությունների փաթեթ" selected>Комплекс услуг</option>
         </select>
       </div>
-      <div class="form-group"><label data-ru="Комментарий (необязательно)" data-am="Մեկնաբանություն (ոչ պարտադիր)">Комментарий (необязательно)</label><textarea id="formMessage" placeholder="Опишите ваш товар..."></textarea></div>
+      <div class="form-group"><label data-ru="Комментарий (необязательно)" data-am="Մեկնաբանություն (ոչ պարտադիր)">Комментарий (необязательно)</label><textarea id="formMessage" placeholder="Опишите ваш товар..." data-placeholder-ru="Опишите ваш товар..." data-placeholder-am="Նկարագրեք ձեր ապրանքը..."></textarea></div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
         <i class="fas fa-paper-plane"></i>
         <span data-ru="Отправить заявку" data-am="Ուղարկել հայտը">Отправить заявку</span>
@@ -2784,21 +2887,21 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <form id="popupForm">
         <div class="pf-group">
           <label class="pf-label" data-ru="Ваше имя" data-am="Ձեր անունը" data-no-rewrite="1">Ваше имя</label>
-          <input class="pf-input" type="text" id="popupName" required placeholder="Имя / Անուն">
+          <input class="pf-input" type="text" id="popupName" required placeholder="Անուն" data-placeholder-ru="Имя" data-placeholder-am="Անուն">
         </div>
         <div class="pf-row">
           <div class="pf-group">
             <label class="pf-label" data-ru="Сколько выкупов нужно?" data-am="Քանի գնում է պետք։">Сколько выкупов нужно?</label>
-            <input class="pf-input" type="number" id="popupBuyouts" min="0" placeholder="Напр: 20" required>
+            <input class="pf-input" type="number" id="popupBuyouts" min="0" placeholder="Напр: 20" required data-placeholder-ru="Напр: 20" data-placeholder-am="Օրինակ: 20">
           </div>
           <div class="pf-group">
             <label class="pf-label" data-ru="Сколько отзывов нужно?" data-am="Քանի կարծիք է պետք։">Сколько отзывов нужно?</label>
-            <input class="pf-input" type="number" id="popupReviews" min="0" placeholder="Напр: 10" required>
+            <input class="pf-input" type="number" id="popupReviews" min="0" placeholder="Напр: 10" required data-placeholder-ru="Напр: 10" data-placeholder-am="Օրինակ: 10">
           </div>
         </div>
         <div class="pf-group">
           <label class="pf-label" data-ru="Ваш Telegram или телефон" data-am="Ձեր Telegram-ը կամ հեռախосը">Ваш Telegram или телефон</label>
-          <input class="pf-input" type="text" id="popupContact" required placeholder="@username или +374...">
+          <input class="pf-input" type="text" id="popupContact" required placeholder="@username или +374..." data-placeholder-ru="@username или +374..." data-placeholder-am="@username կամ +374...">
         </div>
         <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:12px">
           <i class="fas fa-paper-plane"></i>
@@ -2850,6 +2953,10 @@ function switchLang(l) {
     const t = el.getAttribute('data-' + l);
     if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
+  // Update input placeholders for current language
+  document.querySelectorAll('[data-placeholder-' + l + ']').forEach(function(el) {
+    el.placeholder = el.getAttribute('data-placeholder-' + l) || '';
+  });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
   // Update URL path to /am or /ru (without page reload) so shared links carry language
   var newPath = l === 'am' ? '/am' : '/ru';
@@ -2895,6 +3002,26 @@ function closeMenu() {
   document.getElementById('hamburger').classList.remove('active');
   document.body.style.overflow = '';
 }
+
+function toggleBottomMore(e) {
+  if (e) e.stopPropagation();
+  var menu = document.getElementById('bottomMoreMenu');
+  if (menu) menu.classList.toggle('active');
+}
+// Close bottom more menu on outside click
+document.addEventListener('click', function(e) {
+  var menu = document.getElementById('bottomMoreMenu');
+  var btn = document.getElementById('bottomNavMore');
+  if (menu && btn && !btn.contains(e.target)) menu.classList.remove('active');
+});
+// Close bottom more menu on link click
+document.addEventListener('click', function(e) {
+  var link = e.target.closest('.bottom-nav-more-menu a');
+  if (link) {
+    var menu = document.getElementById('bottomMoreMenu');
+    if (menu) menu.classList.remove('active');
+  }
+});
 
 document.querySelectorAll('.nav-links a').forEach(function(a) {
   a.addEventListener('click', function(e) {
@@ -3460,6 +3587,8 @@ function getSelectedPackage() {
 
 function recalcDynamic() {
   var total = 0, items = [];
+  var linkedTotal = 0; // subtotal of services that match linked_services
+  var hasLinkedFilter = typeof _refLinkedServices !== 'undefined' && _refLinkedServices.length > 0;
   // ALL calc groups (not just active) — collect from all
   document.querySelectorAll('.calc-row[data-price="tiered"]').forEach(function(row) {
     var inp = row.querySelector('.calc-input input');
@@ -3467,7 +3596,10 @@ function recalcDynamic() {
     if (qty > 0) {
       try {
         var tiers = JSON.parse(row.getAttribute('data-tiers'));
-        total += getTierTotal(tiers, qty);
+        var rowTotal = getTierTotal(tiers, qty);
+        total += rowTotal;
+        var svcId = parseInt(row.getAttribute('data-svc-id') || '0');
+        if (!hasLinkedFilter || _refLinkedServices.indexOf(svcId) !== -1) linkedTotal += rowTotal;
         var label = row.querySelector('.calc-label');
         var labelText = label ? label.textContent : '';
         var pcsWord = lang === 'am' ? 'հատ' : 'шт';
@@ -3480,13 +3612,16 @@ function recalcDynamic() {
     var inp = row.querySelector('.calc-input input');
     var qty = parseInt(inp ? inp.value : 0);
     if (!isNaN(price) && qty > 0) {
-      total += price * qty;
+      var rowTotal = price * qty;
+      total += rowTotal;
+      var svcId = parseInt(row.getAttribute('data-svc-id') || '0');
+      if (!hasLinkedFilter || _refLinkedServices.indexOf(svcId) !== -1) linkedTotal += rowTotal;
       var label = row.querySelector('.calc-label');
       var labelText = label ? label.textContent : '';
       items.push(labelText + ': ' + qty);
     }
   });
-  // Add package price (discount NOT applied to packages)
+  // Add package price
   var servicesTotal = total; // services subtotal before package
   var selectedPkg = getSelectedPackage();
   var packageAmount = 0;
@@ -3494,13 +3629,24 @@ function recalcDynamic() {
     packageAmount = selectedPkg.package_price || 0;
     total += packageAmount;
   }
-  // Apply referral discount only to services, not to package
+  // Apply referral discount based on linked services and packages
   var subtotalBeforeDiscount = total;
   var discountAmount = 0;
-  if (typeof _refDiscount !== 'undefined' && _refDiscount > 0 && servicesTotal > 0) {
-    discountAmount = Math.round(servicesTotal * _refDiscount / 100);
-    total = total - discountAmount;
+  var packageDiscountAmount = 0;
+  if (typeof _refDiscount !== 'undefined' && _refDiscount > 0) {
+    // Discount on services: if linked_services is empty → all services; otherwise only linked ones
+    var discountableServices = hasLinkedFilter ? linkedTotal : servicesTotal;
+    if (discountableServices > 0) {
+      discountAmount = Math.round(discountableServices * _refDiscount / 100);
+      total = total - discountAmount;
+    }
+    // Discount on package: only if linked_packages contains the selected package
+    if (selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.indexOf(selectedPkg.id) !== -1) {
+      packageDiscountAmount = Math.round(packageAmount * _refDiscount / 100);
+      total = total - packageDiscountAmount;
+    }
   }
+  var totalDiscountAmount = discountAmount + packageDiscountAmount;
   var calcTotalEl = document.getElementById('calcTotal');
   calcTotalEl.setAttribute('data-total', total);
   // Store package data for PDF submission
@@ -3511,34 +3657,61 @@ function recalcDynamic() {
   if (selectedPkg && packageAmount > 0) {
     totalHtml += '<div style="font-size:0.78rem;color:#f59e0b;margin-bottom:2px"><i class="fas fa-box-open" style="margin-right:4px"></i>' + (lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru) + ': ' + formatNum(packageAmount) + ' \u058f</div>';
   }
-  if (discountAmount > 0 && subtotalBeforeDiscount > 0) {
+  if (totalDiscountAmount > 0 && subtotalBeforeDiscount > 0) {
     calcTotalEl.innerHTML = totalHtml + '<div class="calc-total-prices">' +
       '<span class="calc-old-price">' + formatNum(subtotalBeforeDiscount) + ' \u058f</span>' +
       '<span>' + formatNum(total) + ' \u058f</span>' +
       '</div>' +
       '<div class="calc-discount-line"><i class="fas fa-gift" style="margin-right:4px"></i>' +
-      (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573) + ': -' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(discountAmount) + ' \u058f (-' + _refDiscount + '%)</div>';
+      (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573) + ': -' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(totalDiscountAmount) + ' \u058f (-' + _refDiscount + '%)</div>';
   } else if (totalHtml) {
     calcTotalEl.innerHTML = totalHtml + '<span>' + formatNum(total) + ' \u058f</span>';
   } else {
     calcTotalEl.textContent = formatNum(total) + ' \u058f';
   }
-  // Update promo result with live discount amount
+  // Update promo result with live discount amount  
   var refResultEl = document.getElementById('refResult');
   if (refResultEl && refResultEl.style.display !== 'none' && _refDiscount > 0) {
-    var _amActivated = String.fromCharCode(0x054a,0x0580,0x0578,0x0574,0x0578,0x056f,0x0578,0x0564,0x0568,0x20,0x0561,0x056f,0x057f,0x056b,0x057e,0x0561,0x0581,0x057e,0x0561,0x056e,0x20,0x0567,0x21);
-    var _amDiscount = String.fromCharCode(0x0536,0x0565,0x0572,0x0573,0x3a,0x20);
-    var promoMsg = lang === 'am'
-      ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>' + _amActivated
-      : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0430\u043a\u0442\u0438\u0432\u0438\u0440\u043e\u0432\u0430\u043d!';
-    promoMsg += '<br><span style="font-size:0.85rem;font-weight:700;color:var(--success)">';
-    if (subtotalBeforeDiscount > 0) {
-      promoMsg += (lang === 'am' ? _amDiscount + '-' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(discountAmount) + ' \u058f (-' + _refDiscount + '%)';
+    // Check if promo matches selected package
+    var pkgMismatch = selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.indexOf(selectedPkg.id) === -1;
+    if (pkgMismatch) {
+      // Show red error for package mismatch, but still show green service discount if applicable
+      var errMsg = lang === 'am'
+        ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u054f\u057e\u0575\u0561\u056c \u057a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u0568 \u0579\u056b \u0576\u0565\u0580\u0561\u057c\u0578\u0582\u0574 \u057f\u057e\u0575\u0561\u056c \u0583\u0561\u0569\u0565\u0569\u0568\u0589'
+        : '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u042d\u0442\u043e\u0442 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u043d\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 \u043d\u0430 \u0434\u0430\u043d\u043d\u044b\u0439 \u043f\u0430\u043a\u0435\u0442';
+      if (discountAmount > 0) {
+        errMsg += '<br><span style="font-size:0.85rem;font-weight:700;color:var(--success)">' + 
+          (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573,0x20,0x056e,0x0561,0x057c,0x0561,0x0575,0x0578,0x0582,0x0569,0x0575,0x0578,0x0582,0x0576,0x0576,0x0565,0x0580,0x056b,0x3a,0x20,0x2d) : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438: -') + formatNum(discountAmount) + ' \u058f</span>';
+      }
+      refResultEl.innerHTML = errMsg;
+      if (discountAmount > 0) {
+        // Dual display: red error for package + separate green for services
+        refResultEl.style.background = 'linear-gradient(180deg, rgba(239,68,68,0.1) 0%, rgba(16,185,129,0.08) 100%)';
+        refResultEl.style.border = '1px solid rgba(239,68,68,0.3)';
+        refResultEl.style.color = 'var(--danger)';
+      } else {
+        refResultEl.style.background = 'rgba(239,68,68,0.1)';
+        refResultEl.style.border = '1px solid rgba(239,68,68,0.3)';
+        refResultEl.style.color = 'var(--danger)';
+      }
     } else {
-      promoMsg += (lang === 'am' ? _amDiscount : '\u0421\u043a\u0438\u0434\u043a\u0430: ') + _refDiscount + '%';
+      var _amActivated = String.fromCharCode(0x054a,0x0580,0x0578,0x0574,0x0578,0x056f,0x0578,0x0564,0x0568,0x20,0x0561,0x056f,0x057f,0x056b,0x057e,0x0561,0x0581,0x057e,0x0561,0x056e,0x20,0x0567,0x21);
+      var _amDiscount = String.fromCharCode(0x0536,0x0565,0x0572,0x0573,0x3a,0x20);
+      var promoMsg = lang === 'am'
+        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>' + _amActivated
+        : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0430\u043a\u0442\u0438\u0432\u0438\u0440\u043e\u0432\u0430\u043d!';
+      promoMsg += '<br><span style="font-size:0.85rem;font-weight:700;color:var(--success)">';
+      if (subtotalBeforeDiscount > 0) {
+        promoMsg += (lang === 'am' ? _amDiscount + '-' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(totalDiscountAmount) + ' \u058f (-' + _refDiscount + '%)';
+      } else {
+        promoMsg += (lang === 'am' ? _amDiscount : '\u0421\u043a\u0438\u0434\u043a\u0430: ') + _refDiscount + '%';
+      }
+      promoMsg += '</span>';
+      refResultEl.style.background = 'rgba(16,185,129,0.1)';
+      refResultEl.style.border = '1px solid rgba(16,185,129,0.3)';
+      refResultEl.style.color = 'var(--success)';
+      refResultEl.innerHTML = promoMsg;
     }
-    promoMsg += '</span>';
-    refResultEl.innerHTML = promoMsg;
   }
   var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || 'https://t.me/goo_to_top';
   var greeting = lang === 'am' ? 'Ողջույն! Ուզում եմ պատվիրել:' : 'Здравствуйте! Хочу заказать:';
@@ -3547,9 +3720,6 @@ function recalcDynamic() {
   if (discountAmount > 0) {
     var refCode = document.getElementById('refCodeInput') ? document.getElementById('refCodeInput').value : '';
     msg += '\\n\\n' + (lang === 'am' ? 'Պրոմոկոդ: ' : 'Промокод: ') + refCode + ' (-' + _refDiscount + '%, -' + formatNum(discountAmount) + ' ֏)';
-  }
-  if (typeof _refFreeReviews !== 'undefined' && _refFreeReviews > 0) {
-    msg += '\\n' + (lang === 'am' ? 'Անվճար կարծիքներ: ' : 'Бесплатных отзывов: ') + _refFreeReviews;
   }
   msg += '\\n\\n' + totalLabel + ' ' + formatNum(total) + ' ֏';
   var isWaCalc = tgUrl.includes('wa.me') || tgUrl.includes('whatsapp');
@@ -3828,7 +3998,7 @@ switchLang = function(l) {
             if (hasTiers && tiers && tiers.length > 0) {
               var svcId = 'tiered_' + svc.id;
               var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
-              gh += '<div class="calc-row" data-price="tiered" data-tiers="'+tiersAttr+'" id="row_'+svcId+'">';
+              gh += '<div class="calc-row" data-price="tiered" data-tiers="'+tiersAttr+'" data-svc-id="'+svc.id+'" id="row_'+svcId+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang==='am' ? svc.name_am : svc.name_ru) + '</div>';
               gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ֏</div>';
               gh += '<div class="calc-input"><button onclick="ccTiered(&apos;'+svcId+'&apos;,-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(&apos;'+svcId+'&apos;)"><button onclick="ccTiered(&apos;'+svcId+'&apos;,1)">+</button></div>';
@@ -3839,7 +4009,7 @@ switchLang = function(l) {
                 return range + ' → ' + formatNum(t.price) + ' ֏'; 
               }).join(' &nbsp;|&nbsp; ') + '</span></div>';
             } else {
-              gh += '<div class="calc-row" data-price="'+svc.price+'">';
+              gh += '<div class="calc-row" data-price="'+svc.price+'" data-svc-id="'+svc.id+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">'+(lang==='am' ? svc.name_am : svc.name_ru)+'</div>';
               gh += '<div class="calc-price">'+formatNum(svc.price)+' ֏</div>';
               gh += '<div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalcDynamic()" oninput="recalcDynamic()"><button onclick="cc(this,1)">+</button></div>';
@@ -3869,14 +4039,33 @@ switchLang = function(l) {
         }
         ph += '</div>';
         ph += '<div class="calc-packages-grid' + (isSingle ? ' single-pkg' : '') + '">';
-        for (var pki = 0; pki < db.packages.length; pki++) {
-          var pk = db.packages[pki];
+        // Sort: cheaper packages left, gold center, expensive right
+        var sortedPkgs = db.packages.slice();
+        var _goldPkg = null;
+        var _otherPkgs = [];
+        for (var _gi = 0; _gi < sortedPkgs.length; _gi++) {
+          var _gc = sortedPkgs[_gi].crown_tier || (sortedPkgs[_gi].is_popular ? 'gold' : '');
+          if (_gc === 'gold' && !_goldPkg) { _goldPkg = sortedPkgs[_gi]; }
+          else { _otherPkgs.push(sortedPkgs[_gi]); }
+        }
+        _otherPkgs.sort(function(a, b) { return (a.package_price || 0) - (b.package_price || 0); });
+        if (_goldPkg) {
+          // cheaper left, gold center, expensive right
+          var _left = _otherPkgs.slice(0, Math.ceil(_otherPkgs.length / 2));
+          var _right = _otherPkgs.slice(Math.ceil(_otherPkgs.length / 2));
+          sortedPkgs = _left.concat([_goldPkg]).concat(_right);
+        } else {
+          sortedPkgs = _otherPkgs;
+        }
+        for (var pki = 0; pki < sortedPkgs.length; pki++) {
+          var pk = sortedPkgs[pki];
           var pkDisc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
-          ph += '<div class="calc-pkg-card" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
-          if (pk.is_popular) ph += '<div class="pkg-popular"></div>';
-          if (pk.badge_ru || pk.badge_am) {
-            ph += '<div class="pkg-badge" data-ru="' + escCalc(pk.badge_ru || '') + '" data-am="' + escCalc(pk.badge_am || '') + '">' + (lang==='am' ? (pk.badge_am||pk.badge_ru) : pk.badge_ru) + '</div>';
-          }
+          var pkCrown = pk.crown_tier || (pk.is_popular ? 'gold' : '');
+          ph += '<div class="calc-pkg-card' + (pkCrown ? ' pkg-crown-' + pkCrown : '') + '" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
+          // Badge instead of crown
+          var badgeText = lang === 'am' ? (pk.badge_am || pk.badge_ru || '') : (pk.badge_ru || '');
+          if (!badgeText && pkCrown === 'gold') badgeText = lang === 'am' ? '\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F' : '\u041b\u0443\u0447\u0448\u0435\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435';
+          if (badgeText) ph += '<div class="pkg-tier-badge">' + escCalc(badgeText) + '</div>';
           ph += '<div class="pkg-name" data-ru="' + escCalc(pk.name_ru) + '" data-am="' + escCalc(pk.name_am) + '">' + (lang==='am' ? pk.name_am : pk.name_ru) + '</div>';
           if (pk.description_ru || pk.description_am) {
             ph += '<div class="pkg-desc" data-ru="' + escCalc(pk.description_ru || '') + '" data-am="' + escCalc(pk.description_am || '') + '">' + (lang==='am' ? (pk.description_am||pk.description_ru) : pk.description_ru) + '</div>';
@@ -3893,7 +4082,16 @@ switchLang = function(l) {
             for (var pii = 0; pii < pk.items.length; pii++) {
               var pi2 = pk.items[pii];
               var piName = lang==='am' ? (pi2.service_name_am || pi2.service_name_ru || '') : (pi2.service_name_ru || '');
-              ph += '<div><i class="fas fa-check-circle"></i> ' + escCalc(piName) + ' \u00d7 ' + (pi2.quantity || 1) + '</div>';
+              var piQty = pi2.quantity || 1;
+              var piExtra = '';
+              if (pi2.use_tiered && pi2.price_type === 'tiered' && pi2.price_tiers_json) {
+                try {
+                  var piTiers = JSON.parse(pi2.price_tiers_json);
+                  var piUnitP = getTierPrice(piTiers, piQty);
+                  piExtra = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' \u058f/' + (lang==='am' ? '\u0570\u0561\u057f' : '\u0448\u0442') + ')</span>';
+                } catch(e) {}
+              }
+              ph += '<div><i class="fas fa-check-circle"></i> ' + escCalc(piName) + ' \u00d7 ' + piQty + piExtra + '</div>';
             }
             ph += '</div>';
           }
@@ -3903,6 +4101,109 @@ switchLang = function(l) {
         pkgsContainer.innerHTML = ph;
         pkgsContainer.style.display = '';
         console.log('[DB] Packages rendered:', db.packages.length);
+        // Setup smooth transform-based carousel for mobile
+        (function() {
+          if (window.innerWidth > 768) return;
+          var grid = pkgsContainer.querySelector('.calc-packages-grid');
+          if (!grid) return;
+          var cards = grid.querySelectorAll('.calc-pkg-card');
+          if (cards.length <= 1) return;
+          
+          // Find gold card index (center of sorted array)
+          var goldIdx = 0;
+          for (var gi = 0; gi < cards.length; gi++) {
+            if (cards[gi].classList.contains('pkg-crown-gold')) { goldIdx = gi; break; }
+          }
+          
+          var currentIdx = goldIdx;
+          var startX = 0, startY = 0, currentTranslate = 0, isDragging = false, startTime = 0;
+          var isHorizontal = null, dragStartTranslate = 0;
+          var containerW = pkgsContainer.offsetWidth;
+          
+          // Get the translate needed to center a card
+          function getCenterOffset(idx) {
+            idx = Math.max(0, Math.min(idx, cards.length - 1));
+            var card = cards[idx];
+            var cardLeft = card.offsetLeft;
+            var cardW = card.offsetWidth;
+            // Center the card within the parent container
+            return -(cardLeft - (containerW - cardW) / 2);
+          }
+          
+          // Get min/max translate bounds
+          function getMinTranslate() { return getCenterOffset(cards.length - 1); }
+          function getMaxTranslate() { return getCenterOffset(0); }
+          
+          function setTranslate(tx, animated) {
+            if (animated) {
+              grid.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
+            } else {
+              grid.style.transition = 'none';
+            }
+            grid.style.transform = 'translateX(' + tx + 'px)';
+            currentTranslate = tx;
+          }
+          
+          function goToCard(idx, animated) {
+            idx = Math.max(0, Math.min(idx, cards.length - 1));
+            currentIdx = idx;
+            setTranslate(getCenterOffset(idx), animated);
+          }
+          
+          grid.addEventListener('touchstart', function(e) {
+            grid.style.transition = 'none';
+            isDragging = true;
+            isHorizontal = null;
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            dragStartTranslate = currentTranslate;
+            startTime = Date.now();
+          }, {passive: true});
+          
+          grid.addEventListener('touchmove', function(e) {
+            if (!isDragging) return;
+            var dx = e.touches[0].clientX - startX;
+            var dy = e.touches[0].clientY - startY;
+            if (isHorizontal === null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+              isHorizontal = Math.abs(dx) > Math.abs(dy);
+            }
+            if (!isHorizontal) return;
+            e.preventDefault();
+            var newTx = dragStartTranslate + dx;
+            // Rubber-band at edges
+            var minTx = getMinTranslate();
+            var maxTx = getMaxTranslate();
+            if (newTx > maxTx) {
+              newTx = maxTx + (newTx - maxTx) * 0.25;
+            } else if (newTx < minTx) {
+              newTx = minTx + (newTx - minTx) * 0.25;
+            }
+            grid.style.transition = 'none';
+            grid.style.transform = 'translateX(' + newTx + 'px)';
+            currentTranslate = newTx;
+          }, {passive: false});
+          
+          grid.addEventListener('touchend', function(e) {
+            if (!isDragging) return;
+            isDragging = false;
+            if (!isHorizontal) return;
+            var dx = e.changedTouches[0].clientX - startX;
+            var dt = Date.now() - startTime;
+            var velocity = Math.abs(dx) / Math.max(dt, 1);
+            var next = currentIdx;
+            if (velocity > 0.3 || Math.abs(dx) > 50) {
+              next = dx < 0 ? currentIdx + 1 : currentIdx - 1;
+            }
+            goToCard(next, true);
+          }, {passive: true});
+          
+          grid.addEventListener('transitionend', function() {
+            grid.style.transition = 'none';
+          });
+          
+          // Init: center on gold card
+          goToCard(goldIdx, false);
+        })();
       }
     }
     
@@ -5169,6 +5470,44 @@ switchLang = function(l) {
             console.log('[DB] Footer nav synced with header:', footerNavCount, 'items');
           }
           } // end !serverOrdered check for footer nav
+          
+          // ===== SYNC BOTTOM NAVIGATION with header nav =====
+          if (!serverOrdered) {
+          var bottomNav = document.getElementById('bottomNav');
+          if (bottomNav && dbNavItems.length > 0) {
+            var bnIconMap = {
+              'about': 'fas fa-info-circle', 'services': 'fas fa-concierge-bell',
+              'calculator': 'fas fa-calculator', 'warehouse': 'fas fa-warehouse',
+              'guarantee': 'fas fa-shield-alt', 'faq': 'fas fa-question-circle',
+              'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star'
+            };
+            var bnMain = dbNavItems.slice(0, 4);
+            var bnMore = dbNavItems.slice(4);
+            var bnHtml = '<div class="bottom-nav-items">';
+            for (var bni = 0; bni < bnMain.length; bni++) {
+              var bnItem = bnMain[bni];
+              var bnIcon = bnIconMap[bnItem.target] || 'fas fa-link';
+              var bnText = lang === 'am' && bnItem.am ? bnItem.am : bnItem.ru;
+              bnHtml += '<a href="#' + bnItem.target + '" class="bottom-nav-item"><i class="' + bnIcon + '"></i><span data-ru="' + bnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (bnItem.am||'').replace(/"/g,'&quot;') + '">' + bnText + '</span></a>';
+            }
+            if (bnMore.length > 0) {
+              var bnMoreText = lang === 'am' ? '\u0531\u057E\u0565\u056C\u056B\u0576' : '\u0415\u0449\u0451';
+              bnHtml += '<button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="\u0415\u0449\u0451" data-am="\u0531\u057E\u0565\u056C\u056B\u0576">' + bnMoreText + '</span>';
+              bnHtml += '<div class="bottom-nav-more-menu" id="bottomMoreMenu">';
+              for (var bmi = 0; bmi < bnMore.length; bmi++) {
+                var bmItem = bnMore[bmi];
+                if (!bmItem.target || bmItem.target.charAt(0) === '_') continue;
+                var bmIcon = bnIconMap[bmItem.target] || 'fas fa-link';
+                var bmText = lang === 'am' && bmItem.am ? bmItem.am : bmItem.ru;
+                bnHtml += '<a href="#' + bmItem.target + '"><i class="' + bmIcon + '"></i><span data-ru="' + bmItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (bmItem.am||'').replace(/"/g,'&quot;') + '">' + bmText + '</span></a>';
+              }
+              bnHtml += '</div></button>';
+            }
+            bnHtml += '</div>';
+            bottomNav.innerHTML = bnHtml;
+            console.log('[DB] Bottom nav synced with header:', dbNavItems.length, 'items');
+          }
+          } // end !serverOrdered check for bottom nav
         }
       }
       
@@ -5477,22 +5816,32 @@ switchLang = function(l) {
     }
     
     // ===== STAGGERED SECTION REVEAL =====
-    // Reveal sections one by one with a cascade delay
+    // When server-injected, sections are already visible via CSS – add classes instantly
     var allSections = document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker');
-    var revealDelay = 0;
-    allSections.forEach(function(sec) {
-      if (sec.style.display === 'none' || window.getComputedStyle(sec).display === 'none') return;
-      revealDelay += 80;
-      setTimeout(function() {
+    if (serverInjected) {
+      allSections.forEach(function(sec) {
         sec.classList.add('section-revealed');
-        // Re-observe fade-up children since section is now visible
-        sec.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
-      }, revealDelay);
-    });
-    // Reveal footer
-    var _footer = document.querySelector('footer.footer');
-    if (_footer) {
-      setTimeout(function() { _footer.style.opacity = '1'; }, revealDelay + 80);
+        sec.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { el.classList.add('visible'); });
+      });
+      var _footer = document.querySelector('footer.footer');
+      if (_footer) { _footer.style.opacity = '1'; }
+    } else {
+      // Reveal sections one by one with a cascade delay
+      var revealDelay = 0;
+      allSections.forEach(function(sec) {
+        if (sec.style.display === 'none' || window.getComputedStyle(sec).display === 'none') return;
+        revealDelay += 80;
+        setTimeout(function() {
+          sec.classList.add('section-revealed');
+          // Re-observe fade-up children since section is now visible
+          sec.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
+        }, revealDelay);
+      });
+      // Reveal footer
+      var _footer = document.querySelector('footer.footer');
+      if (_footer) {
+        setTimeout(function() { _footer.style.opacity = '1'; }, revealDelay + 80);
+      }
     }
     
     console.log('[DB] All dynamic data applied v7 – loading overlay removed');
@@ -5520,32 +5869,54 @@ setTimeout(function() {
 
 /* ===== REFERRAL CODE CHECK ===== */
 var _refDiscount = 0;
-var _refFreeReviews = 0;
+var _refLinkedPackages = [];
+var _refLinkedServices = [];
+var _refApplyToPackages = 0;
 async function checkRefCode() {
   var code = document.getElementById('refCodeInput').value.trim();
   var result = document.getElementById('refResult');
-  if (!code) { result.style.display = 'none'; return; }
+  if (!code) { result.style.display = 'none'; _refDiscount = 0; _refLinkedPackages = []; _refLinkedServices = []; _refApplyToPackages = 0; recalcDynamic(); return; }
   try {
     var res = await fetch('/api/referral/check', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({code:code}) });
     var data = await res.json();
     if (data.valid) {
       _refDiscount = data.discount_percent || 0;
-      _refFreeReviews = data.free_reviews || 0;
-      // Show activation — recalcDynamic() will update with live discount amount
-      result.style.display = 'block';
-      result.style.background = 'rgba(16,185,129,0.1)';
-      result.style.border = '1px solid rgba(16,185,129,0.3)';
-      result.style.color = 'var(--success)';
-      var msg = lang === 'am' 
-        ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Պրոմոկոդը ակտիվացված է!'
-        : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>Промокод активирован!';
-      if (_refFreeReviews > 0) msg += (lang === 'am' ? ' + ' + _refFreeReviews + ' անվճար կարծիքներ' : ' + ' + _refFreeReviews + ' бесплатных отзывов');
-      result.innerHTML = msg;
-      recalcDynamic();
+      _refLinkedPackages = data.linked_packages || [];
+      _refLinkedServices = data.linked_services || [];
+      _refApplyToPackages = data.apply_to_packages || 0;
+      
+      // Check if promo applies to currently selected package
+      var selectedPkg = getSelectedPackage();
+      var pkgMismatch = false;
+      if (selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.indexOf(selectedPkg.id) === -1) {
+        pkgMismatch = true;
+      }
+      
+      if (pkgMismatch) {
+        // Promo does not apply to selected package — show red error
+        result.style.display = 'block';
+        result.style.background = 'rgba(239,68,68,0.1)';
+        result.style.border = '1px solid rgba(239,68,68,0.3)';
+        result.style.color = 'var(--danger)';
+        result.innerHTML = lang === 'am'
+          ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u054f\u057e\u0575\u0561\u056c \u057a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u0568 \u0579\u056b \u0576\u0565\u0580\u0561\u057c\u0578\u0582\u0574 \u057f\u057e\u0575\u0561\u056c \u0583\u0561\u0569\u0565\u0569\u0568\u0589'
+          : '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u042d\u0442\u043e\u0442 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u043d\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 \u043d\u0430 \u0434\u0430\u043d\u043d\u044b\u0439 \u043f\u0430\u043a\u0435\u0442';
+        // Still allow discount on services if applicable
+        recalcDynamic();
+      } else {
+        // Show activation — recalcDynamic() will update with live discount amount
+        result.style.display = 'block';
+        result.style.background = 'rgba(16,185,129,0.1)';
+        result.style.border = '1px solid rgba(16,185,129,0.3)';
+        result.style.color = 'var(--success)';
+        var msg = lang === 'am' 
+          ? '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u0568 \u0561\u056f\u057f\u056b\u057e\u0561\u0581\u057e\u0561\u056e \u0567!'
+          : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0430\u043a\u0442\u0438\u0432\u0438\u0440\u043e\u0432\u0430\u043d!';
+        result.innerHTML = msg;
+        recalcDynamic();
+      }
     } else if (data.reason === 'limit_reached') {
-      // Limit exhausted — show warning, do NOT apply discount
-      _refDiscount = 0;
-      _refFreeReviews = 0;
+      _refDiscount = 0; _refLinkedPackages = []; _refLinkedServices = []; _refApplyToPackages = 0;
       result.style.display = 'block';
       result.style.background = 'rgba(245,158,11,0.1)';
       result.style.border = '1px solid rgba(245,158,11,0.3)';
@@ -5554,15 +5925,14 @@ async function checkRefCode() {
       result.innerHTML = '<i class="fas fa-exclamation-triangle" style="margin-right:6px"></i>' + limitMsg;
       recalcDynamic();
     } else {
-      _refDiscount = 0;
-      _refFreeReviews = 0;
+      _refDiscount = 0; _refLinkedPackages = []; _refLinkedServices = []; _refApplyToPackages = 0;
       result.style.display = 'block';
       result.style.background = 'rgba(239,68,68,0.1)';
       result.style.border = '1px solid rgba(239,68,68,0.3)';
       result.style.color = 'var(--danger)';
       result.innerHTML = lang === 'am' 
-        ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>Պրոմոկոդը չի գտնվել'
-        : '<i class="fas fa-times-circle" style="margin-right:6px"></i>Промокод не найден';
+        ? '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u0568 \u0579\u056b \u0563\u057f\u0576\u057e\u0565\u056c'
+        : '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u043d\u0435 \u043d\u0430\u0439\u0434\u0435\u043d';
       recalcDynamic();
     }
   } catch(e) {
@@ -5902,14 +6272,15 @@ async function checkRefCode() {
       var nameRu = nameEl ? (nameEl.getAttribute('data-ru') || name) : name;
       var nameAm = nameEl ? (nameEl.getAttribute('data-am') || name) : name;
       var dp = row.getAttribute('data-price');
+      var svcId = parseInt(row.getAttribute('data-svc-id') || '0') || 0;
       if (dp === 'buyout') {
-        items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: getBuyoutPrice(qty), qty: qty, subtotal: getBuyoutTotal(qty) });
+        items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: getBuyoutPrice(qty), qty: qty, subtotal: getBuyoutTotal(qty), service_id: svcId });
       } else if (dp === 'tiered') {
-        try { var t = JSON.parse(row.getAttribute('data-tiers')); items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: getTierPrice(t,qty), qty: qty, subtotal: getTierTotal(t,qty) }); }
-        catch(e) { var pe=row.querySelector('.calc-price'); var pp=pe?parseInt(pe.textContent.replace(/[^0-9]/g,''))||0:0; items.push({name:name,name_ru:nameRu,name_am:nameAm,price:pp,qty:qty,subtotal:pp*qty}); }
+        try { var t = JSON.parse(row.getAttribute('data-tiers')); items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: getTierPrice(t,qty), qty: qty, subtotal: getTierTotal(t,qty), service_id: svcId }); }
+        catch(e) { var pe=row.querySelector('.calc-price'); var pp=pe?parseInt(pe.textContent.replace(/[^0-9]/g,''))||0:0; items.push({name:name,name_ru:nameRu,name_am:nameAm,price:pp,qty:qty,subtotal:pp*qty,service_id:svcId}); }
       } else {
         var p = parseInt(dp) || 0;
-        items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: p, qty: qty, subtotal: p * qty });
+        items.push({ name: name, name_ru: nameRu, name_am: nameAm, price: p, qty: qty, subtotal: p * qty, service_id: svcId });
       }
     });
 
@@ -5986,6 +6357,24 @@ async function checkRefCode() {
   } catch(e) {}
 })();
 </script>
+
+<!-- Bottom Navigation Bar (mobile) -->
+<nav class="bottom-nav" id="bottomNav">
+<div class="bottom-nav-items">
+  <a href="#about" class="bottom-nav-item" data-nav-idx="0"><i class="fas fa-info-circle"></i><span data-ru="\u041E \u043D\u0430\u0441" data-am="\u0544\u0565\u0580 \u0574\u0561\u057D\u056B\u0576">\u041E \u043D\u0430\u0441</span></a>
+  <a href="#services" class="bottom-nav-item" data-nav-idx="1"><i class="fas fa-concierge-bell"></i><span data-ru="\u0423\u0441\u043B\u0443\u0433\u0438" data-am="\u053E\u0561\u057C\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580">\u0423\u0441\u043B\u0443\u0433\u0438</span></a>
+  <a href="#calculator" class="bottom-nav-item" data-nav-idx="2"><i class="fas fa-calculator"></i><span data-ru="\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440" data-am="\u0540\u0561\u0577\u057E\u056B\u0579">\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440</span></a>
+  <a href="#guarantee" class="bottom-nav-item" data-nav-idx="3"><i class="fas fa-shield-alt"></i><span data-ru="\u0413\u0430\u0440\u0430\u043D\u0442\u0438\u0438" data-am="\u0535\u0580\u0561\u0577\u056D\u056B\u0584\u0576\u0565\u0580">\u0413\u0430\u0440\u0430\u043D\u0442\u0438\u0438</span></a>
+  <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="\u0415\u0449\u0451" data-am="\u0531\u057E\u0565\u056C\u056B\u0576">\u0415\u0449\u0451</span>
+    <div class="bottom-nav-more-menu" id="bottomMoreMenu">
+      <a href="#warehouse"><i class="fas fa-warehouse"></i><span data-ru="\u0421\u043A\u043B\u0430\u0434" data-am="\u054A\u0561\u0570\u0565\u057D\u057F">\u0421\u043A\u043B\u0430\u0434</span></a>
+      <a href="#faq"><i class="fas fa-question-circle"></i><span data-ru="FAQ" data-am="\u0540\u054F\u0540">FAQ</span></a>
+      <a href="#contact"><i class="fas fa-envelope"></i><span data-ru="\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B" data-am="\u053F\u0578\u0576\u057F\u0561\u056F\u057F\u0576\u0565\u0580">\u041A\u043E\u043D\u0442\u0430\u043A\u0442\u044B</span></a>
+    </div>
+  </button>
+</div>
+</nav>
+
 </body>
 </html>`;
   
@@ -6333,19 +6722,42 @@ async function checkRefCode() {
       const esc = (s: string) => (s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
       const fmtN = (n: number) => Number(n).toLocaleString('ru-RU');
       let pkgHtml = '<div class="calc-packages-header">';
-      pkgHtml += '<div class="calc-packages-title"><i class="fas fa-box-open" style="color:#f59e0b"></i> <span data-ru="' + esc(titleRu) + '" data-am="' + esc(titleAm) + '">' + esc(titleRu) + '</span></div>';
+      pkgHtml += '<div class="calc-packages-title"><i class="fas fa-box-open" style="color:#f59e0b"></i> <span data-ru="' + esc(titleRu) + '" data-am="' + esc(titleAm) + '">' + esc(isArmenian ? titleAm : titleRu) + '</span></div>';
       if (subRu) {
-        pkgHtml += '<div class="calc-packages-subtitle" data-ru="' + esc(subRu) + '" data-am="' + esc(subAm) + '">' + esc(subRu) + '</div>';
+        pkgHtml += '<div class="calc-packages-subtitle" data-ru="' + esc(subRu) + '" data-am="' + esc(subAm) + '">' + esc(isArmenian ? (subAm || subRu) : subRu) + '</div>';
       }
       pkgHtml += '</div>';
       pkgHtml += '<div class="calc-packages-grid' + (isSingle ? ' single-pkg' : '') + '">';
-      for (const pk of ssrPkgs) {
+      // Sort: cheaper packages left, gold center, expensive right
+      let goldSsrPkg: any = null;
+      const otherSsrPkgs: any[] = [];
+      for (const p of ssrPkgs) {
+        const tier = p.crown_tier || (p.is_popular ? 'gold' : '');
+        if (tier === 'gold' && !goldSsrPkg) { goldSsrPkg = p; }
+        else { otherSsrPkgs.push(p); }
+      }
+      otherSsrPkgs.sort((a: any, b: any) => (a.package_price || 0) - (b.package_price || 0));
+      let sortedSsrPkgs: any[];
+      if (goldSsrPkg) {
+        const leftSsr = otherSsrPkgs.slice(0, Math.ceil(otherSsrPkgs.length / 2));
+        const rightSsr = otherSsrPkgs.slice(Math.ceil(otherSsrPkgs.length / 2));
+        sortedSsrPkgs = [...leftSsr, goldSsrPkg, ...rightSsr];
+      } else {
+        sortedSsrPkgs = otherSsrPkgs;
+      }
+      for (const pk of sortedSsrPkgs) {
         const disc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
-        pkgHtml += '<div class="calc-pkg-card" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
-        if (pk.is_popular) pkgHtml += '<div class="pkg-popular"></div>';
-        if (pk.badge_ru) pkgHtml += '<div class="pkg-badge" data-ru="' + esc(pk.badge_ru) + '" data-am="' + esc(pk.badge_am || '') + '">' + esc(pk.badge_ru) + '</div>';
-        pkgHtml += '<div class="pkg-name" data-ru="' + esc(pk.name_ru) + '" data-am="' + esc(pk.name_am || '') + '">' + esc(pk.name_ru) + '</div>';
-        if (pk.description_ru) pkgHtml += '<div class="pkg-desc" data-ru="' + esc(pk.description_ru) + '" data-am="' + esc(pk.description_am || '') + '">' + esc(pk.description_ru) + '</div>';
+        const ssrCrown = pk.crown_tier || (pk.is_popular ? 'gold' : '');
+        pkgHtml += '<div class="calc-pkg-card' + (ssrCrown ? ' pkg-crown-' + ssrCrown : '') + '" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
+        // Badge instead of crown
+        const badgeRu = pk.badge_ru || (ssrCrown === 'gold' ? '\u041b\u0443\u0447\u0448\u0435\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435' : '');
+        const badgeAm = pk.badge_am || (ssrCrown === 'gold' ? '\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F' : '');
+        const badge = badgeRu;
+        if (badge) {
+          pkgHtml += '<div class="pkg-tier-badge" data-ru="' + esc(badgeRu) + '" data-am="' + esc(badgeAm) + '">' + esc(isArmenian ? (badgeAm || badgeRu) : badgeRu) + '</div>';
+        }
+        pkgHtml += '<div class="pkg-name" data-ru="' + esc(pk.name_ru) + '" data-am="' + esc(pk.name_am || '') + '">' + esc(isArmenian ? (pk.name_am || pk.name_ru) : pk.name_ru) + '</div>';
+        if (pk.description_ru || pk.description_am) pkgHtml += '<div class="pkg-desc" data-ru="' + esc(pk.description_ru || '') + '" data-am="' + esc(pk.description_am || '') + '">' + esc(isArmenian ? (pk.description_am || pk.description_ru || '') : (pk.description_ru || '')) + '</div>';
         pkgHtml += '<div class="pkg-prices">';
         if (pk.original_price > 0 && pk.original_price > pk.package_price) {
           pkgHtml += '<span class="pkg-old-price">' + fmtN(pk.original_price) + ' \u058f</span>';
@@ -6356,7 +6768,21 @@ async function checkRefCode() {
         if (pk.items && pk.items.length > 0) {
           pkgHtml += '<div class="pkg-items">';
           for (const pi of pk.items) {
-            pkgHtml += '<div><i class="fas fa-check-circle"></i> ' + esc(pi.service_name_ru || '') + ' \u00d7 ' + (pi.quantity || 1) + '</div>';
+            const piQty = pi.quantity || 1;
+            let piExtra = '';
+            if (pi.use_tiered && pi.price_type === 'tiered' && pi.price_tiers_json) {
+              try {
+                const piTiers = JSON.parse(pi.price_tiers_json as string);
+                let piUnitP = 0;
+                for (const t of piTiers) { if (piQty >= t.min && piQty <= t.max) { piUnitP = t.price; break; } }
+                if (!piUnitP && piTiers.length) piUnitP = piTiers[piTiers.length - 1].price;
+                piExtra = ' <span style="color:#a78bfa;font-size:0.72rem">(' + fmtN(piUnitP) + ' \u058f/\u0448\u0442)</span>';
+              } catch {}
+            }
+            const piNameSsr = isArmenian ? (pi.service_name_am || pi.service_name_ru || '') : (pi.service_name_ru || '');
+            const piUnitSsr = isArmenian ? '\u0570\u0561\u057f' : '\u0448\u0442';
+            if (piExtra && isArmenian) piExtra = piExtra.replace('/\u0448\u0442', '/' + piUnitSsr);
+            pkgHtml += '<div><i class="fas fa-check-circle"></i> ' + esc(piNameSsr) + ' \u00d7 ' + piQty + piExtra + '</div>';
           }
           pkgHtml += '</div>';
         }
@@ -6364,7 +6790,14 @@ async function checkRefCode() {
       }
       pkgHtml += '</div>';
       // Also inject _calcPackages data for selectPackage() to work
-      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';</scr' + 'ipt>';
+      // Find gold card index in sorted array for initial centering
+      const goldCardIdx = sortedSsrPkgs.findIndex((p: any) => (p.crown_tier || (p.is_popular ? 'gold' : '')) === 'gold');
+      const initIdx = goldCardIdx >= 0 ? goldCardIdx : 0;
+      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
+      // Setup transform-based carousel for mobile (smooth, one card per swipe)
+      // Grid has overflow:visible, parent .calc-packages has overflow:hidden (viewport)
+      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;var ci=' + initIdx + ',sx=0,sy=0,dr=false,st=0,ct=0,dst=0,isH=null;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}g.addEventListener("touchstart",function(e){g.style.transition="none";dr=true;isH=null;sx=e.touches[0].clientX;sy=e.touches[0].clientY;dst=ct;st=Date.now()},{passive:true});g.addEventListener("touchmove",function(e){if(!dr)return;var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(isH===null&&(Math.abs(dx)>8||Math.abs(dy)>8))isH=Math.abs(dx)>Math.abs(dy);if(!isH)return;e.preventDefault();var nt=dst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transition="none";g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!dr)return;dr=false;if(!isH)return;var dx=e.changedTouches[0].clientX-sx,dt=Date.now()-st,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.3||Math.abs(dx)>50)ni=dx<0?ci+1:ci-1;go(ni,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
+      pkgHtml += '</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
         '<div class="calc-packages" id="calcPackages">' + pkgHtml + '</div>'
@@ -6748,7 +7181,8 @@ async function checkRefCode() {
         // Build header nav HTML
         let headerNavHtml = '';
         for (const item of navItems) {
-          headerNavHtml += `    <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}">${item.ru}</a></li>\n`;
+          const navText = isArmenian ? (item.am || item.ru) : item.ru;
+          headerNavHtml += `    <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}">${navText}</a></li>\n`;
         }
         // Add mobile CTA (use floating_tg block data if available for correct URL and text)
         const floatBf = blockFeatures.find((b: any) => b.key === 'floating_tg');
@@ -6770,13 +7204,46 @@ async function checkRefCode() {
         let footerNavHtml = '';
         for (const item of navItems) {
           if (!item.target || item.target.charAt(0) === '_') continue;
-          footerNavHtml += `        <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}" data-no-rewrite="1">${item.ru}</a></li>\n`;
+          const footNavText = isArmenian ? (item.am || item.ru) : item.ru;
+          footerNavHtml += `        <li><a href="#${item.target}" data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}" data-no-rewrite="1">${footNavText}</a></li>\n`;
         }
         
         // Replace footer nav links
         const footerNavMatch = pageHtml.match(/<ul id="footerNavList">[\s\S]*?<\/ul>/);
         if (footerNavMatch) {
           pageHtml = pageHtml.replace(footerNavMatch[0], `<ul id="footerNavList">\n${footerNavHtml}      </ul>`);
+        }
+        
+        // Build bottom nav HTML from admin nav items (sync order)
+        const bottomNavIcons: Record<string, string> = {
+          'about': 'fas fa-info-circle', 'services': 'fas fa-concierge-bell',
+          'calculator': 'fas fa-calculator', 'warehouse': 'fas fa-warehouse',
+          'guarantee': 'fas fa-shield-alt', 'faq': 'fas fa-question-circle',
+          'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star'
+        };
+        const mainBottomItems = navItems.slice(0, 4);
+        const moreBottomItems = navItems.slice(4);
+        let bottomHtml = '<div class="bottom-nav-items">\n';
+        for (const item of mainBottomItems) {
+          const icon = bottomNavIcons[item.target] || 'fas fa-link';
+          const text = isArmenian ? (item.am || item.ru) : item.ru;
+          bottomHtml += `  <a href="#${item.target}" class="bottom-nav-item"><i class="${icon}"></i><span data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}">${text}</span></a>\n`;
+        }
+        if (moreBottomItems.length > 0) {
+          const moreText = isArmenian ? '\u0531\u057E\u0565\u056C\u056B\u0576' : '\u0415\u0449\u0451';
+          bottomHtml += `  <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="\u0415\u0449\u0451" data-am="\u0531\u057E\u0565\u056C\u056B\u0576">${moreText}</span>\n`;
+          bottomHtml += `    <div class="bottom-nav-more-menu" id="bottomMoreMenu">\n`;
+          for (const item of moreBottomItems) {
+            const icon = bottomNavIcons[item.target] || 'fas fa-link';
+            const text = isArmenian ? (item.am || item.ru) : item.ru;
+            bottomHtml += `      <a href="#${item.target}"><i class="${icon}"></i><span data-ru="${item.ru.replace(/"/g,'&quot;')}" data-am="${(item.am||'').replace(/"/g,'&quot;')}">${text}</span></a>\n`;
+          }
+          bottomHtml += `    </div>\n  </button>\n`;
+        }
+        bottomHtml += '</div>';
+        const bottomNavMatch = pageHtml.match(/<nav class="bottom-nav" id="bottomNav">[\s\S]*?<\/nav>/);
+        if (bottomNavMatch) {
+          pageHtml = pageHtml.replace(bottomNavMatch[0], `<nav class="bottom-nav" id="bottomNav">\n${bottomHtml}\n</nav>`);
         }
       }
     }
@@ -6874,6 +7341,30 @@ async function checkRefCode() {
     pageHtml = pageHtml.replace('<html lang="ru"', '<html lang="ru" data-server-ordered="1"');
   }
   
+  // ===== FINAL: SERVER-SIDE ARMENIAN TEXT RENDERING =====
+  // Runs LAST after all SSR injections to ensure all elements (nav, packages, footer) get Armenian text
+  if (isArmenian) {
+    const amResponse = new Response(pageHtml, {
+      headers: { 'Content-Type': 'text/html; charset=utf-8' }
+    });
+    const amRewritten = new HTMLRewriter()
+      .on('[data-am]', {
+        element(el) {
+          const amText = el.getAttribute('data-am') || '';
+          if (amText && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA' && el.tagName !== 'META') {
+            el.setInnerContent(amText);
+          }
+        }
+      })
+      .transform(amResponse);
+    pageHtml = await amRewritten.text();
+    // Set correct initial lang variable in JS so client doesn't flash Russian
+    pageHtml = pageHtml.replace(
+      "let lang = localStorage.getItem('gtt_lang') || 'am';",
+      "let lang = 'am'; localStorage.setItem('gtt_lang','am');"
+    );
+  }
+
   return c.html(pageHtml);
 })
 

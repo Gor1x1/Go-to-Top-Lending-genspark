@@ -65,6 +65,12 @@ export function getAdminHTML(): string {
   .sb-photo-item.sortable-chosen { box-shadow: 0 4px 20px rgba(139,92,246,0.3); transform: scale(1.01); z-index: 10; }
   .calc-drag-handle { cursor: grab !important; touch-action: none; user-select: none; }
   .calc-drag-handle:active { cursor: grabbing !important; }
+  .pkg-drag-handle { cursor: grab !important; touch-action: none; user-select: none; transition: color 0.2s; }
+  .pkg-drag-handle:hover { color: #f59e0b !important; }
+  .pkg-drag-handle:active { cursor: grabbing !important; color: #f59e0b !important; }
+  .pkg-sortable-item { transition: transform 0.15s ease, box-shadow 0.15s ease; }
+  .pkg-sortable-item.sortable-ghost { opacity: 0.4; background: #1a2236 !important; border-color: #f59e0b !important; }
+  .pkg-sortable-item.sortable-chosen { box-shadow: 0 6px 30px rgba(245,158,11,0.3); transform: scale(1.01); z-index: 10; }
   .sb-drag-handle { cursor: grab; padding: 10px 12px; color: #64748b; transition: color 0.2s, background 0.2s; display: flex; align-items: center; justify-content: center; border-radius: 8px; min-width: 40px; min-height: 40px; }
   .sb-drag-handle:hover { color: #8B5CF6; background: rgba(139,92,246,0.15); }
   .sb-drag-handle:active { cursor: grabbing; color: #a78bfa; background: rgba(139,92,246,0.25); transform: scale(1.05); }
@@ -1466,17 +1472,19 @@ function renderCalculator() {
     h += '<div class="card" style="text-align:center;padding:32px"><i class="fas fa-box-open" style="font-size:2.5rem;color:#475569;margin-bottom:12px"></i>' +
       '<p style="color:#94a3b8">\u041f\u0430\u043a\u0435\u0442\u043e\u0432 \u043f\u043e\u043a\u0430 \u043d\u0435\u0442. \u0421\u043e\u0437\u0434\u0430\u0439\u0442\u0435 \u043f\u0435\u0440\u0432\u044b\u0439!</p></div>';
   } else {
+    h += '<div id="pkg_sortable_list">';
     for (var pi = 0; pi < pkgs.length; pi++) {
       var pkg = pkgs[pi];
       var discount = pkg.original_price > 0 ? Math.round((1 - pkg.package_price / pkg.original_price) * 100) : 0;
-      h += '<div class="card" style="margin-bottom:16px;border-left:3px solid ' + (pkg.is_active ? '#f59e0b' : '#475569') + '">';
+      h += '<div class="card pkg-sortable-item" data-pkg-id="' + pkg.id + '" style="margin-bottom:16px;border-left:3px solid ' + (pkg.is_active ? '#f59e0b' : '#475569') + '">';
       
-      // Header
+      // Header with drag handle
+      var crownIcon = pkg.crown_tier === 'gold' ? '<span style="font-size:1.2rem" title="\u0417\u043e\u043b\u043e\u0442\u0430\u044f \u043a\u043e\u0440\u043e\u043d\u0430">\ud83e\udd47</span>' : pkg.crown_tier === 'silver' ? '<span style="font-size:1.2rem" title="\u0421\u0435\u0440\u0435\u0431\u0440\u044f\u043d\u0430\u044f \u043a\u043e\u0440\u043e\u043d\u0430">\ud83e\udd48</span>' : pkg.crown_tier === 'bronze' ? '<span style="font-size:1.2rem" title="\u0411\u0440\u043e\u043d\u0437\u043e\u0432\u0430\u044f \u043a\u043e\u0440\u043e\u043d\u0430">\ud83e\udd49</span>' : '';
       h += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">' +
+        '<i class="fas fa-grip-vertical pkg-drag-handle" style="color:#64748b;cursor:grab;font-size:1.3rem;padding:6px 8px;border-radius:6px;background:rgba(100,116,139,0.1);transition:all 0.2s" title="\u041f\u0435\u0440\u0435\u0442\u0430\u0449\u0438\u0442\u0435 \u0434\u043b\u044f \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f \u043f\u043e\u0440\u044f\u0434\u043a\u0430"></i>' +
         '<i class="fas fa-box-open" style="color:#f59e0b;font-size:1.1rem"></i>' +
         '<span style="font-weight:700;font-size:1rem">' + escHtml(pkg.name_ru || '\u0411\u0435\u0437 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u044f') + '</span>' +
-        (pkg.badge_ru ? '<span class="badge badge-purple">' + escHtml(pkg.badge_ru) + '</span>' : '') +
-        (pkg.is_popular ? '<span class="badge" style="background:#f59e0b;color:#000">\u2B50 \u041f\u043e\u043f\u0443\u043b\u044f\u0440\u043d\u044b\u0439</span>' : '') +
+        crownIcon +
         '<span style="margin-left:auto;font-size:0.85rem;color:#94a3b8">' + (pkg.is_active ? '\u2705 \u0410\u043a\u0442\u0438\u0432\u0435\u043d' : '\u274c \u041d\u0435\u0430\u043a\u0442\u0438\u0432\u0435\u043d') + '</span>' +
         '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.8rem" onclick="editPackage(' + pkg.id + ')"><i class="fas fa-edit"></i></button>' +
         '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deletePackage(' + pkg.id + ')"><i class="fas fa-trash"></i></button>' +
@@ -1498,9 +1506,10 @@ function renderCalculator() {
         h += '<div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:8px">';
         for (var ii = 0; ii < pkg.items.length; ii++) {
           var pi2 = pkg.items[ii];
+          var tieredMark = pi2.use_tiered ? ' \ud83d\udcca' : '';
           h += '<span style="background:#1e293b;padding:4px 10px;border-radius:6px;font-size:0.8rem;color:#e2e8f0">' +
             '<i class="fas fa-check" style="color:#22c55e;margin-right:4px;font-size:0.7rem"></i>' +
-            escHtml(pi2.service_name_ru || '\u0423\u0441\u043b\u0443\u0433\u0430 #' + pi2.service_id) + ' \u00d7 ' + (pi2.quantity || 1) +
+            escHtml(pi2.service_name_ru || '\u0423\u0441\u043b\u0443\u0433\u0430 #' + pi2.service_id) + ' \u00d7 ' + (pi2.quantity || 1) + tieredMark +
           '</span>';
         }
         h += '</div>';
@@ -1508,6 +1517,7 @@ function renderCalculator() {
       
       h += '</div>';
     }
+    h += '</div>'; // close pkg_sortable_list
   }
   
   h += '</div>';
@@ -1540,10 +1550,40 @@ function initCalcSortables() {
           if (svc) svc.sort_order = orders[oi].sort_order;
         }
         api('/calc-services-reorder', { method: 'PUT', body: JSON.stringify({ orders: orders }) })
-          .then(function() { toast('Порядок услуг сохранён и обновлён на сайте'); })
-          .catch(function() { toast('Ошибка сохранения порядка', 'error'); });
+          .then(function() { toast('\u041f\u043e\u0440\u044f\u0434\u043e\u043a \u0443\u0441\u043b\u0443\u0433 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d \u0438 \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d \u043d\u0430 \u0441\u0430\u0439\u0442\u0435'); })
+          .catch(function() { toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043f\u043e\u0440\u044f\u0434\u043a\u0430', 'error'); });
       }
     });
+  });
+  // Initialize sortable for packages list
+  initPkgSortable();
+}
+
+function initPkgSortable() {
+  var pkgList = document.getElementById('pkg_sortable_list');
+  if (!pkgList) return;
+  try { if (pkgList._sortablePkg) pkgList._sortablePkg.destroy(); } catch(e) {}
+  pkgList._sortablePkg = new Sortable(pkgList, {
+    handle: '.pkg-drag-handle',
+    animation: 250,
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    onEnd: function() {
+      var items = pkgList.querySelectorAll('.pkg-sortable-item');
+      var order = [];
+      for (var i = 0; i < items.length; i++) {
+        var pkgId = parseInt(items[i].getAttribute('data-pkg-id'));
+        order.push({ id: pkgId, sort_order: i });
+        // Update local data
+        var localPkg = (data.calcPackages || []).find(function(p) { return p.id === pkgId; });
+        if (localPkg) localPkg.sort_order = i;
+      }
+      // Sort local data array
+      if (data.calcPackages) data.calcPackages.sort(function(a, b) { return (a.sort_order || 0) - (b.sort_order || 0); });
+      api('/calc-packages-reorder', { method: 'PUT', body: JSON.stringify({ order: order }) })
+        .then(function() { toast('\u041f\u043e\u0440\u044f\u0434\u043e\u043a \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d'); })
+        .catch(function() { toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f \u043f\u043e\u0440\u044f\u0434\u043a\u0430', 'error'); });
+    }
   });
 }
 
@@ -1792,7 +1832,7 @@ function openPackageModal(pkg) {
   
   for (var ii = 0; ii < items.length; ii++) {
     var it = items[ii];
-    html += renderPkgItemRow(ii, svcs, it.service_id, it.quantity);
+    html += renderPkgItemRow(ii, svcs, it.service_id, it.quantity, it.use_tiered);
   }
   
   html += '</div>' +
@@ -1820,17 +1860,28 @@ function openPackageModal(pkg) {
       '<div id="pkg_savings_line" style="font-size:0.8rem;color:#64748b;display:none">Экономия клиента: <span id="pkg_savings_amount" style="color:#10B981;font-weight:700">0 ֏</span></div>' +
     '</div>' +
     
-    // === Badges and options ===
-    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">🏷️ Бейдж RU <span style="color:#64748b;font-weight:400">(авто или вручную)</span></label>' +
-        '<input class="input" id="pkg_badge_ru" value="' + escHtml(isEdit ? pkg.badge_ru || '' : '') + '" placeholder="Авто: -20%"></div>' +
-      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">🏷️ Бейдж AM <span style="color:#64748b;font-weight:400">(авто или вручную)</span></label>' +
-        '<input class="input" id="pkg_badge_am" value="' + escHtml(isEdit ? pkg.badge_am || '' : '') + '" placeholder="Авто: -20%"></div>' +
+    // === Crown tier, badge text, and options ===
+    '<div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:flex-start">' +
+      '<div><label style="font-size:0.75rem;color:#94a3b8;display:block;margin-bottom:4px">\u{1F451} \u0423\u0440\u043E\u0432\u0435\u043D\u044C \u043F\u0430\u043A\u0435\u0442\u0430</label>' +
+        '<select class="input" id="pkg_crown_tier" style="width:auto;min-width:180px;padding:8px 12px">' +
+          '<option value=""' + (isEdit && !pkg.crown_tier ? ' selected' : '') + '>\u2014 \u0411\u0435\u0437 \u0443\u0440\u043E\u0432\u043D\u044F \u2014</option>' +
+          '<option value="gold"' + (isEdit && pkg.crown_tier === 'gold' ? ' selected' : '') + ' style="color:#F59E0B">\u{1F947} \u0417\u043E\u043B\u043E\u0442\u043E\u0439 (\u043B\u0443\u0447\u0448\u0435\u0435 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435)</option>' +
+          '<option value="silver"' + (isEdit && pkg.crown_tier === 'silver' ? ' selected' : '') + ' style="color:#94a3b8">\u{1F948} \u0421\u0435\u0440\u0435\u0431\u0440\u044F\u043D\u044B\u0439</option>' +
+          '<option value="bronze"' + (isEdit && pkg.crown_tier === 'bronze' ? ' selected' : '') + ' style="color:#CD7F32">\u{1F949} \u0411\u0440\u043E\u043D\u0437\u043E\u0432\u044B\u0439</option>' +
+        '</select></div>' +
+      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:18px"><input type="checkbox" id="pkg_is_active" ' + (isEdit ? (pkg.is_active ? 'checked' : '') : 'checked') + '> <span style="font-size:0.85rem">\u2705 \u0410\u043A\u0442\u0438\u0432\u0435\u043D</span></label>' +
     '</div>' +
-    '<div style="display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap">' +
-      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_popular" ' + (isEdit && pkg.is_popular ? 'checked' : '') + '> <span style="font-size:0.85rem">⭐ Популярный</span></label>' +
-      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_is_active" ' + (isEdit ? (pkg.is_active ? 'checked' : '') : 'checked') + '> <span style="font-size:0.85rem">✅ Активен</span></label>' +
-      '<label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="checkbox" id="pkg_auto_badge" checked> <span style="font-size:0.85rem">🔄 Авто-бейдж</span></label>' +
+    
+    // === Badge text (bilingual) ===
+    '<div style="background:#1a2236;border:1px solid #334155;border-radius:10px;padding:14px;margin-bottom:16px">' +
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="fas fa-tag" style="color:#f59e0b"></i><span style="font-weight:700;font-size:0.9rem">\u0422\u0435\u043A\u0441\u0442 \u0431\u0435\u0439\u0434\u0436\u0438\u043A\u0430 (\u043E\u043F\u0446\u0438\u043E\u043D\u0430\u043B\u044C\u043D\u043E)</span></div>' +
+      '<div style="font-size:0.75rem;color:#64748b;margin-bottom:8px">\u0422\u0435\u043A\u0441\u0442 \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u043E\u0442\u043E\u0431\u0440\u0430\u0436\u0430\u0435\u0442\u0441\u044F \u043D\u0430 \u0431\u0435\u0439\u0434\u0436\u0438\u043A\u0435 \u0432\u043C\u0435\u0441\u0442\u043E \u043A\u043E\u0440\u043E\u043D\u044B. \u041F\u0440\u0438\u043C\u0435\u0440: "\u041B\u0443\u0447\u0448\u0435\u0435 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435", "TOP", "SALE"</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">' +
+        '<div><label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">\u{1F1F7}\u{1F1FA} \u0411\u0435\u0439\u0434\u0436\u0438\u043A RU</label>' +
+        '<input class="input" type="text" id="pkg_badge_ru" value="' + (isEdit ? (pkg.badge_ru || '').replace(/"/g, '&quot;') : '') + '" placeholder="\u041B\u0443\u0447\u0448\u0435\u0435 \u043F\u0440\u0435\u0434\u043B\u043E\u0436\u0435\u043D\u0438\u0435"></div>' +
+        '<div><label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">\u{1F1E6}\u{1F1F2} \u0411\u0435\u0439\u0434\u0436\u0438\u043A AM</label>' +
+        '<input class="input" type="text" id="pkg_badge_am" value="' + (isEdit ? (pkg.badge_am || '').replace(/"/g, '&quot;') : '') + '" placeholder="\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F"></div>' +
+      '</div>' +
     '</div>' +
     
     // === Footer buttons ===
@@ -1848,24 +1899,49 @@ function openPackageModal(pkg) {
 function recalcPkgTotals() {
   var svcs = data.calcServices || [];
   var svcMap = {};
-  for (var si = 0; si < svcs.length; si++) { svcMap[svcs[si].id] = svcs[si]; }
+  for (var si = 0; si < svcs.length; si++) {
+    var s = svcs[si];
+    svcMap[s.id] = s;
+    svcMap[String(s.id)] = s;
+    svcMap[Number(s.id)] = s;
+  }
   
   var total = 0;
-  var rows = document.querySelectorAll('#pkg_items_list > div');
+  var rows = document.querySelectorAll('#pkg_items_list > [id^="pkgItem_"]');
   for (var i = 0; i < rows.length; i++) {
     var sel = rows[i].querySelector('.pkg-svc-select');
     var qtyIn = rows[i].querySelector('.pkg-qty-input');
-    var svcId = parseInt(sel ? sel.value : '0') || 0;
+    var tieredCb = rows[i].querySelector('.pkg-use-tiered');
+    var tierToggle = rows[i].querySelector('.pkg-tier-toggle');
+    var svcId = sel ? sel.value : '0';
     var qty = parseInt(qtyIn ? qtyIn.value : '1') || 1;
-    var svc = svcMap[svcId];
+    var svc = svcMap[svcId] || svcMap[Number(svcId)];
     if (svc) {
-      total += svc.price * qty;
-      // Update inline price display
+      var tiersJson = svc.price_tiers_json;
+      var hasTiers = (svc.price_type === 'tiered') && tiersJson && tiersJson !== '[]' && tiersJson !== 'null';
+      var useTiered = !!(tieredCb && tieredCb.checked);
+      if (tierToggle) {
+        tierToggle.style.display = hasTiers ? 'inline-flex' : 'none';
+        tierToggle.style.visibility = hasTiers ? 'visible' : 'hidden';
+      }
+      var itemPrice = 0;
+      if (useTiered && hasTiers) {
+        try {
+          var tiers = typeof tiersJson === 'string' ? JSON.parse(tiersJson) : tiersJson;
+          if (Array.isArray(tiers) && tiers.length > 0) {
+            itemPrice = _getPkgTierPrice(tiers, qty) * qty;
+          } else { itemPrice = (Number(svc.price) || 0) * qty; }
+        } catch(e) { itemPrice = (Number(svc.price) || 0) * qty; }
+      } else {
+        itemPrice = (Number(svc.price) || 0) * qty;
+      }
+      total += itemPrice;
       var priceEl = rows[i].querySelector('.pkg-item-price');
-      if (priceEl) priceEl.textContent = (svc.price * qty).toLocaleString('ru-RU') + ' ֏';
+      if (priceEl) priceEl.textContent = itemPrice.toLocaleString('ru-RU') + ' \u058f' + (useTiered && hasTiers ? ' \ud83d\udcca' : '');
     } else {
+      if (tierToggle) { tierToggle.style.display = 'none'; tierToggle.style.visibility = 'hidden'; }
       var priceEl2 = rows[i].querySelector('.pkg-item-price');
-      if (priceEl2) priceEl2.textContent = '—';
+      if (priceEl2) priceEl2.textContent = '\u2014';
     }
   }
   
@@ -1873,7 +1949,7 @@ function recalcPkgTotals() {
   var origEl = document.getElementById('pkg_original_price');
   var origDisplay = document.getElementById('pkg_original_display');
   if (origEl) origEl.value = total;
-  if (origDisplay) origDisplay.textContent = total.toLocaleString('ru-RU') + ' ֏';
+  if (origDisplay) origDisplay.textContent = total.toLocaleString('ru-RU') + ' \u058f';
   
   recalcPkgDiscount();
 }
@@ -1896,14 +1972,6 @@ function recalcPkgDiscount() {
     if (savingsLine) savingsLine.style.display = 'block';
     if (savingsAmt) savingsAmt.textContent = savings.toLocaleString('ru-RU') + ' ֏';
     
-    // Auto-fill badges if auto-badge is checked
-    var autoBadge = document.getElementById('pkg_auto_badge');
-    if (autoBadge && autoBadge.checked) {
-      var badgeRu = document.getElementById('pkg_badge_ru');
-      var badgeAm = document.getElementById('pkg_badge_am');
-      if (badgeRu) badgeRu.value = '-' + discPct + '%';
-      if (badgeAm) badgeAm.value = '-' + discPct + '%';
-    }
   } else if (orig > 0 && price >= orig) {
     if (discDisplay) { discDisplay.textContent = 'нет скидки'; discDisplay.style.color = '#EF4444'; }
     if (savingsLine) savingsLine.style.display = 'none';
@@ -1914,34 +1982,59 @@ function recalcPkgDiscount() {
 }
 
 var _pkgItemCounter = 100;
-function renderPkgItemRow(idx, svcs, selectedId, qty) {
+function _getPkgTierPrice(tiers, qty) {
+  if (!tiers || qty <= 0) return 0;
+  for (var i = 0; i < tiers.length; i++) {
+    if (qty >= tiers[i].min && qty <= tiers[i].max) return tiers[i].price;
+  }
+  return tiers[tiers.length - 1].price;
+}
+
+function renderPkgItemRow(idx, svcs, selectedId, qty, useTiered) {
   _pkgItemCounter++;
   var rowId = 'pkgItem_' + _pkgItemCounter;
-  // Find current price for display
-  var itemTotal = '—';
+  var itemTotal = '\u2014';
+  var hasTiers = false;
   for (var si = 0; si < svcs.length; si++) {
-    if (svcs[si].id == selectedId) { itemTotal = (svcs[si].price * (qty || 1)).toLocaleString('ru-RU') + ' ֏'; break; }
+    if (String(svcs[si].id) === String(selectedId)) {
+      var tj = svcs[si].price_tiers_json;
+      hasTiers = (svcs[si].price_type === 'tiered') && tj && tj !== '[]' && tj !== 'null';
+      var tiersData = null;
+      if (hasTiers) { try { tiersData = typeof tj === 'string' ? JSON.parse(tj) : tj; if (!Array.isArray(tiersData) || tiersData.length === 0) hasTiers = false; } catch(e) { hasTiers = false; } }
+      if (useTiered && hasTiers && tiersData) {
+        var tp = _getPkgTierPrice(tiersData, qty || 1);
+        itemTotal = (tp * (qty || 1)).toLocaleString('ru-RU') + ' \u058f';
+      } else {
+        itemTotal = ((Number(svcs[si].price) || 0) * (qty || 1)).toLocaleString('ru-RU') + ' \u058f';
+      }
+      break;
+    }
   }
-  var h = '<div id="' + rowId + '" style="display:flex;gap:8px;align-items:center;margin-bottom:8px">' +
-    '<select class="input pkg-svc-select" style="flex:1;padding:6px 10px;font-size:0.85rem" onchange="recalcPkgTotals()">';
-  h += '<option value="">-- Выберите услугу --</option>';
+  var h = '<div id="' + rowId + '" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap">';
+  h += '<select class="input pkg-svc-select" style="flex:1;min-width:200px;padding:6px 10px;font-size:0.85rem" onchange="recalcPkgTotals()">';
+  h += '<option value="">-- \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443 --</option>';
   for (var si2 = 0; si2 < svcs.length; si2++) {
     var s = svcs[si2];
-    h += '<option value="' + s.id + '" ' + (selectedId == s.id ? 'selected' : '') + '>' + escHtml(s.name_ru) + ' (' + Number(s.price).toLocaleString('ru-RU') + ' ֏)</option>';
+    var sTj = s.price_tiers_json;
+    var sTiered = (s.price_type === 'tiered') && sTj && sTj !== '[]' && sTj !== 'null';
+    var tierMark = sTiered ? ' \ud83d\udcc8[\u0448\u043a\u0430\u043b\u0430]' : '';
+    h += '<option value="' + s.id + '" ' + (String(selectedId) === String(s.id) ? 'selected' : '') + '>' + escHtml(s.name_ru) + ' (' + Number(s.price).toLocaleString('ru-RU') + ' \u058f)' + tierMark + '</option>';
   }
-  h += '</select>' +
-    '<input class="input pkg-qty-input" type="number" value="' + (qty || 1) + '" min="1" max="999" style="width:70px;padding:6px 10px;font-size:0.85rem;text-align:center" title="Кол-во" oninput="recalcPkgTotals()">' +
-    '<span class="pkg-item-price" style="min-width:80px;text-align:right;font-size:0.82rem;color:#a78bfa;font-weight:600;white-space:nowrap">' + itemTotal + '</span>' +
-    '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(&apos;' + rowId + '&apos;).remove();recalcPkgTotals()" title="Удалить"><i class="fas fa-times"></i></button>' +
-  '</div>';
+  h += '</select>';
+  h += '<input class="input pkg-qty-input" type="number" value="' + (qty || 1) + '" min="1" max="999" style="width:70px;padding:6px 10px;font-size:0.85rem;text-align:center" title="\u041a\u043e\u043b-\u0432\u043e" oninput="recalcPkgTotals()">';
+  h += '<div class="pkg-tier-toggle" style="display:' + (hasTiers ? 'inline-flex' : 'none') + ';align-items:center;gap:6px;cursor:pointer;font-size:0.82rem;color:#c4b5fd;white-space:nowrap;background:rgba(139,92,246,0.18);padding:5px 12px;border-radius:8px;border:1px solid rgba(139,92,246,0.45)" onclick="var cb=this.querySelector(&apos;input&apos;);if(cb){cb.checked=!cb.checked;recalcPkgTotals()}">' +
+    '<input type="checkbox" class="pkg-use-tiered" style="margin:0;cursor:pointer;width:16px;height:16px;accent-color:#8B5CF6" ' + (useTiered ? 'checked' : '') + ' onclick="event.stopPropagation();recalcPkgTotals()"> <span style="pointer-events:none">\ud83d\udcc8 \u041f\u043e \u0448\u043a\u0430\u043b\u0435</span></div>';
+  h += '<span class="pkg-item-price" style="min-width:90px;text-align:right;font-size:0.85rem;color:#a78bfa;font-weight:600;white-space:nowrap">' + itemTotal + '</span>';
+  h += '<button class="btn btn-danger" style="padding:6px 10px;font-size:0.8rem" onclick="document.getElementById(&apos;' + rowId + '&apos;).remove();recalcPkgTotals()" title="\u0423\u0434\u0430\u043b\u0438\u0442\u044c"><i class="fas fa-times"></i></button>';
+  h += '</div>';
   return h;
 }
 
 async function savePkgSectionTitles() {
-  var titleRu = (document.getElementById('pkgSectionTitleRu') as any)?.value || '';
-  var titleAm = (document.getElementById('pkgSectionTitleAm') as any)?.value || '';
-  var subRu = (document.getElementById('pkgSectionSubRu') as any)?.value || '';
-  var subAm = (document.getElementById('pkgSectionSubAm') as any)?.value || '';
+  var titleRu = (document.getElementById('pkgSectionTitleRu') || {}).value || '';
+  var titleAm = (document.getElementById('pkgSectionTitleAm') || {}).value || '';
+  var subRu = (document.getElementById('pkgSectionSubRu') || {}).value || '';
+  var subAm = (document.getElementById('pkgSectionSubAm') || {}).value || '';
   try {
     await api('/settings', { method: 'PUT', body: JSON.stringify({
       packages_title_ru: titleRu,
@@ -1963,7 +2056,7 @@ async function savePkgSectionTitles() {
 function addPkgItem() {
   var list = document.getElementById('pkg_items_list');
   if (!list) return;
-  list.insertAdjacentHTML('beforeend', renderPkgItemRow(list.children.length, data.calcServices || [], '', 1));
+  list.insertAdjacentHTML('beforeend', renderPkgItemRow(list.children.length, data.calcServices || [], '', 1, false));
 }
 
 async function savePackage(pkgId) {
@@ -1976,9 +2069,11 @@ async function savePackage(pkgId) {
   for (var i = 0; i < rows.length; i++) {
     var sel = rows[i].querySelector('.pkg-svc-select');
     var qtyIn = rows[i].querySelector('.pkg-qty-input');
+    var tieredCb = rows[i].querySelector('.pkg-use-tiered');
     var svcId = parseInt(sel ? sel.value : '0') || 0;
     var qty = parseInt(qtyIn ? qtyIn.value : '1') || 1;
-    if (svcId > 0) items.push({ service_id: svcId, quantity: qty });
+    var useTiered = tieredCb && tieredCb.checked ? 1 : 0;
+    if (svcId > 0) items.push({ service_id: svcId, quantity: qty, use_tiered: useTiered });
   }
   
   if (items.length === 0) { toast('Добавьте хотя бы 1 услугу', 'error'); return; }
@@ -1995,7 +2090,7 @@ async function savePackage(pkgId) {
     package_price: pkgPrice,
     badge_ru: (document.getElementById('pkg_badge_ru'))?.value || '',
     badge_am: (document.getElementById('pkg_badge_am'))?.value || '',
-    is_popular: (document.getElementById('pkg_is_popular'))?.checked ? 1 : 0,
+    crown_tier: (document.getElementById('pkg_crown_tier'))?.value || '',
     is_active: (document.getElementById('pkg_is_active'))?.checked ? 1 : 0,
     sort_order: pkgId ? ((data.calcPackages || []).find(function(p) { return p.id === pkgId; })?.sort_order || 0) : (data.calcPackages || []).length,
     items: items
@@ -2391,17 +2486,41 @@ function renderReferrals() {
   // ── Inline form for adding new referral code ──
   h += '<div class="card" style="margin-bottom:24px;border:1px dashed rgba(139,92,246,0.4);background:rgba(139,92,246,0.03)">' +
     '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa;font-size:0.95rem"><i class="fas fa-plus-circle" style="margin-right:8px"></i>Добавить новый код</h3>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Кодовое слово</label><input class="input" id="new_ref_code" placeholder="PROMO2026" style="text-transform:uppercase"></div>' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Скидка (%)</label><input class="input" type="number" id="new_ref_disc" value="0" min="0" max="100"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" id="new_ref_free" value="0" min="0"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Лимит (0 = ∞)</label><input class="input" type="number" id="new_ref_max" value="0" min="0" placeholder="0 = без лимита"></div>' +
+            '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Лимит (0 = ∞)</label><input class="input" type="number" id="new_ref_max" value="0" min="0" placeholder="0 = без лимита"></div>' +
       '<div style="display:flex;align-items:end"><button class="btn btn-primary" style="width:100%;padding:10px" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:6px"></i>Создать</button></div>' +
     '</div>' +
     '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание (для кого этот код)</label><input class="input" id="new_ref_desc" placeholder="Блогер Иван, партнёр, VIP-клиент..."></div>' +
-    '<div style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="new_ref_apply_pkg"> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>Скидка распространяется на пакеты</span></label>' +
-    '<div style="font-size:0.7rem;color:#475569;margin-top:3px;margin-left:24px">Если включено — скидка промокода будет применяться и к цене пакета, а не только к отдельным услугам</div></div>' +
-  '</div>';
+    // Active toggle
+    '<div style="margin-top:10px;display:flex;gap:24px;flex-wrap:wrap">' +
+    '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="new_ref_active" checked> <span style="font-size:0.82rem;color:#10B981"><i class="fas fa-toggle-on" style="margin-right:4px"></i>Активен</span></label>' +
+    '<label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="new_ref_apply_pkg"> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>Скидка распространяется на пакеты</span></label>' +
+    '</div>' +
+    '<div style="font-size:0.7rem;color:#475569;margin-top:3px;margin-left:24px">Если включено — скидка промокода будет применяться и к цене пакета, а не только к отдельным услугам</div>';
+  // Package checkboxes in creation form
+  if (allCalcPackages.length > 0) {
+    h += '<div style="margin-top:10px;padding:8px;background:rgba(245,158,11,0.05);border-radius:6px">' +
+      '<div style="font-size:0.72rem;color:#f59e0b;font-weight:600;margin-bottom:6px"><i class="fas fa-box-open" style="margin-right:4px"></i>Привязка к пакетам (пусто = не привязан)</div><div style="display:flex;flex-wrap:wrap;gap:8px">';
+    for (var npi = 0; npi < allCalcPackages.length; npi++) {
+      var npk = allCalcPackages[npi];
+      h += '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.8rem;padding:3px 6px;background:#1e293b;border-radius:5px"><input type="checkbox" class="new_ref_pkg_cb" value="' + npk.id + '"> ' + escHtml(npk.name_ru) + '</label>';
+    }
+    h += '</div></div>';
+  }
+  // Service multi-select in creation form
+  if (allCalcServices.length > 0) {
+    h += '<div style="margin-top:10px;padding:8px;background:rgba(139,92,246,0.05);border-radius:6px">' +
+      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-list-check" style="margin-right:4px"></i>Привязка к услугам (пусто = все услуги)</div>' +
+      '<select class="input" id="new_ref_services" multiple size="3" style="font-size:0.78rem;min-height:60px">';
+    for (var nsi = 0; nsi < allCalcServices.length; nsi++) {
+      var ns = allCalcServices[nsi];
+      h += '<option value="' + ns.id + '">' + escHtml(ns.name_ru) + ' (' + escHtml(ns.tab) + ')</option>';
+    }
+    h += '</select></div>';
+  }
+  h += '</div>';
   
   // ── Overall promo analytics summary ──
   var totalRefUses = 0, totalRefPaid = 0, totalRefActive = 0, totalRefInactive = 0;
@@ -2439,14 +2558,38 @@ function renderReferrals() {
         '</div>' +
       '</div>' +
       (maxUses > 0 ? '<div style="margin-bottom:12px;background:#1e293b;border-radius:4px;overflow:hidden;height:6px"><div style="height:100%;background:' + usageColor + ';width:' + usagePct + '%;transition:width 0.3s"></div></div>' : '') +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:12px">' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Код (слово)</label><input class="input" value="' + escHtml(ref.code) + '" id="ref_code_' + ref.id + '"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Общая скидка (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
-        '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Бесплатных отзывов</label><input class="input" type="number" value="' + (ref.free_reviews || 0) + '" id="ref_free_' + ref.id + '" min="0"></div>' +
         '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600">Лимит использований (0=∞)</label><input class="input" type="number" value="' + (ref.max_uses || 0) + '" id="ref_max_' + ref.id + '" min="0"></div>' +
       '</div>' +
       '<div style="margin-top:12px"><label style="font-size:0.75rem;color:#64748b;font-weight:600">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Для кого этот код / комментарий"></div>' +
       '<div style="margin-top:10px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ref_apply_pkg_' + ref.id + '" ' + (ref.apply_to_packages ? 'checked' : '') + '> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>Скидка распространяется на пакеты</span></label></div>';
+    // Package checkboxes for this code
+    var refLinkedPkgs = [];
+    try { refLinkedPkgs = JSON.parse(ref.linked_packages || '[]'); } catch(e) { refLinkedPkgs = []; }
+    if (allCalcPackages.length > 0) {
+      h += '<div style="margin-top:10px;padding:8px;background:rgba(245,158,11,0.05);border-radius:6px">' +
+        '<div style="font-size:0.72rem;color:#f59e0b;font-weight:600;margin-bottom:6px"><i class="fas fa-box-open" style="margin-right:4px"></i>Привязка к пакетам</div><div style="display:flex;flex-wrap:wrap;gap:8px">';
+      for (var epi = 0; epi < allCalcPackages.length; epi++) {
+        var epk = allCalcPackages[epi];
+        var epkChecked = refLinkedPkgs.indexOf(epk.id) !== -1 ? 'checked' : '';
+        h += '<label style="display:flex;align-items:center;gap:5px;cursor:pointer;font-size:0.8rem;padding:3px 6px;background:#1e293b;border-radius:5px"><input type="checkbox" class="ref_pkg_cb_' + ref.id + '" value="' + epk.id + '" ' + epkChecked + '> ' + escHtml(epk.name_ru) + '</label>';
+      }
+      h += '</div></div>';
+    }
+    // Linked services for this code
+    var refLinkedSvcs = [];
+    try { refLinkedSvcs = JSON.parse(ref.linked_services || '[]'); } catch(e) { refLinkedSvcs = []; }
+    h += '<div style="margin-top:10px;padding:8px;background:rgba(139,92,246,0.05);border-radius:6px">' +
+      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-list-check" style="margin-right:4px"></i>Привязка к услугам (пусто = все)</div>' +
+      '<select class="input" id="ref_svcs_' + ref.id + '" multiple size="3" style="font-size:0.78rem;min-height:60px">';
+    for (var esi = 0; esi < allCalcServices.length; esi++) {
+      var es = allCalcServices[esi];
+      var esSelected = refLinkedSvcs.indexOf(es.id) !== -1 ? 'selected' : '';
+      h += '<option value="' + es.id + '" ' + esSelected + '>' + escHtml(es.name_ru) + ' (' + escHtml(es.tab) + ')</option>';
+    }
+    h += '</select></div>';
     
     // === Attached services section ===
     h += '<div style="margin-top:16px;border-top:1px solid #334155;padding-top:12px">' +
@@ -2498,23 +2641,33 @@ async function addReferral() {
   var codeEl = document.getElementById('new_ref_code');
   var descEl = document.getElementById('new_ref_desc');
   var discEl = document.getElementById('new_ref_disc');
-  var freeEl = document.getElementById('new_ref_free');
+
   var maxEl = document.getElementById('new_ref_max');
   var code = (codeEl?.value || '').trim();
   if (!code) { toast('Введите кодовое слово', 'error'); codeEl?.focus(); return; }
   var desc = (descEl?.value || '').trim();
   var disc = parseInt(discEl?.value || '0') || 0;
-  var free = parseInt(freeEl?.value || '0') || 0;
+
   var maxUses = parseInt(maxEl?.value || '0') || 0;
   var applyPkgEl = document.getElementById('new_ref_apply_pkg');
   var applyPkg = applyPkgEl ? applyPkgEl.checked : false;
-  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, free_reviews: free, max_uses: maxUses, apply_to_packages: applyPkg ? 1 : 0 }) });
+  // Collect linked packages from checkboxes
+  var linkedPkgs = [];
+  document.querySelectorAll('.new_ref_pkg_cb:checked').forEach(function(cb) { linkedPkgs.push(parseInt(cb.value)); });
+  // Collect linked services from multi-select
+  var linkedSvcs = [];
+  var svcSelect = document.getElementById('new_ref_services');
+  if (svcSelect) { for (var so = 0; so < svcSelect.selectedOptions.length; so++) { linkedSvcs.push(parseInt(svcSelect.selectedOptions[so].value)); } }
+  // Active toggle
+  var activeEl = document.getElementById('new_ref_active');
+  var isActive = activeEl ? (activeEl.checked ? 1 : 0) : 1;
+  await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, max_uses: maxUses, apply_to_packages: applyPkg ? 1 : 0, linked_packages: linkedPkgs, linked_services: linkedSvcs, is_active: isActive }) });
   toast('Код "' + code.toUpperCase() + '" добавлен');
   // Clear form fields
   if (codeEl) codeEl.value = '';
   if (descEl) descEl.value = '';
   if (discEl) discEl.value = '0';
-  if (freeEl) freeEl.value = '0';
+
   if (maxEl) maxEl.value = '0';
   await loadData(); await loadRefServices(); render();
 }
@@ -2565,14 +2718,22 @@ async function saveReferral(id) {
   var ref = data.referrals.find(function(r) { return r.id === id; });
   if (!ref) return;
   var applyPkgEl = document.getElementById('ref_apply_pkg_' + id);
+  // Collect linked packages from checkboxes
+  var linkedPkgs = [];
+  document.querySelectorAll('.ref_pkg_cb_' + id + ':checked').forEach(function(cb) { linkedPkgs.push(parseInt(cb.value)); });
+  // Collect linked services from multi-select
+  var linkedSvcs = [];
+  var svcSelect = document.getElementById('ref_svcs_' + id);
+  if (svcSelect) { for (var so = 0; so < svcSelect.selectedOptions.length; so++) { linkedSvcs.push(parseInt(svcSelect.selectedOptions[so].value)); } }
   await api('/referrals/' + id, { method: 'PUT', body: JSON.stringify({
     code: document.getElementById('ref_code_' + id).value,
     description: document.getElementById('ref_desc_' + id).value,
     discount_percent: parseInt(document.getElementById('ref_disc_' + id).value) || 0,
-    free_reviews: parseInt(document.getElementById('ref_free_' + id).value) || 0,
     max_uses: parseInt(document.getElementById('ref_max_' + id)?.value) || 0,
     is_active: ref.is_active,
-    apply_to_packages: applyPkgEl ? (applyPkgEl.checked ? 1 : 0) : (ref.apply_to_packages || 0)
+    apply_to_packages: applyPkgEl ? (applyPkgEl.checked ? 1 : 0) : (ref.apply_to_packages || 0),
+    linked_packages: linkedPkgs,
+    linked_services: linkedSvcs
   }) });
   toast('Код сохранён');
   await loadData(); render();
@@ -3384,7 +3545,7 @@ async function applyLeadRefCode(leadId) {
   var infoHtml = '<div style="padding:8px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:6px;font-size:0.78rem;color:#6ee7b7">' +
     '<i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(code) + '» применён';
   if (res.discount_percent) infoHtml += ' | Скидка: <strong>' + res.discount_percent + '%</strong>';
-  if (res.free_reviews) infoHtml += ' | Бесп. отзывы: <strong>' + res.free_reviews + '</strong>';
+
   if (res.free_services && res.free_services.length > 0) {
     infoHtml += '<br>Бесплатные услуги: ';
     res.free_services.forEach(function(s) { infoHtml += '<span style="background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px;margin:0 2px">' + escHtml(s.name_ru || s.service_name) + '</span>'; });
