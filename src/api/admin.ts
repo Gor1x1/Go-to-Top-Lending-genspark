@@ -2308,7 +2308,7 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   let refFreeServices: any[] = [];
   if (referralCode) {
     try {
-      const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
+      const refRow = await db.prepare('SELECT * FROM referral_codes WHERE UPPER(code) = UPPER(?) AND is_active = 1').bind(referralCode.trim()).first();
       if (refRow) {
         discountPercent = Number(refRow.discount_percent) || 0;
         if (discountPercent > 0) {
@@ -2337,7 +2337,7 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     } catch {}
   }
   
-  const totalAmount = subtotalAmount - discountAmount;
+  const totalAmount = Math.max(0, subtotalAmount - discountAmount);
   
   // Compute commission from payment method
   let commissionAmount = 0;
