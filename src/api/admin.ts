@@ -769,7 +769,6 @@ api.get('/referral-codes/check', authMiddleware, async (c) => {
     id: row.id,
     code: row.code,
     discount_percent: row.discount_percent || 0,
-    free_reviews: row.free_reviews || 0,
     description: row.description || '',
     free_services: freeServices,
     service_discounts: serviceDiscounts
@@ -1097,7 +1096,7 @@ api.get('/leads/analytics', authMiddleware, async (c) => {
     for (const code of (allCodes.results || [])) {
       const key = code.code as string;
       if (promoCodeCosts[key]) {
-        promoCodeCosts[key].code_details = { discount_percent: code.discount_percent, free_reviews: code.free_reviews, uses_count: code.uses_count, is_active: code.is_active, description: code.description };
+        promoCodeCosts[key].code_details = { discount_percent: code.discount_percent, uses_count: code.uses_count, is_active: code.is_active, description: code.description };
       }
     }
   } catch {}
@@ -3177,7 +3176,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         const key = code.code as string;
         if (promoCodeCosts[key]) {
           promoCodeCosts[key].code_details = {
-            id: code.id, discount_percent: code.discount_percent, free_reviews: code.free_reviews,
+            id: code.id, discount_percent: code.discount_percent,
             uses_count: code.uses_count, is_active: code.is_active, description: code.description
           };
         }
