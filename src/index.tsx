@@ -1815,7 +1815,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:none;background:transparent;box-shadow:none}
-.rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform}
+.rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform;flex-wrap:nowrap;max-width:none}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
 .rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:12px 16px;background:rgba(139,92,246,0.08);border-radius:0 0 12px 12px}
@@ -1959,8 +1959,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .cmp-table{min-width:0!important;width:100%;table-layout:fixed;font-size:0.72rem}
   .cmp-table td,.cmp-table th{padding:8px 6px;word-wrap:break-word;overflow-wrap:break-word}
   /* Carousels: horizontal scroll only inside, vertical scroll passthrough to page */
-  .rv-carousel{overflow:hidden!important;touch-action:pan-y}
-  .rv-carousel .rv-track{max-width:none!important}
+  .rv-carousel{overflow:hidden!important;-webkit-overflow-scrolling:auto;touch-action:pan-y;scroll-snap-type:none!important}
+  .rv-carousel .rv-track{max-width:none!important;width:auto!important;flex-wrap:nowrap!important}
   .pb-carousel{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
   .pb-carousel{touch-action:auto}
   /* Section CTA buttons — always at bottom with proper spacing */

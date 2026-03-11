@@ -2537,6 +2537,9 @@ function renderReferrals() {
   h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #3B82F6"><div style="font-size:0.72rem;color:#94a3b8">Оплач. лидов</div><div style="font-size:1.5rem;font-weight:800;color:#3B82F6">' + totalRefPaid + '</div><div style="font-size:0.58rem;color:#475569">в работе+проверка+готов</div></div>';
   h += '</div>';
 
+  // ── Existing codes list (inside promo section) ──
+  h += '<h3 style="font-weight:700;margin-bottom:16px;font-size:0.95rem;color:#e2e8f0"><i class="fas fa-list" style="margin-right:8px;color:#8B5CF6"></i>Существующие промокоды (' + data.referrals.length + ')</h3>';
+
   for (const ref of data.referrals) {
     var refServices = ref._services || [];
     var paidCount = Number(ref.paid_uses_count || 0);
