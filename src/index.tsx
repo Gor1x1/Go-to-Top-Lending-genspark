@@ -1953,14 +1953,15 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .section .container{overflow:visible!important;max-width:100%!important}
   /* Key fix: prevent ANY child from causing horizontal scroll */
   body{overflow-x:hidden}
-  .section *{max-width:100%;box-sizing:border-box}
+  .section *:not(.rv-track):not(.rv-slide):not(.calc-packages-grid):not(.calc-pkg-card){max-width:100%;box-sizing:border-box}
   /* Comparison table: fixed layout, no scroll outside wrapper */
   .cmp-table-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:var(--r);margin:0;padding:0;max-width:100%}
   .cmp-table{min-width:0!important;width:100%;table-layout:fixed;font-size:0.72rem}
   .cmp-table td,.cmp-table th{padding:8px 6px;word-wrap:break-word;overflow-wrap:break-word}
   /* Carousels: horizontal scroll only inside, vertical scroll passthrough to page */
-  .rv-carousel,.pb-carousel{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
-  .rv-carousel{touch-action:auto}
+  .rv-carousel{overflow:hidden!important;touch-action:pan-y}
+  .rv-carousel .rv-track{max-width:none!important}
+  .pb-carousel{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
   .pb-carousel{touch-action:auto}
   /* Section CTA buttons — always at bottom with proper spacing */
   .section-cta{margin-top:24px!important;text-align:center;display:flex;flex-direction:column;align-items:center}
@@ -4103,7 +4104,8 @@ switchLang = function(l) {
         pkgsContainer.style.display = '';
         console.log('[DB] Packages rendered:', db.packages.length);
         // Setup smooth transform-based carousel for mobile
-        (function() {
+        // Use rAF + timeout to ensure DOM has layout dimensions
+        function _initPkgCarousel() {
           if (window.innerWidth > 768) return;
           var grid = pkgsContainer.querySelector('.calc-packages-grid');
           if (!grid) return;
@@ -4120,6 +4122,12 @@ switchLang = function(l) {
           var startX = 0, startY = 0, currentTranslate = 0, isDragging = false, startTime = 0;
           var isHorizontal = null, dragStartTranslate = 0;
           var containerW = pkgsContainer.offsetWidth;
+          var gridML = parseInt(getComputedStyle(grid).marginLeft || '0');
+          // If container has no width yet, retry after short delay
+          if (containerW <= 0) {
+            setTimeout(_initPkgCarousel, 100);
+            return;
+          }
           
           // Get the translate needed to center a card
           function getCenterOffset(idx) {
@@ -4128,7 +4136,7 @@ switchLang = function(l) {
             var cardLeft = card.offsetLeft;
             var cardW = card.offsetWidth;
             // Center the card within the parent container
-            return -(cardLeft - (containerW - cardW) / 2);
+            return -(cardLeft - (containerW - cardW) / 2 + gridML);
           }
           
           // Get min/max translate bounds
@@ -4204,7 +4212,9 @@ switchLang = function(l) {
           
           // Init: center on gold card
           goToCard(goldIdx, false);
-        })();
+          console.log('[DB] Package carousel initialized, gold at index:', goldIdx, 'containerW:', containerW);
+        }
+        requestAnimationFrame(function() { setTimeout(_initPkgCarousel, 50); });
       }
     }
     
