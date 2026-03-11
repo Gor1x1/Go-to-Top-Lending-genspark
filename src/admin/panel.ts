@@ -2471,6 +2471,8 @@ async function toggleScript(id, active) {
 
 // ===== REFERRAL CODES =====
 function renderReferrals() {
+  // Get all calculator packages for checkboxes
+  var allCalcPackages = (data.calcPackages || []).map(function(p) { return { id: p.id, name_ru: p.name_ru || '', name_am: p.name_am || '' }; });
   // Get all calculator services for the dropdown
   var allCalcServices = [];
   var tabsById = {};
