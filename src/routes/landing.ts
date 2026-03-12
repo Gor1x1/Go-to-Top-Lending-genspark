@@ -299,10 +299,10 @@ img{max-width:100%;height:auto}
 .nav-links a:hover{color:var(--text)}
 .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .lang-switch{display:flex;background:var(--bg-card);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
-.lang-btn{padding:5px 10px;font-size:1.1rem;cursor:pointer;transition:var(--t);background:transparent;border:none;color:var(--text-muted);line-height:1;display:flex;align-items:center;justify-content:center}
-.lang-btn.active{background:var(--purple)}
-.lang-btn .lang-text{display:none}
-.lang-btn .lang-flag{font-size:1.2rem}
+.lang-btn{padding:5px 10px;font-size:1.1rem;cursor:pointer;transition:var(--t);background:transparent;border:none;color:var(--text-muted);line-height:1;display:flex;align-items:center;justify-content:center;gap:4px}
+.lang-btn.active{background:var(--purple);color:white}
+.lang-btn .lang-text{font-size:0.7rem;font-weight:600;letter-spacing:0.5px}
+.lang-btn .lang-flag{font-size:1.1rem}
 .nav-cta{padding:8px 16px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white!important;border-radius:var(--r-sm);font-weight:600;font-size:clamp(0.72rem,0.8vw,0.88rem);transition:var(--t);display:flex;align-items:center;gap:6px;white-space:nowrap;flex-shrink:0}
 .nav-cta:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(139,92,246,0.4)}
 .hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;background:none;border:none;padding:8px}
@@ -318,7 +318,7 @@ img{max-width:100%;height:auto}
 .bottom-nav-item.active{color:var(--purple)}
 .bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
 .bottom-nav-item i{font-size:1.1rem}
-.bottom-nav-item span{white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none;font-size:inherit}
+.bottom-nav-item span{white-space:normal;overflow:visible;text-overflow:clip;max-width:100%;font-size:inherit;text-align:center;line-height:1.2;word-break:break-word}
 .bottom-nav-more{position:relative}
 .bottom-nav-more.active{color:var(--purple)}
 .bottom-nav-more span{font-size:0.68rem}
@@ -437,7 +437,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 75vw;max-width:75vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;touch-action:auto;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.15),0 4px 10px rgba(255,215,0,0.06);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 82vw;max-width:82vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;scroll-snap-stop:always;touch-action:auto;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 82vw;max-width:82vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.15),0 4px 10px rgba(255,215,0,0.06);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 82vw;max-width:82vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 82vw;max-width:82vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -769,7 +769,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:none;background:transparent;box-shadow:none}
 .rv-carousel .rv-track{display:flex;flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-behavior:smooth;touch-action:pan-x pan-y}
 .rv-carousel .rv-track::-webkit-scrollbar{display:none}
-.rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative;scroll-snap-align:start}
+.rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative;scroll-snap-align:start;scroll-snap-stop:always}
 .rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:12px 16px;background:rgba(139,92,246,0.08);border-radius:0 0 12px 12px}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#8b8b9e);font-style:italic}
@@ -1047,8 +1047,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
-      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag">\u{1F1F7}\u{1F1FA}</span></button>
-      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag">\u{1F1E6}\u{1F1F2}</span></button>
+      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag">\u{1F1F7}\u{1F1FA}</span><span class="lang-text">RU</span></button>
+      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag">\u{1F1E6}\u{1F1F2}</span><span class="lang-text">AM</span></button>
     </div>
     <a href="https://wa.me/37441888389" target="_blank" class="nav-cta">
       <i class="fab fa-whatsapp"></i>
@@ -3187,15 +3187,18 @@ switchLang = function(l) {
         pkgsContainer.innerHTML = ph;
         pkgsContainer.style.display = '';
         console.log('[DB] Packages rendered:', db.packages.length);
-        // Scroll to gold card on mobile (CSS scroll-snap handles the swipe)
+        // Scroll grid to gold card on mobile (only horizontal, not page scroll)
         requestAnimationFrame(function() { setTimeout(function() {
           if (window.innerWidth > 768) return;
           var grid = pkgsContainer.querySelector('.calc-packages-grid');
           if (!grid) return;
           var goldCard = grid.querySelector('.pkg-crown-gold');
           if (goldCard) {
-            goldCard.scrollIntoView({inline:'center', block:'nearest', behavior:'instant'});
-            console.log('[DB] Scrolled to gold card');
+            var cardLeft = goldCard.offsetLeft;
+            var cardW = goldCard.offsetWidth;
+            var gridW = grid.offsetWidth;
+            grid.scrollLeft = cardLeft - (gridW - cardW) / 2;
+            console.log('[DB] Scrolled grid to gold card');
           }
         }, 50); });
       }
@@ -5731,8 +5734,8 @@ async function checkRefCode() {
       const goldCardIdx = sortedSsrPkgs.findIndex((p: any) => (p.crown_tier || (p.is_popular ? 'gold' : '')) === 'gold');
       const initIdx = goldCardIdx >= 0 ? goldCardIdx : 0;
       pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
-      // CSS scroll-snap handles swiping natively — just scroll to gold card on load
-      pkgHtml += '(function(){if(window.innerWidth>768)return;var g=document.querySelector(".calc-packages-grid");if(!g)return;var gold=g.querySelector(".pkg-crown-gold");if(gold){gold.scrollIntoView({inline:"center",block:"nearest",behavior:"instant"})}})();';
+      // CSS scroll-snap handles swiping natively — scroll grid horizontally to gold card (no page jump)
+      pkgHtml += '(function(){if(window.innerWidth>768)return;var g=document.querySelector(".calc-packages-grid");if(!g)return;var gold=g.querySelector(".pkg-crown-gold");if(gold){var cl=gold.offsetLeft,cw=gold.offsetWidth,gw=g.offsetWidth;g.scrollLeft=cl-(gw-cw)/2}})();';
       pkgHtml += '</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
