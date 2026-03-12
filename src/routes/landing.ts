@@ -1992,37 +1992,50 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Active section highlighting on scroll
+// Active section highlighting on scroll — re-reads nav items each time
+// so it works even after DB client rebuilds the bottom nav
 (function() {
-  var navItems = document.querySelectorAll('.bottom-nav-item[href]');
-  if (!navItems.length) return;
-  var sectionIds = [];
-  navItems.forEach(function(a) {
-    var href = a.getAttribute('href');
-    if (href && href.startsWith('#')) sectionIds.push(href.substring(1));
-  });
-  // Also collect targets from the more menu
-  var moreLinks = document.querySelectorAll('.bottom-nav-more-menu a[href]');
-  var moreTargets = [];
-  moreLinks.forEach(function(a) {
-    var href = a.getAttribute('href');
-    if (href && href.startsWith('#')) moreTargets.push(href.substring(1));
-  });
-  var allTargets = sectionIds.concat(moreTargets);
   var scrollTimer = null;
   function updateActiveNav() {
+    var navItems = document.querySelectorAll('.bottom-nav-item[href]');
+    if (!navItems.length) return;
+    var moreLinks = document.querySelectorAll('.bottom-nav-more-menu a[href]');
+    var moreTargets = [];
+    moreLinks.forEach(function(a) {
+      var href = a.getAttribute('href');
+      if (href && href.startsWith('#')) moreTargets.push(href.substring(1));
+    });
+    // Collect all sections in DOM order (top to bottom)
+    var allSections = [];
+    navItems.forEach(function(a) {
+      var href = a.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        var el = document.getElementById(href.substring(1));
+        if (el) allSections.push({ id: href.substring(1), top: el.getBoundingClientRect().top + window.scrollY });
+      }
+    });
+    moreLinks.forEach(function(a) {
+      var href = a.getAttribute('href');
+      if (href && href.startsWith('#')) {
+        var el = document.getElementById(href.substring(1));
+        if (el) allSections.push({ id: href.substring(1), top: el.getBoundingClientRect().top + window.scrollY });
+      }
+    });
+    // Sort by position on page
+    allSections.sort(function(a, b) { return a.top - b.top; });
+    // Find active: last section whose top is above 35% of viewport
     var scrollY = window.scrollY + window.innerHeight * 0.35;
     var activeId = '';
-    for (var i = 0; i < allTargets.length; i++) {
-      var el = document.getElementById(allTargets[i]);
-      if (el && el.offsetTop <= scrollY) activeId = allTargets[i];
+    for (var i = 0; i < allSections.length; i++) {
+      if (allSections[i].top <= scrollY) activeId = allSections[i].id;
     }
+    // Highlight matching nav item
     navItems.forEach(function(a) {
       var href = (a.getAttribute('href') || '').substring(1);
       if (href === activeId) a.classList.add('active');
       else a.classList.remove('active');
     });
-    // If active section is in "more" menu, highlight the more button
+    // Highlight more button if active section is inside the dropdown
     var moreBtn = document.getElementById('bottomNavMore');
     if (moreBtn) {
       var inMore = moreTargets.indexOf(activeId) >= 0;
@@ -2032,9 +2045,11 @@ document.addEventListener('click', function(e) {
   }
   window.addEventListener('scroll', function() {
     if (scrollTimer) clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(updateActiveNav, 80);
+    scrollTimer = setTimeout(updateActiveNav, 60);
   }, {passive: true});
-  updateActiveNav();
+  // Run after a delay to let DB client rebuild nav
+  setTimeout(updateActiveNav, 500);
+  setTimeout(updateActiveNav, 2000);
 })();
 
 document.querySelectorAll('.nav-links a').forEach(function(a) {
