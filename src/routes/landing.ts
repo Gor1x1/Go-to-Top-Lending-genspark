@@ -434,7 +434,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:hidden;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow:visible;gap:12px;padding:12px 0;scrollbar-width:none;justify-content:flex-start;will-change:transform;align-items:center}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 68vw;max-width:68vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 75vw;max-width:75vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -764,8 +764,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:none;background:transparent;box-shadow:none}
-.rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform;flex-wrap:nowrap;max-width:none}
-.rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
+.rv-carousel .rv-track{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-behavior:smooth}
+.rv-carousel .rv-track::-webkit-scrollbar{display:none}
+.rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative;scroll-snap-align:start}
 .rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:12px 16px;background:rgba(139,92,246,0.08);border-radius:0 0 12px 12px}
 .rv-carousel .rv-caption-text{font-size:0.92rem;line-height:1.6;color:var(--text-sec,#8b8b9e);font-style:italic}
@@ -901,6 +902,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   #client-reviews .container{overflow:visible!important}
   section[data-section-id^="photo-block"]{overflow:visible!important}
   section[data-section-id^="photo-block"] .container{overflow:visible!important}
+  #calculator{overflow:visible!important}
+  #calculator .container{overflow:visible!important}
   .section .container{overflow:visible!important;max-width:100%!important}
   /* Key fix: prevent ANY child from causing horizontal scroll */
   body{overflow-x:hidden}
@@ -910,8 +913,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .cmp-table{min-width:0!important;width:100%;table-layout:fixed;font-size:0.72rem}
   .cmp-table td,.cmp-table th{padding:8px 6px;word-wrap:break-word;overflow-wrap:break-word}
   /* Carousels: horizontal scroll only inside, vertical scroll passthrough to page */
-  .rv-carousel{overflow:hidden!important;-webkit-overflow-scrolling:auto;scroll-snap-type:none!important}
-  .rv-carousel .rv-track{max-width:none!important;width:auto!important;flex-wrap:nowrap!important}
+  .rv-carousel{overflow:hidden;max-width:100%;position:relative}
+  .rv-carousel .rv-track{width:100%!important;flex-wrap:nowrap!important;overflow-x:auto!important;overflow-y:hidden!important;scroll-snap-type:x mandatory!important;-webkit-overflow-scrolling:touch!important;scroll-behavior:smooth!important;scrollbar-width:none!important}
+  .rv-carousel .rv-track::-webkit-scrollbar{display:none!important}
   .pb-carousel{overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none}
   .pb-carousel::-webkit-scrollbar{display:none}
   /* Section CTA buttons — always at bottom with proper spacing */
@@ -2224,9 +2228,11 @@ function rvSlide(carId, dir) {
   if (state.idx < 0) state.idx = state.total - 1;
   if (state.idx >= state.total) state.idx = 0;
   _rvState[carId] = state;
-  // Ensure transition is applied for smooth animation
-  track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
-  track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
+  // Scroll to the target slide using native scroll
+  var targetSlide = slides[state.idx];
+  if (targetSlide) {
+    track.scrollTo({ left: targetSlide.offsetLeft, behavior: 'smooth' });
+  }
   // Update dots
   var dots = document.querySelectorAll('#' + carId + '_dots .rv-dot');
   for (var d = 0; d < dots.length; d++) {
@@ -2239,8 +2245,10 @@ function rvGoTo(carId, idx) {
   var slides = track.querySelectorAll('.rv-slide');
   if (idx < 0 || idx >= slides.length) return;
   _rvState[carId] = { idx: idx, total: slides.length };
-  track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
-  track.style.transform = 'translateX(-' + (idx * 100) + '%)';
+  var targetSlide = slides[idx];
+  if (targetSlide) {
+    track.scrollTo({ left: targetSlide.offsetLeft, behavior: 'smooth' });
+  }
   var dots = document.querySelectorAll('#' + carId + '_dots .rv-dot');
   for (var d = 0; d < dots.length; d++) {
     if (d === idx) { dots[d].classList.add('active'); } else { dots[d].classList.remove('active'); }
@@ -3058,129 +3066,17 @@ switchLang = function(l) {
         pkgsContainer.innerHTML = ph;
         pkgsContainer.style.display = '';
         console.log('[DB] Packages rendered:', db.packages.length);
-        // Setup smooth transform-based carousel for mobile
-        // Use rAF + timeout to ensure DOM has layout dimensions
-        function _initPkgCarousel() {
+        // Scroll to gold card on mobile (CSS scroll-snap handles the swipe)
+        requestAnimationFrame(function() { setTimeout(function() {
           if (window.innerWidth > 768) return;
           var grid = pkgsContainer.querySelector('.calc-packages-grid');
           if (!grid) return;
-          var cards = grid.querySelectorAll('.calc-pkg-card');
-          if (cards.length <= 1) return;
-          
-          // Find gold card index (center of sorted array)
-          var goldIdx = 0;
-          for (var gi = 0; gi < cards.length; gi++) {
-            if (cards[gi].classList.contains('pkg-crown-gold')) { goldIdx = gi; break; }
+          var goldCard = grid.querySelector('.pkg-crown-gold');
+          if (goldCard) {
+            goldCard.scrollIntoView({inline:'center', block:'nearest', behavior:'instant'});
+            console.log('[DB] Scrolled to gold card');
           }
-          
-          var currentIdx = goldIdx;
-          var startX = 0, startY = 0, currentTranslate = 0, isDragging = false, startTime = 0;
-          var isHorizontal = null, dragStartTranslate = 0;
-          var containerW = pkgsContainer.offsetWidth;
-          var gridML = parseInt(getComputedStyle(grid).marginLeft || '0');
-          // If container has no width yet, retry after short delay
-          if (containerW <= 0) {
-            setTimeout(_initPkgCarousel, 100);
-            return;
-          }
-          
-          // Get the translate needed to center a card
-          function getCenterOffset(idx) {
-            idx = Math.max(0, Math.min(idx, cards.length - 1));
-            var card = cards[idx];
-            var cardLeft = card.offsetLeft;
-            var cardW = card.offsetWidth;
-            // Center the card within the parent container
-            return -(cardLeft - (containerW - cardW) / 2 + gridML);
-          }
-          
-          // Get min/max translate bounds
-          function getMinTranslate() { return getCenterOffset(cards.length - 1); }
-          function getMaxTranslate() { return getCenterOffset(0); }
-          
-          function setTranslate(tx, animated) {
-            if (animated) {
-              grid.style.transition = 'transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94)';
-            } else {
-              grid.style.transition = 'none';
-            }
-            grid.style.transform = 'translateX(' + tx + 'px)';
-            currentTranslate = tx;
-          }
-          
-          function goToCard(idx, animated) {
-            idx = Math.max(0, Math.min(idx, cards.length - 1));
-            currentIdx = idx;
-            setTranslate(getCenterOffset(idx), animated);
-          }
-          
-          // iOS Safari compatible touch handling
-          // Key: use {passive:false} on touchstart AND touchmove
-          // so e.preventDefault() works reliably on iOS
-          var touchActive = false, touchDir = '', touchSX = 0, touchSY = 0, touchDST = 0, touchST = 0;
-          
-          grid.addEventListener('touchstart', function(e) {
-            if (e.touches.length !== 1) return;
-            touchActive = true;
-            touchDir = '';
-            touchSX = e.touches[0].clientX;
-            touchSY = e.touches[0].clientY;
-            touchDST = currentTranslate;
-            touchST = Date.now();
-            grid.style.transition = 'none';
-          }, {passive: false});
-          
-          grid.addEventListener('touchmove', function(e) {
-            if (!touchActive || e.touches.length !== 1) return;
-            var dx = e.touches[0].clientX - touchSX;
-            var dy = e.touches[0].clientY - touchSY;
-            // Determine direction on first significant move
-            if (!touchDir) {
-              if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-              touchDir = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
-            }
-            if (touchDir === 'v') return; // let iOS handle vertical scroll
-            // Horizontal: prevent default to stop iOS from scrolling page
-            e.preventDefault();
-            e.stopPropagation();
-            var newTx = touchDST + dx;
-            var minTx = getMinTranslate();
-            var maxTx = getMaxTranslate();
-            if (newTx > maxTx) newTx = maxTx + (newTx - maxTx) * 0.25;
-            if (newTx < minTx) newTx = minTx + (newTx - minTx) * 0.25;
-            grid.style.transform = 'translateX(' + newTx + 'px)';
-            currentTranslate = newTx;
-          }, {passive: false});
-          
-          grid.addEventListener('touchend', function(e) {
-            if (!touchActive) return;
-            touchActive = false;
-            if (touchDir !== 'h') return;
-            var dx = e.changedTouches[0].clientX - touchSX;
-            var dt = Date.now() - touchST;
-            var velocity = Math.abs(dx) / Math.max(dt, 1);
-            var next = currentIdx;
-            if (velocity > 0.25 || Math.abs(dx) > 30) {
-              next = dx < 0 ? currentIdx + 1 : currentIdx - 1;
-            }
-            goToCard(next, true);
-          }, {passive: true});
-          
-          grid.addEventListener('touchcancel', function() {
-            if (!touchActive) return;
-            touchActive = false;
-            goToCard(currentIdx, true);
-          }, {passive: true});
-          
-          grid.addEventListener('transitionend', function() {
-            grid.style.transition = 'none';
-          });
-          
-          // Init: center on gold card
-          goToCard(goldIdx, false);
-          console.log('[DB] Package carousel initialized, gold at index:', goldIdx, 'containerW:', containerW);
-        }
-        requestAnimationFrame(function() { setTimeout(_initPkgCarousel, 50); });
+        }, 50); });
       }
     }
     
@@ -3726,94 +3622,30 @@ switchLang = function(l) {
                 if (container) { container.appendChild(carouselWrap); container.appendChild(dotsDiv); }
                 else { section.appendChild(carouselWrap); section.appendChild(dotsDiv); }
               }
-              // Touch swipe support with drag feedback
-              // Initialize state for this carousel
+              // Initialize state and add scroll listener for dot sync
               _rvState[carId] = { idx: 0, total: validPhotos.length };
               (function(cid, totalSlides) {
                 var track = document.getElementById(cid + '_track');
                 if (!track) return;
-                var carousel = track.parentElement;
-                var touchData = { startX: 0, startY: 0, currentX: 0, dragging: false, startTime: 0, moved: false, direction: '' };
-                
-                function onTouchStart(e) {
-                  if (e.touches.length !== 1) return;
-                  touchData.startX = e.touches[0].clientX;
-                  touchData.startY = e.touches[0].clientY;
-                  touchData.currentX = touchData.startX;
-                  touchData.dragging = true;
-                  touchData.moved = false;
-                  touchData.direction = '';
-                  touchData.startTime = Date.now();
-                  track.style.transition = 'none';
-                }
-                
-                function onTouchMove(e) {
-                  if (!touchData.dragging || e.touches.length !== 1) return;
-                  var tx = e.touches[0].clientX;
-                  var ty = e.touches[0].clientY;
-                  var dx = tx - touchData.startX;
-                  var dy = ty - touchData.startY;
-                  if (!touchData.direction) {
-                    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-                    touchData.direction = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
-                  }
-                  if (touchData.direction === 'v') {
-                    touchData.dragging = false;
-                    var st = _rvState[cid] || { idx: 0, total: totalSlides };
-                    track.style.transition = 'transform 0.3s ease';
-                    track.style.transform = 'translateX(-' + (st.idx * 100) + '%)';
-                    return;
-                  }
-                  // Horizontal swipe — prevent page scroll on iOS
-                  e.preventDefault();
-                  e.stopPropagation();
-                  touchData.currentX = tx;
-                  touchData.moved = true;
-                  var state = _rvState[cid] || { idx: 0, total: totalSlides };
-                  var baseOffset = -(state.idx * 100);
-                  var w = carousel ? carousel.offsetWidth : 400;
-                  var movePercent = (dx / w) * 100;
-                  if ((state.idx === 0 && dx > 0) || (state.idx === state.total - 1 && dx < 0)) {
-                    movePercent = movePercent * 0.3;
-                  }
-                  track.style.transform = 'translateX(' + (baseOffset + movePercent) + '%)';
-                }
-                
-                function onTouchEnd(e) {
-                  if (!touchData.dragging && !touchData.moved) return;
-                  touchData.dragging = false;
-                  track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
-                  if (!touchData.moved) {
-                    var snapState = _rvState[cid] || { idx: 0, total: totalSlides };
-                    track.style.transform = 'translateX(-' + (snapState.idx * 100) + '%)';
-                    return;
-                  }
-                  var endX = e.changedTouches[0].clientX;
-                  var diff = endX - touchData.startX;
-                  var elapsed = Date.now() - touchData.startTime;
-                  var velocity = Math.abs(diff) / Math.max(elapsed, 1);
-                  if (Math.abs(diff) > 30 || (velocity > 0.25 && Math.abs(diff) > 10)) {
-                    rvSlide(cid, diff < 0 ? 1 : -1);
-                  } else {
-                    var state = _rvState[cid] || { idx: 0, total: totalSlides };
-                    track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
-                  }
-                  var hint = document.querySelector('.rv-swipe-hint');
-                  if (hint) hint.style.display = 'none';
-                  touchData.direction = '';
-                }
-                
-                // iOS Safari: {passive:false} on BOTH touchstart and touchmove
-                track.addEventListener('touchstart', onTouchStart, {passive:false});
-                track.addEventListener('touchmove', onTouchMove, {passive:false});
-                track.addEventListener('touchend', onTouchEnd, {passive:true});
-                track.addEventListener('touchcancel', function() {
-                  if (!touchData.dragging) return;
-                  touchData.dragging = false;
-                  var state = _rvState[cid] || { idx: 0, total: totalSlides };
-                  track.style.transition = 'transform 0.3s ease';
-                  track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
-                }, {passive:true});
+                // Sync dots with native scroll position
+                var scrollTimer = null;
+                track.addEventListener('scroll', function() {
+                  if (scrollTimer) clearTimeout(scrollTimer);
+                  scrollTimer = setTimeout(function() {
+                    var slideW = track.offsetWidth;
+                    if (slideW <= 0) return;
+                    var newIdx = Math.round(track.scrollLeft / slideW);
+                    newIdx = Math.max(0, Math.min(newIdx, totalSlides - 1));
+                    _rvState[cid] = { idx: newIdx, total: totalSlides };
+                    var dots = document.querySelectorAll('#' + cid + '_dots .rv-dot');
+                    for (var d = 0; d < dots.length; d++) {
+                      if (d === newIdx) dots[d].classList.add('active');
+                      else dots[d].classList.remove('active');
+                    }
+                    var hint = document.querySelector('.rv-swipe-hint');
+                    if (hint) hint.style.display = 'none';
+                  }, 80);
+                }, {passive: true});
               })(carId, validPhotos.length);
             } else {
               // Default grid view for regular blocks
@@ -5760,9 +5592,8 @@ async function checkRefCode() {
       const goldCardIdx = sortedSsrPkgs.findIndex((p: any) => (p.crown_tier || (p.is_popular ? 'gold' : '')) === 'gold');
       const initIdx = goldCardIdx >= 0 ? goldCardIdx : 0;
       pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
-      // Setup transform-based carousel for mobile (smooth, one card per swipe)
-      // Grid has overflow:visible, parent .calc-packages has overflow:hidden (viewport)
-      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;var ci=' + initIdx + ',ct=0;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}var ta=false,td="",tsx=0,tsy=0,tdst=0,tst=0;g.addEventListener("touchstart",function(e){if(e.touches.length!==1)return;ta=true;td="";tsx=e.touches[0].clientX;tsy=e.touches[0].clientY;tdst=ct;tst=Date.now();g.style.transition="none"},{passive:false});g.addEventListener("touchmove",function(e){if(!ta||e.touches.length!==1)return;var dx=e.touches[0].clientX-tsx,dy=e.touches[0].clientY-tsy;if(!td){if(Math.abs(dx)<3&&Math.abs(dy)<3)return;td=Math.abs(dx)>=Math.abs(dy)?"h":"v"}if(td==="v")return;e.preventDefault();e.stopPropagation();var nt=tdst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!ta)return;ta=false;if(td!=="h")return;var dx=e.changedTouches[0].clientX-tsx,dt=Date.now()-tst,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.25||Math.abs(dx)>30)ni=dx<0?ci+1:ci-1;go(ni,true)},{passive:true});g.addEventListener("touchcancel",function(){ta=false;go(ci,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
+      // CSS scroll-snap handles swiping natively — just scroll to gold card on load
+      pkgHtml += '(function(){if(window.innerWidth>768)return;var g=document.querySelector(".calc-packages-grid");if(!g)return;var gold=g.querySelector(".pkg-crown-gold");if(gold){gold.scrollIntoView({inline:"center",block:"nearest",behavior:"instant"})}})();';
       pkgHtml += '</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
