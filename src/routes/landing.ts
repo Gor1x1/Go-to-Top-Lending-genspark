@@ -314,11 +314,14 @@ img{max-width:100%;height:auto}
 /* Bottom Navigation Bar - mobile only */
 .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(15,10,26,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
 .bottom-nav-items{display:flex;justify-content:space-around;align-items:center;gap:2px}
-.bottom-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.62rem;font-weight:500;transition:var(--t);flex:1;min-width:0;cursor:pointer;background:none;border:none}
+.bottom-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.72rem;font-weight:500;transition:color 0.3s ease;flex:1;min-width:0;cursor:pointer;background:none;border:none}
+.bottom-nav-item.active{color:var(--purple)}
 .bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
 .bottom-nav-item i{font-size:1.1rem}
-.bottom-nav-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.bottom-nav-item span{white-space:nowrap;overflow:visible;text-overflow:clip;max-width:none;font-size:inherit}
 .bottom-nav-more{position:relative}
+.bottom-nav-more.active{color:var(--purple)}
+.bottom-nav-more span{font-size:0.68rem}
 .bottom-nav-more-menu{display:none;position:absolute;bottom:100%;right:0;margin-bottom:8px;background:rgba(15,10,26,0.98);backdrop-filter:blur(20px);border:1px solid var(--border);border-radius:12px;padding:8px;min-width:200px;box-shadow:0 -8px 30px rgba(0,0,0,0.4)}
 .bottom-nav-more-menu.active{display:block}
 .bottom-nav-more-menu a{display:flex;align-items:center;gap:10px;padding:10px 14px;color:var(--text);font-size:0.88rem;font-weight:500;border-radius:8px;text-decoration:none;transition:var(--t)}
@@ -1963,22 +1966,76 @@ function closeMenu() {
 function toggleBottomMore(e) {
   if (e) e.stopPropagation();
   var menu = document.getElementById('bottomMoreMenu');
-  if (menu) menu.classList.toggle('active');
+  var btn = document.getElementById('bottomNavMore');
+  if (menu) {
+    menu.classList.toggle('active');
+    if (btn) btn.classList.toggle('active', menu.classList.contains('active'));
+  }
 }
 // Close bottom more menu on outside click
 document.addEventListener('click', function(e) {
   var menu = document.getElementById('bottomMoreMenu');
   var btn = document.getElementById('bottomNavMore');
-  if (menu && btn && !btn.contains(e.target)) menu.classList.remove('active');
+  if (menu && btn && !btn.contains(e.target)) {
+    menu.classList.remove('active');
+    btn.classList.remove('active');
+  }
 });
 // Close bottom more menu on link click
 document.addEventListener('click', function(e) {
   var link = e.target.closest('.bottom-nav-more-menu a');
   if (link) {
     var menu = document.getElementById('bottomMoreMenu');
+    var btn = document.getElementById('bottomNavMore');
     if (menu) menu.classList.remove('active');
+    if (btn) btn.classList.remove('active');
   }
 });
+
+// Active section highlighting on scroll
+(function() {
+  var navItems = document.querySelectorAll('.bottom-nav-item[href]');
+  if (!navItems.length) return;
+  var sectionIds = [];
+  navItems.forEach(function(a) {
+    var href = a.getAttribute('href');
+    if (href && href.startsWith('#')) sectionIds.push(href.substring(1));
+  });
+  // Also collect targets from the more menu
+  var moreLinks = document.querySelectorAll('.bottom-nav-more-menu a[href]');
+  var moreTargets = [];
+  moreLinks.forEach(function(a) {
+    var href = a.getAttribute('href');
+    if (href && href.startsWith('#')) moreTargets.push(href.substring(1));
+  });
+  var allTargets = sectionIds.concat(moreTargets);
+  var scrollTimer = null;
+  function updateActiveNav() {
+    var scrollY = window.scrollY + window.innerHeight * 0.35;
+    var activeId = '';
+    for (var i = 0; i < allTargets.length; i++) {
+      var el = document.getElementById(allTargets[i]);
+      if (el && el.offsetTop <= scrollY) activeId = allTargets[i];
+    }
+    navItems.forEach(function(a) {
+      var href = (a.getAttribute('href') || '').substring(1);
+      if (href === activeId) a.classList.add('active');
+      else a.classList.remove('active');
+    });
+    // If active section is in "more" menu, highlight the more button
+    var moreBtn = document.getElementById('bottomNavMore');
+    if (moreBtn) {
+      var inMore = moreTargets.indexOf(activeId) >= 0;
+      if (inMore) moreBtn.classList.add('active');
+      else if (!moreBtn.querySelector('.bottom-nav-more-menu.active')) moreBtn.classList.remove('active');
+    }
+  }
+  window.addEventListener('scroll', function() {
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(updateActiveNav, 80);
+  }, {passive: true});
+  updateActiveNav();
+})();
 
 document.querySelectorAll('.nav-links a').forEach(function(a) {
   a.addEventListener('click', function(e) {
@@ -4355,10 +4412,11 @@ switchLang = function(l) {
           var bottomNav = document.getElementById('bottomNav');
           if (bottomNav && dbNavItems.length > 0) {
             var bnIconMap = {
-              'about': 'fas fa-info-circle', 'services': 'fas fa-concierge-bell',
+              'about': 'fas fa-info-circle', 'services': 'fas fa-hand-holding',
               'calculator': 'fas fa-calculator', 'warehouse': 'fas fa-warehouse',
               'guarantee': 'fas fa-shield-alt', 'faq': 'fas fa-question-circle',
-              'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star'
+              'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star',
+              'fifty-vs-fifty': 'fas fa-person-circle-question', 'why-buyouts': 'fas fa-person-circle-question'
             };
             var bnMain = dbNavItems.slice(0, 4);
             var bnMore = dbNavItems.slice(4);
@@ -5241,7 +5299,7 @@ async function checkRefCode() {
 <nav class="bottom-nav" id="bottomNav">
 <div class="bottom-nav-items">
   <a href="#about" class="bottom-nav-item" data-nav-idx="0"><i class="fas fa-info-circle"></i><span data-ru="\u041E \u043D\u0430\u0441" data-am="\u0544\u0565\u0580 \u0574\u0561\u057D\u056B\u0576">\u041E \u043D\u0430\u0441</span></a>
-  <a href="#services" class="bottom-nav-item" data-nav-idx="1"><i class="fas fa-concierge-bell"></i><span data-ru="\u0423\u0441\u043B\u0443\u0433\u0438" data-am="\u053E\u0561\u057C\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580">\u0423\u0441\u043B\u0443\u0433\u0438</span></a>
+  <a href="#services" class="bottom-nav-item" data-nav-idx="1"><i class="fas fa-hand-holding"></i><span data-ru="\u0423\u0441\u043B\u0443\u0433\u0438" data-am="\u053E\u0561\u057C\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580">\u0423\u0441\u043B\u0443\u0433\u0438</span></a>
   <a href="#calculator" class="bottom-nav-item" data-nav-idx="2"><i class="fas fa-calculator"></i><span data-ru="\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440" data-am="\u0540\u0561\u0577\u057E\u056B\u0579">\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440</span></a>
   <a href="#guarantee" class="bottom-nav-item" data-nav-idx="3"><i class="fas fa-shield-alt"></i><span data-ru="\u0413\u0430\u0440\u0430\u043D\u0442\u0438\u0438" data-am="\u0535\u0580\u0561\u0577\u056D\u056B\u0584\u0576\u0565\u0580">\u0413\u0430\u0440\u0430\u043D\u0442\u0438\u0438</span></a>
   <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="\u0415\u0449\u0451" data-am="\u0531\u057E\u0565\u056C\u056B\u0576">\u0415\u0449\u0451</span>
@@ -6094,10 +6152,11 @@ async function checkRefCode() {
         
         // Build bottom nav HTML from admin nav items (sync order)
         const bottomNavIcons: Record<string, string> = {
-          'about': 'fas fa-info-circle', 'services': 'fas fa-concierge-bell',
+          'about': 'fas fa-info-circle', 'services': 'fas fa-hand-holding',
           'calculator': 'fas fa-calculator', 'warehouse': 'fas fa-warehouse',
           'guarantee': 'fas fa-shield-alt', 'faq': 'fas fa-question-circle',
-          'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star'
+          'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star',
+          'fifty-vs-fifty': 'fas fa-person-circle-question', 'why-buyouts': 'fas fa-person-circle-question'
         };
         const mainBottomItems = navItems.slice(0, 4);
         const moreBottomItems = navItems.slice(4);
