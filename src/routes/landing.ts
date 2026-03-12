@@ -434,7 +434,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 75vw;max-width:75vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 75vw;max-width:75vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;touch-action:pan-x;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -764,7 +764,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:none;background:transparent;box-shadow:none}
-.rv-carousel .rv-track{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-behavior:smooth}
+.rv-carousel .rv-track{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-behavior:smooth;touch-action:pan-x pan-y}
 .rv-carousel .rv-track::-webkit-scrollbar{display:none}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative;scroll-snap-align:start}
 .rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
@@ -2179,6 +2179,34 @@ document.addEventListener('keydown', function(e) {
   }, {passive:true});
 })();
 
+/* ===== SWIPE-AWARE LIGHTBOX OPEN ===== */
+/* On iOS, inline onclick on carousel images blocks native scroll-snap swipe.
+   Use data-lightbox-url attribute + global tap detection instead. */
+(function() {
+  var _lbTouchX = 0, _lbTouchY = 0, _lbTouchMoved = false;
+  document.addEventListener('touchstart', function(e) {
+    var el = e.target.closest && (e.target.closest('[data-lightbox-url]') || e.target.closest('[onclick*="openLightbox"]'));
+    if (!el) return;
+    _lbTouchX = e.touches[0].clientX;
+    _lbTouchY = e.touches[0].clientY;
+    _lbTouchMoved = false;
+  }, {passive: true});
+  document.addEventListener('touchmove', function(e) {
+    if (_lbTouchMoved) return;
+    var dx = Math.abs(e.touches[0].clientX - _lbTouchX);
+    var dy = Math.abs(e.touches[0].clientY - _lbTouchY);
+    if (dx > 8 || dy > 8) _lbTouchMoved = true;
+  }, {passive: true});
+  document.addEventListener('touchend', function(e) {
+    if (_lbTouchMoved) return;
+    var el = e.target.closest && e.target.closest('[data-lightbox-url]');
+    if (el) {
+      openLightbox(el.getAttribute('data-lightbox-url'));
+      return;
+    }
+  }, {passive: true});
+})();
+
 // Reviews carousel scroll helper (legacy — kept for photo_blocks)
 function rcScroll(carId, dir) {
   var el = document.getElementById(carId);
@@ -2537,6 +2565,42 @@ function selectPackage(pkgId) {
   });
   recalcDynamic();
 }
+
+/* ===== SWIPE-AWARE PACKAGE CARD TAP ===== */
+/* On iOS, onclick fires even during scroll, blocking swipe.
+   Instead, track touch start/end positions and only trigger selectPackage
+   if the finger didn't move (tap, not swipe). */
+(function() {
+  var _pkgTouchStartX = 0, _pkgTouchStartY = 0, _pkgTouchMoved = false;
+  document.addEventListener('touchstart', function(e) {
+    var card = e.target.closest && e.target.closest('.calc-pkg-card');
+    if (!card) return;
+    _pkgTouchStartX = e.touches[0].clientX;
+    _pkgTouchStartY = e.touches[0].clientY;
+    _pkgTouchMoved = false;
+  }, {passive: true});
+  document.addEventListener('touchmove', function(e) {
+    if (_pkgTouchMoved) return;
+    var dx = Math.abs(e.touches[0].clientX - _pkgTouchStartX);
+    var dy = Math.abs(e.touches[0].clientY - _pkgTouchStartY);
+    if (dx > 8 || dy > 8) _pkgTouchMoved = true;
+  }, {passive: true});
+  document.addEventListener('touchend', function(e) {
+    if (_pkgTouchMoved) return;
+    var card = e.target.closest && e.target.closest('.calc-pkg-card');
+    if (!card) return;
+    var pkgId = parseInt(card.getAttribute('data-pkg-id'));
+    if (pkgId) selectPackage(pkgId);
+  }, {passive: true});
+  // Desktop: use click
+  document.addEventListener('click', function(e) {
+    if ('ontouchstart' in window) return; // skip on touch devices, handled by touch events
+    var card = e.target.closest && e.target.closest('.calc-pkg-card');
+    if (!card) return;
+    var pkgId = parseInt(card.getAttribute('data-pkg-id'));
+    if (pkgId) selectPackage(pkgId);
+  });
+})();
 
 function getSelectedPackage() {
   if (!_selectedPackageId || !window._calcPackages) return null;
@@ -3026,7 +3090,7 @@ switchLang = function(l) {
           var pk = sortedPkgs[pki];
           var pkDisc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
           var pkCrown = pk.crown_tier || (pk.is_popular ? 'gold' : '');
-          ph += '<div class="calc-pkg-card' + (pkCrown ? ' pkg-crown-' + pkCrown : '') + '" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
+          ph += '<div class="calc-pkg-card' + (pkCrown ? ' pkg-crown-' + pkCrown : '') + '" data-pkg-id="' + pk.id + '">';
           // Badge instead of crown
           var badgeText = lang === 'am' ? (pk.badge_am || pk.badge_ru || '') : (pk.badge_ru || '');
           if (!badgeText && pkCrown === 'gold') badgeText = lang === 'am' ? '\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F' : '\u041b\u0443\u0447\u0448\u0435\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435';
@@ -3586,7 +3650,7 @@ switchLang = function(l) {
                 }
                 cH += '<div class="rv-slide">' +
                   '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
-                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="eager" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="eager" data-lightbox-url="' + (p.url||'').replace(/"/g,'&quot;') + '">' +
                   '<div class="rv-caption"><div class="rv-caption-text" data-ru="' + captionRu.replace(/"/g,'&quot;') + '" data-am="' + captionAm.replace(/"/g,'&quot;') + '"><i class="fas fa-quote-left" style="font-size:0.7em;margin-right:6px;opacity:0.5;vertical-align:top"></i>' + captionText + '</div></div>' +
                 '</div>';
               });
@@ -4894,7 +4958,7 @@ async function checkRefCode() {
         html += '<div id="' + carId + '" class="pb-carousel" style="display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;scroll-behavior:smooth;-webkit-overflow-scrolling:touch;padding:4px 8px;-ms-overflow-style:none">';
         for (var i = 0; i < validPhotos.length; i++) {
           var p = validPhotos[i];
-          html += '<div class="pb-card pb-card-size" style="flex:0 0 340px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;display:flex;flex-direction:column" onclick="openLightbox(&apos;' + (p.url||'').replace(/'/g,'') + '&apos;)">' +
+          html += '<div class="pb-card pb-card-size" data-lightbox-url="' + (p.url||'').replace(/"/g,'&quot;') + '" style="flex:0 0 340px;scroll-snap-align:start;border-radius:16px;overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);box-shadow:0 4px 20px rgba(0,0,0,0.2);cursor:pointer;display:flex;flex-direction:column">' +
             '<img src="' + p.url + '" alt="' + (p.caption||'') + '" style="width:100%;height:auto;object-fit:contain;flex-shrink:0" loading="eager">' +
             (p.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + p.caption + '</div>' : '') +
           '</div>';
@@ -4919,7 +4983,7 @@ async function checkRefCode() {
         html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px">';
         for (var gi = 0; gi < validPhotos.length; gi++) {
           var gp = validPhotos[gi];
-          html += '<div class="pb-card" style="border-radius:var(--r,16px);overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer" onclick="openLightbox(&apos;' + (gp.url||'').replace(/'/g,'') + '&apos;)">' +
+          html += '<div class="pb-card" data-lightbox-url="' + (gp.url||'').replace(/"/g,'&quot;') + '" style="border-radius:var(--r,16px);overflow:hidden;border:1px solid var(--border,rgba(255,255,255,0.1));background:var(--bg-card,#1a1a2e);cursor:pointer">' +
             '<img src="' + gp.url + '" alt="' + (gp.caption||'') + '" style="width:100%;height:auto;object-fit:contain" loading="eager">' +
             (gp.caption ? '<div style="padding:10px 14px;font-size:0.85rem;color:var(--text-sec,#94a3b8)">' + gp.caption + '</div>' : '') +
           '</div>';
@@ -5546,7 +5610,7 @@ async function checkRefCode() {
       for (const pk of sortedSsrPkgs) {
         const disc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
         const ssrCrown = pk.crown_tier || (pk.is_popular ? 'gold' : '');
-        pkgHtml += '<div class="calc-pkg-card' + (ssrCrown ? ' pkg-crown-' + ssrCrown : '') + '" data-pkg-id="' + pk.id + '" onclick="selectPackage(' + pk.id + ')">';
+        pkgHtml += '<div class="calc-pkg-card' + (ssrCrown ? ' pkg-crown-' + ssrCrown : '') + '" data-pkg-id="' + pk.id + '">';
         // Badge instead of crown
         const badgeRu = pk.badge_ru || (ssrCrown === 'gold' ? '\u041b\u0443\u0447\u0448\u0435\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435' : '');
         const badgeAm = pk.badge_am || (ssrCrown === 'gold' ? '\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F' : '');
