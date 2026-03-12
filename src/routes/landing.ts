@@ -3112,42 +3112,41 @@ switchLang = function(l) {
             setTranslate(getCenterOffset(idx), animated);
           }
           
-          // iOS Safari compatible touch handling
-          // Key: use {passive:false} on touchstart AND touchmove
-          // so e.preventDefault() works reliably on iOS
-          // Also set touch-action via JS to ensure iOS respects it
+          // iOS compatible touch handling
+          // touch-action:pan-y tells WebKit: vertical=browser, horizontal=JS
           grid.style.touchAction = 'pan-y';
           grid.style.webkitUserSelect = 'none';
           grid.style.userSelect = 'none';
-          var touchActive = false, touchDir = '', touchSX = 0, touchSY = 0, touchDST = 0, touchST = 0;
+          var _ta = false, _td = '', _tsx = 0, _tsy = 0, _tdst = 0, _tst = 0;
           
           grid.addEventListener('touchstart', function(e) {
             if (e.touches.length !== 1) return;
-            touchActive = true;
-            touchDir = '';
-            touchSX = e.touches[0].clientX;
-            touchSY = e.touches[0].clientY;
-            touchDST = currentTranslate;
-            touchST = Date.now();
+            _ta = true;
+            _td = '';
+            _tsx = e.touches[0].clientX;
+            _tsy = e.touches[0].clientY;
+            // Recalculate containerW each time (handles orientation change, layout shifts)
+            containerW = pkgsContainer.offsetWidth;
+            _tdst = currentTranslate;
+            _tst = Date.now();
             grid.style.transition = 'none';
-          }, {passive: false});
+          }, {passive: true});
           
           grid.addEventListener('touchmove', function(e) {
-            if (!touchActive || e.touches.length !== 1) return;
-            var dx = e.touches[0].clientX - touchSX;
-            var dy = e.touches[0].clientY - touchSY;
-            // Determine direction on first significant move
-            if (!touchDir) {
-              if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-              touchDir = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+            if (!_ta || e.touches.length !== 1) return;
+            var dx = e.touches[0].clientX - _tsx;
+            var dy = e.touches[0].clientY - _tsy;
+            // Detect direction once with a 5px threshold
+            if (!_td) {
+              if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+              _td = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
             }
-            if (touchDir === 'v') return; // let iOS handle vertical scroll
-            // Horizontal: prevent default to stop iOS from scrolling page
+            if (_td !== 'h') return;
             e.preventDefault();
-            e.stopPropagation();
-            var newTx = touchDST + dx;
+            var newTx = _tdst + dx;
             var minTx = getMinTranslate();
             var maxTx = getMaxTranslate();
+            // Rubber-band at edges
             if (newTx > maxTx) newTx = maxTx + (newTx - maxTx) * 0.25;
             if (newTx < minTx) newTx = minTx + (newTx - minTx) * 0.25;
             grid.style.transform = 'translateX(' + newTx + 'px)';
@@ -3155,22 +3154,22 @@ switchLang = function(l) {
           }, {passive: false});
           
           grid.addEventListener('touchend', function(e) {
-            if (!touchActive) return;
-            touchActive = false;
-            if (touchDir !== 'h') return;
-            var dx = e.changedTouches[0].clientX - touchSX;
-            var dt = Date.now() - touchST;
-            var velocity = Math.abs(dx) / Math.max(dt, 1);
+            if (!_ta) return;
+            _ta = false;
+            if (_td !== 'h') { _td = ''; return; }
+            var dx = e.changedTouches[0].clientX - _tsx;
+            var dt = Date.now() - _tst;
+            var vel = Math.abs(dx) / Math.max(dt, 1);
             var next = currentIdx;
-            if (velocity > 0.25 || Math.abs(dx) > 30) {
+            if (vel > 0.2 || Math.abs(dx) > 25) {
               next = dx < 0 ? currentIdx + 1 : currentIdx - 1;
             }
+            _td = '';
             goToCard(next, true);
           }, {passive: true});
           
           grid.addEventListener('touchcancel', function() {
-            if (!touchActive) return;
-            touchActive = false;
+            _ta = false; _td = '';
             goToCard(currentIdx, true);
           }, {passive: true});
           
@@ -3735,70 +3734,55 @@ switchLang = function(l) {
                 var track = document.getElementById(cid + '_track');
                 if (!track) return;
                 var carousel = track.parentElement;
-                // iOS Safari: set touch-action via JS to ensure swipe works
+                // iOS: touch-action:pan-y tells WebKit to let JS handle horizontal
                 track.style.touchAction = 'pan-y';
                 track.style.webkitUserSelect = 'none';
                 track.style.userSelect = 'none';
-                var touchData = { startX: 0, startY: 0, currentX: 0, dragging: false, startTime: 0, moved: false };
                 
-                function onTouchStart(e) {
+                var _active = false, _dir = '', _sx = 0, _sy = 0, _st = 0;
+                
+                track.addEventListener('touchstart', function(e) {
                   if (e.touches.length !== 1) return;
-                  touchData.startX = e.touches[0].clientX;
-                  touchData.startY = e.touches[0].clientY;
-                  touchData.currentX = touchData.startX;
-                  touchData.dragging = true;
-                  touchData.moved = false;
-                  touchData.direction = '';
-                  touchData.startTime = Date.now();
+                  _active = true;
+                  _dir = '';
+                  _sx = e.touches[0].clientX;
+                  _sy = e.touches[0].clientY;
+                  _st = Date.now();
                   track.style.transition = 'none';
-                }
+                }, {passive: true});
                 
-                function onTouchMove(e) {
-                  if (!touchData.dragging || e.touches.length !== 1) return;
-                  var tx = e.touches[0].clientX;
-                  var ty = e.touches[0].clientY;
-                  var dx = tx - touchData.startX;
-                  var dy = ty - touchData.startY;
-                  if (!touchData.direction) {
-                    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
-                    touchData.direction = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
+                track.addEventListener('touchmove', function(e) {
+                  if (!_active || e.touches.length !== 1) return;
+                  var cx = e.touches[0].clientX;
+                  var cy = e.touches[0].clientY;
+                  var dx = cx - _sx;
+                  var dy = cy - _sy;
+                  // Detect direction once
+                  if (!_dir) {
+                    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+                    _dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
                   }
-                  if (touchData.direction === 'v') {
-                    touchData.dragging = false;
-                    var st = _rvState[cid] || { idx: 0, total: totalSlides };
-                    track.style.transition = 'transform 0.3s ease';
-                    track.style.transform = 'translateX(-' + (st.idx * 100) + '%)';
-                    return;
-                  }
-                  // Horizontal swipe — prevent page scroll on iOS
+                  if (_dir !== 'h') return;
                   e.preventDefault();
-                  e.stopPropagation();
-                  touchData.currentX = tx;
-                  touchData.moved = true;
+                  // Visual drag feedback
                   var state = _rvState[cid] || { idx: 0, total: totalSlides };
-                  var baseOffset = -(state.idx * 100);
-                  var w = carousel ? carousel.offsetWidth : 400;
-                  var movePercent = (dx / w) * 100;
-                  if ((state.idx === 0 && dx > 0) || (state.idx === state.total - 1 && dx < 0)) {
-                    movePercent = movePercent * 0.3;
-                  }
-                  track.style.transform = 'translateX(' + (baseOffset + movePercent) + '%)';
-                }
+                  var w = carousel ? carousel.offsetWidth : 300;
+                  var pct = (dx / w) * 100;
+                  // Rubber-band at edges
+                  if ((state.idx === 0 && dx > 0) || (state.idx >= state.total - 1 && dx < 0)) pct *= 0.3;
+                  track.style.transform = 'translateX(' + (-(state.idx * 100) + pct) + '%)';
+                }, {passive: false});
                 
-                function onTouchEnd(e) {
-                  if (!touchData.dragging && !touchData.moved) return;
-                  touchData.dragging = false;
+                track.addEventListener('touchend', function(e) {
+                  if (!_active) return;
+                  _active = false;
+                  if (_dir !== 'h') { _dir = ''; return; }
+                  var ex = e.changedTouches[0].clientX;
+                  var diff = ex - _sx;
+                  var elapsed = Date.now() - _st;
+                  var vel = Math.abs(diff) / Math.max(elapsed, 1);
                   track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
-                  if (!touchData.moved) {
-                    var snapState = _rvState[cid] || { idx: 0, total: totalSlides };
-                    track.style.transform = 'translateX(-' + (snapState.idx * 100) + '%)';
-                    return;
-                  }
-                  var endX = e.changedTouches[0].clientX;
-                  var diff = endX - touchData.startX;
-                  var elapsed = Date.now() - touchData.startTime;
-                  var velocity = Math.abs(diff) / Math.max(elapsed, 1);
-                  if (Math.abs(diff) > 30 || (velocity > 0.25 && Math.abs(diff) > 10)) {
+                  if (Math.abs(diff) > 25 || (vel > 0.2 && Math.abs(diff) > 8)) {
                     rvSlide(cid, diff < 0 ? 1 : -1);
                   } else {
                     var state = _rvState[cid] || { idx: 0, total: totalSlides };
@@ -3806,20 +3790,15 @@ switchLang = function(l) {
                   }
                   var hint = document.querySelector('.rv-swipe-hint');
                   if (hint) hint.style.display = 'none';
-                  touchData.direction = '';
-                }
+                  _dir = '';
+                }, {passive: true});
                 
-                // iOS Safari: {passive:false} on BOTH touchstart and touchmove
-                track.addEventListener('touchstart', onTouchStart, {passive:false});
-                track.addEventListener('touchmove', onTouchMove, {passive:false});
-                track.addEventListener('touchend', onTouchEnd, {passive:true});
                 track.addEventListener('touchcancel', function() {
-                  if (!touchData.dragging) return;
-                  touchData.dragging = false;
+                  _active = false; _dir = '';
                   var state = _rvState[cid] || { idx: 0, total: totalSlides };
                   track.style.transition = 'transform 0.3s ease';
                   track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
-                }, {passive:true});
+                }, {passive: true});
               })(carId, validPhotos.length);
             } else {
               // Default grid view for regular blocks
@@ -5768,7 +5747,7 @@ async function checkRefCode() {
       pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
       // Setup transform-based carousel for mobile (smooth, one card per swipe)
       // Grid has overflow:visible, parent .calc-packages has overflow:hidden (viewport)
-      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;g.style.touchAction="pan-y";g.style.webkitUserSelect="none";g.style.userSelect="none";var ci=' + initIdx + ',ct=0;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}var ta=false,td="",tsx=0,tsy=0,tdst=0,tst=0;g.addEventListener("touchstart",function(e){if(e.touches.length!==1)return;ta=true;td="";tsx=e.touches[0].clientX;tsy=e.touches[0].clientY;tdst=ct;tst=Date.now();g.style.transition="none"},{passive:false});g.addEventListener("touchmove",function(e){if(!ta||e.touches.length!==1)return;var dx=e.touches[0].clientX-tsx,dy=e.touches[0].clientY-tsy;if(!td){if(Math.abs(dx)<3&&Math.abs(dy)<3)return;td=Math.abs(dx)>=Math.abs(dy)?"h":"v"}if(td==="v")return;e.preventDefault();e.stopPropagation();var nt=tdst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!ta)return;ta=false;if(td!=="h")return;var dx=e.changedTouches[0].clientX-tsx,dt=Date.now()-tst,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.25||Math.abs(dx)>30)ni=dx<0?ci+1:ci-1;go(ni,true)},{passive:true});g.addEventListener("touchcancel",function(){ta=false;go(ci,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
+      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;g.style.touchAction="pan-y";g.style.webkitUserSelect="none";g.style.userSelect="none";var ci=' + initIdx + ',ct=0;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}var ta=false,td="",tsx=0,tsy=0,tdst=0,tst=0;g.addEventListener("touchstart",function(e){if(e.touches.length!==1)return;ta=true;td="";tsx=e.touches[0].clientX;tsy=e.touches[0].clientY;cw=p.offsetWidth;tdst=ct;tst=Date.now();g.style.transition="none"},{passive:true});g.addEventListener("touchmove",function(e){if(!ta||e.touches.length!==1)return;var dx=e.touches[0].clientX-tsx,dy=e.touches[0].clientY-tsy;if(!td){if(Math.abs(dx)<5&&Math.abs(dy)<5)return;td=Math.abs(dx)>Math.abs(dy)?"h":"v"}if(td!=="h")return;e.preventDefault();var nt=tdst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!ta)return;ta=false;if(td!=="h"){td="";return}var dx=e.changedTouches[0].clientX-tsx,dt=Date.now()-tst,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.2||Math.abs(dx)>25)ni=dx<0?ci+1:ci-1;td="";go(ni,true)},{passive:true});g.addEventListener("touchcancel",function(){ta=false;td="";go(ci,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
       pkgHtml += '</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
