@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Team access, roles, permissions, company roles
- * 574 lines of JS code for the admin SPA
+ * 574 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== TEAM ACCESS (ROLES + PERMISSIONS) — UNIFIED =====
 var _teamAccessTab = 'matrix'; // matrix | roles | log
 var editPermUserId = 0;
@@ -575,6 +575,7 @@ async function cloneCompanyRole(id) {
   toast('\\u0420\\u043e\\u043b\\u044c \\u043a\\u043b\\u043e\\u043d\\u0438\\u0440\\u043e\\u0432\\u0430\\u043d\\u0430!');
   render();
 }
+
 
 
 `;

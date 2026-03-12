@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Telegram bot, PDF template, slot counter, footer, photo blocks
- * 890 lines of JS code for the admin SPA
+ * 890 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== TELEGRAM BOT =====
 function renderTelegramBot() {
   var bots = data.telegramBot || [];
@@ -892,5 +892,6 @@ async function savePhotoBlock(id) {
   toast('Фото-блок сохранён');
   await loadData(); render();
 }
+
 
 `;

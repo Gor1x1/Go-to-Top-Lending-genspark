@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Leads CRM, comments, articles, calc modal
- * 1191 lines of JS code for the admin SPA
+ * 1191 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== LEADS / CRM =====
 let leadsFilter = { status: 'all', source: 'all', search: '', assignee: 'all' };
 
@@ -1193,5 +1193,6 @@ async function generateLeadKP(leadId) {
     toast('Ошибка создания КП', 'error');
   }
 }
+
 
 `;

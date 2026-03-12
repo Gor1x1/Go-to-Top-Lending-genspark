@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Employees management page
- * 603 lines of JS code for the admin SPA
+ * 603 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== EMPLOYEES PAGE =====
 var _empSearch = '';
 var _empFilterRole = '';
@@ -605,5 +605,6 @@ async function saveEmployee(e, id) {
   toast(id ? 'Сотрудник обновлён' : 'Сотрудник создан');
   render();
 }
+
 
 `;

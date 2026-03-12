@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Site blocks constructor V3
- * 2334 lines of JS code for the admin SPA
+ * 2334 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace V3 =====
 var sbLangView = 'both'; // 'both', 'ru', 'am'
 var sbExpandedBlocks = {}; // track which blocks are expanded
@@ -2336,5 +2336,6 @@ async function importSiteBlocks() {
   await loadData();
   render();
 }
+
 
 `;

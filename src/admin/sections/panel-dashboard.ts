@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Dashboard rendering
- * 313 lines of JS code for the admin SPA
+ * 313 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== DASHBOARD =====
 function renderDashboard() {
   var s = data.stats || {};
@@ -315,5 +315,6 @@ function renderDashboard() {
   h += '</div>';
   return h;
 }
+
 
 `;

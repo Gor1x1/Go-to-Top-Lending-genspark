@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Telegram messages
- * 331 lines of JS code for the admin SPA
+ * 331 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== TELEGRAM MESSAGES =====
 // ===== TG MESSAGES INLINE (inside block constructor, grouped by block) =====
 function renderTelegramInline() {
@@ -333,5 +333,6 @@ async function toggleScript(id, active) {
   toast(active ? 'Скрипт включён' : 'Скрипт выключен');
   await loadData(); render();
 }
+
 
 `;

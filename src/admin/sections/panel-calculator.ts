@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Calculator tabs, services, packages
- * 796 lines of JS code for the admin SPA
+ * 796 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== CALCULATOR =====
 function renderCalculator() {
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:10px"></i>Калькулятор услуг</h1>' +
@@ -798,5 +798,6 @@ async function deletePackage(pkgId) {
   }
   render();
 }
+
 
 `;

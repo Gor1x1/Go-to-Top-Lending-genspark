@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Referral codes, section order
- * 385 lines of JS code for the admin SPA
+ * 385 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== REFERRAL CODES =====
 function renderReferrals() {
   // Get all calculator packages for checkboxes
@@ -387,5 +387,6 @@ async function seedSections() {
   toast('Блоки загружены!');
   await loadData(); render();
 }
+
 
 `;

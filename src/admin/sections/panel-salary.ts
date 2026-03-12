@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Salary summary, period actions
- * 301 lines of JS code for the admin SPA
+ * 301 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== SALARY SUMMARY LOADER (auto-fetch from DB for month editing) =====
 var salSummaryCache = {};
 var salSummaryLoading = {};
@@ -302,6 +302,7 @@ function setAnalyticsPeriod(period) {
   analyticsData = null;
   loadAnalyticsData();
 }
+
 
 
 `;

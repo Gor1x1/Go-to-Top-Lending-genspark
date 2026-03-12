@@ -1,8 +1,8 @@
 /**
  * Admin Panel — State, auth, API helpers, UI helpers, login, data loading, navigation
- * 354 lines of JS code for the admin SPA
+ * 354 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== STATE =====
 let token = localStorage.getItem('gtt_token') || '';
 let currentPage = 'dashboard';
@@ -356,5 +356,6 @@ function previewSite() {
   toast('Изменения применены! Сайт обновляется автоматически при каждой загрузке страницы.', 'success');
   window.open('/?_nocache=' + Date.now(), '_blank');
 }
+
 
 `;

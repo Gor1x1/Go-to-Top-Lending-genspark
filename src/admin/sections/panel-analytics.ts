@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Business analytics, P&L, tax rules, all tabs
- * 4613 lines of JS code for the admin SPA
+ * 4613 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== BUSINESS ANALYTICS =====
 let analyticsDateFrom = '';
 let analyticsDateTo = '';
@@ -4615,5 +4615,6 @@ async function saveBonusEdit(bonusId, userId, bonusType) {
     analyticsData = null; loadAnalyticsData();
   } else { toast(res?.error || '\\u041e\\u0448\\u0438\\u0431\\u043a\\u0430', 'error'); }
 }
+
 
 `;

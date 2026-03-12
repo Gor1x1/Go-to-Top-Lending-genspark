@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Settings, payment methods
- * 313 lines of JS code for the admin SPA
+ * 313 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== SETTINGS =====
 function renderSettings() {
   var isMainAdmin = currentUser && currentUser.role === 'main_admin';
@@ -315,5 +315,6 @@ async function executeDataReset() {
     toast(res?.error || 'Ошибка при сбросе', 'error');
   }
 }
+
 
 `;

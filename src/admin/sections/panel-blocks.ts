@@ -1,8 +1,8 @@
 /**
  * Admin Panel — Block constructor, create block modal
- * 566 lines of JS code for the admin SPA
+ * 566 lines of admin SPA JS code
  */
-export const CODE = `
+export const CODE: string = `
 // ===== UNIFIED BLOCK CONSTRUCTOR =====
 // Merges: Content editor + Section order + Photo blocks into one visual editor
 function getBlockContent(sectionId) {
@@ -568,5 +568,6 @@ async function seedContent() {
     toast('Ошибка загрузки', 'error');
   }
 }
+
 
 `;
