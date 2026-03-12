@@ -406,12 +406,12 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-popular{position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,#f59e0b,#f97316,#ef4444);z-index:4}
 .calc-pkg-card .pkg-crown{position:absolute;top:10px;right:10px;display:flex;align-items:center;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))}
 .calc-pkg-card .pkg-tier-badge{position:absolute;top:0;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:0.72rem;padding:4px 14px;border-radius:0 0 12px 12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(245,158,11,0.3)}
-.calc-pkg-card.pkg-crown-gold{border:2px solid rgba(255,215,0,0.35);border-top:4px solid #FFD700;box-shadow:0 0 12px rgba(255,215,0,0.1),0 0 24px rgba(255,215,0,0.05);z-index:3;padding:24px 22px;min-height:auto;background:linear-gradient(145deg,var(--bg-surface),rgba(255,215,0,0.03));transform:scale(1.03)}
+.calc-pkg-card.pkg-crown-gold{border:2px solid rgba(255,215,0,0.3);border-top:4px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.08),0 4px 12px rgba(255,215,0,0.04);z-index:3;padding:24px 22px;min-height:auto;background:linear-gradient(145deg,var(--bg-surface),rgba(255,215,0,0.03));transform:scale(1.03)}
 .calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.08rem}
 .calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}
 .calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem}
 .calc-pkg-card.pkg-crown-gold .pkg-crown{display:none}
-.calc-pkg-card.pkg-crown-gold:hover{border-color:#FFD700;box-shadow:0 0 18px rgba(255,215,0,0.15),0 4px 16px rgba(255,215,0,0.1);transform:scale(1.03) translateY(-3px)}
+.calc-pkg-card.pkg-crown-gold:hover{border-color:#FFD700;box-shadow:0 0 10px rgba(255,215,0,0.15),0 4px 12px rgba(255,215,0,0.08);transform:scale(1.03) translateY(-3px)}
 .calc-pkg-card.pkg-crown-gold::before{display:none}
 .calc-pkg-card.pkg-crown-silver{border:2px solid rgba(192,192,192,0.3);border-top:3px solid #C0C0C0;box-shadow:0 0 6px rgba(192,192,192,0.04);z-index:2;padding:20px 19px;min-height:auto;background:linear-gradient(145deg,var(--bg-surface),rgba(192,192,192,0.01))}
 .calc-pkg-card.pkg-crown-silver .pkg-name{font-size:1.02rem}
@@ -434,7 +434,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 75vw;max-width:75vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;touch-action:pan-x;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 75vw;max-width:75vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;touch-action:auto;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.15),0 4px 10px rgba(255,215,0,0.06);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 75vw;max-width:75vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -764,7 +764,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:none;background:transparent;box-shadow:none}
-.rv-carousel .rv-track{display:flex;flex-wrap:nowrap;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-behavior:smooth;touch-action:pan-x pan-y}
+.rv-carousel .rv-track{display:flex;flex-wrap:nowrap;overflow-x:auto;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scrollbar-width:none;scroll-behavior:smooth;touch-action:pan-x pan-y}
 .rv-carousel .rv-track::-webkit-scrollbar{display:none}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative;scroll-snap-align:start}
 .rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
@@ -3686,7 +3686,7 @@ switchLang = function(l) {
                 if (container) { container.appendChild(carouselWrap); container.appendChild(dotsDiv); }
                 else { section.appendChild(carouselWrap); section.appendChild(dotsDiv); }
               }
-              // Initialize state and add scroll listener for dot sync
+              // Initialize state and add scroll listener for dot sync + loop
               _rvState[carId] = { idx: 0, total: validPhotos.length };
               (function(cid, totalSlides) {
                 var track = document.getElementById(cid + '_track');
@@ -3709,6 +3709,23 @@ switchLang = function(l) {
                     var hint = document.querySelector('.rv-swipe-hint');
                     if (hint) hint.style.display = 'none';
                   }, 80);
+                }, {passive: true});
+                // Loop: swipe past last → go to first, swipe before first → go to last
+                var _rvLoopTouchX = 0;
+                track.addEventListener('touchstart', function(e) {
+                  _rvLoopTouchX = e.touches[0].clientX;
+                }, {passive: true});
+                track.addEventListener('touchend', function(e) {
+                  var dx = e.changedTouches[0].clientX - _rvLoopTouchX;
+                  var state = _rvState[cid] || { idx: 0, total: totalSlides };
+                  // Swiped left on last slide → go to first
+                  if (dx < -30 && state.idx >= totalSlides - 1) {
+                    setTimeout(function() { rvGoTo(cid, 0); }, 100);
+                  }
+                  // Swiped right on first slide → go to last
+                  if (dx > 30 && state.idx <= 0) {
+                    setTimeout(function() { rvGoTo(cid, totalSlides - 1); }, 100);
+                  }
                 }, {passive: true});
               })(carId, validPhotos.length);
             } else {
