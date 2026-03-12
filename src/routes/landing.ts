@@ -1895,6 +1895,13 @@ const AM = {
 };
 // Helper: set text on element while preserving child <i> icons (e.g. quote icons in captions)
 function _setTextPreserveIcons(el, t) {
+  // For pkg-items children: replace everything after the <i> icon using innerHTML
+  if (el.parentElement && el.parentElement.classList.contains('pkg-items')) {
+    var icon = el.querySelector('i');
+    var iconHtml = icon ? icon.outerHTML + ' ' : '';
+    el.innerHTML = iconHtml + t;
+    return;
+  }
   var icons = el.querySelectorAll('i');
   if (icons.length > 0) {
     // Remove only text nodes, keep icon elements intact
@@ -3165,8 +3172,12 @@ switchLang = function(l) {
           ph += '<div class="calc-pkg-card' + (pkCrown ? ' pkg-crown-' + pkCrown : '') + '" data-pkg-id="' + pk.id + '">';
           // Badge instead of crown
           var badgeText = lang === 'am' ? (pk.badge_am || pk.badge_ru || '') : (pk.badge_ru || '');
-          if (!badgeText && pkCrown === 'gold') badgeText = lang === 'am' ? '\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F' : '\u041b\u0443\u0447\u0448\u0435\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435';
-          if (badgeText) ph += '<div class="pkg-tier-badge">' + escCalc(badgeText) + '</div>';
+          var badgeRu = pk.badge_ru || '';
+          var badgeAm = pk.badge_am || '';
+          if (!badgeRu && pkCrown === 'gold') badgeRu = '\u041b\u0443\u0447\u0448\u0435\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435';
+          if (!badgeAm && pkCrown === 'gold') badgeAm = '\u0531\u0574\u0565\u0576\u0561\u0577\u0561\u0570\u0561\u057E\u0565\u057F';
+          if (!badgeText && pkCrown === 'gold') badgeText = lang === 'am' ? badgeAm : badgeRu;
+          if (badgeText) ph += '<div class="pkg-tier-badge" data-ru="' + escCalc(badgeRu) + '" data-am="' + escCalc(badgeAm) + '">' + escCalc(badgeText) + '</div>';
           ph += '<div class="pkg-name" data-ru="' + escCalc(pk.name_ru) + '" data-am="' + escCalc(pk.name_am) + '">' + (lang==='am' ? pk.name_am : pk.name_ru) + '</div>';
           if (pk.description_ru || pk.description_am) {
             ph += '<div class="pkg-desc" data-ru="' + escCalc(pk.description_ru || '') + '" data-am="' + escCalc(pk.description_am || '') + '">' + (lang==='am' ? (pk.description_am||pk.description_ru) : pk.description_ru) + '</div>';
@@ -3183,16 +3194,25 @@ switchLang = function(l) {
             for (var pii = 0; pii < pk.items.length; pii++) {
               var pi2 = pk.items[pii];
               var piName = lang==='am' ? (pi2.service_name_am || pi2.service_name_ru || '') : (pi2.service_name_ru || '');
+              var piNameRu = pi2.service_name_ru || '';
+              var piNameAm = pi2.service_name_am || pi2.service_name_ru || '';
               var piQty = pi2.quantity || 1;
               var piExtra = '';
+              var piExtraRu = '';
+              var piExtraAm = '';
               if (pi2.use_tiered && pi2.price_type === 'tiered' && pi2.price_tiers_json) {
                 try {
                   var piTiers = JSON.parse(pi2.price_tiers_json);
                   var piUnitP = getTierPrice(piTiers, piQty);
-                  piExtra = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' \u058f/' + (lang==='am' ? '\u0570\u0561\u057f' : '\u0448\u0442') + ')</span>';
+                  piExtraRu = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' \u058f/\u0448\u0442)</span>';
+                  piExtraAm = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' \u058f/\u0570\u0561\u057f)</span>';
+                  piExtra = lang==='am' ? piExtraAm : piExtraRu;
                 } catch(e) {}
               }
-              ph += '<div><i class="fas fa-check-circle"></i> ' + escCalc(piName) + ' \u00d7 ' + piQty + piExtra + '</div>';
+              var itemRu = escCalc(piNameRu) + ' \u00d7 ' + piQty + piExtraRu;
+              var itemAm = escCalc(piNameAm) + ' \u00d7 ' + piQty + piExtraAm;
+              var itemCur = lang==='am' ? itemAm : itemRu;
+              ph += '<div data-ru="' + itemRu.replace(/"/g,'&quot;') + '" data-am="' + itemAm.replace(/"/g,'&quot;') + '"><i class="fas fa-check-circle"></i> ' + itemCur + '</div>';
             }
             ph += '</div>';
           }
@@ -5735,9 +5755,18 @@ async function checkRefCode() {
               } catch {}
             }
             const piNameSsr = isArmenian ? (pi.service_name_am || pi.service_name_ru || '') : (pi.service_name_ru || '');
-            const piUnitSsr = isArmenian ? '\u0570\u0561\u057f' : '\u0448\u0442';
-            if (piExtra && isArmenian) piExtra = piExtra.replace('/\u0448\u0442', '/' + piUnitSsr);
-            pkgHtml += '<div><i class="fas fa-check-circle"></i> ' + esc(piNameSsr) + ' \u00d7 ' + piQty + piExtra + '</div>';
+            const piNameRuSsr = pi.service_name_ru || '';
+            const piNameAmSsr = pi.service_name_am || pi.service_name_ru || '';
+            let piExtraRuSsr = '';
+            let piExtraAmSsr = '';
+            if (piExtra) {
+              piExtraRuSsr = piExtra.includes('/\u0570\u0561\u057f') ? piExtra.replace('/\u0570\u0561\u057f', '/\u0448\u0442') : piExtra;
+              piExtraAmSsr = piExtra.includes('/\u0448\u0442') ? piExtra.replace('/\u0448\u0442', '/\u0570\u0561\u057f') : piExtra;
+            }
+            const itemRuSsr = esc(piNameRuSsr) + ' \u00d7 ' + piQty + piExtraRuSsr;
+            const itemAmSsr = esc(piNameAmSsr) + ' \u00d7 ' + piQty + piExtraAmSsr;
+            const itemCurSsr = isArmenian ? itemAmSsr : itemRuSsr;
+            pkgHtml += '<div data-ru="' + itemRuSsr.replace(/"/g,'&quot;') + '" data-am="' + itemAmSsr.replace(/"/g,'&quot;') + '"><i class="fas fa-check-circle"></i> ' + itemCurSsr + '</div>';
           }
           pkgHtml += '</div>';
         }
