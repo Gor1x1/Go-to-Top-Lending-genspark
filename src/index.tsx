@@ -1485,7 +1485,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:hidden;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow:visible;gap:12px;padding:12px 0;scrollbar-width:none;justify-content:flex-start;will-change:transform;align-items:center;touch-action:pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 68vw;max-width:68vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:hidden;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow:visible;gap:12px;padding:12px 0;scrollbar-width:none;justify-content:flex-start;will-change:transform;align-items:center}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 68vw;max-width:68vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -1959,10 +1959,10 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .cmp-table{min-width:0!important;width:100%;table-layout:fixed;font-size:0.72rem}
   .cmp-table td,.cmp-table th{padding:8px 6px;word-wrap:break-word;overflow-wrap:break-word}
   /* Carousels: horizontal scroll only inside, vertical scroll passthrough to page */
-  .rv-carousel{overflow:hidden!important;-webkit-overflow-scrolling:auto;touch-action:pan-y;scroll-snap-type:none!important}
+  .rv-carousel{overflow:hidden!important;-webkit-overflow-scrolling:auto;scroll-snap-type:none!important}
   .rv-carousel .rv-track{max-width:none!important;width:auto!important;flex-wrap:nowrap!important}
-  .pb-carousel{overflow-x:auto;overflow-y:visible;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
-  .pb-carousel{touch-action:pan-x}
+  .pb-carousel{overflow-x:scroll;overflow-y:hidden;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;-ms-overflow-style:none;scrollbar-width:none}
+  .pb-carousel::-webkit-scrollbar{display:none}
   /* Section CTA buttons — always at bottom with proper spacing */
   .section-cta{margin-top:24px!important;text-align:center;display:flex;flex-direction:column;align-items:center}
   .section-cta .btn{width:100%;max-width:400px;justify-content:center;display:inline-flex}
@@ -3818,6 +3818,10 @@ switchLang = function(l) {
     var t = el.getAttribute('data-' + l);
     if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
+  // Update input placeholders for current language
+  document.querySelectorAll('[data-placeholder-' + l + ']').forEach(function(el) {
+    el.placeholder = el.getAttribute('data-placeholder-' + l) || '';
+  });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
   // Update URL path to /am or /ru (without page reload) so shared links carry language
   var newPath = l === 'am' ? '/am' : '/ru';
@@ -4159,52 +4163,62 @@ switchLang = function(l) {
             setTranslate(getCenterOffset(idx), animated);
           }
           
+          // iOS Safari compatible touch handling
+          // Key: use {passive:false} on touchstart AND touchmove
+          // so e.preventDefault() works reliably on iOS
+          var touchActive = false, touchDir = '', touchSX = 0, touchSY = 0, touchDST = 0, touchST = 0;
+          
           grid.addEventListener('touchstart', function(e) {
+            if (e.touches.length !== 1) return;
+            touchActive = true;
+            touchDir = '';
+            touchSX = e.touches[0].clientX;
+            touchSY = e.touches[0].clientY;
+            touchDST = currentTranslate;
+            touchST = Date.now();
             grid.style.transition = 'none';
-            isDragging = true;
-            isHorizontal = null;
-            startX = e.touches[0].clientX;
-            startY = e.touches[0].clientY;
-            dragStartTranslate = currentTranslate;
-            startTime = Date.now();
-          }, {passive: true});
+          }, {passive: false});
           
           grid.addEventListener('touchmove', function(e) {
-            if (!isDragging) return;
-            var dx = e.touches[0].clientX - startX;
-            var dy = e.touches[0].clientY - startY;
-            if (isHorizontal === null && (Math.abs(dx) > 5 || Math.abs(dy) > 5)) {
-              isHorizontal = Math.abs(dx) > Math.abs(dy);
+            if (!touchActive || e.touches.length !== 1) return;
+            var dx = e.touches[0].clientX - touchSX;
+            var dy = e.touches[0].clientY - touchSY;
+            // Determine direction on first significant move
+            if (!touchDir) {
+              if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+              touchDir = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
             }
-            if (isHorizontal === false) { isDragging = false; return; }
-            if (isHorizontal === null) return;
+            if (touchDir === 'v') return; // let iOS handle vertical scroll
+            // Horizontal: prevent default to stop iOS from scrolling page
             e.preventDefault();
-            var newTx = dragStartTranslate + dx;
-            // Rubber-band at edges
+            e.stopPropagation();
+            var newTx = touchDST + dx;
             var minTx = getMinTranslate();
             var maxTx = getMaxTranslate();
-            if (newTx > maxTx) {
-              newTx = maxTx + (newTx - maxTx) * 0.25;
-            } else if (newTx < minTx) {
-              newTx = minTx + (newTx - minTx) * 0.25;
-            }
-            grid.style.transition = 'none';
+            if (newTx > maxTx) newTx = maxTx + (newTx - maxTx) * 0.25;
+            if (newTx < minTx) newTx = minTx + (newTx - minTx) * 0.25;
             grid.style.transform = 'translateX(' + newTx + 'px)';
             currentTranslate = newTx;
           }, {passive: false});
           
           grid.addEventListener('touchend', function(e) {
-            if (!isDragging) return;
-            isDragging = false;
-            if (!isHorizontal) return;
-            var dx = e.changedTouches[0].clientX - startX;
-            var dt = Date.now() - startTime;
+            if (!touchActive) return;
+            touchActive = false;
+            if (touchDir !== 'h') return;
+            var dx = e.changedTouches[0].clientX - touchSX;
+            var dt = Date.now() - touchST;
             var velocity = Math.abs(dx) / Math.max(dt, 1);
             var next = currentIdx;
-            if (velocity > 0.3 || Math.abs(dx) > 50) {
+            if (velocity > 0.25 || Math.abs(dx) > 30) {
               next = dx < 0 ? currentIdx + 1 : currentIdx - 1;
             }
             goToCard(next, true);
+          }, {passive: true});
+          
+          grid.addEventListener('touchcancel', function() {
+            if (!touchActive) return;
+            touchActive = false;
+            goToCard(currentIdx, true);
           }, {passive: true});
           
           grid.addEventListener('transitionend', function() {
@@ -4771,13 +4785,13 @@ switchLang = function(l) {
                 var touchData = { startX: 0, startY: 0, currentX: 0, dragging: false, startTime: 0, moved: false };
                 
                 function onTouchStart(e) {
-                  if (e.touches.length !== 1) return; // ignore multi-touch
+                  if (e.touches.length !== 1) return;
                   touchData.startX = e.touches[0].clientX;
                   touchData.startY = e.touches[0].clientY;
                   touchData.currentX = touchData.startX;
                   touchData.dragging = true;
                   touchData.moved = false;
-                  touchData.direction = ''; // 'h' or 'v' — locks after first significant move
+                  touchData.direction = '';
                   touchData.startTime = Date.now();
                   track.style.transition = 'none';
                 }
@@ -4788,15 +4802,10 @@ switchLang = function(l) {
                   var ty = e.touches[0].clientY;
                   var dx = tx - touchData.startX;
                   var dy = ty - touchData.startY;
-                  // Lock direction after 8px movement
                   if (!touchData.direction) {
-                    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
-                      touchData.direction = Math.abs(dy) > Math.abs(dx) ? 'v' : 'h';
-                    } else {
-                      return; // not enough movement to determine direction
-                    }
+                    if (Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+                    touchData.direction = Math.abs(dx) >= Math.abs(dy) ? 'h' : 'v';
                   }
-                  // If vertical scroll, release touch
                   if (touchData.direction === 'v') {
                     touchData.dragging = false;
                     var st = _rvState[cid] || { idx: 0, total: totalSlides };
@@ -4804,15 +4813,15 @@ switchLang = function(l) {
                     track.style.transform = 'translateX(-' + (st.idx * 100) + '%)';
                     return;
                   }
-                  // Horizontal swipe — prevent page scroll
+                  // Horizontal swipe — prevent page scroll on iOS
+                  e.preventDefault();
+                  e.stopPropagation();
                   touchData.currentX = tx;
                   touchData.moved = true;
-                  e.preventDefault();
                   var state = _rvState[cid] || { idx: 0, total: totalSlides };
                   var baseOffset = -(state.idx * 100);
                   var w = carousel ? carousel.offsetWidth : 400;
                   var movePercent = (dx / w) * 100;
-                  // Add resistance at edges
                   if ((state.idx === 0 && dx > 0) || (state.idx === state.total - 1 && dx < 0)) {
                     movePercent = movePercent * 0.3;
                   }
@@ -4824,7 +4833,6 @@ switchLang = function(l) {
                   touchData.dragging = false;
                   track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
                   if (!touchData.moved) {
-                    // No horizontal move — just snap to current
                     var snapState = _rvState[cid] || { idx: 0, total: totalSlides };
                     track.style.transform = 'translateX(-' + (snapState.idx * 100) + '%)';
                     return;
@@ -4833,24 +4841,19 @@ switchLang = function(l) {
                   var diff = endX - touchData.startX;
                   var elapsed = Date.now() - touchData.startTime;
                   var velocity = Math.abs(diff) / Math.max(elapsed, 1);
-                  // Swipe threshold: 40px distance OR velocity > 0.3px/ms
-                  if (Math.abs(diff) > 40 || (velocity > 0.3 && Math.abs(diff) > 15)) {
+                  if (Math.abs(diff) > 30 || (velocity > 0.25 && Math.abs(diff) > 10)) {
                     rvSlide(cid, diff < 0 ? 1 : -1);
                   } else {
-                    // Snap back to current slide
                     var state = _rvState[cid] || { idx: 0, total: totalSlides };
                     track.style.transform = 'translateX(-' + (state.idx * 100) + '%)';
                   }
-                  // Hide swipe hint after first successful swipe
                   var hint = document.querySelector('.rv-swipe-hint');
                   if (hint) hint.style.display = 'none';
-                  // Reset direction for next touch
                   touchData.direction = '';
                 }
                 
-                // Use {passive:false} on touchmove to allow preventDefault
-                // Use {passive:true} on touchstart/touchend for performance
-                track.addEventListener('touchstart', onTouchStart, {passive:true});
+                // iOS Safari: {passive:false} on BOTH touchstart and touchmove
+                track.addEventListener('touchstart', onTouchStart, {passive:false});
                 track.addEventListener('touchmove', onTouchMove, {passive:false});
                 track.addEventListener('touchend', onTouchEnd, {passive:true});
                 track.addEventListener('touchcancel', function() {
@@ -6808,7 +6811,7 @@ async function checkRefCode() {
       pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
       // Setup transform-based carousel for mobile (smooth, one card per swipe)
       // Grid has overflow:visible, parent .calc-packages has overflow:hidden (viewport)
-      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;var ci=' + initIdx + ',sx=0,sy=0,dr=false,st=0,ct=0,dst=0,isH=null;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}g.addEventListener("touchstart",function(e){g.style.transition="none";dr=true;isH=null;sx=e.touches[0].clientX;sy=e.touches[0].clientY;dst=ct;st=Date.now()},{passive:true});g.addEventListener("touchmove",function(e){if(!dr)return;var dx=e.touches[0].clientX-sx,dy=e.touches[0].clientY-sy;if(isH===null&&(Math.abs(dx)>5||Math.abs(dy)>5))isH=Math.abs(dx)>Math.abs(dy);if(isH===false){dr=false;return}if(isH===null)return;e.preventDefault();var nt=dst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transition="none";g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!dr)return;dr=false;if(!isH)return;var dx=e.changedTouches[0].clientX-sx,dt=Date.now()-st,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.3||Math.abs(dx)>50)ni=dx<0?ci+1:ci-1;go(ni,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
+      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;var ci=' + initIdx + ',ct=0;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}var ta=false,td="",tsx=0,tsy=0,tdst=0,tst=0;g.addEventListener("touchstart",function(e){if(e.touches.length!==1)return;ta=true;td="";tsx=e.touches[0].clientX;tsy=e.touches[0].clientY;tdst=ct;tst=Date.now();g.style.transition="none"},{passive:false});g.addEventListener("touchmove",function(e){if(!ta||e.touches.length!==1)return;var dx=e.touches[0].clientX-tsx,dy=e.touches[0].clientY-tsy;if(!td){if(Math.abs(dx)<3&&Math.abs(dy)<3)return;td=Math.abs(dx)>=Math.abs(dy)?"h":"v"}if(td==="v")return;e.preventDefault();e.stopPropagation();var nt=tdst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!ta)return;ta=false;if(td!=="h")return;var dx=e.changedTouches[0].clientX-tsx,dt=Date.now()-tst,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.25||Math.abs(dx)>30)ni=dx<0?ci+1:ci-1;go(ni,true)},{passive:true});g.addEventListener("touchcancel",function(){ta=false;go(ci,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
       pkgHtml += '</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
