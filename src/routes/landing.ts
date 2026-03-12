@@ -394,7 +394,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-packages-header{text-align:center;margin-bottom:20px}
 .calc-packages-title{font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--text)}
 .calc-packages-subtitle{font-size:0.85rem;color:var(--text-muted);margin-top:6px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5}
-.calc-packages-grid{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:nowrap;padding:20px 10px;overflow:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.calc-packages-grid{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:nowrap;padding:20px 10px;overflow:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
 .calc-packages-grid::-webkit-scrollbar{display:none}
 .calc-packages-grid.single-pkg{max-width:400px;margin:0 auto}
 .calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;flex:1 1 0;min-width:180px;max-width:280px;display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent}
@@ -434,7 +434,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:hidden;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow:visible;gap:12px;padding:12px 0;scrollbar-width:none;justify-content:flex-start;will-change:transform;align-items:center;touch-action:pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 68vw;max-width:68vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:hidden;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow:visible;gap:12px;padding:12px 0;scrollbar-width:none;justify-content:flex-start;will-change:transform;align-items:center}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 68vw;max-width:68vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:all 0.4s ease;border-radius:14px;-webkit-tap-highlight-color:transparent}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 18px rgba(255,215,0,0.35),0 0 40px rgba(255,215,0,0.15),0 4px 20px rgba(255,215,0,0.1);opacity:1;z-index:5}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 68vw;max-width:68vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -764,7 +764,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 /* ===== REVIEWS SINGLE-PHOTO CAROUSEL ===== */
 .rv-carousel{position:relative;width:100%;max-width:480px;margin:0 auto;overflow:hidden;border-radius:16px;border:none;background:transparent;box-shadow:none}
-.rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform;flex-wrap:nowrap;max-width:none;touch-action:pan-y}
+.rv-carousel .rv-track{display:flex;transition:transform 0.45s cubic-bezier(.4,0,.2,1);will-change:transform;flex-wrap:nowrap;max-width:none}
 .rv-carousel .rv-slide{flex:0 0 100%;width:100%;position:relative}
 .rv-carousel .rv-slide img{width:100%;height:auto;object-fit:contain;display:block;background:transparent;-webkit-user-drag:none;user-select:none}
 .rv-carousel .rv-caption{padding:12px 16px;background:rgba(139,92,246,0.08);border-radius:0 0 12px 12px}
@@ -3112,12 +3112,11 @@ switchLang = function(l) {
             setTranslate(getCenterOffset(idx), animated);
           }
           
-          // iOS compatible touch handling
-          // touch-action:pan-y tells WebKit: vertical=browser, horizontal=JS
-          grid.style.touchAction = 'pan-y';
+          // ALL-PASSIVE touch handling — works reliably on iOS
+          // No preventDefault, no touch-action CSS — just track finger and snap
           grid.style.webkitUserSelect = 'none';
           grid.style.userSelect = 'none';
-          var _ta = false, _td = '', _tsx = 0, _tsy = 0, _tdst = 0, _tst = 0;
+          var _ta = false, _td = '', _tsx = 0, _tsy = 0, _tdst = 0, _tst = 0, _lastDx = 0;
           
           grid.addEventListener('touchstart', function(e) {
             if (e.touches.length !== 1) return;
@@ -3125,7 +3124,7 @@ switchLang = function(l) {
             _td = '';
             _tsx = e.touches[0].clientX;
             _tsy = e.touches[0].clientY;
-            // Recalculate containerW each time (handles orientation change, layout shifts)
+            _lastDx = 0;
             containerW = pkgsContainer.offsetWidth;
             _tdst = currentTranslate;
             _tst = Date.now();
@@ -3136,32 +3135,31 @@ switchLang = function(l) {
             if (!_ta || e.touches.length !== 1) return;
             var dx = e.touches[0].clientX - _tsx;
             var dy = e.touches[0].clientY - _tsy;
-            // Detect direction once with a 5px threshold
             if (!_td) {
-              if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+              if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
               _td = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
             }
             if (_td !== 'h') return;
-            e.preventDefault();
+            // Move carousel following finger (no preventDefault needed)
+            _lastDx = dx;
             var newTx = _tdst + dx;
             var minTx = getMinTranslate();
             var maxTx = getMaxTranslate();
-            // Rubber-band at edges
-            if (newTx > maxTx) newTx = maxTx + (newTx - maxTx) * 0.25;
-            if (newTx < minTx) newTx = minTx + (newTx - minTx) * 0.25;
+            if (newTx > maxTx) newTx = maxTx + (newTx - maxTx) * 0.2;
+            if (newTx < minTx) newTx = minTx + (newTx - minTx) * 0.2;
             grid.style.transform = 'translateX(' + newTx + 'px)';
             currentTranslate = newTx;
-          }, {passive: false});
+          }, {passive: true});
           
           grid.addEventListener('touchend', function(e) {
             if (!_ta) return;
             _ta = false;
             if (_td !== 'h') { _td = ''; return; }
-            var dx = e.changedTouches[0].clientX - _tsx;
+            var dx = _lastDx;
             var dt = Date.now() - _tst;
             var vel = Math.abs(dx) / Math.max(dt, 1);
             var next = currentIdx;
-            if (vel > 0.2 || Math.abs(dx) > 25) {
+            if (vel > 0.15 || Math.abs(dx) > 20) {
               next = dx < 0 ? currentIdx + 1 : currentIdx - 1;
             }
             _td = '';
@@ -3734,12 +3732,11 @@ switchLang = function(l) {
                 var track = document.getElementById(cid + '_track');
                 if (!track) return;
                 var carousel = track.parentElement;
-                // iOS: touch-action:pan-y tells WebKit to let JS handle horizontal
-                track.style.touchAction = 'pan-y';
+                // ALL-PASSIVE — works on every iOS browser
                 track.style.webkitUserSelect = 'none';
                 track.style.userSelect = 'none';
                 
-                var _active = false, _dir = '', _sx = 0, _sy = 0, _st = 0;
+                var _active = false, _dir = '', _sx = 0, _sy = 0, _st = 0, _lastDx = 0;
                 
                 track.addEventListener('touchstart', function(e) {
                   if (e.touches.length !== 1) return;
@@ -3747,6 +3744,7 @@ switchLang = function(l) {
                   _dir = '';
                   _sx = e.touches[0].clientX;
                   _sy = e.touches[0].clientY;
+                  _lastDx = 0;
                   _st = Date.now();
                   track.style.transition = 'none';
                 }, {passive: true});
@@ -3757,32 +3755,28 @@ switchLang = function(l) {
                   var cy = e.touches[0].clientY;
                   var dx = cx - _sx;
                   var dy = cy - _sy;
-                  // Detect direction once
                   if (!_dir) {
-                    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+                    if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
                     _dir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
                   }
                   if (_dir !== 'h') return;
-                  e.preventDefault();
-                  // Visual drag feedback
+                  _lastDx = dx;
                   var state = _rvState[cid] || { idx: 0, total: totalSlides };
                   var w = carousel ? carousel.offsetWidth : 300;
                   var pct = (dx / w) * 100;
-                  // Rubber-band at edges
                   if ((state.idx === 0 && dx > 0) || (state.idx >= state.total - 1 && dx < 0)) pct *= 0.3;
                   track.style.transform = 'translateX(' + (-(state.idx * 100) + pct) + '%)';
-                }, {passive: false});
+                }, {passive: true});
                 
                 track.addEventListener('touchend', function(e) {
                   if (!_active) return;
                   _active = false;
                   if (_dir !== 'h') { _dir = ''; return; }
-                  var ex = e.changedTouches[0].clientX;
-                  var diff = ex - _sx;
+                  var diff = _lastDx;
                   var elapsed = Date.now() - _st;
                   var vel = Math.abs(diff) / Math.max(elapsed, 1);
                   track.style.transition = 'transform 0.4s cubic-bezier(.4,0,.2,1)';
-                  if (Math.abs(diff) > 25 || (vel > 0.2 && Math.abs(diff) > 8)) {
+                  if (Math.abs(diff) > 20 || (vel > 0.15 && Math.abs(diff) > 8)) {
                     rvSlide(cid, diff < 0 ? 1 : -1);
                   } else {
                     var state = _rvState[cid] || { idx: 0, total: totalSlides };
@@ -5747,7 +5741,7 @@ async function checkRefCode() {
       pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
       // Setup transform-based carousel for mobile (smooth, one card per swipe)
       // Grid has overflow:visible, parent .calc-packages has overflow:hidden (viewport)
-      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;g.style.touchAction="pan-y";g.style.webkitUserSelect="none";g.style.userSelect="none";var ci=' + initIdx + ',ct=0;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}var ta=false,td="",tsx=0,tsy=0,tdst=0,tst=0;g.addEventListener("touchstart",function(e){if(e.touches.length!==1)return;ta=true;td="";tsx=e.touches[0].clientX;tsy=e.touches[0].clientY;cw=p.offsetWidth;tdst=ct;tst=Date.now();g.style.transition="none"},{passive:true});g.addEventListener("touchmove",function(e){if(!ta||e.touches.length!==1)return;var dx=e.touches[0].clientX-tsx,dy=e.touches[0].clientY-tsy;if(!td){if(Math.abs(dx)<5&&Math.abs(dy)<5)return;td=Math.abs(dx)>Math.abs(dy)?"h":"v"}if(td!=="h")return;e.preventDefault();var nt=tdst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.25;if(nt<mn)nt=mn+(nt-mn)*0.25;g.style.transform="translateX("+nt+"px)";ct=nt},{passive:false});g.addEventListener("touchend",function(e){if(!ta)return;ta=false;if(td!=="h"){td="";return}var dx=e.changedTouches[0].clientX-tsx,dt=Date.now()-tst,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.2||Math.abs(dx)>25)ni=dx<0?ci+1:ci-1;td="";go(ni,true)},{passive:true});g.addEventListener("touchcancel",function(){ta=false;td="";go(ci,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
+      pkgHtml += '(function(){if(window.innerWidth>768)return;var p=document.getElementById("calcPackages");var g=p&&p.querySelector(".calc-packages-grid");if(!g)return;var cs=g.querySelectorAll(".calc-pkg-card");if(cs.length<=1)return;g.style.webkitUserSelect="none";g.style.userSelect="none";var ci=' + initIdx + ',ct=0;var cw=p.offsetWidth;var ml=parseInt(getComputedStyle(g).marginLeft||"0");function coff(i){i=Math.max(0,Math.min(i,cs.length-1));var c=cs[i];return -(c.offsetLeft-(cw-c.offsetWidth)/2+ml)}function mnT(){return coff(cs.length-1)}function mxT(){return coff(0)}function setT(tx,anim){g.style.transition=anim?"transform 0.4s cubic-bezier(0.25,0.46,0.45,0.94)":"none";g.style.transform="translateX("+tx+"px)";ct=tx}function go(i,anim){i=Math.max(0,Math.min(i,cs.length-1));ci=i;setT(coff(i),anim)}var ta=false,td="",tsx=0,tsy=0,tdst=0,tst=0,ldx=0;g.addEventListener("touchstart",function(e){if(e.touches.length!==1)return;ta=true;td="";tsx=e.touches[0].clientX;tsy=e.touches[0].clientY;ldx=0;cw=p.offsetWidth;tdst=ct;tst=Date.now();g.style.transition="none"},{passive:true});g.addEventListener("touchmove",function(e){if(!ta||e.touches.length!==1)return;var dx=e.touches[0].clientX-tsx,dy=e.touches[0].clientY-tsy;if(!td){if(Math.abs(dx)<8&&Math.abs(dy)<8)return;td=Math.abs(dx)>Math.abs(dy)?"h":"v"}if(td!=="h")return;ldx=dx;var nt=tdst+dx,mn=mnT(),mx=mxT();if(nt>mx)nt=mx+(nt-mx)*0.2;if(nt<mn)nt=mn+(nt-mn)*0.2;g.style.transform="translateX("+nt+"px)";ct=nt},{passive:true});g.addEventListener("touchend",function(e){if(!ta)return;ta=false;if(td!=="h"){td="";return}var dx=ldx,dt=Date.now()-tst,v=Math.abs(dx)/Math.max(dt,1),ni=ci;if(v>0.15||Math.abs(dx)>20)ni=dx<0?ci+1:ci-1;td="";go(ni,true)},{passive:true});g.addEventListener("touchcancel",function(){ta=false;td="";go(ci,true)},{passive:true});g.addEventListener("transitionend",function(){g.style.transition="none"});go(ci,false)})();';
       pkgHtml += '</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
