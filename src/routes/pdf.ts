@@ -38,6 +38,12 @@ app.post('/api/generate-pdf', async (c) => {
       try {
         const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
         if (refRow) {
+          // Check usage limit — if max_uses > 0 and uses_count >= max_uses, code is expired
+          const maxUses = Number(refRow.max_uses) || 0;
+          const usesCount = Number(refRow.uses_count) || 0;
+          if (maxUses > 0 && usesCount >= maxUses) {
+            // Code exceeded limit — treat as no promo (don't apply discount or free services)
+          } else {
           discountPercent = Number(refRow.discount_percent) || 0;
           try { initLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { initLinkedPackages = []; }
           try { initLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { initLinkedServices = []; }
@@ -53,10 +59,8 @@ app.post('/api/generate-pdf', async (c) => {
             subtotal: 0
           }));
           // When promo has free services, percentage discount is disabled (mutual exclusivity)
-          // Free services = the discount benefit, no additional % off
           const hasFreeServices = freeServices.length > 0;
           if (discountPercent > 0 && !hasFreeServices) {
-            // If linked_services is specified, only discount those services
             if (initLinkedServices.length > 0) {
               let linkedSubtotal = 0;
               for (const item of items) {
@@ -64,28 +68,24 @@ app.post('/api/generate-pdf', async (c) => {
                   linkedSubtotal += Number(item.subtotal || 0);
                 }
               }
-              // Fallback: if linked filtering found nothing, apply to all services
               discountAmount = Math.round((linkedSubtotal > 0 ? linkedSubtotal : subtotal) * discountPercent / 100);
             } else {
               discountAmount = Math.round(subtotal * discountPercent / 100);
             }
           }
+          } // end limit check
         }
       } catch {}
     }
     
-    // Package discount: 
-    // When promo has free services, no % discount on packages either
-    // - Global promo (no linked_packages, no linked_services) → always apply to package
-    // - Linked promo → only if linked_packages contains the selected package
+    // Package discount: ONLY when specific packages are checked in the promo code
+    // linked_packages=[] (no packages selected) → NO discount on packages
+    // linked_packages=[id1,id2] → discount only on those specific packages
     let initPkgDiscount = 0;
     const hasFreeServicesForPkg = freeServices.length > 0;
     if (discountPercent > 0 && !hasFreeServicesForPkg && packageData && packagePrice > 0) {
-      const isGlobalPromo = initLinkedPackages.length === 0 && initLinkedServices.length === 0;
       const pkgId = packageData.package_id || packageData.id;
-      if (isGlobalPromo) {
-        initPkgDiscount = Math.round(packagePrice * discountPercent / 100);
-      } else if (pkgId && initLinkedPackages.length > 0 && initLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
+      if (pkgId && initLinkedPackages.length > 0 && initLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
         initPkgDiscount = Math.round(packagePrice * discountPercent / 100);
       }
     }
@@ -309,42 +309,33 @@ app.get('/pdf/:id', async (c) => {
     
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
     // When promo has free services, percentage discount is disabled (mutual exclusivity)
-    // Free services = the discount benefit, no additional % off 
     const hasFreeOrBonusServices = refFreeServices.length > 0;
     const calcDiscountPercent = hasFreeOrBonusServices ? 0 : (calcData.discountPercent || refDiscount || 0);
-    const isGlobalRef = refLinkedPackages.length === 0 && refLinkedServices.length === 0;
     // Calculate discount base: if linked_services specified, only those services; otherwise all services
     let discountBase = 0;
     if (calcDiscountPercent > 0) {
       if (refLinkedServices.length > 0) {
-        // Only sum services that are in the linked list
         for (const si of serviceItems) {
           if (si.service_id && refLinkedServices.map(Number).indexOf(Number(si.service_id)) !== -1) {
             discountBase += Number(si.subtotal || 0);
           }
         }
-        // Fallback: if linked filtering found nothing (e.g., old data without service_id),
-        // apply discount to all services — the promo code has a discount, it must apply
         if (discountBase === 0 && svcSubtotal > 0) {
           discountBase = svcSubtotal;
         }
       }
-      // No linked_services filter OR global promo → discount applies to all services
       if (discountBase === 0 && refLinkedServices.length === 0) {
         discountBase = svcSubtotal > 0 ? svcSubtotal : (calcData.servicesSubtotal || subtotal);
       }
     }
     const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(discountBase) * calcDiscountPercent / 100) : 0;
-    // Package discount:
-    // When promo has free services, no % discount on packages either
-    // - Global promo (no linked_packages, no linked_services) → always apply to package
-    // - Linked promo → only if linked_packages contains the selected package
+    // Package discount: ONLY when specific packages are checked in the promo code
+    // linked_packages=[] (empty) → NO discount on packages
+    // linked_packages=[id1,id2] → discount only on those specific packages
     let pkgDiscountAmount = 0;
     if (calcDiscountPercent > 0 && !hasFreeOrBonusServices && pkgData && pkgPrice > 0) {
       const pkgId = pkgData.package_id || pkgData.id;
-      if (isGlobalRef) {
-        pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
-      } else if (pkgId && refLinkedPackages.length > 0 && refLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
+      if (pkgId && refLinkedPackages.length > 0 && refLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
         pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
       }
     }

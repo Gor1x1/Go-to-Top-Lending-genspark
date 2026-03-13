@@ -342,21 +342,16 @@ app.post('/api/referral/check', async (c) => {
     const row = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(code.trim().toUpperCase()).first();
     if (!row) return c.json({ valid: false });
     
-    // Check max_uses limit: count leads with paid statuses that used this code
+    // Check max_uses limit using uses_count (incremented on every PDF generation)
     const maxUses = Number(row.max_uses) || 0;
-    if (maxUses > 0) {
-      const paidCount = await db.prepare(
-        "SELECT COUNT(*) as cnt FROM leads WHERE UPPER(referral_code) = ? AND status IN ('in_progress','checking','done')"
-      ).bind(String(row.code).toUpperCase()).first();
-      const currentPaid = Number(paidCount?.cnt) || 0;
-      if (currentPaid >= maxUses) {
-        return c.json({ 
-          valid: false, 
-          reason: 'limit_reached',
-          message_ru: 'Лимит использований промокода исчерпан',
-          message_am: '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u056b \u0585\u0563\u057f\u0561\u0563\u0578\u0580\u056e\u0574\u0561\u0576 \u057d\u0561\u0570\u0574\u0561\u0576\u0568 \u057d\u057a\u0561\u057c\u057e\u0565\u056c \u0567'
-        });
-      }
+    const usesCount = Number(row.uses_count) || 0;
+    if (maxUses > 0 && usesCount >= maxUses) {
+      return c.json({ 
+        valid: false, 
+        reason: 'limit_reached',
+        message_ru: 'Лимит использований промокода исчерпан',
+        message_am: 'Պdelays \u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564\u056b \u0585\u0563\u057f\u0561\u0563\u0578\u0580\u056e\u0574\u0561\u0576 \u057d\u0561\u0570\u0574\u0561\u0576\u0568 \u057d\u057a\u0561\u057c\u057e\u0565\u056c \u0567'
+      });
     }
     
     // Don't increment uses_count here — it's incremented only when a lead is actually created (PDF generation)

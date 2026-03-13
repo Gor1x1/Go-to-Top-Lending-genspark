@@ -314,7 +314,7 @@ img{max-width:100%;height:auto}
 /* Bottom Navigation Bar - mobile only */
 .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(15,10,26,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
 .bottom-nav-items{display:flex;justify-content:space-around;align-items:stretch;gap:2px}
-.bottom-nav-item{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;padding:6px 4px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.72rem;font-weight:500;transition:color 0.3s ease;flex:1;min-width:0;cursor:pointer;background:none;border:none}
+.bottom-nav-item{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;gap:3px;padding:6px 4px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.72rem;font-weight:500;transition:color 0.3s ease;flex:1;min-width:0;cursor:pointer;background:none;border:none}
 .bottom-nav-item.active{color:var(--purple)}
 .bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
 .bottom-nav-item i{font-size:1.15rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -2748,12 +2748,12 @@ function recalcDynamic() {
       discountAmount = Math.round(discountableServices * _refDiscount / 100);
       total = total - discountAmount;
     }
-    // Discount on package:
-    // - Global promo (no linked_packages, no linked_services) → always apply to package
-    // - Linked promo → only if linked_packages contains the selected package
+    // Discount on package: ONLY when specific packages are checked in the promo code
+    // linked_packages=[] (empty) → NO discount on packages
+    // linked_packages=[id1,id2] → discount only on those specific packages
     if (selectedPkg && packageAmount > 0) {
       var pkgIdNum = Number(selectedPkg.id);
-      if (isGlobalPromo || (_refLinkedPackages.length > 0 && _refLinkedPackages.map(Number).indexOf(pkgIdNum) !== -1)) {
+      if (_refLinkedPackages.length > 0 && _refLinkedPackages.map(Number).indexOf(pkgIdNum) !== -1) {
         packageDiscountAmount = Math.round(packageAmount * _refDiscount / 100);
         total = total - packageDiscountAmount;
       }
