@@ -37,3 +37,4 @@ lerna-debug.log*
 fix_*.cjs
 fix_*.mjs
 *.bak
+core

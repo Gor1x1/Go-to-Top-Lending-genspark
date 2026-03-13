@@ -318,7 +318,7 @@ img{max-width:100%;height:auto}
 .bottom-nav-item.active{color:var(--purple)}
 .bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
 .bottom-nav-item i{font-size:1.15rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.bottom-nav-item span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:0.6rem;text-align:center;line-height:1.2;display:block;flex-shrink:0}
+.bottom-nav-item span{white-space:normal;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:0.6rem;text-align:center;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;flex-shrink:0}
 .bottom-nav-more{position:relative}
 .bottom-nav-more.active{color:var(--purple)}
 .bottom-nav-more span:first-of-type{font-size:0.6rem}
@@ -4464,7 +4464,7 @@ switchLang = function(l) {
           var bottomNav = document.getElementById('bottomNav');
           if (bottomNav && dbNavItems.length > 0) {
             var bnIconMap = {
-              'about': 'fas fa-info-circle', 'services': 'fas fa-concierge-bell',
+              'about': 'fas fa-info-circle', 'services': 'fas fa-hand-holding',
               'calculator': 'fas fa-calculator', 'warehouse': 'fas fa-warehouse',
               'guarantee': 'fas fa-shield-alt', 'faq': 'fas fa-question-circle',
               'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star',
@@ -5351,7 +5351,7 @@ async function checkRefCode() {
 <nav class="bottom-nav" id="bottomNav">
 <div class="bottom-nav-items">
   <a href="#about" class="bottom-nav-item" data-nav-idx="0"><i class="fas fa-info-circle"></i><span data-ru="\u041E \u043D\u0430\u0441" data-am="\u0544\u0565\u0580 \u0574\u0561\u057D\u056B\u0576">\u041E \u043D\u0430\u0441</span></a>
-  <a href="#services" class="bottom-nav-item" data-nav-idx="1"><i class="fas fa-concierge-bell"></i><span data-ru="\u0423\u0441\u043B\u0443\u0433\u0438" data-am="\u053E\u0561\u057C\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580">\u0423\u0441\u043B\u0443\u0433\u0438</span></a>
+  <a href="#services" class="bottom-nav-item" data-nav-idx="1"><i class="fas fa-hand-holding"></i><span data-ru="\u0423\u0441\u043B\u0443\u0433\u0438" data-am="\u053E\u0561\u057C\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580">\u0423\u0441\u043B\u0443\u0433\u0438</span></a>
   <a href="#calculator" class="bottom-nav-item" data-nav-idx="2"><i class="fas fa-calculator"></i><span data-ru="\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440" data-am="\u0540\u0561\u0577\u057E\u056B\u0579">\u041A\u0430\u043B\u044C\u043A\u0443\u043B\u044F\u0442\u043E\u0440</span></a>
   <a href="#guarantee" class="bottom-nav-item" data-nav-idx="3"><i class="fas fa-shield-alt"></i><span data-ru="\u0413\u0430\u0440\u0430\u043D\u0442\u0438\u0438" data-am="\u0535\u0580\u0561\u0577\u056D\u056B\u0584\u0576\u0565\u0580">\u0413\u0430\u0440\u0430\u043D\u0442\u0438\u0438</span></a>
   <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="\u0415\u0449\u0451" data-am="\u0531\u057E\u0565\u056C\u056B\u0576">\u0415\u0449\u0451</span>
@@ -6216,7 +6216,7 @@ async function checkRefCode() {
         
         // Build bottom nav HTML from admin nav items (sync order)
         const bottomNavIcons: Record<string, string> = {
-          'about': 'fas fa-info-circle', 'services': 'fas fa-concierge-bell',
+          'about': 'fas fa-info-circle', 'services': 'fas fa-hand-holding',
           'calculator': 'fas fa-calculator', 'warehouse': 'fas fa-warehouse',
           'guarantee': 'fas fa-shield-alt', 'faq': 'fas fa-question-circle',
           'contact': 'fas fa-envelope', 'client-reviews': 'fas fa-star',
