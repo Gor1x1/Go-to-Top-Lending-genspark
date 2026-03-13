@@ -256,7 +256,8 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     let totalDiscountCost = 0;
     let totalDiscountLeads = 0;
     let servicesBeforeDiscount = 0;
-    const promoCodeCosts: Record<string, { count: number; discount_total: number; revenue: number; services_total: number; code_details?: any; leads: any[] }> = {};
+    let totalFreeServicesValue = 0;
+    const promoCodeCosts: Record<string, { count: number; discount_total: number; revenue: number; services_total: number; free_services_value: number; code_details?: any; leads: any[] }> = {};
     try {
       const dfNoAlias = dateFilter.replace(/l\./g, '');
       const refRes = await db.prepare("SELECT referral_code, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE referral_code != '' AND referral_code IS NOT NULL AND status IN ('in_progress','checking','done')" + dfNoAlias + " GROUP BY referral_code ORDER BY count DESC").bind(...dateParams).all();
@@ -281,7 +282,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       if (!rc) continue;
       const leadStatus = lead.status as string || '';
       if (!paidStatuses.includes(leadStatus)) continue; // Only in_progress, checking, done
-      if (!promoCodeCosts[rc]) promoCodeCosts[rc] = { count: 0, discount_total: 0, revenue: 0, services_total: 0, leads: [] };
+      if (!promoCodeCosts[rc]) promoCodeCosts[rc] = { count: 0, discount_total: 0, revenue: 0, services_total: 0, free_services_value: 0, leads: [] };
       promoCodeCosts[rc].count++;
       promoCodeCosts[rc].revenue += Number(lead.total_amount || 0);
       try {
@@ -313,9 +314,17 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         totalDiscountCost += da;
         if (da > 0) totalDiscountLeads++;
         servicesBeforeDiscount += svcSub;
+        // Track free services value from calc_data
+        const freeServicesInLead = cd.freeServices || [];
+        let leadFreeValue = 0;
+        for (const fs of freeServicesInLead) {
+          leadFreeValue += (Number(fs.qty || fs.quantity || 1)) * (Number(fs.price || 0));
+        }
+        promoCodeCosts[rc].free_services_value += leadFreeValue;
+        totalFreeServicesValue += leadFreeValue;
         promoCodeCosts[rc].leads.push({
           id: lead.id, name: (lead as any).name || '', status: lead.status,
-          total: Number(lead.total_amount || 0), discount: da,
+          total: Number(lead.total_amount || 0), discount: da, free_value: leadFreeValue,
           services: svcSub, date: (lead as any).created_at || ''
         });
       } catch {}
@@ -672,6 +681,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       promo_costs: promoCodeCosts,
       total_discount_cost: totalDiscountCost,
       total_discount_leads: totalDiscountLeads,
+      total_free_services_value: totalFreeServicesValue,
       services_before_discount: servicesBeforeDiscount,
       ref_code_services: refCodeServices,
       monthly_discounts: monthlyDiscounts,
