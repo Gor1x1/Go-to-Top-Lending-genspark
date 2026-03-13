@@ -41,7 +41,21 @@ app.post('/api/generate-pdf', async (c) => {
           discountPercent = Number(refRow.discount_percent) || 0;
           try { initLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { initLinkedPackages = []; }
           try { initLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { initLinkedServices = []; }
-          if (discountPercent > 0) {
+          // Load free/bonus services first — they affect discount logic
+          const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
+          freeServices = (fsRes.results || []).map((fs: any) => ({
+            name: fs.name_ru || '',
+            name_am: fs.name_am || '',
+            qty: fs.quantity || 1,
+            price: Number(fs.price) || 0,
+            discount_percent: fs.discount_percent,
+            service_id: fs.service_id,
+            subtotal: 0
+          }));
+          // KEY LOGIC: If promo has free/bonus services → no global % discount
+          // Free services are the benefit, global discount does NOT stack
+          const hasFreeOrBonusServices = freeServices.length > 0;
+          if (discountPercent > 0 && !hasFreeOrBonusServices) {
             // If linked_services is specified, only discount those services
             if (initLinkedServices.length > 0) {
               let linkedSubtotal = 0;
@@ -56,25 +70,17 @@ app.post('/api/generate-pdf', async (c) => {
               discountAmount = Math.round(subtotal * discountPercent / 100);
             }
           }
-          // Load free services
-          const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
-          freeServices = (fsRes.results || []).map((fs: any) => ({
-            name: fs.name_ru || '',
-            name_am: fs.name_am || '',
-            qty: fs.quantity || 1,
-            price: Number(fs.price) || 0,
-            discount_percent: fs.discount_percent,
-            subtotal: 0
-          }));
         }
       } catch {}
     }
     
     // Package discount: 
+    // - Only if no free/bonus services (free services = the benefit, discount doesn't stack)
     // - Global promo (no linked_packages, no linked_services) → always apply to package
     // - Linked promo → only if linked_packages contains the selected package
+    const hasFreeOrBonusSvc = freeServices.length > 0;
     let initPkgDiscount = 0;
-    if (discountPercent > 0 && packageData && packagePrice > 0) {
+    if (discountPercent > 0 && !hasFreeOrBonusSvc && packageData && packagePrice > 0) {
       const isGlobalPromo = initLinkedPackages.length === 0 && initLinkedServices.length === 0;
       const pkgId = packageData.package_id || packageData.id;
       if (isGlobalPromo) {
@@ -82,6 +88,13 @@ app.post('/api/generate-pdf', async (c) => {
       } else if (pkgId && initLinkedPackages.length > 0 && initLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
         initPkgDiscount = Math.round(packagePrice * discountPercent / 100);
       }
+    }
+    
+    // Free services add bonus qty to matching items — compute bonus value 
+    // (this is informational for the PDF, not subtracted from total since they're free)
+    let freeServicesBonusTotal = 0;
+    for (const fs of freeServices) {
+      freeServicesBonusTotal += (fs.qty || 1) * (fs.price || 0);
     }
     
     // Final total = servicesSubtotal - discount + packagePrice - packageDiscount
@@ -128,9 +141,9 @@ app.post('/api/generate-pdf', async (c) => {
     const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
       .bind(nextNum, 'calculator_pdf', clientName, clientContact, calcDataJson, lang, referralCode, ua.substring(0,200), finalTotal).run();
     const leadId = leadResult.meta?.last_row_id || 0;
-    // Increment referral code usage
+    // Increment referral code usage (normalize to uppercase to match DB storage)
     if (referralCode) {
-      try { await db.prepare("UPDATE referral_codes SET uses_count = uses_count + 1 WHERE code = ? AND is_active = 1").bind(referralCode).run(); } catch {}
+      try { await db.prepare("UPDATE referral_codes SET uses_count = uses_count + 1 WHERE UPPER(code) = ? AND is_active = 1").bind(referralCode.trim().toUpperCase()).run(); } catch {}
     }
 
     // Notify via Telegram with detailed info
@@ -295,8 +308,10 @@ app.get('/pdf/:id', async (c) => {
     for (const ai of articleItems) { artSubtotal += Number(ai.subtotal || 0); }
     
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
+    // KEY LOGIC: If promo has free/bonus services → no global % discount (they don't stack)
+    const hasFreeOrBonusSvc = refFreeServices.length > 0;
     // Apply referral discount based on linked_services and linked_packages
-    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
+    const calcDiscountPercent = hasFreeOrBonusSvc ? 0 : (calcData.discountPercent || refDiscount || 0);
     const isGlobalRef = refLinkedPackages.length === 0 && refLinkedServices.length === 0;
     // Calculate discount base: if linked_services specified, only those services; otherwise all services
     let discountBase = 0;
@@ -321,10 +336,11 @@ app.get('/pdf/:id', async (c) => {
     }
     const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(discountBase) * calcDiscountPercent / 100) : 0;
     // Package discount:
+    // - Only if no free/bonus services
     // - Global promo (no linked_packages, no linked_services) → always apply to package
     // - Linked promo → only if linked_packages contains the selected package
     let pkgDiscountAmount = 0;
-    if (calcDiscountPercent > 0 && pkgData && pkgPrice > 0) {
+    if (calcDiscountPercent > 0 && !hasFreeOrBonusSvc && pkgData && pkgPrice > 0) {
       const pkgId = pkgData.package_id || pkgData.id;
       if (isGlobalRef) {
         pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
@@ -393,16 +409,71 @@ app.get('/pdf/:id', async (c) => {
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
         '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
     }
-    // Add free / discounted services from referral code
-    for (const fs of refFreeServices) {
-      rowNum++;
-      const fsName = (isAm ? (fs.name_am || fs.name_ru) : (isEn ? fs.name_ru : fs.name_ru)) || '';
-      const freeLabel = isEn ? '(free)' : isAm ? '(\u0561\u0576\u057e\u0573\u0561\u0580)' : '(\u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e)';
-      rows += '<tr style="background:#f0fdf4"><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td>' +
-        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a"><i class="fas fa-gift" style="margin-right:4px"></i>' + fsName + ' <span style="font-size:0.8em;opacity:0.8">' + freeLabel + '</span></td>' +
-        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (fs.quantity || 1) + '</td>' +
-        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + Number(fs.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
-        '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#16a34a">0\u00a0\u058f</td></tr>';
+    
+    // === FREE / BONUS SERVICES from referral code ===
+    // If a free service matches a paid item (same service_id), combine qty: e.g. 10 paid + 5 free = 15 total
+    // Track which service_ids have been merged so we show standalone rows for unmatched ones
+    const mergedFreeServiceIds = new Set<number>();
+    
+    // Re-render service items with merged bonus quantities
+    if (refFreeServices.length > 0) {
+      // Rebuild rows with merged quantities
+      rows = '';
+      rowNum = 0;
+      if (articleItems.length > 0 && serviceItems.length > 0) {
+        rows += '<tr><td colspan="5" style="padding:10px 12px;background:' + accentColor + '0d;font-weight:700;color:' + accentColor + ';font-size:0.9em"><i class="fas fa-calculator" style="margin-right:6px"></i>' + (isEn ? 'Services' : isAm ? '\u053e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0423\u0441\u043b\u0443\u0433\u0438') + '</td></tr>';
+      }
+      for (const item of serviceItems) {
+        rowNum++;
+        let itemName = '';
+        if (isAm) {
+          itemName = item.name_am || (svcNameMap[item.name] && svcNameMap[item.name].name_am) || item.name || '';
+        } else if (isEn) {
+          itemName = item.name || '';
+        } else {
+          itemName = item.name_ru || (svcNameMap[item.name] && svcNameMap[item.name].name_ru) || item.name || '';
+        }
+        // Check if any free service matches this paid item
+        const matchingFree = refFreeServices.find((fs: any) => fs.service_id && item.service_id && Number(fs.service_id) === Number(item.service_id));
+        const bonusQty = matchingFree ? (Number(matchingFree.quantity) || 1) : 0;
+        if (matchingFree) mergedFreeServiceIds.add(Number(matchingFree.service_id));
+        const totalQty = (item.qty || 1) + bonusQty;
+        const paidQty = item.qty || 1;
+        
+        // Show the row with combined qty
+        rows += '<tr><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb">' + itemName
+          + (bonusQty > 0 ? ' <span style="background:#dcfce7;color:#16a34a;padding:1px 6px;border-radius:8px;font-size:0.75em;font-weight:600"><i class="fas fa-gift" style="margin-right:2px;font-size:0.7em"></i>+' + bonusQty + ' ' + (isEn ? 'free' : isAm ? '\u0561\u0576\u057e\u0573\u0561\u0580' : '\u0431\u0435\u0441\u043f\u043b.') + '</span>' : '')
+          + '</td>'
+          + '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">'
+          + (bonusQty > 0 ? '<span style="font-weight:700">' + totalQty + '</span> <span style="font-size:0.75em;color:#64748b">(' + paidQty + '+' + bonusQty + ')</span>' : String(paidQty))
+          + '</td>'
+          + '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;white-space:nowrap">' + Number(item.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>'
+          + '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;white-space:nowrap">' + Number(item.subtotal || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>';
+      }
+      // Show standalone free services that didn't match any paid item
+      for (const fs of refFreeServices) {
+        if (fs.service_id && mergedFreeServiceIds.has(Number(fs.service_id))) continue;
+        rowNum++;
+        const fsName = (isAm ? (fs.name_am || fs.name_ru) : (isEn ? fs.name_ru : fs.name_ru)) || '';
+        const freeLabel = isEn ? '(free)' : isAm ? '(\u0561\u0576\u057e\u0573\u0561\u0580)' : '(\u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e)';
+        rows += '<tr style="background:#f0fdf4"><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a"><i class="fas fa-gift" style="margin-right:4px"></i>' + fsName + ' <span style="font-size:0.8em;opacity:0.8">' + freeLabel + '</span></td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (fs.quantity || 1) + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + Number(fs.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#16a34a">0\u00a0\u058f</td></tr>';
+      }
+    } else {
+      // No free services — old behavior: show free services as separate rows
+      for (const fs of refFreeServices) {
+        rowNum++;
+        const fsName = (isAm ? (fs.name_am || fs.name_ru) : (isEn ? fs.name_ru : fs.name_ru)) || '';
+        const freeLabel = isEn ? '(free)' : isAm ? '(\u0561\u0576\u057e\u0573\u0561\u0580)' : '(\u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e)';
+        rows += '<tr style="background:#f0fdf4"><td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#64748b;font-size:0.85em;text-align:center">' + rowNum + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;color:#16a34a"><i class="fas fa-gift" style="margin-right:4px"></i>' + fsName + ' <span style="font-size:0.8em;opacity:0.8">' + freeLabel + '</span></td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:center">' + (fs.quantity || 1) + '</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;text-decoration:line-through;color:#94a3b8">' + Number(fs.price || 0).toLocaleString('ru-RU') + '\u00a0\u058f</td>' +
+          '<td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-weight:600;color:#16a34a">0\u00a0\u058f</td></tr>';
+      }
     }
     // Add services with partial discount from referral code (e.g. -30% on specific service)
     for (const sd of refServiceDiscounts) {
@@ -535,7 +606,7 @@ app.get('/pdf/:id', async (c) => {
       + '<div class="meta"><span><i class="fas fa-calendar-alt" style="margin-right:4px"></i>' + L.date + ' ' + dateStr + '</span><span><i class="fas fa-hashtag" style="margin-right:4px"></i>' + L.id + ' ' + invoiceNum + '</span></div>'
       + (clientName || clientContact ? '<div class="cli"><strong><i class="fas fa-user" style="margin-right:4px;color:' + accentColor + '"></i>' + L.client + '</strong> ' + (clientName || '') + (clientContact ? ' | <i class="fas fa-phone-alt" style="margin-right:4px;color:#10B981"></i>' + clientContact : '') + '</div>' : '')
       + (intro ? '<div class="intro">' + intro + '</div>' : '')
-      + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (refDiscount > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + refDiscount + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em">' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
+      + (referralCode ? '<div style="margin-bottom:16px;padding:10px 16px;background:' + accentColor + '0d;border:1px solid ' + accentColor + '30;border-radius:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap"><i class="fas fa-gift" style="color:' + accentColor + ';font-size:1.1rem"></i><span style="font-weight:700;color:' + accentColor + '">' + (isEn ? 'Promo code' : isAm ? '\u054a\u0580\u0578\u0574\u0578\u056f\u0578\u0564' : '\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434') + ': ' + referralCode + '</span>' + (calcDiscountPercent > 0 ? '<span style="background:' + accentColor + ';color:white;padding:2px 8px;border-radius:12px;font-size:0.8em;font-weight:600">-' + calcDiscountPercent + '%</span>' : '') + (refFreeServices.length > 0 ? '<span style="color:#16a34a;font-size:0.85em"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Free services included' : isAm ? '\u0531\u0576\u057e\u0573\u0561\u0580 \u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580' : '\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 \u0432\u043a\u043b\u044e\u0447\u0435\u043d\u044b') + '</span>' : '') + '</div>' : '')
       // Package block (if package was selected)
       + (pkgData ? '<div style="margin-bottom:16px;padding:14px 18px;background:linear-gradient(135deg,#FEF3C710,#F59E0B12);border:2px solid #F59E0B40;border-radius:10px">'
         + '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><i class="fas fa-box-open" style="color:#F59E0B;font-size:1.1rem"></i><span style="font-weight:700;font-size:1rem;color:#B45309">' + (isEn ? 'Package' : isAm ? '\u0553\u0561\u0569\u0565\u0569' : '\u041f\u0430\u043a\u0435\u0442') + ': ' + (isAm ? (pkgData.name_am || pkgData.name_ru || pkgData.name || '') : (pkgData.name_ru || pkgData.name || '')) + '</span></div>'
