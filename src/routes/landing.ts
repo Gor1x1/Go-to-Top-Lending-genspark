@@ -437,7 +437,7 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
 .calc-pkg-card .pkg-items div{display:flex;align-items:flex-start;gap:6px;margin-bottom:2px}
 .calc-pkg-card .pkg-items i{color:#22c55e;font-size:0.65rem;flex-shrink:0;margin-top:5px}
-@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:smooth;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 72vw;max-width:72vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;scroll-snap-stop:always;touch-action:auto;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.15),0 4px 10px rgba(255,215,0,0.06);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
+@media(max-width:768px){.calc-packages{padding:16px 0;overflow:visible;position:relative}.calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:12px;padding:12px 16px;scrollbar-width:none;justify-content:flex-start;align-items:stretch;touch-action:pan-x pan-y}.calc-packages-grid.smooth-scroll{scroll-behavior:smooth}.calc-packages-grid::-webkit-scrollbar{display:none}.calc-packages-grid.single-pkg{max-width:100%;overflow:visible;justify-content:center}.calc-pkg-card{flex:0 0 72vw;max-width:72vw;min-width:0;padding:18px 16px;overflow:hidden;opacity:1;transform:none;transition:border-color 0.3s ease,box-shadow 0.3s ease,background 0.3s ease;border-radius:14px;-webkit-tap-highlight-color:transparent;scroll-snap-align:center;scroll-snap-stop:always;touch-action:auto;-webkit-user-select:none;user-select:none}.calc-pkg-card.pkg-crown-gold{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none;border:3px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.15),0 4px 10px rgba(255,215,0,0.06);opacity:1;z-index:auto}.calc-pkg-card.pkg-crown-gold .pkg-name{font-size:1.05rem}.calc-pkg-card.pkg-crown-gold .pkg-new-price{font-size:1.35rem}.calc-pkg-card.pkg-crown-gold .pkg-items{font-size:0.82rem;line-height:1.9}.calc-pkg-card.pkg-crown-gold .pkg-desc{font-size:0.85rem;line-height:1.5}.calc-pkg-card.pkg-crown-gold .pkg-prices{margin-bottom:12px}.calc-pkg-card.pkg-crown-gold .pkg-badge{font-size:0.72rem;padding:4px 10px}.calc-pkg-card.pkg-crown-gold:hover{transform:none}.calc-pkg-card.pkg-crown-silver{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-silver:hover{transform:none}.calc-pkg-card.pkg-crown-bronze{padding:18px 16px;min-height:auto;flex:0 0 72vw;max-width:72vw;transform:none;opacity:1}.calc-pkg-card.pkg-crown-bronze:hover{transform:none}.calc-pkg-card .pkg-name{font-size:0.88rem}.calc-pkg-card .pkg-new-price{font-size:1.05rem}.calc-pkg-card .pkg-items{font-size:0.72rem}.calc-packages-title{font-size:1.05rem}}
 .calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
 .calc-row:last-of-type{border-bottom:none}
 .calc-label{font-size:0.92rem;font-weight:500}
@@ -2687,7 +2687,7 @@ function selectPackage(pkgId) {
 function getSelectedPackage() {
   if (!_selectedPackageId || !window._calcPackages) return null;
   for (var i = 0; i < window._calcPackages.length; i++) {
-    if (window._calcPackages[i].id === _selectedPackageId) return window._calcPackages[i];
+    if (Number(window._calcPackages[i].id) === Number(_selectedPackageId)) return window._calcPackages[i];
   }
   return null;
 }
@@ -2706,7 +2706,7 @@ function recalcDynamic() {
         var rowTotal = getTierTotal(tiers, qty);
         total += rowTotal;
         var svcId = parseInt(row.getAttribute('data-svc-id') || '0');
-        if (!hasLinkedFilter || _refLinkedServices.indexOf(svcId) !== -1) linkedTotal += rowTotal;
+        if (!hasLinkedFilter || _refLinkedServices.map(Number).indexOf(svcId) !== -1) linkedTotal += rowTotal;
         var label = row.querySelector('.calc-label');
         var labelText = label ? label.textContent : '';
         var pcsWord = lang === 'am' ? 'հատ' : 'шт';
@@ -2722,7 +2722,7 @@ function recalcDynamic() {
       var rowTotal = price * qty;
       total += rowTotal;
       var svcId = parseInt(row.getAttribute('data-svc-id') || '0');
-      if (!hasLinkedFilter || _refLinkedServices.indexOf(svcId) !== -1) linkedTotal += rowTotal;
+      if (!hasLinkedFilter || _refLinkedServices.map(Number).indexOf(svcId) !== -1) linkedTotal += rowTotal;
       var label = row.querySelector('.calc-label');
       var labelText = label ? label.textContent : '';
       items.push(labelText + ': ' + qty);
@@ -2741,16 +2741,22 @@ function recalcDynamic() {
   var discountAmount = 0;
   var packageDiscountAmount = 0;
   if (typeof _refDiscount !== 'undefined' && _refDiscount > 0) {
+    var isGlobalPromo = _refLinkedPackages.length === 0 && _refLinkedServices.length === 0;
     // Discount on services: if linked_services is empty → all services; otherwise only linked ones
     var discountableServices = hasLinkedFilter ? linkedTotal : servicesTotal;
     if (discountableServices > 0) {
       discountAmount = Math.round(discountableServices * _refDiscount / 100);
       total = total - discountAmount;
     }
-    // Discount on package: only if linked_packages contains the selected package
-    if (selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.indexOf(selectedPkg.id) !== -1) {
-      packageDiscountAmount = Math.round(packageAmount * _refDiscount / 100);
-      total = total - packageDiscountAmount;
+    // Discount on package:
+    // - Global promo (no linked_packages, no linked_services) → always apply to package
+    // - Linked promo → only if linked_packages contains the selected package
+    if (selectedPkg && packageAmount > 0) {
+      var pkgIdNum = Number(selectedPkg.id);
+      if (isGlobalPromo || (_refLinkedPackages.length > 0 && _refLinkedPackages.map(Number).indexOf(pkgIdNum) !== -1)) {
+        packageDiscountAmount = Math.round(packageAmount * _refDiscount / 100);
+        total = total - packageDiscountAmount;
+      }
     }
   }
   var totalDiscountAmount = discountAmount + packageDiscountAmount;
@@ -2780,7 +2786,7 @@ function recalcDynamic() {
   var refResultEl = document.getElementById('refResult');
   if (refResultEl && refResultEl.style.display !== 'none' && _refDiscount > 0) {
     // Check if promo matches selected package
-    var pkgMismatch = selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.indexOf(selectedPkg.id) === -1;
+    var pkgMismatch = selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.map(Number).indexOf(Number(selectedPkg.id)) === -1;
     if (pkgMismatch) {
       // Show red error for package mismatch, but still show green service discount if applicable
       var errMsg = lang === 'am'
@@ -3225,6 +3231,25 @@ switchLang = function(l) {
         pkgsContainer.innerHTML = ph;
         pkgsContainer.style.display = '';
         console.log('[DB] Packages rendered:', db.packages.length);
+        // Scroll to gold package card on mobile so it's visible first
+        (function centerGold() {
+          var grid = pkgsContainer.querySelector('.calc-packages-grid');
+          if (!grid || window.innerWidth > 768) return;
+          var goldCard = grid.querySelector('.calc-pkg-card.pkg-crown-gold');
+          if (!goldCard) return;
+          // Disable snap temporarily for instant jump
+          grid.style.scrollSnapType = 'none';
+          grid.style.scrollBehavior = 'auto';
+          requestAnimationFrame(function() {
+            var sl = goldCard.offsetLeft - (grid.offsetWidth - goldCard.offsetWidth) / 2;
+            grid.scrollLeft = Math.max(0, sl);
+            // Re-enable snap and smooth scroll after jump
+            requestAnimationFrame(function() {
+              grid.style.scrollSnapType = 'x mandatory';
+              grid.classList.add('smooth-scroll');
+            });
+          });
+        })();
       }
     }
     
@@ -4852,7 +4877,7 @@ async function checkRefCode() {
       // Check if promo applies to currently selected package
       var selectedPkg = getSelectedPackage();
       var pkgMismatch = false;
-      if (selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.indexOf(selectedPkg.id) === -1) {
+      if (selectedPkg && _refLinkedPackages.length > 0 && _refLinkedPackages.map(Number).indexOf(Number(selectedPkg.id)) === -1) {
         pkgMismatch = true;
       }
       
@@ -5766,7 +5791,13 @@ async function checkRefCode() {
       // Find gold card index in sorted array for initial centering
       const goldCardIdx = sortedSsrPkgs.findIndex((p: any) => (p.crown_tier || (p.is_popular ? 'gold' : '')) === 'gold');
       const initIdx = goldCardIdx >= 0 ? goldCardIdx : 0;
-      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';</scr' + 'ipt>';
+      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';'
+        + '(function(){var idx=' + initIdx + ';if(idx>0&&window.innerWidth<=768){'
+        + 'var g=document.querySelector(".calc-packages-grid");if(g){'
+        + 'g.style.scrollSnapType="none";g.style.scrollBehavior="auto";'
+        + 'requestAnimationFrame(function(){var c=g.children[idx];if(c){g.scrollLeft=Math.max(0,c.offsetLeft-(g.offsetWidth-c.offsetWidth)/2)}'
+        + 'requestAnimationFrame(function(){g.style.scrollSnapType="x mandatory";g.classList.add("smooth-scroll")})})'
+        + '}}})()</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
         '<div class="calc-packages" id="calcPackages">' + pkgHtml + '</div>'

@@ -359,8 +359,7 @@ app.post('/api/referral/check', async (c) => {
       }
     }
     
-    // Increment uses count
-    await db.prepare('UPDATE referral_codes SET uses_count = uses_count + 1 WHERE id = ?').bind(row.id).run();
+    // Don't increment uses_count here — it's incremented only when a lead is actually created (PDF generation)
     
     // Get free services for this referral code
     let freeServices: any[] = [];
