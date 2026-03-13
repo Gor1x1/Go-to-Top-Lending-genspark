@@ -2470,6 +2470,10 @@ async function toggleScript(id, active) {
 }
 
 // ===== REFERRAL CODES =====
+// In-memory state for services being added during creation
+var _newRefServices = [];
+var _newRefLinkedSvcs = [];
+
 function renderReferrals() {
   // Get all calculator packages for checkboxes
   var allCalcPackages = (data.calcPackages || []).map(function(p) { return { id: p.id, name_ru: p.name_ru || '', name_am: p.name_am || '' }; });
@@ -2481,19 +2485,20 @@ function renderReferrals() {
     var tab = tabsById[svc.tab_id] || {};
     allCalcServices.push({ id: svc.id, name_ru: svc.name_ru, name_am: svc.name_am, price: svc.price, tab: tab.name_ru || '' });
   });
+  window._allCalcServices = allCalcServices;
   
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px">Реферальные коды</h1>' +
-    '<p style="color:#94a3b8;margin-bottom:24px">Промокоды со скидками, бесплатными услугами и отзывами. Можно привязать конкретные услуги из калькулятора.</p>';
+    '<p style="color:#94a3b8;margin-bottom:24px">Промокоды со скидками, бесплатными услугами и сложными правилами. Скидка — глобальная (%), услуги привязываются по одной.</p>';
   
   // ── Inline form for adding new referral code ──
   h += '<div class="card" style="margin-bottom:24px;border:2px dashed rgba(139,92,246,0.4);background:rgba(139,92,246,0.03);border-radius:16px;padding:24px">' +
     '<h3 style="font-weight:700;margin-bottom:16px;color:#a78bfa;font-size:1.05rem"><i class="fas fa-plus-circle" style="margin-right:8px"></i>Создать новый промокод</h3>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:4px;display:block">Кодовое слово</label><input class="input" id="new_ref_code" placeholder="PROMO2026" style="text-transform:uppercase"></div>' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:4px;display:block">Скидка (%)</label><input class="input" type="number" id="new_ref_disc" value="0" min="0" max="100"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:4px;display:block">Глобальная скидка (%)</label><input class="input" type="number" id="new_ref_disc" value="0" min="0" max="100"></div>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">' +
-      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:4px;display:block">Лимит использований (0 = ∞)</label><input class="input" type="number" id="new_ref_max" value="0" min="0" placeholder="0 = без лимита"></div>' +
+      '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:4px;display:block">Лимит использований (0 = без лимита)</label><input class="input" type="number" id="new_ref_max" value="0" min="0" placeholder="0 = без лимита"></div>' +
       '<div><label style="font-size:0.75rem;color:#64748b;font-weight:600;margin-bottom:4px;display:block">Описание</label><input class="input" id="new_ref_desc" placeholder="Блогер, партнёр, VIP..."></div>' +
     '</div>' +
     // Toggles
@@ -2511,17 +2516,44 @@ function renderReferrals() {
     }
     h += '</div></div>';
   }
-  // Service multi-select in creation form
+  // Service single-select dropdown for linked_services (discount scope)
   if (allCalcServices.length > 0) {
-    h += '<div style="margin-bottom:16px;padding:10px;background:rgba(139,92,246,0.05);border-radius:8px;border:1px solid rgba(139,92,246,0.15)">' +
-      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-list-check" style="margin-right:4px"></i>Привязка к услугам (пусто = скидка на все услуги)</div>' +
-      '<select class="input" id="new_ref_services" multiple size="4" style="font-size:0.78rem;min-height:80px">';
+    h += '<div style="margin-bottom:12px;padding:10px;background:rgba(139,92,246,0.05);border-radius:8px;border:1px solid rgba(139,92,246,0.15)">' +
+      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-list-check" style="margin-right:4px"></i>Скидка ограничена услугами (пусто = ко всем)</div>' +
+      '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
+        '<div style="flex:2;min-width:180px"><select class="input" id="new_ref_linked_svc" style="font-size:0.8rem"><option value="">— Выберите услугу —</option>';
     for (var nsi = 0; nsi < allCalcServices.length; nsi++) {
       var ns = allCalcServices[nsi];
       h += '<option value="' + ns.id + '">' + escHtml(ns.name_ru) + ' (' + escHtml(ns.tab) + ')</option>';
     }
-    h += '</select><div style="font-size:0.65rem;color:#475569;margin-top:4px">Зажмите Ctrl/Cmd чтобы выбрать несколько. Если ничего не выбрано — скидка применяется ко всем услугам.</div></div>';
+    h += '</select></div>' +
+      '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addNewRefLinkedService()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button></div>' +
+      '<div id="new_ref_linked_svcs_list" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">' + renderNewRefLinkedServicesTags() + '</div>' +
+      '<div style="font-size:0.62rem;color:#475569;margin-top:4px">Если список пуст — скидка применяется ко всем услугам.</div></div>';
   }
+  // ── Services to include with the code (free/discounted, one at a time) ──
+  h += '<div style="margin-bottom:16px;padding:12px;background:rgba(16,185,129,0.04);border-radius:8px;border:1px solid rgba(16,185,129,0.15)">' +
+    '<div style="font-size:0.72rem;color:#10B981;font-weight:600;margin-bottom:8px"><i class="fas fa-gift" style="margin-right:4px"></i>Привязанные услуги (бесплатные / со скидкой)</div>' +
+    '<div id="new_ref_services_list">' + renderNewRefServicesTags() + '</div>';
+  if (allCalcServices.length > 0) {
+    h += '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-top:8px">' +
+      '<div style="flex:2;min-width:180px"><label style="font-size:0.68rem;color:#64748b;margin-bottom:3px;display:block">Услуга</label>' +
+        '<select class="input" id="new_ref_add_svc" style="font-size:0.8rem"><option value="">— Выберите услугу —</option>';
+    for (var nai = 0; nai < allCalcServices.length; nai++) {
+      var na = allCalcServices[nai];
+      h += '<option value="' + na.id + '">' + escHtml(na.name_ru) + ' (' + escHtml(na.tab) + ') — ' + Number(na.price).toLocaleString('ru-RU') + ' \u058f</option>';
+    }
+    h += '</select></div>' +
+      '<div style="flex:0.5;min-width:60px"><label style="font-size:0.68rem;color:#64748b;margin-bottom:3px;display:block">Скидка %</label><input class="input" type="number" id="new_ref_add_disc" value="100" min="0" max="100" style="font-size:0.8rem"></div>' +
+      '<div style="flex:0.5;min-width:50px"><label style="font-size:0.68rem;color:#64748b;margin-bottom:3px;display:block">Кол-во</label><input class="input" type="number" id="new_ref_add_qty" value="1" min="1" max="999" style="font-size:0.8rem"></div>' +
+      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addNewRefService()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button></div>' +
+      '<div style="font-size:0.62rem;color:#475569;margin-top:4px">100% = бесплатно. Добавляйте по одной услуге.</div>';
+  }
+  h += '</div>';
+  // Complex rules explanation
+  h += '<div style="margin-bottom:16px;padding:10px;background:rgba(59,130,246,0.05);border-radius:8px;border:1px solid rgba(59,130,246,0.15)">' +
+    '<div style="font-size:0.72rem;color:#3B82F6;font-weight:600;margin-bottom:4px"><i class="fas fa-info-circle" style="margin-right:4px"></i>Как работают сложные правила</div>' +
+    '<div style="font-size:0.72rem;color:#94a3b8;line-height:1.5">Пример: лимит 10, услуга \u00abВыкуп\u00bb \u00d75 шт, скидка 100%.<br>Итого: 10 \u00d7 5 = <strong style="color:#10B981">50 бесплатных выкупов</strong>.<br>Глобальная скидка (%) \u2014 на все или выбранные услуги.</div></div>';
   h += '<button class="btn btn-primary" style="width:100%;padding:12px;font-size:0.95rem" onclick="addReferral()"><i class="fas fa-plus" style="margin-right:8px"></i>Создать промокод</button>' +
   '</div>';
   
@@ -2566,6 +2598,11 @@ function renderReferrals() {
       if (!seenSvcIds[rsKey]) { seenSvcIds[rsKey] = true; uniqueRefServices.push(refServices[rsi]); }
     }
 
+    // Calculate total items provided by this code
+    var totalItemsPerUse = 0;
+    for (var ti = 0; ti < uniqueRefServices.length; ti++) { totalItemsPerUse += Number(uniqueRefServices[ti].quantity || 1); }
+    var totalItemsLifetime = maxUses > 0 ? totalItemsPerUse * maxUses : 0;
+
     h += '<div class="card" style="margin-bottom:16px;border-radius:16px;border:1px solid ' + (ref.is_active ? 'rgba(16,185,129,0.3)' : 'rgba(239,68,68,0.25)') + ';overflow:hidden">';
     
     // Card header
@@ -2593,6 +2630,10 @@ function renderReferrals() {
     // Usage progress bar
     if (maxUses > 0) {
       h += '<div style="padding:0 20px"><div style="margin:8px 0;background:#1e293b;border-radius:4px;overflow:hidden;height:5px"><div style="height:100%;background:' + usageColor + ';width:' + usagePct + '%;transition:width 0.3s"></div></div></div>';
+    }
+    // Complex rule summary
+    if (totalItemsLifetime > 0) {
+      h += '<div style="padding:8px 20px;background:rgba(59,130,246,0.04);border-top:1px solid #1e293b"><div style="font-size:0.75rem;color:#3B82F6"><i class="fas fa-calculator" style="margin-right:4px"></i>' + maxUses + ' \u0430\u043a\u0442\u0438\u0432\u0430\u0446\u0438\u0439 \u00d7 ' + totalItemsPerUse + ' \u0448\u0442/\u0430\u043a\u0442\u0438\u0432\u0430\u0446\u0438\u044e = <strong>' + totalItemsLifetime + ' \u0448\u0442 \u0432\u0441\u0435\u0433\u043e</strong></div></div>';
     }
     
     // Attached services (non-editable summary)
@@ -2637,19 +2678,18 @@ function renderReferrals() {
 
     // ── Collapsible EDIT form ──
     h += '<div id="ref-edit-' + ref.id + '" style="display:none;padding:16px 20px;border-top:2px solid rgba(139,92,246,0.3);background:rgba(139,92,246,0.02)">';
-    h += '<h4 style="font-size:0.88rem;font-weight:700;color:#a78bfa;margin-bottom:12px"><i class="fas fa-pen" style="margin-right:6px"></i>Редактировать «' + escHtml(ref.code) + '»</h4>';
-    // Edit fields
+    h += '<h4 style="font-size:0.88rem;font-weight:700;color:#a78bfa;margin-bottom:12px"><i class="fas fa-pen" style="margin-right:6px"></i>\u0420\u0435\u0434\u0430\u043a\u0442\u0438\u0440\u043e\u0432\u0430\u0442\u044c \u00ab' + escHtml(ref.code) + '\u00bb</h4>';
     h += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
-      '<div><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">Код</label><input class="input" value="' + escHtml(ref.code) + '" id="ref_code_' + ref.id + '"></div>' +
-      '<div><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">Скидка (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
-      '<div><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">Лимит (0=∞)</label><input class="input" type="number" value="' + (ref.max_uses || 0) + '" id="ref_max_' + ref.id + '" min="0"></div>' +
+      '<div><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">\u041a\u043e\u0434</label><input class="input" value="' + escHtml(ref.code) + '" id="ref_code_' + ref.id + '"></div>' +
+      '<div><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">\u0413\u043b\u043e\u0431\u0430\u043b\u044c\u043d\u0430\u044f \u0441\u043a\u0438\u0434\u043a\u0430 (%)</label><input class="input" type="number" value="' + (ref.discount_percent || 0) + '" id="ref_disc_' + ref.id + '" min="0" max="100"></div>' +
+      '<div><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">\u041b\u0438\u043c\u0438\u0442 (0=\u221e)</label><input class="input" type="number" value="' + (ref.max_uses || 0) + '" id="ref_max_' + ref.id + '" min="0"></div>' +
     '</div>' +
-    '<div style="margin-bottom:12px"><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">Описание</label><input class="input" value="' + escHtml(ref.description) + '" id="ref_desc_' + ref.id + '" placeholder="Комментарий..."></div>' +
-    '<div style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ref_apply_pkg_' + ref.id + '" ' + (ref.apply_to_packages ? 'checked' : '') + '> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>Применить к пакетам</span></label></div>';
+    '<div style="margin-bottom:12px"><label style="font-size:0.72rem;color:#64748b;font-weight:600;display:block;margin-bottom:3px">\u041e\u043f\u0438\u0441\u0430\u043d\u0438\u0435</label><input class="input" value="' + escHtml(ref.description || '') + '" id="ref_desc_' + ref.id + '" placeholder="\u041a\u043e\u043c\u043c\u0435\u043d\u0442\u0430\u0440\u0438\u0439..."></div>' +
+    '<div style="margin-bottom:12px"><label style="display:flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="ref_apply_pkg_' + ref.id + '" ' + (ref.apply_to_packages ? 'checked' : '') + '> <span style="font-size:0.82rem;color:#f59e0b"><i class="fas fa-box-open" style="margin-right:4px"></i>\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u043a \u043f\u0430\u043a\u0435\u0442\u0430\u043c</span></label></div>';
     // Package checkboxes for edit
     if (allCalcPackages.length > 0) {
       h += '<div style="margin-bottom:12px;padding:8px;background:rgba(245,158,11,0.05);border-radius:6px;border:1px solid rgba(245,158,11,0.1)">' +
-        '<div style="font-size:0.72rem;color:#f59e0b;font-weight:600;margin-bottom:6px"><i class="fas fa-box-open" style="margin-right:4px"></i>Привязка к пакетам</div><div style="display:flex;flex-wrap:wrap;gap:8px">';
+        '<div style="font-size:0.72rem;color:#f59e0b;font-weight:600;margin-bottom:6px"><i class="fas fa-box-open" style="margin-right:4px"></i>\u041f\u0440\u0438\u0432\u044f\u0437\u043a\u0430 \u043a \u043f\u0430\u043a\u0435\u0442\u0430\u043c</div><div style="display:flex;flex-wrap:wrap;gap:8px">';
       for (var epi = 0; epi < allCalcPackages.length; epi++) {
         var epk = allCalcPackages[epi];
         var epkChecked = refLinkedPkgs.indexOf(epk.id) !== -1 ? 'checked' : '';
@@ -2657,53 +2697,47 @@ function renderReferrals() {
       }
       h += '</div></div>';
     }
-    // Linked services edit
+    // Linked services edit — single-select dropdown
     h += '<div style="margin-bottom:12px;padding:8px;background:rgba(139,92,246,0.05);border-radius:6px;border:1px solid rgba(139,92,246,0.1)">' +
-      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-list-check" style="margin-right:4px"></i>Привязка к услугам (пусто = все)</div>' +
-      '<select class="input" id="ref_svcs_' + ref.id + '" multiple size="4" style="font-size:0.78rem;min-height:80px">';
+      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-list-check" style="margin-right:4px"></i>\u0421\u043a\u0438\u0434\u043a\u0430 \u043e\u0433\u0440\u0430\u043d\u0438\u0447\u0435\u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0430\u043c\u0438 (\u043f\u0443\u0441\u0442\u043e = \u0432\u0441\u0435)</div>' +
+      '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><div style="flex:2;min-width:180px"><select class="input" id="ref_linked_svc_' + ref.id + '" style="font-size:0.8rem"><option value="">\u2014 \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443 \u2014</option>';
     for (var esi = 0; esi < allCalcServices.length; esi++) {
-      var es = allCalcServices[esi];
-      var esSelected = refLinkedSvcs.indexOf(es.id) !== -1 ? 'selected' : '';
-      h += '<option value="' + es.id + '" ' + esSelected + '>' + escHtml(es.name_ru) + ' (' + escHtml(es.tab) + ')</option>';
+      h += '<option value="' + allCalcServices[esi].id + '">' + escHtml(allCalcServices[esi].name_ru) + ' (' + escHtml(allCalcServices[esi].tab) + ')</option>';
     }
-    h += '</select></div>';
-
-    // === Attached services management ===
+    h += '</select></div><button class="btn btn-outline" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addEditRefLinkedService(' + ref.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>' +
+      '<div id="ref_linked_svcs_list_' + ref.id + '" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">';
+    for (var lse = 0; lse < refLinkedSvcs.length; lse++) {
+      var lseId = refLinkedSvcs[lse]; var lseName = '';
+      for (var fse = 0; fse < allCalcServices.length; fse++) { if (allCalcServices[fse].id === lseId) { lseName = allCalcServices[fse].name_ru; break; } }
+      h += '<span style="font-size:0.75rem;padding:3px 8px;background:rgba(139,92,246,0.1);border-radius:5px;color:#a78bfa;border:1px solid rgba(139,92,246,0.2);display:flex;align-items:center;gap:4px">' + escHtml(lseName || 'ID#' + lseId) + '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:0 2px;font-size:0.7rem" onclick="removeEditRefLinkedService(' + ref.id + ',' + lseId + ')"><i class="fas fa-times"></i></button></span>';
+    }
+    h += '</div></div>';
+    // === Attached services management (one-by-one dropdown) ===
     h += '<div style="margin-bottom:12px;border-top:1px solid #334155;padding-top:12px">' +
-      '<div style="font-size:0.82rem;font-weight:700;color:#a78bfa;margin-bottom:8px"><i class="fas fa-gift" style="margin-right:6px"></i>Привязанные услуги (бесплатные / со скидкой)</div>';
-    
+      '<div style="font-size:0.82rem;font-weight:700;color:#10B981;margin-bottom:8px"><i class="fas fa-gift" style="margin-right:6px"></i>\u041f\u0440\u0438\u0432\u044f\u0437\u0430\u043d\u043d\u044b\u0435 \u0443\u0441\u043b\u0443\u0433\u0438 (\u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u044b\u0435 / \u0441\u043e \u0441\u043a\u0438\u0434\u043a\u043e\u0439)</div>';
     if (uniqueRefServices.length > 0) {
       h += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px">';
       for (var rsi3 = 0; rsi3 < uniqueRefServices.length; rsi3++) {
         var rs3 = uniqueRefServices[rsi3];
-        var rs3Label = rs3.discount_percent >= 100 || rs3.discount_percent === 0
-          ? '<span style="color:#10B981">Бесплатно</span>'
-          : '<span style="color:#fbbf24">-' + rs3.discount_percent + '%</span>';
-        h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#1a2236;border-radius:6px;font-size:0.8rem">' +
-          '<span><i class="fas fa-check-circle" style="color:#10B981;margin-right:6px"></i>' + escHtml(rs3.name_ru || 'Услуга #' + rs3.service_id) + ' <span style="color:#64748b">×' + (rs3.quantity || 1) + '</span></span>' +
-          '<div style="display:flex;align-items:center;gap:8px">' + rs3Label +
-          '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:2px 4px" onclick="removeRefService(' + ref.id + ',' + rs3.id + ')"><i class="fas fa-times"></i></button></div></div>';
+        var rs3Label = rs3.discount_percent >= 100 || rs3.discount_percent === 0 ? '<span style="color:#10B981">\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e</span>' : '<span style="color:#fbbf24">-' + rs3.discount_percent + '%</span>';
+        h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#1a2236;border-radius:6px;font-size:0.8rem"><span><i class="fas fa-check-circle" style="color:#10B981;margin-right:6px"></i>' + escHtml(rs3.name_ru || 'ID#' + rs3.service_id) + ' <span style="color:#64748b">\u00d7' + (rs3.quantity || 1) + '</span></span><div style="display:flex;align-items:center;gap:8px">' + rs3Label + '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:2px 4px" onclick="removeRefService(' + ref.id + ',' + rs3.id + ')"><i class="fas fa-times"></i></button></div></div>';
       }
       h += '</div>';
     }
-    
-    // Add service form
-    h += '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap">' +
-      '<div style="flex:2;min-width:180px"><select class="input" id="ref_addsvc_' + ref.id + '" multiple size="4" style="font-size:0.8rem;min-height:80px">';
+    // Add service — single select
+    h += '<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap"><div style="flex:2;min-width:180px"><label style="font-size:0.68rem;color:#64748b;margin-bottom:3px;display:block">\u0423\u0441\u043b\u0443\u0433\u0430</label><select class="input" id="ref_addsvc_' + ref.id + '" style="font-size:0.8rem"><option value="">\u2014 \u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443 \u2014</option>';
     for (var asi = 0; asi < allCalcServices.length; asi++) {
       var as2 = allCalcServices[asi];
-      h += '<option value="' + as2.id + '">' + escHtml(as2.name_ru) + ' (' + escHtml(as2.tab) + ') — ' + Number(as2.price).toLocaleString('ru-RU') + ' ֏</option>';
+      h += '<option value="' + as2.id + '">' + escHtml(as2.name_ru) + ' (' + escHtml(as2.tab) + ') \u2014 ' + Number(as2.price).toLocaleString('ru-RU') + ' \u058f</option>';
     }
     h += '</select></div>' +
-      '<div style="flex:0.5;min-width:60px"><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Скидка %</div><input class="input" type="number" id="ref_adddisc_' + ref.id + '" value="100" min="0" max="100" style="font-size:0.8rem"></div>' +
-      '<div style="flex:0.5;min-width:50px"><div style="font-size:0.68rem;color:#64748b;margin-bottom:3px">Кол-во</div><input class="input" type="number" id="ref_addqty_' + ref.id + '" value="1" min="1" max="99" style="font-size:0.8rem"></div>' +
-      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addRefService(' + ref.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
-    '</div>' +
-    '<div style="font-size:0.65rem;color:#475569;margin-top:4px">Скидка 100% = бесплатно. Ctrl/Cmd для множественного выбора.</div>';
+      '<div style="flex:0.5;min-width:60px"><label style="font-size:0.68rem;color:#64748b;margin-bottom:3px;display:block">\u0421\u043a\u0438\u0434\u043a\u0430 %</label><input class="input" type="number" id="ref_adddisc_' + ref.id + '" value="100" min="0" max="100" style="font-size:0.8rem"></div>' +
+      '<div style="flex:0.5;min-width:50px"><label style="font-size:0.68rem;color:#64748b;margin-bottom:3px;display:block">\u041a\u043e\u043b-\u0432\u043e</label><input class="input" type="number" id="ref_addqty_' + ref.id + '" value="1" min="1" max="999" style="font-size:0.8rem"></div>' +
+      '<button class="btn btn-primary" style="padding:6px 12px;font-size:0.78rem;white-space:nowrap" onclick="addRefService(' + ref.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>\u0414\u043e\u0431\u0430\u0432\u0438\u0442\u044c</button></div>' +
+    '<div style="font-size:0.62rem;color:#475569;margin-top:4px">100% = \u0431\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e. \u0414\u043e\u0431\u0430\u0432\u043b\u044f\u0439\u0442\u0435 \u043f\u043e \u043e\u0434\u043d\u043e\u0439.</div>';
     h += '</div>';
-
     // Save button
-    h += '<div style="margin-top:12px;text-align:right"><button class="btn btn-success" style="padding:10px 28px;font-size:0.88rem" onclick="saveReferral(' + ref.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить изменения</button></div>';
+    h += '<div style="margin-top:12px;text-align:right"><button class="btn btn-success" style="padding:10px 28px;font-size:0.88rem" onclick="saveReferral(' + ref.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>\u0421\u043e\u0445\u0440\u0430\u043d\u0438\u0442\u044c \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u0438\u044f</button></div>';
     h += '</div>'; // end edit form
     
     h += '</div>'; // end card
@@ -2711,6 +2745,100 @@ function renderReferrals() {
   
   h += '</div>';
   return h;
+}
+
+// ===== NEW REF: In-memory linked services tags =====
+function renderNewRefLinkedServicesTags() {
+  var h = '';
+  var svcs = window._allCalcServices || [];
+  for (var i = 0; i < _newRefLinkedSvcs.length; i++) {
+    var svcId = _newRefLinkedSvcs[i]; var svcName = '';
+    for (var j = 0; j < svcs.length; j++) { if (svcs[j].id === svcId) { svcName = svcs[j].name_ru; break; } }
+    h += '<span style="font-size:0.75rem;padding:3px 8px;background:rgba(139,92,246,0.1);border-radius:5px;color:#a78bfa;border:1px solid rgba(139,92,246,0.2);display:flex;align-items:center;gap:4px">' + escHtml(svcName || 'ID#' + svcId) + '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:0 2px;font-size:0.7rem" onclick="removeNewRefLinkedService(' + svcId + ')"><i class="fas fa-times"></i></button></span>';
+  }
+  return h;
+}
+function addNewRefLinkedService() {
+  var sel = document.getElementById('new_ref_linked_svc');
+  var svcId = parseInt(sel.value);
+  if (!svcId) { toast('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443', 'error'); return; }
+  if (_newRefLinkedSvcs.indexOf(svcId) !== -1) { toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0443\u0436\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430', 'error'); return; }
+  _newRefLinkedSvcs.push(svcId); sel.value = '';
+  var container = document.getElementById('new_ref_linked_svcs_list');
+  if (container) container.innerHTML = renderNewRefLinkedServicesTags();
+}
+function removeNewRefLinkedService(svcId) {
+  _newRefLinkedSvcs = _newRefLinkedSvcs.filter(function(id) { return id !== svcId; });
+  var container = document.getElementById('new_ref_linked_svcs_list');
+  if (container) container.innerHTML = renderNewRefLinkedServicesTags();
+}
+
+// ===== NEW REF: In-memory attached services (free/discounted) =====
+function renderNewRefServicesTags() {
+  var h = '';
+  var svcs = window._allCalcServices || [];
+  if (_newRefServices.length === 0) return '<div style="font-size:0.72rem;color:#64748b;padding:4px 0">\u041f\u043e\u043a\u0430 \u043d\u0435\u0442 \u043f\u0440\u0438\u0432\u044f\u0437\u0430\u043d\u043d\u044b\u0445 \u0443\u0441\u043b\u0443\u0433.</div>';
+  h += '<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:6px">';
+  for (var i = 0; i < _newRefServices.length; i++) {
+    var svc = _newRefServices[i]; var svcName = '';
+    for (var j = 0; j < svcs.length; j++) { if (svcs[j].id === svc.service_id) { svcName = svcs[j].name_ru; break; } }
+    var label = svc.discount_percent >= 100 || svc.discount_percent === 0 ? '<span style="color:#10B981">\u0411\u0435\u0441\u043f\u043b\u0430\u0442\u043d\u043e</span>' : '<span style="color:#fbbf24">-' + svc.discount_percent + '%</span>';
+    h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:6px 10px;background:#1a2236;border-radius:6px;font-size:0.8rem"><span><i class="fas fa-check-circle" style="color:#10B981;margin-right:6px"></i>' + escHtml(svcName || 'ID#' + svc.service_id) + ' <span style="color:#64748b">\u00d7' + svc.quantity + '</span></span><div style="display:flex;align-items:center;gap:8px">' + label + '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:2px 4px" onclick="removeNewRefService(' + i + ')"><i class="fas fa-times"></i></button></div></div>';
+  }
+  h += '</div>';
+  return h;
+}
+function addNewRefService() {
+  var sel = document.getElementById('new_ref_add_svc');
+  var svcId = parseInt(sel.value);
+  if (!svcId) { toast('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443', 'error'); return; }
+  var disc = parseInt(document.getElementById('new_ref_add_disc').value) || 100;
+  var qty = parseInt(document.getElementById('new_ref_add_qty').value) || 1;
+  for (var i = 0; i < _newRefServices.length; i++) {
+    if (_newRefServices[i].service_id === svcId) { toast('\u042d\u0442\u0430 \u0443\u0441\u043b\u0443\u0433\u0430 \u0443\u0436\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430', 'error'); return; }
+  }
+  _newRefServices.push({ service_id: svcId, discount_percent: disc, quantity: qty }); sel.value = '';
+  var container = document.getElementById('new_ref_services_list');
+  if (container) container.innerHTML = renderNewRefServicesTags();
+  toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430 \u0432 \u0441\u043f\u0438\u0441\u043e\u043a');
+}
+function removeNewRefService(idx) {
+  _newRefServices.splice(idx, 1);
+  var container = document.getElementById('new_ref_services_list');
+  if (container) container.innerHTML = renderNewRefServicesTags();
+}
+
+// ===== EDIT: Linked services management (discount scope) =====
+function addEditRefLinkedService(refId) {
+  var sel = document.getElementById('ref_linked_svc_' + refId);
+  var svcId = parseInt(sel.value);
+  if (!svcId) { toast('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443', 'error'); return; }
+  var ref = data.referrals.find(function(r) { return r.id === refId; });
+  if (!ref) return;
+  var linked = []; try { linked = JSON.parse(ref.linked_services || '[]'); } catch(e) { linked = []; }
+  if (linked.indexOf(svcId) !== -1) { toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0443\u0436\u0435 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430', 'error'); return; }
+  linked.push(svcId); ref.linked_services = JSON.stringify(linked); sel.value = '';
+  _rerenderLinkedSvcsTags(refId, linked);
+}
+function removeEditRefLinkedService(refId, svcId) {
+  var ref = data.referrals.find(function(r) { return r.id === refId; });
+  if (!ref) return;
+  var linked = []; try { linked = JSON.parse(ref.linked_services || '[]'); } catch(e) { linked = []; }
+  linked = linked.filter(function(id) { return id !== svcId; });
+  ref.linked_services = JSON.stringify(linked);
+  _rerenderLinkedSvcsTags(refId, linked);
+}
+function _rerenderLinkedSvcsTags(refId, linked) {
+  var svcs = window._allCalcServices || [];
+  var container = document.getElementById('ref_linked_svcs_list_' + refId);
+  if (!container) return;
+  var h = '';
+  for (var i = 0; i < linked.length; i++) {
+    var id = linked[i]; var name = '';
+    for (var j = 0; j < svcs.length; j++) { if (svcs[j].id === id) { name = svcs[j].name_ru; break; } }
+    h += '<span style="font-size:0.75rem;padding:3px 8px;background:rgba(139,92,246,0.1);border-radius:5px;color:#a78bfa;border:1px solid rgba(139,92,246,0.2);display:flex;align-items:center;gap:4px">' + escHtml(name || 'ID#' + id) + '<button style="background:none;border:none;color:#EF4444;cursor:pointer;padding:0 2px;font-size:0.7rem" onclick="removeEditRefLinkedService(' + refId + ',' + id + ')"><i class="fas fa-times"></i></button></span>';
+  }
+  container.innerHTML = h;
 }
 
 function toggleRefEditForm(refId) {
@@ -2727,33 +2855,37 @@ async function addReferral() {
   var codeEl = document.getElementById('new_ref_code');
   var descEl = document.getElementById('new_ref_desc');
   var discEl = document.getElementById('new_ref_disc');
-
   var maxEl = document.getElementById('new_ref_max');
   var code = (codeEl?.value || '').trim();
-  if (!code) { toast('Введите кодовое слово', 'error'); codeEl?.focus(); return; }
+  if (!code) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043a\u043e\u0434\u043e\u0432\u043e\u0435 \u0441\u043b\u043e\u0432\u043e', 'error'); codeEl?.focus(); return; }
   var desc = (descEl?.value || '').trim();
   var disc = parseInt(discEl?.value || '0') || 0;
-
   var maxUses = parseInt(maxEl?.value || '0') || 0;
   var applyPkgEl = document.getElementById('new_ref_apply_pkg');
   var applyPkg = applyPkgEl ? applyPkgEl.checked : false;
-  // Collect linked packages from checkboxes
   var linkedPkgs = [];
   document.querySelectorAll('.new_ref_pkg_cb:checked').forEach(function(cb) { linkedPkgs.push(parseInt(cb.value)); });
-  // Collect linked services from multi-select
-  var linkedSvcs = [];
-  var svcSelect = document.getElementById('new_ref_services');
-  if (svcSelect) { for (var so = 0; so < svcSelect.selectedOptions.length; so++) { linkedSvcs.push(parseInt(svcSelect.selectedOptions[so].value)); } }
-  // Active toggle
+  var linkedSvcs = _newRefLinkedSvcs.slice();
   var activeEl = document.getElementById('new_ref_active');
   var isActive = activeEl ? (activeEl.checked ? 1 : 0) : 1;
   await api('/referrals', { method: 'POST', body: JSON.stringify({ code, description: desc, discount_percent: disc, max_uses: maxUses, apply_to_packages: applyPkg ? 1 : 0, linked_packages: linkedPkgs, linked_services: linkedSvcs, is_active: isActive }) });
-  toast('Код "' + code.toUpperCase() + '" добавлен');
-  // Clear form fields
+  toast('\u041a\u043e\u0434 "' + code.toUpperCase() + '" \u0441\u043e\u0437\u0434\u0430\u043d');
+  // Attach services from in-memory list
+  if (_newRefServices.length > 0) {
+    await loadData();
+    var newRef = data.referrals.find(function(r) { return (r.code || '').toUpperCase() === code.toUpperCase(); });
+    if (newRef) {
+      for (var si = 0; si < _newRefServices.length; si++) {
+        var svc = _newRefServices[si];
+        await api('/referrals/' + newRef.id + '/services', { method: 'POST', body: JSON.stringify({ service_id: svc.service_id, discount_percent: svc.discount_percent, quantity: svc.quantity }) });
+      }
+      toast(_newRefServices.length + ' \u0443\u0441\u043b\u0443\u0433 \u043f\u0440\u0438\u0432\u044f\u0437\u0430\u043d\u043e');
+    }
+  }
+  _newRefServices = []; _newRefLinkedSvcs = [];
   if (codeEl) codeEl.value = '';
   if (descEl) descEl.value = '';
   if (discEl) discEl.value = '0';
-
   if (maxEl) maxEl.value = '0';
   await loadData(); await loadRefServices(); render();
 }
@@ -2773,24 +2905,14 @@ async function addRefService(refId) {
   var svcSelect = document.getElementById('ref_addsvc_' + refId);
   var discInput = document.getElementById('ref_adddisc_' + refId);
   var qtyInput = document.getElementById('ref_addqty_' + refId);
-  if (!svcSelect) { toast('Выберите услугу', 'error'); return; }
-  // Support multiple selection
-  var selectedOpts = svcSelect.selectedOptions || [];
-  var selectedIds = [];
-  for (var so = 0; so < selectedOpts.length; so++) {
-    if (selectedOpts[so].value) selectedIds.push(parseInt(selectedOpts[so].value));
-  }
-  if (selectedIds.length === 0) { toast('Выберите хотя бы одну услугу', 'error'); return; }
+  if (!svcSelect) { toast('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443', 'error'); return; }
+  var svcId = parseInt(svcSelect.value);
+  if (!svcId) { toast('\u0412\u044b\u0431\u0435\u0440\u0438\u0442\u0435 \u0443\u0441\u043b\u0443\u0433\u0443 \u0438\u0437 \u0441\u043f\u0438\u0441\u043a\u0430', 'error'); return; }
   var disc = parseInt(discInput.value) || 100;
   var qty = parseInt(qtyInput.value) || 1;
-  for (var si = 0; si < selectedIds.length; si++) {
-    await api('/referrals/' + refId + '/services', { method: 'POST', body: JSON.stringify({
-      service_id: selectedIds[si],
-      discount_percent: disc,
-      quantity: qty
-    }) });
-  }
-  toast(selectedIds.length > 1 ? selectedIds.length + ' услуг привязано к коду' : 'Услуга привязана к коду');
+  await api('/referrals/' + refId + '/services', { method: 'POST', body: JSON.stringify({ service_id: svcId, discount_percent: disc, quantity: qty }) });
+  toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u043f\u0440\u0438\u0432\u044f\u0437\u0430\u043d\u0430');
+  svcSelect.value = '';
   await loadRefServices(); render();
 }
 
@@ -2804,13 +2926,11 @@ async function saveReferral(id) {
   var ref = data.referrals.find(function(r) { return r.id === id; });
   if (!ref) return;
   var applyPkgEl = document.getElementById('ref_apply_pkg_' + id);
-  // Collect linked packages from checkboxes
   var linkedPkgs = [];
   document.querySelectorAll('.ref_pkg_cb_' + id + ':checked').forEach(function(cb) { linkedPkgs.push(parseInt(cb.value)); });
-  // Collect linked services from multi-select
+  // Linked services from in-memory (modified by add/remove buttons)
   var linkedSvcs = [];
-  var svcSelect = document.getElementById('ref_svcs_' + id);
-  if (svcSelect) { for (var so = 0; so < svcSelect.selectedOptions.length; so++) { linkedSvcs.push(parseInt(svcSelect.selectedOptions[so].value)); } }
+  try { linkedSvcs = JSON.parse(ref.linked_services || '[]'); } catch(e) { linkedSvcs = []; }
   await api('/referrals/' + id, { method: 'PUT', body: JSON.stringify({
     code: document.getElementById('ref_code_' + id).value,
     description: document.getElementById('ref_desc_' + id).value,
@@ -2821,8 +2941,8 @@ async function saveReferral(id) {
     linked_packages: linkedPkgs,
     linked_services: linkedSvcs
   }) });
-  toast('Код сохранён');
-  await loadData(); render();
+  toast('\u041a\u043e\u0434 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
+  await loadData(); await loadRefServices(); render();
 }
 
 async function toggleReferral(id, active) {

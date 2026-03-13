@@ -313,12 +313,12 @@ img{max-width:100%;height:auto}
 .nav-mobile-cta{display:none}
 /* Bottom Navigation Bar - mobile only */
 .bottom-nav{display:none;position:fixed;bottom:0;left:0;right:0;z-index:9999;background:rgba(15,10,26,0.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);padding:6px 8px;padding-bottom:max(6px,env(safe-area-inset-bottom))}
-.bottom-nav-items{display:flex;justify-content:space-around;align-items:center;gap:2px}
-.bottom-nav-item{display:flex;flex-direction:column;align-items:center;gap:2px;padding:4px 6px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.72rem;font-weight:500;transition:color 0.3s ease;flex:1;min-width:0;cursor:pointer;background:none;border:none}
+.bottom-nav-items{display:flex;justify-content:space-around;align-items:flex-end;gap:2px}
+.bottom-nav-item{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:2px;padding:4px 4px;border-radius:8px;text-decoration:none;color:var(--text-muted);font-size:0.72rem;font-weight:500;transition:color 0.3s ease;flex:1;min-width:0;cursor:pointer;background:none;border:none;height:52px}
 .bottom-nav-item.active{color:var(--purple)}
 .bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
-.bottom-nav-item i{font-size:1.1rem}
-.bottom-nav-item span{white-space:normal;overflow:visible;text-overflow:clip;max-width:100%;font-size:inherit;text-align:center;line-height:1.2;word-break:break-word}
+.bottom-nav-item i{font-size:1.1rem;width:24px;height:22px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bottom-nav-item span{white-space:normal;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:0.62rem;text-align:center;line-height:1.15;word-break:break-word;display:flex;align-items:flex-start;justify-content:center;flex:1;max-height:2.3em}
 .bottom-nav-more{position:relative}
 .bottom-nav-more.active{color:var(--purple)}
 .bottom-nav-more span{font-size:0.68rem}
@@ -1878,6 +1878,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </div>
 
 <script>
+// Force page to start from top on every load (prevent iOS scroll restoration)
+if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
+window.scrollTo(0, 0);
 /* ===== LANGUAGE ===== */
 let lang = localStorage.getItem('gtt_lang') || 'am';
 const AM = {
@@ -3222,20 +3225,6 @@ switchLang = function(l) {
         pkgsContainer.innerHTML = ph;
         pkgsContainer.style.display = '';
         console.log('[DB] Packages rendered:', db.packages.length);
-        // Scroll grid to gold card on mobile (only horizontal, not page scroll)
-        requestAnimationFrame(function() { setTimeout(function() {
-          if (window.innerWidth > 768) return;
-          var grid = pkgsContainer.querySelector('.calc-packages-grid');
-          if (!grid) return;
-          var goldCard = grid.querySelector('.pkg-crown-gold');
-          if (goldCard) {
-            var cardLeft = goldCard.offsetLeft;
-            var cardW = goldCard.offsetWidth;
-            var gridW = grid.offsetWidth;
-            grid.scrollLeft = cardLeft - (gridW - cardW) / 2;
-            console.log('[DB] Scrolled grid to gold card');
-          }
-        }, 50); });
       }
     }
     
@@ -5777,10 +5766,7 @@ async function checkRefCode() {
       // Find gold card index in sorted array for initial centering
       const goldCardIdx = sortedSsrPkgs.findIndex((p: any) => (p.crown_tier || (p.is_popular ? 'gold' : '')) === 'gold');
       const initIdx = goldCardIdx >= 0 ? goldCardIdx : 0;
-      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';';
-      // CSS scroll-snap handles swiping natively — scroll grid horizontally to gold card (no page jump)
-      pkgHtml += '(function(){if(window.innerWidth>768)return;var g=document.querySelector(".calc-packages-grid");if(!g)return;var gold=g.querySelector(".pkg-crown-gold");if(gold){var cl=gold.offsetLeft,cw=gold.offsetWidth,gw=g.offsetWidth;g.scrollLeft=cl-(gw-cw)/2}})();';
-      pkgHtml += '</scr' + 'ipt>';
+      pkgHtml += '<scr' + 'ipt>window._calcPackages=' + JSON.stringify(ssrPkgs) + ';</scr' + 'ipt>';
       pageHtml = pageHtml.replace(
         '<div class="calc-packages" id="calcPackages" style="display:none"></div>',
         '<div class="calc-packages" id="calcPackages">' + pkgHtml + '</div>'

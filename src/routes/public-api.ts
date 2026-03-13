@@ -372,7 +372,9 @@ app.post('/api/referral/check', async (c) => {
         name_ru: fs.name_ru || '',
         name_am: fs.name_am || '',
         price: fs.price || 0,
-        discount_percent: fs.discount_percent || 0
+        discount_percent: fs.discount_percent || 0,
+        quantity: fs.quantity || 1,
+        service_id: fs.service_id
       }));
     } catch {}
     
