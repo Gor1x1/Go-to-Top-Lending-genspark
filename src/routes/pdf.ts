@@ -58,9 +58,11 @@ app.post('/api/generate-pdf', async (c) => {
             service_id: fs.service_id,
             subtotal: 0
           }));
-          // When promo has free services, percentage discount is disabled (mutual exclusivity)
-          const hasFreeServices = freeServices.length > 0;
-          if (discountPercent > 0 && !hasFreeServices) {
+          // Percentage discount and free services can coexist:
+          // - Free services add bonus items (different service_ids)
+          // - % discount applies to linked_services (or all services if empty)
+          // - Package discount applies to linked_packages (or none if empty)
+          if (discountPercent > 0) {
             if (initLinkedServices.length > 0) {
               let linkedSubtotal = 0;
               for (const item of items) {
@@ -68,8 +70,10 @@ app.post('/api/generate-pdf', async (c) => {
                   linkedSubtotal += Number(item.subtotal || 0);
                 }
               }
+              // Only apply discount to linked services; if none match, apply to all services as fallback
               discountAmount = Math.round((linkedSubtotal > 0 ? linkedSubtotal : subtotal) * discountPercent / 100);
             } else {
+              // No linked_services filter → discount applies to all services
               discountAmount = Math.round(subtotal * discountPercent / 100);
             }
           }
@@ -81,9 +85,9 @@ app.post('/api/generate-pdf', async (c) => {
     // Package discount: ONLY when specific packages are checked in the promo code
     // linked_packages=[] (no packages selected) → NO discount on packages
     // linked_packages=[id1,id2] → discount only on those specific packages
+    // Free services do NOT block package discount — they are independent benefits
     let initPkgDiscount = 0;
-    const hasFreeServicesForPkg = freeServices.length > 0;
-    if (discountPercent > 0 && !hasFreeServicesForPkg && packageData && packagePrice > 0) {
+    if (discountPercent > 0 && packageData && packagePrice > 0) {
       const pkgId = packageData.package_id || packageData.id;
       if (pkgId && initLinkedPackages.length > 0 && initLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
         initPkgDiscount = Math.round(packagePrice * discountPercent / 100);
@@ -308,9 +312,10 @@ app.get('/pdf/:id', async (c) => {
     for (const ai of articleItems) { artSubtotal += Number(ai.subtotal || 0); }
     
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    // When promo has free services, percentage discount is disabled (mutual exclusivity)
-    const hasFreeOrBonusServices = refFreeServices.length > 0;
-    const calcDiscountPercent = hasFreeOrBonusServices ? 0 : (calcData.discountPercent || refDiscount || 0);
+    // Percentage discount and free services can coexist:
+    // - Free services provide bonus items (independent benefit)
+    // - % discount applies to linked_services (or all services if empty)
+    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
     // Calculate discount base: if linked_services specified, only those services; otherwise all services
     let discountBase = 0;
     if (calcDiscountPercent > 0) {
@@ -332,8 +337,9 @@ app.get('/pdf/:id', async (c) => {
     // Package discount: ONLY when specific packages are checked in the promo code
     // linked_packages=[] (empty) → NO discount on packages
     // linked_packages=[id1,id2] → discount only on those specific packages
+    // Free services do NOT block package discount — they are independent benefits
     let pkgDiscountAmount = 0;
-    if (calcDiscountPercent > 0 && !hasFreeOrBonusServices && pkgData && pkgPrice > 0) {
+    if (calcDiscountPercent > 0 && pkgData && pkgPrice > 0) {
       const pkgId = pkgData.package_id || pkgData.id;
       if (pkgId && refLinkedPackages.length > 0 && refLinkedPackages.map(Number).indexOf(Number(pkgId)) !== -1) {
         pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);

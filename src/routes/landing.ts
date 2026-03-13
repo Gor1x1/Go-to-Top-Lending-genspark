@@ -2741,7 +2741,6 @@ function recalcDynamic() {
   var discountAmount = 0;
   var packageDiscountAmount = 0;
   if (typeof _refDiscount !== 'undefined' && _refDiscount > 0) {
-    var isGlobalPromo = _refLinkedPackages.length === 0 && _refLinkedServices.length === 0;
     // Discount on services: if linked_services is empty → all services; otherwise only linked ones
     var discountableServices = hasLinkedFilter ? linkedTotal : servicesTotal;
     if (discountableServices > 0) {
