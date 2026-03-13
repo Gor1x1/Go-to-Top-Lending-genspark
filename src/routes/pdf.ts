@@ -52,10 +52,9 @@ app.post('/api/generate-pdf', async (c) => {
             service_id: fs.service_id,
             subtotal: 0
           }));
-          // KEY LOGIC: If promo has free/bonus services → no global % discount
-          // Free services are the benefit, global discount does NOT stack
-          const hasFreeOrBonusServices = freeServices.length > 0;
-          if (discountPercent > 0 && !hasFreeOrBonusServices) {
+          // Discount and free services work INDEPENDENTLY
+          // Global % discount applies to services, free services add bonus items
+          if (discountPercent > 0) {
             // If linked_services is specified, only discount those services
             if (initLinkedServices.length > 0) {
               let linkedSubtotal = 0;
@@ -75,12 +74,11 @@ app.post('/api/generate-pdf', async (c) => {
     }
     
     // Package discount: 
-    // - Only if no free/bonus services (free services = the benefit, discount doesn't stack)
+    // Discount and free services work independently
     // - Global promo (no linked_packages, no linked_services) → always apply to package
     // - Linked promo → only if linked_packages contains the selected package
-    const hasFreeOrBonusSvc = freeServices.length > 0;
     let initPkgDiscount = 0;
-    if (discountPercent > 0 && !hasFreeOrBonusSvc && packageData && packagePrice > 0) {
+    if (discountPercent > 0 && packageData && packagePrice > 0) {
       const isGlobalPromo = initLinkedPackages.length === 0 && initLinkedServices.length === 0;
       const pkgId = packageData.package_id || packageData.id;
       if (isGlobalPromo) {
@@ -308,10 +306,9 @@ app.get('/pdf/:id', async (c) => {
     for (const ai of articleItems) { artSubtotal += Number(ai.subtotal || 0); }
     
     const subtotalFormatted = Number(subtotal).toLocaleString('ru-RU');
-    // KEY LOGIC: If promo has free/bonus services → no global % discount (they don't stack)
-    const hasFreeOrBonusSvc = refFreeServices.length > 0;
+    // Discount and free services work INDEPENDENTLY
     // Apply referral discount based on linked_services and linked_packages
-    const calcDiscountPercent = hasFreeOrBonusSvc ? 0 : (calcData.discountPercent || refDiscount || 0);
+    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
     const isGlobalRef = refLinkedPackages.length === 0 && refLinkedServices.length === 0;
     // Calculate discount base: if linked_services specified, only those services; otherwise all services
     let discountBase = 0;
@@ -336,11 +333,11 @@ app.get('/pdf/:id', async (c) => {
     }
     const calcDiscountAmount = calcDiscountPercent > 0 ? Math.round(Number(discountBase) * calcDiscountPercent / 100) : 0;
     // Package discount:
-    // - Only if no free/bonus services
+    // Discount and free services work independently
     // - Global promo (no linked_packages, no linked_services) → always apply to package
     // - Linked promo → only if linked_packages contains the selected package
     let pkgDiscountAmount = 0;
-    if (calcDiscountPercent > 0 && !hasFreeOrBonusSvc && pkgData && pkgPrice > 0) {
+    if (calcDiscountPercent > 0 && pkgData && pkgPrice > 0) {
       const pkgId = pkgData.package_id || pkgData.id;
       if (isGlobalRef) {
         pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
