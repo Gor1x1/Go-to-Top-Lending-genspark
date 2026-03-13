@@ -50,7 +50,8 @@ app.post('/api/generate-pdf', async (c) => {
                   linkedSubtotal += Number(item.subtotal || 0);
                 }
               }
-              discountAmount = Math.round(linkedSubtotal * discountPercent / 100);
+              // Fallback: if linked filtering found nothing, apply to all services
+              discountAmount = Math.round((linkedSubtotal > 0 ? linkedSubtotal : subtotal) * discountPercent / 100);
             } else {
               discountAmount = Math.round(subtotal * discountPercent / 100);
             }
@@ -307,8 +308,14 @@ app.get('/pdf/:id', async (c) => {
             discountBase += Number(si.subtotal || 0);
           }
         }
-      } else {
-        // No filter — discount applies to all services
+        // Fallback: if linked filtering found nothing (e.g., old data without service_id),
+        // apply discount to all services — the promo code has a discount, it must apply
+        if (discountBase === 0 && svcSubtotal > 0) {
+          discountBase = svcSubtotal;
+        }
+      }
+      // No linked_services filter OR global promo → discount applies to all services
+      if (discountBase === 0 && refLinkedServices.length === 0) {
         discountBase = svcSubtotal > 0 ? svcSubtotal : (calcData.servicesSubtotal || subtotal);
       }
     }
