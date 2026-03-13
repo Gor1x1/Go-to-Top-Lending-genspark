@@ -70,8 +70,8 @@ app.post('/api/generate-pdf', async (c) => {
                   linkedSubtotal += Number(item.subtotal || 0);
                 }
               }
-              // Only apply discount to linked services; if none match, apply to all services as fallback
-              discountAmount = Math.round((linkedSubtotal > 0 ? linkedSubtotal : subtotal) * discountPercent / 100);
+              // Only apply discount to linked services; if none match, discount is 0 (not applied)
+              discountAmount = Math.round(linkedSubtotal * discountPercent / 100);
             } else {
               // No linked_services filter → discount applies to all services
               discountAmount = Math.round(subtotal * discountPercent / 100);
@@ -255,15 +255,25 @@ app.get('/pdf/:id', async (c) => {
       try {
         const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
         if (refRow) {
-          refDiscount = Number(refRow.discount_percent) || 0;
+          // Check usage limit — same as in POST /api/generate-pdf
+          const maxUses = Number(refRow.max_uses) || 0;
+          const usesCount = Number(refRow.uses_count) || 0;
+          const limitExceeded = maxUses > 0 && usesCount > maxUses;
+          // Use saved discount from calc_data as primary source (calculated at generation time)
+          // Only fall back to live DB discount if calc_data doesn't have it AND limit is not exceeded
+          if (!limitExceeded) {
+            refDiscount = Number(refRow.discount_percent) || 0;
+          }
           try { refLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { refLinkedPackages = []; }
           try { refLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { refLinkedServices = []; }
           const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
-          for (const fs of (fsRes.results || [])) {
-            if ((fs.discount_percent as number) === 0 || (fs.discount_percent as number) >= 100) {
-              refFreeServices.push(fs);
-            } else {
-              refServiceDiscounts.push(fs);
+          if (!limitExceeded) {
+            for (const fs of (fsRes.results || [])) {
+              if ((fs.discount_percent as number) === 0 || (fs.discount_percent as number) >= 100) {
+                refFreeServices.push(fs);
+              } else {
+                refServiceDiscounts.push(fs);
+              }
             }
           }
         }
@@ -315,7 +325,10 @@ app.get('/pdf/:id', async (c) => {
     // Percentage discount and free services can coexist:
     // - Free services provide bonus items (independent benefit)
     // - % discount applies to linked_services (or all services if empty)
-    const calcDiscountPercent = calcData.discountPercent || refDiscount || 0;
+    // Use the discount that was calculated at lead generation time (calcData.discountPercent)
+    // This ensures expired/limit-reached codes show the discount they had when the lead was created
+    // Fall back to live DB discount (refDiscount) only if calcData doesn't have it
+    const calcDiscountPercent = calcData.discountPercent > 0 ? calcData.discountPercent : (refDiscount || 0);
     // Calculate discount base: if linked_services specified, only those services; otherwise all services
     let discountBase = 0;
     if (calcDiscountPercent > 0) {
@@ -325,7 +338,9 @@ app.get('/pdf/:id', async (c) => {
             discountBase += Number(si.subtotal || 0);
           }
         }
-        if (discountBase === 0 && svcSubtotal > 0) {
+        // Only fall back to full svcSubtotal when items have no service_ids (legacy leads)
+        // AND the lead was actually generated with a discount (calcData.discountAmount > 0)
+        if (discountBase === 0 && svcSubtotal > 0 && calcData.discountAmount > 0) {
           discountBase = svcSubtotal;
         }
       }
