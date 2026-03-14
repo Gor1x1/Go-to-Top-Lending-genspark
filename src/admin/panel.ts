@@ -3570,7 +3570,7 @@ function renderLeads() {
       if (freeSvcs.length > 0) h += '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>';
       var _invPrefix = (data.pdfTemplate && data.pdfTemplate.invoice_prefix) || 'INV';
       var _invNum = _invPrefix + '-' + String(l.id).padStart(4, '0');
-      h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-file-invoice" style="margin-right:3px"></i>' + _invNum + '</span>';
+      h += '<a href="/pdf/' + l.id + '" target="_blank" onclick="event.stopPropagation()" class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;text-decoration:none;cursor:pointer" title="\u041E\u0442\u043A\u0440\u044B\u0442\u044C PDF"><i class="fas fa-file-invoice" style="margin-right:3px"></i>' + _invNum + ' <i class="fas fa-external-link-alt" style="font-size:0.6rem;margin-left:3px;opacity:0.7"></i></a>';
       h += '</div>';
       // Right: age + actions
       h += '<div style="display:flex;align-items:center;gap:10px">';
@@ -3916,7 +3916,7 @@ function renderLeads() {
       h += '<div style="padding:14px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(16,185,129,0.03));border:1px solid rgba(34,197,94,0.2);border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">';
       h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
       h += '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>';
-      if (isCalc) h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>';
+      h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>\u041E\u0442\u043A\u0440\u044B\u0442\u044C PDF</a>';
       h += '</div>';
       h += '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button>';
       h += '</div>';
@@ -4419,12 +4419,7 @@ function showArticleModal(leadId, articleId) {
     }
   }
   h += (isEdit ? '</select></div>' : '') +
-      '<div><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Выкупщик</label><select class="input" id="art_buyer"><option value="">— Не назначен —</option>';
-  for (var bk = 0; bk < ensureArray(data.users).length; bk++) {
-    var ub = data.users[bk];
-    h += '<option value="' + ub.id + '"' + ((art && art.buyer_id==ub.id)?' selected':'') + '>' + escHtml(ub.display_name) + '</option>';
-  }
-  h += '</select></div></div>' +
+    '</div>' +
     '<div style="margin-bottom:12px"><label style="font-size:0.78rem;color:#94a3b8;display:block;margin-bottom:4px">Примечание</label><textarea class="input" id="art_notes" rows="2" placeholder="Особые пожелания клиента...">' + escHtml((art && art.notes) || '') + '</textarea></div>' +
     '<div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn btn-outline" onclick="this.closest(&apos;[style*=fixed]&apos;).remove()">Отмена</button><button type="submit" class="btn btn-primary"><i class="fas fa-check" style="margin-right:6px"></i>' + (isEdit ? 'Сохранить' : 'Добавить') + '</button></div>' +
     '</form></div></div>';
@@ -4451,7 +4446,7 @@ async function submitArticle(e, leadId, articleId) {
     quantity: parseInt(document.getElementById('art_quantity').value) || 1,
     price_per_unit: parseFloat(document.getElementById('art_price').value) || 0,
     status: document.getElementById('art_status') ? document.getElementById('art_status').value : 'pending',
-    buyer_id: document.getElementById('art_buyer').value ? Number(document.getElementById('art_buyer').value) : null,
+    buyer_id: null,
     notes: document.getElementById('art_notes').value.trim()
   };
   if (articleId) {

@@ -235,7 +235,7 @@ app.post('/api/generate-pdf', async (c) => {
 app.get('/pdf/:id', async (c) => {
   try {
     const db = c.env.DB;
-    await initDatabase(db);
+    // Skip heavy initDatabase for read-only PDF view — DB is already initialized by admin/API routes
     const id = c.req.param('id');
     const lead = await db.prepare('SELECT * FROM leads WHERE id = ?').bind(id).first();
     if (!lead) return c.text('PDF not found', 404);
@@ -268,37 +268,36 @@ app.get('/pdf/:id', async (c) => {
     let refServiceDiscounts: any[] = [];
     let refLinkedPackages: number[] = [];
     let refLinkedServices: number[] = [];
-    if (referralCode) {
-      try {
-        const refRow = await db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first();
-        if (refRow) {
-          // Check usage limit — same as in POST /api/generate-pdf
-          const maxUses = Number(refRow.max_uses) || 0;
-          const usesCount = Number(refRow.uses_count) || 0;
-          const limitExceeded = maxUses > 0 && usesCount > maxUses;
-          // Use saved discount from calc_data as primary source (calculated at generation time)
-          // Only fall back to live DB discount if calc_data doesn't have it AND limit is not exceeded
-          if (!limitExceeded) {
-            refDiscount = Number(refRow.discount_percent) || 0;
-          }
-          try { refLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { refLinkedPackages = []; }
-          try { refLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { refLinkedServices = []; }
-          const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
-          if (!limitExceeded) {
-            for (const fs of (fsRes.results || [])) {
-              if ((fs.discount_percent as number) === 0 || (fs.discount_percent as number) >= 100) {
-                refFreeServices.push(fs);
-              } else {
-                refServiceDiscounts.push(fs);
-              }
-            }
+    
+    // Run template + referral queries in parallel for speed
+    const [tplRow, refRow] = await Promise.all([
+      db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first(),
+      referralCode
+        ? db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first().catch(() => null)
+        : Promise.resolve(null)
+    ]);
+    let tpl: any = tplRow || {};
+    
+    if (refRow) {
+      const maxUses = Number(refRow.max_uses) || 0;
+      const usesCount = Number(refRow.uses_count) || 0;
+      const limitExceeded = maxUses > 0 && usesCount > maxUses;
+      if (!limitExceeded) {
+        refDiscount = Number(refRow.discount_percent) || 0;
+      }
+      try { refLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { refLinkedPackages = []; }
+      try { refLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { refLinkedServices = []; }
+      const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
+      if (!limitExceeded) {
+        for (const fs of (fsRes.results || [])) {
+          if ((fs.discount_percent as number) === 0 || (fs.discount_percent as number) >= 100) {
+            refFreeServices.push(fs);
+          } else {
+            refServiceDiscounts.push(fs);
           }
         }
-      } catch {}
+      }
     }
-    
-    let tpl: any = await db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first();
-    if (!tpl) tpl = {};
     
     const lSuffix = '_' + lang;
     const header = tpl['header' + lSuffix] || (isEn ? 'Commercial Proposal' : isAm ? '\u0531\u057c\u0587\u057f\u0580\u0561\u0575\u056b\u0576 \u0561\u057c\u0561\u057b\u0561\u0580\u056f' : '\u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u043e\u0435 \u043f\u0440\u0435\u0434\u043b\u043e\u0436\u0435\u043d\u0438\u0435');
@@ -381,23 +380,25 @@ app.get('/pdf/:id', async (c) => {
     const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + pkgPrice - pkgDiscountAmount;
     const beforeCommission = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
     
-    // Load payment method commission
+    // Load payment method + service names in parallel for speed
     let pmName = '';
     let pmNameAm = '';
     let pmNameEn = '';
     let pmCommissionPct = 0;
     let pmCommissionAmt = 0;
-    if (lead.payment_method_id) {
-      try {
-        const pmRow = await db.prepare('SELECT * FROM payment_methods WHERE id = ? AND is_active = 1').bind(lead.payment_method_id).first();
-        if (pmRow) {
-          pmName = (pmRow.name_ru as string) || '';
-          pmNameAm = (pmRow.name_am as string) || pmName;
-          pmNameEn = pmName; // fallback
-          pmCommissionPct = Number(pmRow.commission_pct) || 0;
-          pmCommissionAmt = pmCommissionPct > 0 ? Math.round(beforeCommission * pmCommissionPct / 100) : 0;
-        }
-      } catch {}
+    let svcNameMap: Record<string, { name_ru: string; name_am: string }> = {};
+    const [pmRow, allSvcs] = await Promise.all([
+      lead.payment_method_id
+        ? db.prepare('SELECT * FROM payment_methods WHERE id = ? AND is_active = 1').bind(lead.payment_method_id).first().catch(() => null)
+        : Promise.resolve(null),
+      db.prepare('SELECT name_ru, name_am FROM calculator_services').all().catch(() => ({ results: [] }))
+    ]);
+    if (pmRow) {
+      pmName = (pmRow.name_ru as string) || '';
+      pmNameAm = (pmRow.name_am as string) || pmName;
+      pmNameEn = pmName;
+      pmCommissionPct = Number(pmRow.commission_pct) || 0;
+      pmCommissionAmt = pmCommissionPct > 0 ? Math.round(beforeCommission * pmCommissionPct / 100) : 0;
     }
     const finalTotal = beforeCommission + pmCommissionAmt;
     const totalFormatted = finalTotal.toLocaleString('ru-RU');
@@ -406,10 +407,8 @@ app.get('/pdf/:id', async (c) => {
     let rowNum = 0;
     
     // Section header for services (if articles also exist)
-    // Load service name translations for fallback (when items were saved without name_am/name_ru)
-    let svcNameMap: Record<string, { name_ru: string; name_am: string }> = {};
+    // Service name translations for fallback (when items were saved without name_am/name_ru)
     try {
-      const allSvcs = await db.prepare('SELECT name_ru, name_am FROM calculator_services').all();
       for (const s of (allSvcs.results || [])) {
         if (s.name_ru) svcNameMap[String(s.name_ru)] = { name_ru: String(s.name_ru), name_am: String(s.name_am || s.name_ru) };
         if (s.name_am) svcNameMap[String(s.name_am)] = { name_ru: String(s.name_ru || s.name_am), name_am: String(s.name_am) };
@@ -569,7 +568,7 @@ app.get('/pdf/:id', async (c) => {
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
       + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
       + '<title>' + invoiceNum + ' | ' + companyName + '</title>'
-      + '<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css">'
+      + '<link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel=&apos;stylesheet&apos;"><noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css"></noscript>'
       + '<style>'
       + '*{margin:0;padding:0;box-sizing:border-box}'
       + 'body{font-family:Arial,Helvetica,sans-serif;color:#1f2937;background:#f9fafb}'
@@ -662,7 +661,7 @@ app.get('/pdf/:id', async (c) => {
       + '<scr' + 'ipt>function cleanAndPrint(){var pc=document.getElementById("pc");if(pc){var all=document.body.querySelectorAll("*");for(var i=all.length-1;i>=0;i--){var e=all[i];if(!pc.contains(e)&&e!==document.body&&e!==document.head&&e.tagName!=="HTML"&&e.tagName!=="SCRIPT"&&e.tagName!=="STYLE"&&e.tagName!=="LINK"&&e.tagName!=="META"){e.style.display="none"}}}window.print()}</scr' + 'ipt>'
       + '</body></html>';
 
-    return c.html(pdfHtml);
+    return c.html(pdfHtml, 200, { 'Cache-Control': 'public, max-age=60, s-maxage=120' });
   } catch (e: any) {
     return c.text('Error: ' + e.message, 500);
   }
