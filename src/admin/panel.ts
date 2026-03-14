@@ -3624,192 +3624,203 @@ function renderLeads() {
       h += '</div></div></div>';
       
       // ========== EXPANDABLE DETAIL AREA ==========
-      h += '<div id="lead-detail-' + l.id + '" style="display:none">';
-      
-      // --- 1. EDITABLE FIELDS: Name + Contact (phone) ---
-      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя клиента:</div>' +
-        '<input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..."></div>' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон:</div>' +
-        '<input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..."></div></div>';
+      h += '<div id="lead-detail-' + l.id + '" style="display:none;margin-top:12px;border-top:2px solid #334155;padding-top:16px">';
 
-      // --- 1b. PACKAGE INFO (beautiful card, from calculator) ---
-      if (pkgData) {
-        var pkgDiscountPct = (pkgOrigPrice > 0 && pkgOrigPrice > pkgPrice) ? Math.round((1 - pkgPrice / pkgOrigPrice) * 100) : 0;
-        // Check if promo gives package discount
-        var pkgPromoDisc = 0;
-        var pkgPromoPct = Number(calcData && calcData.discountPercent || 0);
-        if (pkgPromoPct > 0 && l.referral_code) {
-          var refForPkg = ensureArray(data.referrals).find(function(r) { return r.code && r.code.toUpperCase() === (l.referral_code||'').toUpperCase(); });
-          if (refForPkg) {
-            var linkedPkgs = [];
-            try { linkedPkgs = JSON.parse(refForPkg.linked_packages || '[]'); } catch(e) {}
-            if (linkedPkgs.length > 0 && linkedPkgs.map(Number).indexOf(Number(pkgId)) !== -1) {
-              pkgPromoDisc = Math.round(pkgPrice * pkgPromoPct / 100);
+      // ===== SECTION 1: CLIENT INFO =====
+      h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(99,102,241,0.04));border:1px solid rgba(139,92,246,0.2);border-radius:12px">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#8B5CF6,#6366F1);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-user" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#c4b5fd">Клиент</span></div>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя</label><input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..."></div>';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон</label><input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..."></div>';
+      h += '</div>';
+      // Row 2: TG + TZ
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Telegram группа</label><input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..."></div>';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента</label><input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..."></div>';
+      h += '</div>';
+      // Row 3: Product + Service (for non-calc leads)
+      if (l.product || l.service || !isCalc) {
+        h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">';
+        h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-box" style="margin-right:4px;color:#fb923c"></i>Товар (WB)</label><input class="input" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>';
+        h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-concierge-bell" style="margin-right:4px;color:#60a5fa"></i>Интересует</label><input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>';
+        h += '</div>';
+      } else {
+        h += '<input type="hidden" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '"><input type="hidden" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '">';
+      }
+      // Client comment
+      if (l.message) {
+        h += '<div style="margin-top:10px"><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-comment-alt" style="margin-right:4px;color:#c084fc"></i>Комментарий клиента</label>';
+        h += '<div style="font-size:0.85rem;color:#cbd5e1;padding:10px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.15);border-radius:8px;line-height:1.5;white-space:pre-wrap">' + escHtml(l.message) + '</div></div>';
+      }
+      // Notes
+      h += '<div style="margin-top:10px"><label style="font-size:0.72rem;font-weight:600;color:#fbbf24;display:block;margin-bottom:4px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка</label>';
+      h += '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea></div>';
+      // Info badges row: created_at, source, lang, PDF version
+      h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(139,92,246,0.15)">';
+      h += '<span style="font-size:0.7rem;color:#94a3b8;padding:3px 8px;background:rgba(100,116,139,0.1);border-radius:6px"><i class="fas fa-calendar" style="margin-right:4px"></i>Создан: ' + formatArmTime(l.created_at) + '</span>';
+      h += '<span style="font-size:0.7rem;color:#a78bfa;padding:3px 8px;background:rgba(139,92,246,0.1);border-radius:6px"><i class="fas fa-link" style="margin-right:4px"></i>Источник: ' + escHtml(l.source || 'form') + '</span>';
+      if (l.lang) h += '<span style="font-size:0.7rem;padding:3px 8px;border-radius:6px;background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.1);color:#fb923c' : 'rgba(59,130,246,0.1);color:#60a5fa') + '">' + (l.lang === 'am' ? '\uD83C\uDDE6\uD83C\uDDF2 AM' : '\uD83C\uDDF7\uD83C\uDDFA RU') + '</span>';
+      if (l.pdf_template_version) h += '<span style="font-size:0.7rem;color:#60a5fa;padding:3px 8px;background:rgba(59,130,246,0.1);border-radius:6px"><i class="fas fa-file-pdf" style="margin-right:4px"></i>PDF v' + escHtml(String(l.pdf_template_version)) + '</span>';
+      if (l.status_changed_at) h += '<span style="font-size:0.7rem;color:#94a3b8;padding:3px 8px;background:rgba(100,116,139,0.1);border-radius:6px"><i class="fas fa-clock" style="margin-right:4px"></i>Обновлён: ' + formatArmTime(l.status_changed_at) + '</span>';
+      if (l.completed_at) h += '<span style="font-size:0.7rem;color:#22C55E;padding:3px 8px;background:rgba(34,197,94,0.1);border-radius:6px"><i class="fas fa-check" style="margin-right:4px"></i>Завершён: ' + formatArmTime(l.completed_at) + '</span>';
+      h += '</div>';
+      h += '</div>'; // END section 1
+
+      // ===== SECTION 2: PACKAGE & PROMO =====
+      if (pkgData || freeSvcs.length > 0 || l.referral_code) {
+        h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(251,191,36,0.03));border:1px solid rgba(245,158,11,0.2);border-radius:12px">';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-cube" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#FBBF24">Пакет и промо</span></div>';
+        // Package card
+        if (pkgData) {
+          var pkgDiscountPct = (pkgOrigPrice > 0 && pkgOrigPrice > pkgPrice) ? Math.round((1 - pkgPrice / pkgOrigPrice) * 100) : 0;
+          var pkgPromoDisc = 0;
+          var pkgPromoPct = Number(calcData && calcData.discountPercent || 0);
+          if (pkgPromoPct > 0 && l.referral_code) {
+            var refForPkg = ensureArray(data.referrals).find(function(r) { return r.code && r.code.toUpperCase() === (l.referral_code||'').toUpperCase(); });
+            if (refForPkg) {
+              var linkedPkgs = [];
+              try { linkedPkgs = JSON.parse(refForPkg.linked_packages || '[]'); } catch(e) {}
+              if (linkedPkgs.length > 0 && linkedPkgs.map(Number).indexOf(Number(pkgId)) !== -1) {
+                pkgPromoDisc = Math.round(pkgPrice * pkgPromoPct / 100);
+              }
             }
           }
+          h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:rgba(0,0,0,0.15);border-radius:10px;margin-bottom:10px">';
+          h += '<div><div style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px">Выбранный пакет</div>';
+          h += '<div style="font-size:1.05rem;font-weight:800;color:#FBBF24">' + escHtml(pkgName) + '</div></div>';
+          h += '<div style="text-align:right">';
+          if (pkgOrigPrice > pkgPrice) h += '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + Number(pkgOrigPrice).toLocaleString('ru-RU') + ' \u058F</div>';
+          h += '<div style="font-size:1.2rem;font-weight:900;color:#FBBF24">' + Number(pkgPrice).toLocaleString('ru-RU') + ' \u058F</div>';
+          if (pkgDiscountPct > 0) h += '<span style="font-size:0.65rem;color:#34D399;font-weight:700;background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px">-' + pkgDiscountPct + '%</span> ';
+          if (pkgPromoDisc > 0) h += '<span style="font-size:0.65rem;color:#A78BFA;font-weight:700;background:rgba(139,92,246,0.15);padding:1px 6px;border-radius:4px">-' + Number(pkgPromoDisc).toLocaleString('ru-RU') + ' \u058F</span>';
+          h += '</div></div>';
+          if (pkgData.items && pkgData.items.length > 0) {
+            h += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
+            for (var pki = 0; pki < pkgData.items.length; pki++) {
+              var pkgItem = pkgData.items[pki];
+              h += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.18);padding:3px 10px;border-radius:20px;font-size:0.7rem;color:#D97706"><i class="fas fa-check-circle" style="color:#10B981;font-size:0.6rem"></i>' + escHtml(pkgItem.service_name_ru || pkgItem.service_name_am || '') + ' \u00D7' + (pkgItem.quantity || 1) + '</span>';
+            }
+            h += '</div>';
+          }
         }
-        h += '<div style="margin-top:12px;padding:14px 16px;background:linear-gradient(135deg,rgba(245,158,11,0.08) 0%,rgba(251,191,36,0.04) 50%,rgba(245,158,11,0.06) 100%);border:1px solid rgba(245,158,11,0.25);border-radius:12px;position:relative;overflow:hidden">' +
-          '<div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;background:radial-gradient(circle,rgba(245,158,11,0.08),transparent);border-radius:50%"></div>' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
-          '<div style="width:32px;height:32px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-cube" style="color:#fff;font-size:0.85rem"></i></div>' +
-          '<div style="flex:1"><div style="font-size:0.72rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Выбранный пакет</div>' +
-          '<div style="font-size:1.05rem;font-weight:800;color:#FBBF24;line-height:1.2">' + escHtml(pkgName) + '</div></div>' +
-          '<div style="text-align:right;flex-shrink:0">' +
-          (pkgOrigPrice > pkgPrice ? '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through;line-height:1">' + Number(pkgOrigPrice).toLocaleString('ru-RU') + ' ֏</div>' : '') +
-          '<div style="font-size:1.2rem;font-weight:900;color:#FBBF24;line-height:1.2">' + Number(pkgPrice).toLocaleString('ru-RU') + ' ֏</div>' +
-          (pkgDiscountPct > 0 ? '<div style="display:inline-block;margin-top:2px;padding:1px 6px;background:rgba(16,185,129,0.15);border-radius:4px;font-size:0.65rem;color:#34D399;font-weight:700">-' + pkgDiscountPct + '% скидка</div>' : '') +
-          (pkgPromoDisc > 0 ? '<div style="display:inline-block;margin-top:2px;padding:1px 6px;background:rgba(139,92,246,0.15);border-radius:4px;font-size:0.65rem;color:#A78BFA;font-weight:700">промо -' + pkgPromoPct + '% = -' + Number(pkgPromoDisc).toLocaleString('ru-RU') + ' ֏</div>' : '') +
-          '</div></div>';
-        // Show package items if available
-        if (pkgData.items && pkgData.items.length > 0) {
-          h += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px">';
-          for (var pki = 0; pki < pkgData.items.length; pki++) {
-            var pkgItem = pkgData.items[pki];
-            h += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.18);padding:3px 10px;border-radius:20px;font-size:0.7rem;color:#D97706"><i class="fas fa-check-circle" style="color:#10B981;font-size:0.6rem"></i>' + escHtml(pkgItem.service_name_ru || pkgItem.service_name_am || '') + ' <span style="color:#94a3b8">&times;' + (pkgItem.quantity || 1) + '</span></span>';
+        // Free services
+        if (freeSvcs.length > 0) {
+          h += '<div style="padding:10px 12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:8px;margin-bottom:10px">';
+          h += '<div style="font-size:0.75rem;font-weight:700;color:#34D399;margin-bottom:6px"><i class="fas fa-gift" style="margin-right:4px"></i>Бесплатные услуги по промокоду</div>';
+          h += '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+          for (var fsi = 0; fsi < freeSvcs.length; fsi++) {
+            var ffs = freeSvcs[fsi];
+            h += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.18);padding:3px 10px;border-radius:20px;font-size:0.7rem;color:#34D399"><i class="fas fa-gift" style="font-size:0.6rem"></i>' + escHtml(ffs.name || ffs.name_ru || ffs.name_am || '') + ' \u00D7' + (ffs.qty || 1) + '</span>';
+          }
+          h += '</div></div>';
+        }
+        // Referral code
+        var leadRefCode = l.referral_code || '';
+        h += '<div>';
+        h += '<label style="font-size:0.72rem;font-weight:600;color:#10B981;display:block;margin-bottom:4px"><i class="fas fa-tag" style="margin-right:4px"></i>Реферальный код</label>';
+        h += '<div style="display:flex;gap:8px;align-items:center">';
+        h += '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="Введите промокод...">';
+        h += '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Применить</button>';
+        if (leadRefCode) h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="removeLeadRefCode(' + l.id + ')"><i class="fas fa-times" style="margin-right:4px"></i>Отменить</button>';
+        h += '</div>';
+        if (leadRefCode) {
+          var refDiscPct = Number(calcData && calcData.discountPercent || 0);
+          if (refDiscPct === 0 && data.referrals) {
+            var refMatch2 = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === leadRefCode.toUpperCase(); });
+            if (refMatch2) refDiscPct = Number(refMatch2.discount_percent || 0);
+          }
+          var refSvcBase = svcAmt || Number(calcData && calcData.servicesSubtotal || 0);
+          var refDiscAmt = refDiscPct > 0 ? Math.round(refSvcBase * refDiscPct / 100) : 0;
+          var svcAfterDisc = refSvcBase - refDiscAmt;
+          h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:8px;padding:10px 12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:8px;font-size:0.78rem;color:#6ee7b7">';
+          h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span><i class="fas fa-check-circle" style="margin-right:4px"></i>Код \u00AB' + escHtml(leadRefCode) + '\u00BB применён</span>';
+          h += (refDiscPct > 0 ? '<span class="badge badge-green" style="font-size:0.72rem">-' + refDiscPct + '%</span>' : '') + '</div>';
+          if (refDiscAmt > 0) {
+            h += '<div style="margin-top:4px;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:0.72rem;line-height:1.6">';
+            h += '<div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Подитог услуг:</span><span>' + Number(refSvcBase).toLocaleString('ru-RU') + ' \u058F</span></div>';
+            h += '<div style="display:flex;justify-content:space-between;color:#a78bfa"><span>Скидка ' + refDiscPct + '%:</span><span style="font-weight:700">-' + Number(refDiscAmt).toLocaleString('ru-RU') + ' \u058F</span></div>';
+            h += '<div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;margin-top:4px"><span>Со скидкой:</span><span style="color:#10B981">' + Number(svcAfterDisc).toLocaleString('ru-RU') + ' \u058F</span></div>';
+            h += '</div>';
           }
           h += '</div>';
+        } else {
+          h += '<div id="lead-refcode-info-' + l.id + '"></div>';
         }
+        h += '</div>'; // end referral
+        h += '</div>'; // END section 2
+      } else {
+        // No package/promo — still need referral code section
+        var leadRefCode = l.referral_code || '';
+        h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(16,185,129,0.03));border:1px solid rgba(16,185,129,0.2);border-radius:12px">';
+        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-tag" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#34D399">Промокод</span></div>';
+        h += '<div style="display:flex;gap:8px;align-items:center">';
+        h += '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="Введите промокод...">';
+        h += '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Применить</button>';
+        if (leadRefCode) h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="removeLeadRefCode(' + l.id + ')"><i class="fas fa-times" style="margin-right:4px"></i>Отменить</button>';
+        h += '</div>';
+        h += '<div id="lead-refcode-info-' + l.id + '"></div>';
         h += '</div>';
       }
 
-      // --- 1c. FREE SERVICES from promo code ---
-      if (freeSvcs.length > 0) {
-        h += '<div style="margin-top:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(52,211,153,0.03));border:1px solid rgba(16,185,129,0.2);border-radius:10px">' +
-          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
-          '<div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-gift" style="color:#fff;font-size:0.75rem"></i></div>' +
-          '<div style="font-size:0.78rem;font-weight:700;color:#34D399">Бесплатные услуги по промокоду</div></div>' +
-          '<div style="display:flex;flex-wrap:wrap;gap:5px">';
-        for (var fsi = 0; fsi < freeSvcs.length; fsi++) {
-          var ffs = freeSvcs[fsi];
-          h += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.18);padding:3px 10px;border-radius:20px;font-size:0.7rem;color:#34D399"><i class="fas fa-gift" style="font-size:0.6rem"></i>' + escHtml(ffs.name || ffs.name_ru || ffs.name_am || '') + ' <span style="color:#6EE7B7">&times;' + (ffs.qty || 1) + '</span></span>';
-        }
-        h += '</div></div>';
-      }
-
-      // --- 1d. PRODUCT, SERVICE & CLIENT COMMENT ---
-      if (l.product || l.service || !isCalc) {
-      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-box" style="margin-right:4px;color:#fb923c"></i>Товар (WB):</div>' +
-        '<input class="input" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-concierge-bell" style="margin-right:4px;color:#60a5fa"></i>Интересует:</div>' +
-        '<input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div></div>';
-      } else {
-        // Hidden inputs for calculator leads (keep DOM IDs intact for save function)
-        h += '<input type="hidden" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '"><input type="hidden" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '">';
-      }
-      if (l.message) {
-        h += '<div style="margin-top:10px">' +
-          '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-comment-alt" style="margin-right:4px;color:#c084fc"></i>Комментарий клиента:</div>' +
-          '<div style="font-size:0.85rem;color:#cbd5e1;padding:10px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.15);border-radius:8px;line-height:1.5;white-space:pre-wrap">' + escHtml(l.message) + '</div></div>';
-      }
-
-      // --- 2. TELEGRAM GROUP & TZ LINKS ---
-      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Telegram группа:</div>' +
-        '<input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..."></div>' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента:</div>' +
-        '<input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..."></div></div>';
-
-      // --- 2.5. REFUND AMOUNT ---
-      var refundVal = Number(l.refund_amount || 0);
-      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-undo-alt" style="margin-right:4px;color:#EF4444"></i>Возврат средств (֏):</div>' +
-        '<input class="input" type="number" min="0" step="1" id="lead-refund-' + l.id + '" value="' + refundVal + '" style="font-size:0.88rem;padding:8px;border-color:rgba(239,68,68,0.3)" placeholder="0"></div>' +
-        '<div style="display:flex;align-items:flex-end">' +
-        (refundVal > 0 ? '<div style="font-size:0.78rem;color:#f87171;font-weight:600;padding:8px"><i class="fas fa-exclamation-triangle" style="margin-right:4px"></i>Возврат: ' + Number(refundVal).toLocaleString('ru-RU') + ' ֏ (из суммы выкупов)</div>' : '<div style="font-size:0.78rem;color:#64748b;padding:8px">Сумма вычитается из стоимости выкупов</div>') +
-        '</div></div>';
-
-      // --- 2.7. PAYMENT METHOD (commission) ---
+      // ===== SECTION 3: FINANCES =====
+      h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(99,102,241,0.03));border:1px solid rgba(59,130,246,0.2);border-radius:12px">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#3B82F6,#2563EB);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-wallet" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#93c5fd">Финансы</span></div>';
+      // Payment method + Refund
       var pmId = l.payment_method_id || '';
       var pmMethods = ensureArray(data.paymentMethods);
-      h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
-        '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-credit-card" style="margin-right:4px;color:#3B82F6"></i>Способ оплаты:</div>' +
-        '<select class="input" id="lead-pm-' + l.id + '" style="font-size:0.85rem;padding:8px;border-color:rgba(59,130,246,0.3)" onchange="applyPaymentMethod(' + l.id + ')">' +
-        '<option value="">— Не выбран —</option>';
+      h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-credit-card" style="margin-right:4px;color:#3B82F6"></i>Способ оплаты</label>';
+      h += '<select class="input" id="lead-pm-' + l.id + '" style="font-size:0.85rem;padding:8px;border-color:rgba(59,130,246,0.3)" onchange="applyPaymentMethod(' + l.id + ')"><option value="">-- Не выбран --</option>';
       for (var pmi = 0; pmi < pmMethods.length; pmi++) {
         var pm = pmMethods[pmi];
         h += '<option value="' + pm.id + '"' + (pmId == pm.id ? ' selected' : '') + '>' + escHtml(pm.name_ru) + ' (' + pm.commission_pct + '%)</option>';
       }
       h += '</select></div>';
-      // Commission preview
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-undo-alt" style="margin-right:4px;color:#EF4444"></i>Возврат средств (\u058F)</label>';
+      h += '<input class="input" type="number" min="0" step="1" id="lead-refund-' + l.id + '" value="' + Number(l.refund_amount || 0) + '" style="font-size:0.88rem;padding:8px;border-color:rgba(239,68,68,0.3)" placeholder="0"></div>';
+      h += '</div>';
+      // Financial summary cards
       var pmMatch = pmMethods.find(function(m) { return m.id == pmId; });
       var pmPct = pmMatch ? Number(pmMatch.commission_pct) : 0;
       var pmBase = Number(l.total_amount || 0);
       var pmCommission = pmPct > 0 ? Math.round(pmBase * pmPct / 100) : 0;
       var pmFinal = pmBase + pmCommission;
-      h += '<div id="lead-pm-preview-' + l.id + '" style="display:flex;align-items:flex-end">';
+      var refundVal = Number(l.refund_amount || 0);
+      h += '<div id="lead-pm-preview-' + l.id + '" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px">';
+      h += '<div style="padding:10px;background:rgba(0,0,0,0.15);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:2px">Сумма заказа</div><div style="font-size:1.05rem;font-weight:800;color:#e2e8f0">' + Number(pmBase).toLocaleString('ru-RU') + ' \u058F</div></div>';
       if (pmMatch) {
-        h += '<div style="font-size:0.78rem;padding:8px;line-height:1.6">' +
-          '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
-          '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmPct + '%: +' + Number(pmCommission).toLocaleString('ru-RU') + ' ֏</div>' +
-          '<div style="color:#22C55E;font-weight:700">К оплате: ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏</div></div>';
-      } else {
-        h += '<div style="font-size:0.78rem;color:#64748b;padding:8px">Выберите способ оплаты для расчёта комиссии</div>';
+        h += '<div style="padding:10px;background:rgba(59,130,246,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#93c5fd;margin-bottom:2px">Комиссия ' + pmPct + '%</div><div style="font-size:1.05rem;font-weight:800;color:#3B82F6">+' + Number(pmCommission).toLocaleString('ru-RU') + ' \u058F</div></div>';
+        h += '<div style="padding:10px;background:rgba(34,197,94,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#86efac;margin-bottom:2px">К оплате</div><div style="font-size:1.05rem;font-weight:800;color:#22C55E">' + Number(pmFinal).toLocaleString('ru-RU') + ' \u058F</div></div>';
       }
-      h += '</div></div>';
-
-      // --- 3. NOTES (at top, above services) ---
-      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
-        '<div style="font-size:0.78rem;font-weight:600;color:#fbbf24;margin-bottom:6px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка:</div>' +
-        '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea></div>';
-
-      // --- 3b. REFERRAL CODE ---
-      var leadRefCode = l.referral_code || '';
-      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">' +
-        '<div style="font-size:0.78rem;font-weight:600;color:#10B981;margin-bottom:6px"><i class="fas fa-tag" style="margin-right:4px"></i>Реферальный код:</div>' +
-        '<div style="display:flex;gap:8px;align-items:center">' +
-        '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="Введите промокод...">' +
-        '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Применить</button>' +
-        (leadRefCode ? '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="removeLeadRefCode(' + l.id + ')"><i class="fas fa-times" style="margin-right:4px"></i>Отменить</button>' : '') +
-        '</div>';
-      if (leadRefCode) {
-        // Show discount breakdown — ALWAYS recalculate from services to ensure correctness
-        var refDiscPct = Number(calcData && calcData.discountPercent || 0);
-        // FALLBACK: look up from data.referrals if calc_data has no discountPercent
-        if (refDiscPct === 0 && data.referrals) {
-          var refMatch2 = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === leadRefCode.toUpperCase(); });
-          if (refMatch2) refDiscPct = Number(refMatch2.discount_percent || 0);
-        }
-        var refSvcBase = svcAmt || Number(calcData && calcData.servicesSubtotal || 0);
-        // Recalculate discount from services base (never trust stored discountAmount — may be stale)
-        var refDiscAmt = refDiscPct > 0 ? Math.round(refSvcBase * refDiscPct / 100) : 0;
-        var svcAfterDisc = refSvcBase - refDiscAmt;
-        h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:6px;padding:10px 12px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:8px;font-size:0.78rem;color:#6ee7b7">' +
-          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span><i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(leadRefCode) + '» применён</span>' +
-          (refDiscPct > 0 ? '<span class="badge badge-green" style="font-size:0.72rem">-' + refDiscPct + '%</span>' : '') + '</div>';
-        if (refDiscAmt > 0) {
-          h += '<div style="margin-top:6px;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:0.72rem;line-height:1.6">' +
-            '<div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Подитог услуг:</span><span>' + Number(refSvcBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
-            '<div style="display:flex;justify-content:space-between;color:#a78bfa"><span>Скидка ' + refDiscPct + '% на услуги:</span><span style="font-weight:700">-' + Number(refDiscAmt).toLocaleString('ru-RU') + ' ֏</span></div>' +
-            '<div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;margin-top:4px"><span>Услуги со скидкой:</span><span style="color:#10B981">' + Number(svcAfterDisc).toLocaleString('ru-RU') + ' ֏</span></div>' +
-          '</div>';
-        }
-        h += '</div>';
-      } else {
-        h += '<div id="lead-refcode-info-' + l.id + '"></div>';
+      if (refundVal > 0) {
+        h += '<div style="padding:10px;background:rgba(239,68,68,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#fca5a5;margin-bottom:2px">Возврат</div><div style="font-size:1.05rem;font-weight:800;color:#EF4444">-' + Number(refundVal).toLocaleString('ru-RU') + ' \u058F</div></div>';
       }
       h += '</div>';
+      h += '</div>'; // END section 3
 
-      // --- 4. SERVICES — collapsible with total shown when closed ---
+      // ===== SECTION 4: SERVICES =====
       var svcTotal = 0;
       for (var si3 = 0; si3 < serviceItems.length; si3++) { svcTotal += Number(serviceItems[si3].subtotal || 0); }
       var leadDiscPct2 = Number(calcData && calcData.discountPercent || 0);
-      // FALLBACK: look up from data.referrals if calc_data has no discountPercent
       if (leadDiscPct2 === 0 && l.referral_code && data.referrals) {
         var refMatch3 = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
         if (refMatch3) leadDiscPct2 = Number(refMatch3.discount_percent || 0);
       }
-      // Recalculate discount from actual services total
       var leadDiscAmt2 = leadDiscPct2 > 0 && l.referral_code ? Math.round(svcTotal * leadDiscPct2 / 100) : 0;
       var svcAfterDisc2 = leadDiscAmt2 > 0 ? (svcTotal - leadDiscAmt2) : svcTotal;
-      h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
-      h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">' +
-        '<span style="font-size:0.85rem;font-weight:700;color:#a78bfa"><i class="fas fa-calculator" style="margin-right:6px"></i>Услуги (' + serviceItems.length + ') — ' +
-        (leadDiscAmt2 > 0 ? '<span style="text-decoration:line-through;color:#64748b;font-weight:400;margin-right:4px">' + Number(svcTotal).toLocaleString('ru-RU') + '</span><span style="color:#10B981">' + Number(svcAfterDisc2).toLocaleString('ru-RU') + '&nbsp;֏</span> <span style="color:#8B5CF6;font-size:0.72rem;font-weight:400">(-' + leadDiscPct2 + '%)</span>' : '<span style="color:#8B5CF6">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</span>') +
-        '</span>' +
-        '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
-        '<i id="svc-arrow-' + l.id + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
+      h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(167,139,250,0.06),rgba(139,92,246,0.03));border:1px solid rgba(167,139,250,0.2);border-radius:12px">';
+      h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">';
+      h += '<div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#8B5CF6,#7C3AED);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-calculator" style="color:#fff;font-size:0.75rem"></i></div>';
+      h += '<span style="font-size:0.88rem;font-weight:700;color:#c4b5fd">Услуги (' + serviceItems.length + ')</span>';
+      h += '<span style="font-size:0.82rem;font-weight:700;margin-left:4px">';
+      if (leadDiscAmt2 > 0) {
+        h += '<span style="text-decoration:line-through;color:#64748b;font-weight:400;font-size:0.75rem;margin-right:4px">' + Number(svcTotal).toLocaleString('ru-RU') + '</span><span style="color:#10B981">' + Number(svcAfterDisc2).toLocaleString('ru-RU') + '&nbsp;\u058F</span> <span style="color:#8B5CF6;font-size:0.72rem;font-weight:400">(-' + leadDiscPct2 + '%)</span>';
+      } else {
+        h += '<span style="color:#8B5CF6">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;\u058F</span>';
+      }
+      h += '</span></div>';
+      h += '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showLeadCalcModal(' + l.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>';
+      h += '<i id="svc-arrow-' + l.id + '" class="fas fa-chevron-right" style="color:#64748b;transition:transform 0.2s;font-size:0.75rem"></i></div></div>';
       h += '<div id="svc-body-' + l.id + '" style="display:none;margin-top:8px">';
       if (serviceItems.length > 0) {
         h += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.8rem;margin-bottom:8px">' +
@@ -3823,25 +3834,26 @@ function renderLeads() {
             '<td style="padding:6px 8px;text-align:right;color:#a78bfa;font-weight:600;white-space:nowrap">' + Number(sii.subtotal||0).toLocaleString('ru-RU') + '&nbsp;֏</td>' +
             '<td style="padding:6px 8px;text-align:center"><button style="background:none;border:none;color:#EF4444;cursor:pointer;font-size:0.75rem;padding:2px 4px" onclick="removeLeadService(' + l.id + ',' + si4 + ')" title="Удалить"><i class="fas fa-trash"></i></button></td></tr>';
         }
-        h += '</tbody><tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="3" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО услуги:</td><td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;֏</td><td></td></tr></tfoot></table></div>';
+        h += '</tbody><tfoot><tr style="background:rgba(139,92,246,0.1)"><td colspan="3" style="padding:8px;text-align:right;font-weight:700;color:#94a3b8">ИТОГО услуги:</td><td style="padding:8px;text-align:right;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(svcTotal).toLocaleString('ru-RU') + '&nbsp;\u058F</td><td></td></tr></tfoot></table></div>';
       } else {
         h += '<div style="text-align:center;padding:14px;color:#64748b;font-size:0.82rem;background:#0f172a;border-radius:8px"><i class="fas fa-info-circle" style="margin-right:6px"></i>Нет услуг. Нажмите «Добавить» чтобы выбрать из калькулятора.</div>';
       }
-      h += '</div></div>';
+      h += '</div></div>'; // end svc-body & section 4
 
-      // --- 5. ARTICLES — collapsible, loaded dynamically, with total shown ---
-      h += '<div id="articles-' + l.id + '"><div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px;text-align:center"><span class="spinner" style="width:16px;height:16px"></span><span style="font-size:0.82rem;color:#64748b;margin-left:8px">Загрузка артикулов...</span></div></div>';
+      // ===== SECTION 5: ARTICLES =====
+      h += '<div id="articles-' + l.id + '" style="margin-bottom:16px"></div>';
 
-      // --- 6. COMMENTS ---
-      h += '<div id="comments-' + l.id + '"></div>';
+      // ===== SECTION 6: COMMENTS =====
+      h += '<div id="comments-' + l.id + '" style="margin-bottom:16px"></div>';
 
-      // --- 7. PDF BUTTONS + SAVE (at the very bottom) ---
-      h += '<div style="margin-top:14px;border-top:1px solid #334155;padding-top:14px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">' +
-        '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
-        '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>' +
-        (isCalc ? '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>' : '') +
-        '</div>' +
-        '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button></div>';
+      // ===== ACTIONS BAR =====
+      h += '<div style="padding:14px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(16,185,129,0.03));border:1px solid rgba(34,197,94,0.2);border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<div style="display:flex;gap:8px;flex-wrap:wrap">';
+      h += '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>';
+      if (isCalc) h += '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>';
+      h += '</div>';
+      h += '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button>';
+      h += '</div>';
 
       h += '</div>'; // end lead-detail
       h += '</div>'; // end card
@@ -7259,16 +7271,36 @@ function renderBizOverviewV2(d, sd, fin) {
   }
   h += '</div></div>';
 
-  // ---- SECTION: CAC, ROAS & Revenue Forecast (from backend KPI) ----
+  // ---- SECTION: CAC, ROAS & Revenue Forecast ----
   var kpiBackend = d.kpi || {};
+  // CAC: use backend value, fallback to local calculation (total_expenses / done leads)
+  var doneCountLocal = Number((sd.done || {}).count) || 0;
+  var totalExpLocal = Number(fin.total_expenses) || 0;
+  var mktExpLocal = Number(fin.marketing_expenses) || 0;
+  var svcRevLocal = Number(fin.services) || 0;
   var cacVal = Number(kpiBackend.cac) || 0;
+  if (cacVal === 0 && totalExpLocal > 0 && doneCountLocal > 0) {
+    cacVal = Math.round(totalExpLocal / doneCountLocal);
+  }
+  // ROAS: use backend value, fallback to local (services / total_expenses)
   var roasVal = Number(kpiBackend.roas) || 0;
+  if (roasVal === 0 && totalExpLocal > 0 && svcRevLocal > 0) {
+    roasVal = Math.round(svcRevLocal / totalExpLocal * 100) / 100;
+  }
+  // Revenue forecast
   var revForecast = Number(kpiBackend.revenue_forecast) || 0;
-  var inProgCount = Number(kpiBackend.in_progress_count) || 0;
+  var inProgCount = Number(kpiBackend.in_progress_count) || Number((sd.in_progress || {}).count) || 0;
   var histConvRate = Number(kpiBackend.historical_conversion_rate) || 0;
+  if (revForecast === 0 && inProgCount > 0 && Number(fin.avg_check) > 0 && fin.conversion_rate > 0) {
+    revForecast = Math.round(inProgCount * (Number(fin.conversion_rate) / 100) * Number(fin.avg_check));
+  }
+  // Expense label
+  var cacExpLabel = mktExpLocal > 0 ? 'Маркетинг расходы' : 'Все расходы';
+  var cacExpAmt = mktExpLocal > 0 ? mktExpLocal : totalExpLocal;
+
   h += '<div style="margin-bottom:32px">';
   h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-bullseye" style="color:#F97316;margin-right:8px"></i>Маркетинговые KPI</h3>';
-  h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:16px;line-height:1.5">CAC — стоимость привлечения клиента (маркетинг / количество лидов). ROAS — возврат на рекламные расходы (доход услуг / маркетинг). Прогноз — потенциальная выручка от текущих лидов в работе.</div>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:16px;line-height:1.5">CAC — стоимость привлечения клиента (' + cacExpLabel.toLowerCase() + ' / кол-во завершённых). ROAS — возврат на расходы (доход услуг / расходы). Прогноз — потенциальная выручка от текущих лидов в работе.</div>';
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">';
   // CAC card
   var cacColor = cacVal > 0 ? (cacVal < 5000 ? '#22C55E' : cacVal < 15000 ? '#F59E0B' : '#EF4444') : '#64748b';
@@ -7276,19 +7308,19 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<i class="fas fa-user-plus" style="color:#F97316;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
   h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">CAC (стоимость привлечения)</div>';
   h += '<div style="font-size:2rem;font-weight:900;color:' + cacColor + '">' + fmtAmt(cacVal) + '</div>';
-  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">Маркетинг расходы / Всего лидов за период</div>';
+  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">' + fmtAmt(cacExpAmt) + ' / ' + doneCountLocal + ' клиентов</div>';
   h += '</div>';
   // ROAS card
   var roasColor = roasVal > 0 ? (roasVal >= 3 ? '#22C55E' : roasVal >= 1 ? '#F59E0B' : '#EF4444') : '#64748b';
   h += '<div class="card" style="padding:24px;text-align:center;background:linear-gradient(135deg,rgba(59,130,246,0.1),transparent);border:1px solid rgba(59,130,246,0.25)">';
   h += '<i class="fas fa-chart-bar" style="color:#3B82F6;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
-  h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">ROAS (возврат на рекл. расходы)</div>';
+  h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">ROAS (возврат на расходы)</div>';
   h += '<div style="font-size:2rem;font-weight:900;color:' + roasColor + '">' + roasVal.toFixed(2) + 'x</div>';
-  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">Доход услуг / Маркетинг расходы' + (roasVal >= 3 ? ' <span style="color:#22C55E">\\u2714 Отличный</span>' : roasVal >= 1 ? ' <span style="color:#F59E0B">\\u26A0 Нормальный</span>' : roasVal > 0 ? ' <span style="color:#EF4444">\\u26D4 Низкий</span>' : '') + '</div>';
+  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">' + fmtAmt(svcRevLocal) + ' / ' + fmtAmt(cacExpAmt) + (roasVal >= 3 ? ' <span style="color:#22C55E">\u2714 Отличный</span>' : roasVal >= 1 ? ' <span style="color:#F59E0B">\u26A0 Нормальный</span>' : roasVal > 0 ? ' <span style="color:#EF4444">\u26D4 Низкий</span>' : '') + '</div>';
   h += '</div>';
   // Revenue Forecast card
   h += '<div class="card" style="padding:24px;text-align:center;background:linear-gradient(135deg,rgba(16,185,129,0.1),transparent);border:1px solid rgba(16,185,129,0.25)">';
-  h += '<i class="fas fa-crystal-ball fa-magic" style="color:#10B981;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
+  h += '<i class="fas fa-magic" style="color:#10B981;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
   h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">Прогноз выручки</div>';
   h += '<div style="font-size:2rem;font-weight:900;color:#10B981">' + fmtAmt(revForecast) + '</div>';
   h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">' + inProgCount + ' лидов в работе &times; ' + fmtPct(histConvRate) + ' конверсия &times; ср. чек</div>';

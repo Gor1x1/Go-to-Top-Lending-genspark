@@ -669,10 +669,13 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // ===== DASHBOARD KPIs: CAC, ROAS =====
     const newLeadsCount = statusData.new?.count || 0;
     const totalLeadsAll = Object.values(statusData).reduce((a: number, s: any) => a + (Number(s.count) || 0), 0);
-    // CAC = marketing_expenses / new leads in period
-    const cac = totalLeadsAll > 0 ? Math.round(marketingExpenses / totalLeadsAll * 100) / 100 : 0;
-    // ROAS = revenue / marketing spend
-    const roas = marketingExpenses > 0 ? Math.round(servicesTotal / marketingExpenses * 100) / 100 : 0;
+    // CAC = cost per acquisition. Prefer marketing expenses; fallback to total expenses
+    const cacExpenseBase = marketingExpenses > 0 ? marketingExpenses : allExpensesSum;
+    const cacDivisor = doneCount > 0 ? doneCount : totalLeadsAll;
+    const cac = cacDivisor > 0 ? Math.round(cacExpenseBase / cacDivisor * 100) / 100 : 0;
+    // ROAS = revenue / ad spend. Prefer marketing expenses; fallback to total expenses
+    const roasExpenseBase = marketingExpenses > 0 ? marketingExpenses : allExpensesSum;
+    const roas = roasExpenseBase > 0 ? Math.round(servicesTotal / roasExpenseBase * 100) / 100 : 0;
 
     // ===== SALES FUNNEL BY DATES =====
     let funnelByDate: any[] = [];
