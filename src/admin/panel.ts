@@ -3537,42 +3537,7 @@ function renderLeads() {
       // Free services from calc_data
       var freeSvcs = calcData && calcData.freeServices ? calcData.freeServices : [];
       
-      h += '<div class="card" style="margin-bottom:14px;border-left:4px solid ' + statusBorderColor + ';cursor:pointer;padding:0;overflow:hidden" onclick="handleCardClick(event,' + l.id + ')">';
-      // === TOP ROW: Lead number + key badges ===
-      h += '<div style="display:flex;align-items:center;gap:6px;padding:10px 14px;background:rgba(0,0,0,0.15);border-bottom:1px solid #1e293b;flex-wrap:wrap">';
-      h += '<span style="font-size:1.05rem;font-weight:900;color:#a78bfa">#' + (l.lead_number || l.id) + '</span>';
-      h += '<span class="badge badge-purple" style="font-size:0.68rem">' + (l.source || 'form') + '</span>';
-      if (l.lang) h += '<span class="badge" style="background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.15);color:#fb923c' : 'rgba(59,130,246,0.15);color:#60a5fa') + ';font-size:0.68rem;font-weight:700">' + (l.lang === 'am' ? '\uD83C\uDDE6\uD83C\uDDF2 AM' : '\uD83C\uDDF7\uD83C\uDDFA RU') + '</span>';
-      if (l.referral_code) h += '<span class="badge badge-amber" style="font-size:0.68rem">\uD83C\uDFF7 ' + escHtml(l.referral_code) + '</span>';
-      if (pkgName) h += '<span class="badge" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.15));color:#FBBF24;font-size:0.68rem;font-weight:700;border:1px solid rgba(245,158,11,0.25)"><i class="fas fa-cube" style="margin-right:3px"></i>' + escHtml(pkgName) + '</span>';
-      if (l.articles_count > 0) h += '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.68rem"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + ' арт.</span>';
-      if (freeSvcs.length > 0) h += '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399;font-size:0.68rem"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>';
-      if (l.pdf_template_version) h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.65rem"><i class="fas fa-file-pdf" style="margin-right:3px"></i>v' + escHtml(String(l.pdf_template_version)) + '</span>';
-      h += '</div>';
-
-      // === MAIN BODY: 3-column layout ===
-      h += '<div style="display:grid;grid-template-columns:1fr auto auto;gap:12px;padding:14px;align-items:start">';
-
-      // --- Column 1: Client info ---
-      h += '<div style="min-width:180px">';
-      h += '<div style="font-size:1.1rem;font-weight:800;color:#e2e8f0;margin-bottom:4px">' + escHtml(l.name || '\u2014') + '</div>';
-      h += '<div style="font-size:0.88rem;color:#a78bfa;margin-bottom:6px">' + escHtml(l.contact || '\u2014') + '</div>';
-      // Assignee
-      if (l.assigned_to) {
-        h += '<div style="font-size:0.75rem;color:#86efac;margin-bottom:4px"><i class="fas fa-user" style="margin-right:4px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</div>';
-      } else {
-        h += '<div style="font-size:0.75rem;color:#f87171;margin-bottom:4px"><i class="fas fa-user-slash" style="margin-right:4px"></i>Не назначен</div>';
-      }
-      // Quick links
-      if (l.telegram_group || l.tz_link) {
-        h += '<div style="display:flex;gap:8px">';
-        if (l.telegram_group) h += '<a href="' + escHtml(l.telegram_group) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.72rem;color:#0EA5E9;text-decoration:none"><i class="fab fa-telegram" style="margin-right:2px"></i>TG</a>';
-        if (l.tz_link) h += '<a href="' + escHtml(l.tz_link) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.72rem;color:#F59E0B;text-decoration:none"><i class="fas fa-file-alt" style="margin-right:2px"></i>\u0422\u0417</a>';
-        h += '</div>';
-      }
-      h += '</div>';
-
-      // --- Column 2: Financial summary ---
+      // Calculate financial data for card
       var discPct = Number(calcData && calcData.discountPercent || 0);
       if (discPct === 0 && l.referral_code && data.referrals) {
         var refMatch = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
@@ -3581,38 +3546,82 @@ function renderLeads() {
       var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
       var cardPmMatch = ensureArray(data.paymentMethods).find(function(m) { return m.id == l.payment_method_id; });
       var cardPmComm = Number(l.commission_amount || 0);
+      var leadCommission = Number(l.commission_amount || 0);
+      var leadFinalTotal = leadAmt + leadCommission;
+      // Time since creation
+      var createdDate = l.created_at ? new Date(l.created_at) : null;
+      var daysSince = createdDate ? Math.floor((Date.now() - createdDate.getTime()) / 86400000) : 0;
+      var ageLabel = daysSince === 0 ? '\u0421\u0435\u0433\u043E\u0434\u043D\u044F' : daysSince === 1 ? '1 \u0434\u0435\u043D\u044C' : daysSince + ' \u0434\u043D.';
+      var ageColor = daysSince < 2 ? '#22C55E' : daysSince < 7 ? '#F59E0B' : '#EF4444';
 
-      h += '<div style="min-width:160px">';
-      if (svcAmt > 0 || artAmt > 0 || pkgPrice > 0 || discAmt > 0 || refundAmt > 0 || cardPmMatch) {
-        h += '<div style="display:grid;grid-template-columns:auto 1fr;gap:2px 8px;font-size:0.75rem;line-height:1.6">';
-        if (svcAmt > 0) h += '<span style="color:#94a3b8"><i class="fas fa-calculator" style="width:14px;text-align:center;color:#a78bfa"></i> \u0423\u0441\u043B:</span><span style="color:#c4b5fd;font-weight:600;text-align:right">' + Number(svcAmt).toLocaleString('ru-RU') + ' \u058F</span>';
-        if (pkgPrice > 0) h += '<span style="color:#94a3b8"><i class="fas fa-cube" style="width:14px;text-align:center;color:#FBBF24"></i> \u041F\u0430\u043A\u0435\u0442:</span><span style="color:#FBBF24;font-weight:600;text-align:right">' + Number(pkgPrice).toLocaleString('ru-RU') + ' \u058F</span>';
-        if (artAmt > 0) h += '<span style="color:#94a3b8"><i class="fas fa-box" style="width:14px;text-align:center;color:#fb923c"></i> \u0417\u0430\u043A:</span><span style="color:#fb923c;font-weight:600;text-align:right">' + Number(artAmt).toLocaleString('ru-RU') + ' \u058F</span>';
-        if (discAmt > 0) h += '<span style="color:#94a3b8"><i class="fas fa-gift" style="width:14px;text-align:center;color:#8B5CF6"></i> \u0421\u043A\u0438\u0434\u043A\u0430:</span><span style="color:#8B5CF6;font-weight:600;text-align:right">\u2212' + Number(discAmt).toLocaleString('ru-RU') + ' \u058F (' + discPct + '%)</span>';
-        if (refundAmt > 0) h += '<span style="color:#94a3b8"><i class="fas fa-undo-alt" style="width:14px;text-align:center;color:#f87171"></i> \u0412\u043E\u0437\u0432\u0440\u0430\u0442:</span><span style="color:#f87171;font-weight:600;text-align:right">\u2212' + Number(refundAmt).toLocaleString('ru-RU') + ' \u058F</span>';
-        if (cardPmMatch) h += '<span style="color:#94a3b8"><i class="fas fa-credit-card" style="width:14px;text-align:center;color:#3B82F6"></i> \u041E\u043F\u043B\u0430\u0442\u0430:</span><span style="color:#93c5fd;font-weight:600;text-align:right">' + escHtml(cardPmMatch.name_ru) + (cardPmComm > 0 ? ' +' + Number(cardPmComm).toLocaleString('ru-RU') : '') + '</span>';
+      h += '<div class="card" style="margin-bottom:16px;border-left:4px solid ' + statusBorderColor + ';cursor:pointer;padding:0;overflow:hidden" onclick="handleCardClick(event,' + l.id + ')">';
+
+      // === ROW 1: Header bar ===
+      h += '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 18px;background:rgba(0,0,0,0.2);border-bottom:1px solid #1e293b">';
+      // Left: # + badges
+      h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
+      h += '<span style="font-size:1.15rem;font-weight:900;color:#a78bfa">#' + (l.lead_number || l.id) + '</span>';
+      h += '<span class="badge badge-purple">' + (l.source || 'form') + '</span>';
+      if (l.lang) h += '<span class="badge" style="background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.15);color:#fb923c' : 'rgba(59,130,246,0.15);color:#60a5fa') + ';font-weight:700">' + (l.lang === 'am' ? '\uD83C\uDDE6\uD83C\uDDF2 AM' : '\uD83C\uDDF7\uD83C\uDDFA RU') + '</span>';
+      if (l.referral_code) h += '<span class="badge badge-amber">\uD83C\uDFF7 ' + escHtml(l.referral_code) + (discPct > 0 ? ' \u2212' + discPct + '%' : '') + '</span>';
+      if (pkgName) h += '<span class="badge" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.15));color:#FBBF24;font-weight:700;border:1px solid rgba(245,158,11,0.25)"><i class="fas fa-cube" style="margin-right:3px"></i>' + escHtml(pkgName) + '</span>';
+      if (l.articles_count > 0) h += '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + ' \u0430\u0440\u0442.</span>';
+      if (freeSvcs.length > 0) h += '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>';
+      if (l.pdf_template_version) h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-file-pdf" style="margin-right:3px"></i>v' + escHtml(String(l.pdf_template_version)) + '</span>';
+      h += '</div>';
+      // Right: age + actions
+      h += '<div style="display:flex;align-items:center;gap:10px">';
+      h += '<span style="font-size:0.78rem;color:' + ageColor + ';font-weight:600"><i class="fas fa-clock" style="margin-right:4px"></i>' + ageLabel + '</span>';
+      h += '<button class="btn btn-outline" style="padding:5px 12px;font-size:0.78rem" onclick="event.stopPropagation();closeLeadDetail(' + l.id + ')"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
+      h += '<button class="btn btn-danger" style="padding:5px 10px;font-size:0.78rem" onclick="event.stopPropagation();deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
+      h += '</div></div>';
+
+      // === ROW 2: Main content — full width 4-zone layout ===
+      h += '<div style="display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(200px,1fr) minmax(200px,1fr) minmax(180px,auto);gap:0;min-height:100px">';
+
+      // --- ZONE 1: Client ---
+      h += '<div style="padding:16px 20px;border-right:1px solid #1e293b">';
+      h += '<div style="font-size:1.25rem;font-weight:800;color:#e2e8f0;margin-bottom:6px;line-height:1.2">' + escHtml(l.name || '\u2014') + '</div>';
+      h += '<div style="font-size:1rem;color:#a78bfa;font-weight:600;margin-bottom:8px"><i class="fas fa-phone" style="margin-right:6px;font-size:0.85rem"></i>' + escHtml(l.contact || '\u2014') + '</div>';
+      // Assignee
+      if (l.assigned_to) {
+        h += '<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:6px;font-size:0.85rem;color:#86efac;font-weight:600"><i class="fas fa-user-check"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</div>';
+      } else {
+        h += '<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.85rem;color:#fca5a5;font-weight:600"><i class="fas fa-user-slash"></i>\u041D\u0435 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D</div>';
+      }
+      // Quick links
+      if (l.telegram_group || l.tz_link) {
+        h += '<div style="display:flex;gap:10px;margin-top:8px">';
+        if (l.telegram_group) h += '<a href="' + escHtml(l.telegram_group) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.85rem;color:#0EA5E9;text-decoration:none;font-weight:600"><i class="fab fa-telegram" style="margin-right:4px;font-size:1rem"></i>Telegram</a>';
+        if (l.tz_link) h += '<a href="' + escHtml(l.tz_link) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.85rem;color:#F59E0B;text-decoration:none;font-weight:600"><i class="fas fa-file-alt" style="margin-right:4px;font-size:0.9rem"></i>\u0422\u0417</a>';
         h += '</div>';
       }
       h += '</div>';
 
-      // --- Column 3: Total + Controls ---
-      h += '<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;min-width:170px">';
-      var leadCommission = Number(l.commission_amount || 0);
-      var leadFinalTotal = leadAmt + leadCommission;
-      h += '<div id="lead-total-' + l.id + '">';
-      if (leadAmt > 0) {
-        if (leadCommission > 0) {
-          h += '<div style="text-align:right">' +
-            '<div style="font-size:0.7rem;color:#64748b;text-decoration:line-through">' + Number(leadAmt).toLocaleString('ru-RU') + ' \u058F</div>' +
-            '<div style="font-size:1.4rem;font-weight:900;color:#22C55E;white-space:nowrap">' + Number(leadFinalTotal).toLocaleString('ru-RU') + '&nbsp;\u058F</div>' +
-            '<div style="font-size:0.65rem;color:#3B82F6;font-weight:600">+' + Number(leadCommission).toLocaleString('ru-RU') + ' \u058F \u043A\u043E\u043C\u0438\u0441\u0441\u0438\u044F</div></div>';
-        } else {
-          h += '<div style="font-size:1.4rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + '&nbsp;\u058F</div>';
-        }
+      // --- ZONE 2: Financial breakdown ---
+      h += '<div style="padding:16px 20px;border-right:1px solid #1e293b">';
+      h += '<div style="font-size:0.78rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px"><i class="fas fa-receipt" style="margin-right:5px"></i>\u0424\u0438\u043D\u0430\u043D\u0441\u044B</div>';
+      if (svcAmt > 0 || artAmt > 0 || pkgPrice > 0 || discAmt > 0 || refundAmt > 0) {
+        h += '<div style="display:flex;flex-direction:column;gap:4px">';
+        if (svcAmt > 0) h += '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.88rem;color:#94a3b8"><i class="fas fa-calculator" style="width:18px;color:#a78bfa"></i>\u0423\u0441\u043B\u0443\u0433\u0438</span><span style="font-size:0.95rem;font-weight:700;color:#c4b5fd">' + Number(svcAmt).toLocaleString('ru-RU') + ' \u058F</span></div>';
+        if (pkgPrice > 0) h += '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.88rem;color:#94a3b8"><i class="fas fa-cube" style="width:18px;color:#FBBF24"></i>\u041F\u0430\u043A\u0435\u0442</span><span style="font-size:0.95rem;font-weight:700;color:#FBBF24">' + Number(pkgPrice).toLocaleString('ru-RU') + ' \u058F</span></div>';
+        if (artAmt > 0) h += '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.88rem;color:#94a3b8"><i class="fas fa-box" style="width:18px;color:#fb923c"></i>\u0417\u0430\u043A\u0443\u043F</span><span style="font-size:0.95rem;font-weight:700;color:#fb923c">' + Number(artAmt).toLocaleString('ru-RU') + ' \u058F</span></div>';
+        if (discAmt > 0) h += '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.88rem;color:#94a3b8"><i class="fas fa-tag" style="width:18px;color:#8B5CF6"></i>\u0421\u043A\u0438\u0434\u043A\u0430</span><span style="font-size:0.95rem;font-weight:700;color:#8B5CF6">\u2212' + Number(discAmt).toLocaleString('ru-RU') + ' \u058F <span style="font-size:0.78rem;font-weight:400">(' + discPct + '%)</span></span></div>';
+        if (refundAmt > 0) h += '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:0.88rem;color:#94a3b8"><i class="fas fa-undo-alt" style="width:18px;color:#f87171"></i>\u0412\u043E\u0437\u0432\u0440\u0430\u0442</span><span style="font-size:0.95rem;font-weight:700;color:#f87171">\u2212' + Number(refundAmt).toLocaleString('ru-RU') + ' \u058F</span></div>';
+        h += '</div>';
+      } else {
+        h += '<div style="color:#475569;font-size:0.88rem;font-style:italic">\u041D\u0435\u0442 \u0434\u0430\u043D\u043D\u044B\u0445</div>';
       }
       h += '</div>';
+
+      // --- ZONE 3: Payment + Status controls ---
+      h += '<div style="padding:16px 20px;border-right:1px solid #1e293b">';
+      // Payment method
+      if (cardPmMatch) {
+        h += '<div style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);border-radius:8px;margin-bottom:10px"><i class="fas fa-credit-card" style="color:#3B82F6;font-size:0.9rem"></i><span style="font-size:0.88rem;color:#93c5fd;font-weight:600">' + escHtml(cardPmMatch.name_ru) + '</span>' + (cardPmComm > 0 ? '<span style="font-size:0.8rem;color:#3B82F6;font-weight:700;margin-left:auto">+' + Number(cardPmComm).toLocaleString('ru-RU') + ' \u058F</span>' : '') + '</div>';
+      }
       // Status
-      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.78rem" onchange="updateLeadStatus(' + l.id + ', this.value)" onclick="event.stopPropagation()">' +
+      h += '<select class="input" style="width:100%;padding:6px 10px;font-size:0.88rem;margin-bottom:8px" onchange="updateLeadStatus(' + l.id + ', this.value)" onclick="event.stopPropagation()">' +
         '<option value="new"' + (l.status === 'new' ? ' selected' : '') + '>\uD83D\uDFE2 \u041D\u043E\u0432\u044B\u0435 \u043B\u0438\u0434\u044B</option>' +
         '<option value="contacted"' + (l.status === 'contacted' ? ' selected' : '') + '>\uD83D\uDCAC \u041D\u0430 \u0441\u0432\u044F\u0437\u0438</option>' +
         '<option value="in_progress"' + (l.status === 'in_progress' ? ' selected' : '') + '>\uD83D\uDD04 \u0412 \u0440\u0430\u0431\u043E\u0442\u0435</option>' +
@@ -3620,21 +3629,38 @@ function renderLeads() {
         '<option value="checking"' + (l.status === 'checking' ? ' selected' : '') + '>\uD83D\uDD0D \u041F\u0440\u043E\u0432\u0435\u0440\u043A\u0430</option>' +
         '<option value="done"' + (l.status === 'done' ? ' selected' : '') + '>\u2705 \u0417\u0430\u0432\u0435\u0440\u0448\u0451\u043D</option></select>';
       // Assignee
-      h += '<select class="input" style="width:150px;padding:4px 8px;font-size:0.75rem;color:#94a3b8" onchange="assignLead(' + l.id + ', this.value)" onclick="event.stopPropagation()">' +
+      h += '<select class="input" style="width:100%;padding:6px 10px;font-size:0.85rem" onchange="assignLead(' + l.id + ', this.value)" onclick="event.stopPropagation()">' +
         '<option value="">\u041E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0439...</option>';
       for (var uj = 0; uj < ensureArray(data.users).length; uj++) {
         var uu = data.users[uj];
         h += '<option value="' + uu.id + '"' + (l.assigned_to==uu.id?' selected':'') + '>' + escHtml(uu.display_name) + '</option>';
       }
       h += '</select>';
-      // Date + actions
-      h += '<div style="font-size:0.72rem;color:#64748b">' + formatArmTime(l.created_at) + '</div>';
-      h += '<div style="display:flex;gap:4px">';
-      h += '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.75rem" onclick="closeLeadDetail(' + l.id + ')" title="\u0421\u0432\u0435\u0440\u043D\u0443\u0442\u044C/\u0420\u0430\u0437\u0432\u0435\u0440\u043D\u0443\u0442\u044C"><i id="lead-arrow-' + l.id + '" class="fas fa-chevron-down" style="transition:transform 0.2s"></i></button>';
-      h += '<button class="btn btn-danger" style="padding:4px 8px;font-size:0.75rem" onclick="deleteLead(' + l.id + ')"><i class="fas fa-trash"></i></button>';
-      h += '</div></div>';
+      // Date
+      h += '<div style="font-size:0.78rem;color:#64748b;margin-top:8px;text-align:center"><i class="fas fa-calendar-alt" style="margin-right:4px"></i>' + formatArmTime(l.created_at) + '</div>';
+      h += '</div>';
 
-      h += '</div>'; // end grid
+      // --- ZONE 4: Total amount (prominent) ---
+      h += '<div style="padding:16px 20px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(139,92,246,0.05),rgba(34,197,94,0.03))">';
+      h += '<div style="font-size:0.75rem;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:6px">\u0418\u0422\u041E\u0413\u041E</div>';
+      h += '<div id="lead-total-' + l.id + '" style="text-align:center">';
+      if (leadAmt > 0) {
+        if (leadCommission > 0) {
+          h += '<div style="font-size:0.78rem;color:#64748b;text-decoration:line-through">' + Number(leadAmt).toLocaleString('ru-RU') + ' \u058F</div>';
+          h += '<div style="font-size:1.8rem;font-weight:900;color:#22C55E;line-height:1.1">' + Number(leadFinalTotal).toLocaleString('ru-RU') + '</div>';
+          h += '<div style="font-size:0.85rem;color:#22C55E;font-weight:600">\u058F</div>';
+          h += '<div style="font-size:0.72rem;color:#3B82F6;font-weight:600;margin-top:2px">+' + Number(leadCommission).toLocaleString('ru-RU') + ' \u058F \u043A\u043E\u043C.</div>';
+        } else {
+          h += '<div style="font-size:1.8rem;font-weight:900;color:#8B5CF6;line-height:1.1">' + Number(leadAmt).toLocaleString('ru-RU') + '</div>';
+          h += '<div style="font-size:0.85rem;color:#8B5CF6;font-weight:600">\u058F</div>';
+        }
+      } else {
+        h += '<div style="font-size:1.2rem;color:#475569;font-weight:600">\u2014</div>';
+      }
+      h += '</div>';
+      h += '</div>';
+
+      h += '</div>'; // end 4-zone grid
       
       // ========== EXPANDABLE DETAIL AREA ==========
       h += '<div id="lead-detail-' + l.id + '" style="display:none;margin-top:12px;border-top:2px solid #334155;padding-top:16px">';
