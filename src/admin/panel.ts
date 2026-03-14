@@ -3408,6 +3408,14 @@ function renderLeads() {
           else { svcAmt += Number(calcData.items[bi].subtotal||0); serviceItems.push(calcData.items[bi]); }
         }
       }
+      // Extract package data from calc_data
+      var pkgData = calcData && calcData.package ? calcData.package : null;
+      var pkgName = pkgData ? (pkgData.name_ru || pkgData.name || pkgData.name_am || '') : '';
+      var pkgPrice = pkgData ? Number(pkgData.package_price || 0) : 0;
+      var pkgOrigPrice = pkgData ? Number(pkgData.original_price || 0) : 0;
+      var pkgId = pkgData ? (pkgData.package_id || pkgData.id || '') : '';
+      // Free services from calc_data
+      var freeSvcs = calcData && calcData.freeServices ? calcData.freeServices : [];
       
       h += '<div class="card" style="margin-bottom:12px;border-left:3px solid ' + statusBorderColor + ';cursor:pointer" onclick="handleCardClick(event,' + l.id + ')">' +
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap">' +
@@ -3419,6 +3427,8 @@ function renderLeads() {
               (l.referral_code ? '<span class="badge badge-amber">🏷 ' + escHtml(l.referral_code) + '</span>' : '') +
               (l.assigned_to ? '<span class="badge badge-green" style="font-size:0.7rem"><i class="fas fa-user" style="margin-right:3px"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</span>' : '<span class="badge" style="background:rgba(239,68,68,0.15);color:#f87171;font-size:0.7rem">Не назначен</span>') +
               (l.articles_count > 0 ? '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.7rem"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + '</span>' : '') +
+              (pkgName ? '<span class="badge" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.15));color:#FBBF24;font-size:0.7rem;font-weight:700;border:1px solid rgba(245,158,11,0.25)"><i class="fas fa-cube" style="margin-right:3px"></i>' + escHtml(pkgName) + '</span>' : '') +
+              (freeSvcs.length > 0 ? '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399;font-size:0.7rem"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>' : '') +
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
@@ -3440,8 +3450,9 @@ function renderLeads() {
       // Payment method info for card summary — use saved commission_amount for accuracy
       var cardPmMatch = ensureArray(data.paymentMethods).find(function(m) { return m.id == l.payment_method_id; });
       var cardPmComm = Number(l.commission_amount || 0);
-      h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0 || cardPmMatch) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
+      h += ((svcAmt > 0 || artAmt > 0 || discAmt > 0 || cardPmMatch || pkgPrice > 0) ? '<div style="display:flex;gap:10px;margin-top:6px;flex-wrap:wrap">' +
               (svcAmt > 0 ? '<span style="font-size:0.72rem;color:#a78bfa;font-weight:600"><i class="fas fa-calculator" style="margin-right:3px"></i>Усл: ' + Number(svcAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
+              (pkgPrice > 0 ? '<span style="font-size:0.72rem;color:#FBBF24;font-weight:600"><i class="fas fa-cube" style="margin-right:3px"></i>Пакет: ' + Number(pkgPrice).toLocaleString('ru-RU') + ' ֏' + (pkgOrigPrice > pkgPrice ? ' <span style="text-decoration:line-through;color:#64748b;font-weight:400;font-size:0.65rem">' + Number(pkgOrigPrice).toLocaleString('ru-RU') + '</span>' : '') + '</span>' : '') +
               (artAmt > 0 ? '<span style="font-size:0.72rem;color:#fb923c;font-weight:600"><i class="fas fa-box" style="margin-right:3px"></i>Зак: ' + Number(artAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
               (discAmt > 0 ? '<span style="font-size:0.72rem;color:#8B5CF6;font-weight:600"><i class="fas fa-gift" style="margin-right:3px"></i>Скидка: -' + Number(discAmt).toLocaleString('ru-RU') + ' ֏ (' + discPct + '%)</span>' : '') +
               (refundAmt > 0 ? '<span style="font-size:0.72rem;color:#f87171;font-weight:600"><i class="fas fa-undo-alt" style="margin-right:3px"></i>Возврат: -' + Number(refundAmt).toLocaleString('ru-RU') + ' ֏</span>' : '') +
@@ -3501,12 +3512,71 @@ function renderLeads() {
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон:</div>' +
         '<input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..."></div></div>';
 
-      // --- 1b. PRODUCT, SERVICE & CLIENT COMMENT (from contact form) ---
+      // --- 1b. PACKAGE INFO (beautiful card, from calculator) ---
+      if (pkgData) {
+        var pkgDiscountPct = (pkgOrigPrice > 0 && pkgOrigPrice > pkgPrice) ? Math.round((1 - pkgPrice / pkgOrigPrice) * 100) : 0;
+        // Check if promo gives package discount
+        var pkgPromoDisc = 0;
+        var pkgPromoPct = Number(calcData && calcData.discountPercent || 0);
+        if (pkgPromoPct > 0 && l.referral_code) {
+          var refForPkg = ensureArray(data.referrals).find(function(r) { return r.code && r.code.toUpperCase() === (l.referral_code||'').toUpperCase(); });
+          if (refForPkg) {
+            var linkedPkgs = [];
+            try { linkedPkgs = JSON.parse(refForPkg.linked_packages || '[]'); } catch(e) {}
+            if (linkedPkgs.length > 0 && linkedPkgs.map(Number).indexOf(Number(pkgId)) !== -1) {
+              pkgPromoDisc = Math.round(pkgPrice * pkgPromoPct / 100);
+            }
+          }
+        }
+        h += '<div style="margin-top:12px;padding:14px 16px;background:linear-gradient(135deg,rgba(245,158,11,0.08) 0%,rgba(251,191,36,0.04) 50%,rgba(245,158,11,0.06) 100%);border:1px solid rgba(245,158,11,0.25);border-radius:12px;position:relative;overflow:hidden">' +
+          '<div style="position:absolute;top:-20px;right:-20px;width:80px;height:80px;background:radial-gradient(circle,rgba(245,158,11,0.08),transparent);border-radius:50%"></div>' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">' +
+          '<div style="width:32px;height:32px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-cube" style="color:#fff;font-size:0.85rem"></i></div>' +
+          '<div style="flex:1"><div style="font-size:0.72rem;color:#94a3b8;font-weight:600;text-transform:uppercase;letter-spacing:0.5px">Выбранный пакет</div>' +
+          '<div style="font-size:1.05rem;font-weight:800;color:#FBBF24;line-height:1.2">' + escHtml(pkgName) + '</div></div>' +
+          '<div style="text-align:right;flex-shrink:0">' +
+          (pkgOrigPrice > pkgPrice ? '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through;line-height:1">' + Number(pkgOrigPrice).toLocaleString('ru-RU') + ' ֏</div>' : '') +
+          '<div style="font-size:1.2rem;font-weight:900;color:#FBBF24;line-height:1.2">' + Number(pkgPrice).toLocaleString('ru-RU') + ' ֏</div>' +
+          (pkgDiscountPct > 0 ? '<div style="display:inline-block;margin-top:2px;padding:1px 6px;background:rgba(16,185,129,0.15);border-radius:4px;font-size:0.65rem;color:#34D399;font-weight:700">-' + pkgDiscountPct + '% скидка</div>' : '') +
+          (pkgPromoDisc > 0 ? '<div style="display:inline-block;margin-top:2px;padding:1px 6px;background:rgba(139,92,246,0.15);border-radius:4px;font-size:0.65rem;color:#A78BFA;font-weight:700">промо -' + pkgPromoPct + '% = -' + Number(pkgPromoDisc).toLocaleString('ru-RU') + ' ֏</div>' : '') +
+          '</div></div>';
+        // Show package items if available
+        if (pkgData.items && pkgData.items.length > 0) {
+          h += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:2px">';
+          for (var pki = 0; pki < pkgData.items.length; pki++) {
+            var pkgItem = pkgData.items[pki];
+            h += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.18);padding:3px 10px;border-radius:20px;font-size:0.7rem;color:#D97706"><i class="fas fa-check-circle" style="color:#10B981;font-size:0.6rem"></i>' + escHtml(pkgItem.service_name_ru || pkgItem.service_name_am || '') + ' <span style="color:#94a3b8">&times;' + (pkgItem.quantity || 1) + '</span></span>';
+          }
+          h += '</div>';
+        }
+        h += '</div>';
+      }
+
+      // --- 1c. FREE SERVICES from promo code ---
+      if (freeSvcs.length > 0) {
+        h += '<div style="margin-top:8px;padding:12px 14px;background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(52,211,153,0.03));border:1px solid rgba(16,185,129,0.2);border-radius:10px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">' +
+          '<div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-gift" style="color:#fff;font-size:0.75rem"></i></div>' +
+          '<div style="font-size:0.78rem;font-weight:700;color:#34D399">Бесплатные услуги по промокоду</div></div>' +
+          '<div style="display:flex;flex-wrap:wrap;gap:5px">';
+        for (var fsi = 0; fsi < freeSvcs.length; fsi++) {
+          var ffs = freeSvcs[fsi];
+          h += '<span style="display:inline-flex;align-items:center;gap:4px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.18);padding:3px 10px;border-radius:20px;font-size:0.7rem;color:#34D399"><i class="fas fa-gift" style="font-size:0.6rem"></i>' + escHtml(ffs.name || ffs.name_ru || ffs.name_am || '') + ' <span style="color:#6EE7B7">&times;' + (ffs.qty || 1) + '</span></span>';
+        }
+        h += '</div></div>';
+      }
+
+      // --- 1d. PRODUCT, SERVICE & CLIENT COMMENT ---
+      if (l.product || l.service || !isCalc) {
       h += '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:12px">' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-box" style="margin-right:4px;color:#fb923c"></i>Товар (WB):</div>' +
         '<input class="input" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>' +
         '<div><div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-concierge-bell" style="margin-right:4px;color:#60a5fa"></i>Интересует:</div>' +
-        '<input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано" readonly></div></div>';
+        '<input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div></div>';
+      } else {
+        // Hidden inputs for calculator leads (keep DOM IDs intact for save function)
+        h += '<input type="hidden" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '"><input type="hidden" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '">';
+      }
       if (l.message) {
         h += '<div style="margin-top:10px">' +
           '<div style="font-size:0.78rem;font-weight:600;color:#94a3b8;margin-bottom:6px"><i class="fas fa-comment-alt" style="margin-right:4px;color:#c084fc"></i>Комментарий клиента:</div>' +
