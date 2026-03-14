@@ -52,10 +52,10 @@ api.put('/users/:id', authMiddleware, async (c) => {
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can edit users' }, 403);
   const id = c.req.param('id');
   
-  // Protect main_admin from being edited via employee panel — use /admin-profile instead
+  // Only main_admin can edit main_admin's card (other admins cannot)
   const targetUser = await db.prepare('SELECT role FROM users WHERE id = ?').bind(id).first();
-  if (targetUser && targetUser.role === 'main_admin') {
-    return c.json({ error: 'Профиль главного администратора редактируется только в разделе Настройки' }, 403);
+  if (targetUser && targetUser.role === 'main_admin' && caller.role !== 'main_admin') {
+    return c.json({ error: 'Только главный администратор может редактировать свой профиль' }, 403);
   }
   
   const d = await c.req.json();
@@ -109,10 +109,10 @@ api.post('/users/:id/reset-password', authMiddleware, async (c) => {
   if (caller.role !== 'main_admin') return c.json({ error: 'Only main_admin can reset passwords' }, 403);
   const id = c.req.param('id');
   
-  // Protect main_admin credentials — password change only via Settings > Change Password (requires old password)
+  // Only main_admin can change main_admin credentials
   const targetUser = await db.prepare('SELECT role FROM users WHERE id = ?').bind(id).first();
-  if (targetUser && targetUser.role === 'main_admin') {
-    return c.json({ error: 'Пароль главного администратора можно сменить только в разделе Настройки (с подтверждением старого пароля)' }, 403);
+  if (targetUser && targetUser.role === 'main_admin' && caller.role !== 'main_admin') {
+    return c.json({ error: 'Только главный администратор может менять свои учётные данные' }, 403);
   }
   
   const body = await c.req.json().catch(() => ({}));

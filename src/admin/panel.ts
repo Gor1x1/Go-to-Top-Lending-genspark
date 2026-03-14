@@ -11196,24 +11196,26 @@ function renderEmployees() {
     }
 
     // === ACTIONS PANEL ===
-    if (isAdmin) {
-      // Hide edit/credentials buttons for main_admin — admin profile is managed in Settings
-      var isTargetMainAdmin = u.role === 'main_admin';
-      if (isTargetMainAdmin) {
-        h += '<div style="padding:10px 20px 14px;border-top:1px solid #1e293b;text-align:center;background:linear-gradient(180deg,transparent,rgba(15,23,42,0.5))">';
-        h += '<span style="font-size:0.78rem;color:#64748b"><i class="fas fa-shield-alt" style="margin-right:4px;color:#8B5CF6"></i>Управление профилем — в разделе <a href="#" onclick="navigate(&apos;settings&apos;);return false" style="color:#a78bfa;text-decoration:underline">Настройки</a></span>';
-        h += '</div>';
-      } else {
+    // main_admin can edit everyone including themselves
+    // other roles cannot see edit controls on main_admin's card
+    var isTargetMainAdmin = u.role === 'main_admin';
+    var canEditThisUser = isAdmin || (!isTargetMainAdmin);
+    // Only main_admin can edit main_admin card
+    if (isTargetMainAdmin && !isAdmin) canEditThisUser = false;
+    // Non-admin users without permissions don't see actions at all
+    if (!isAdmin && isTargetMainAdmin) canEditThisUser = false;
+    
+    if (isAdmin && canEditThisUser) {
       h += '<div style="padding:10px 20px 16px;border-top:1px solid #1e293b;display:flex;gap:6px;flex-wrap:wrap;background:linear-gradient(180deg,transparent,rgba(15,23,42,0.5))">';
       h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.8rem;flex:1;border-radius:10px" onclick="editEmployee(' + u.id + ')"><i class="fas fa-edit" style="margin-right:5px"></i>Ред.</button>';
       h += '<button class="btn btn-outline" style="padding:8px 16px;font-size:0.8rem;flex:1;border-radius:10px" onclick="showChangePassForm(' + u.id + ')"><i class="fas fa-key" style="margin-right:5px"></i>Учётные</button>';
       h += '<button class="btn btn-outline" style="padding:8px 12px;font-size:0.8rem;border-radius:10px" onclick="navigate(&apos;team_access&apos;);editPermUserId=' + u.id + ';render()" title="Права доступа"><i class="fas fa-shield-alt"></i></button>';
-      if (u.is_active && u.role !== 'main_admin') {
+      if (u.is_active && !isTargetMainAdmin) {
         h += '<button class="btn" style="padding:8px 14px;font-size:0.8rem;background:rgba(239,68,68,0.1);color:#f87171;border:1px solid rgba(239,68,68,0.2);border-radius:10px" onclick="forceStopEmployee(' + u.id + ',&apos;' + escHtml(u.display_name) + '&apos;)" title="Принудительно завершить работу"><i class="fas fa-user-slash" style="margin-right:4px"></i>Стоп</button>';
-      } else if (!u.is_active && u.role !== 'main_admin') {
+      } else if (!u.is_active && !isTargetMainAdmin) {
         h += '<button class="btn" style="padding:8px 14px;font-size:0.8rem;background:rgba(16,185,129,0.1);color:#34d399;border:1px solid rgba(16,185,129,0.2);border-radius:10px" onclick="reactivateEmployee(' + u.id + ',&apos;' + escHtml(u.display_name) + '&apos;)" title="Активировать сотрудника"><i class="fas fa-user-check" style="margin-right:4px"></i>Вкл.</button>';
       }
-      if (u.role !== 'main_admin') h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.8rem;border-radius:10px" onclick="deleteEmployee(' + u.id + ',&apos;' + escHtml(u.display_name) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
+      if (!isTargetMainAdmin) h += '<button class="btn btn-danger" style="padding:8px 12px;font-size:0.8rem;border-radius:10px" onclick="deleteEmployee(' + u.id + ',&apos;' + escHtml(u.display_name) + '&apos;)" title="Удалить"><i class="fas fa-trash"></i></button>';
       h += '</div>';
       // Credentials change form
       if (_changePassUserId === u.id) {
@@ -11230,7 +11232,8 @@ function renderEmployees() {
         h += '<button class="btn btn-outline" style="padding:9px 16px;border-radius:10px" onclick="_changePassUserId=0;render()"><i class="fas fa-times"></i></button>';
         h += '</div></div>';
       }
-      } // end if !isTargetMainAdmin
+    } else if (!isAdmin && !isTargetMainAdmin) {
+      // Non-admin users can see limited actions for non-main_admin employees (if they have permission to this page)
     }
     h += '</div>'; // card end
   }
