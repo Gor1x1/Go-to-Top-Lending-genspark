@@ -820,7 +820,7 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
 });
 
 // ===== DATA RESET (main_admin only) =====
-// Professional "soft reset" — clears operational data while preserving configuration
+// Professional granular reset — clears selected data categories while preserving configuration
 api.post('/data-reset', authMiddleware, async (c) => {
   const caller = c.get('user');
   if (caller.role !== 'main_admin') {
@@ -829,10 +829,9 @@ api.post('/data-reset', authMiddleware, async (c) => {
   
   const db = c.env.DB;
   const body = await c.req.json();
-  const targets = body.targets || []; // array of: 'leads', 'analytics', 'finance', 'referrals_usage'
+  const targets = body.targets || [];
   const confirmCode = body.confirm_code || '';
   
-  // Safety: require explicit confirmation code
   if (confirmCode !== 'RESET-CONFIRM') {
     return c.json({ error: 'Для подтверждения сброса введите код: RESET-CONFIRM' }, 400);
   }
@@ -840,61 +839,75 @@ api.post('/data-reset', authMiddleware, async (c) => {
   const results: string[] = [];
   
   try {
-    // 1. LEADS RESET — clears all leads, comments, articles, resets invoice counter
+    // 1. LEADS — leads, comments, articles, invoice counter
     if (targets.includes('leads')) {
       await db.prepare('DELETE FROM lead_comments').run();
       await db.prepare('DELETE FROM lead_articles').run();
       await db.prepare('DELETE FROM leads').run();
-      // Reset auto-increment so next lead_number starts from 1
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'leads'").run(); } catch {}
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'lead_comments'").run(); } catch {}
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'lead_articles'").run(); } catch {}
-      results.push('✅ Лиды: удалено всё (заявки, комментарии, артикулы). Нумерация сброшена на 1.');
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('leads','lead_comments','lead_articles')").run(); } catch {}
+      results.push('Лиды: заявки, комментарии, артикулы удалены. Нумерация сброшена на 1.');
     }
     
-    // 2. ANALYTICS RESET — clears page views, activity logs
+    // 2. ANALYTICS — page views, activity logs, sessions
     if (targets.includes('analytics')) {
       await db.prepare('DELETE FROM page_views').run();
       await db.prepare('DELETE FROM activity_log').run();
       await db.prepare('DELETE FROM activity_sessions').run();
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'page_views'").run(); } catch {}
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'activity_log'").run(); } catch {}
-      results.push('✅ Аналитика: просмотры страниц, логи активности очищены.');
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('page_views','activity_log','activity_sessions')").run(); } catch {}
+      results.push('Аналитика: просмотры, логи, сессии очищены.');
     }
     
-    // 3. FINANCE RESET — clears financial data (loans, payments, dividends, expenses, period snapshots, taxes)
+    // 3. FINANCE — loans, expenses, dividends, taxes, assets, P&L snapshots
     if (targets.includes('finance')) {
       await db.prepare('DELETE FROM loan_payments').run();
       await db.prepare('DELETE FROM loans').run();
       await db.prepare('DELETE FROM dividends').run();
       await db.prepare('DELETE FROM other_income_expenses').run();
       await db.prepare('DELETE FROM expenses').run();
-      await db.prepare('DELETE FROM employee_bonuses').run();
       await db.prepare('DELETE FROM tax_payments').run();
       await db.prepare('DELETE FROM tax_rules').run();
       await db.prepare('DELETE FROM assets').run();
       await db.prepare('DELETE FROM period_snapshots').run();
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('loans','loan_payments','dividends','other_income_expenses','expenses','employee_bonuses','tax_payments','tax_rules','assets','period_snapshots')").run(); } catch {}
-      results.push('✅ Финансы: кредиты, расходы, дивиденды, налоги, снепшоты периодов очищены.');
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('loans','loan_payments','dividends','other_income_expenses','expenses','tax_payments','tax_rules','assets','period_snapshots')").run(); } catch {}
+      results.push('Финансы: кредиты, расходы, дивиденды, налоги, активы, P&L очищены.');
     }
     
-    // 4. REFERRALS USAGE RESET — resets uses_count but keeps codes & settings
+    // 4. REFERRALS USAGE — reset counters only
     if (targets.includes('referrals_usage')) {
       await db.prepare('UPDATE referral_codes SET uses_count = 0, paid_uses_count = 0').run();
-      results.push('✅ Промокоды: счётчик использований сброшен (коды и настройки сохранены).');
+      results.push('Промокоды: счётчики использований сброшены (коды сохранены).');
     }
     
-    // 5. FULL RESET — everything above
+    // 5. EMPLOYEE DATA — bonuses, vacations
+    if (targets.includes('employees')) {
+      await db.prepare('DELETE FROM employee_bonuses').run();
+      try { await db.prepare('DELETE FROM employee_vacations').run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('employee_bonuses','employee_vacations')").run(); } catch {}
+      results.push('Сотрудники: бонусы, штрафы, отпуска удалены (аккаунты сохранены).');
+    }
+    
+    // 6. UPLOADS — uploaded files records
+    if (targets.includes('uploads')) {
+      try { await db.prepare('DELETE FROM uploads').run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'uploads'").run(); } catch {}
+      results.push('Загрузки: записи о загруженных файлах удалены.');
+    }
+    
+    // 7. AUDIT LOG
+    if (targets.includes('audit_log')) {
+      try { await db.prepare('DELETE FROM audit_log').run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name = 'audit_log'").run(); } catch {}
+      results.push('Аудит-лог: все записи журнала удалены.');
+    }
+    
+    // 8. FULL RESET — everything above
     if (targets.includes('full')) {
-      // Leads
       await db.prepare('DELETE FROM lead_comments').run();
       await db.prepare('DELETE FROM lead_articles').run();
       await db.prepare('DELETE FROM leads').run();
-      // Analytics
       await db.prepare('DELETE FROM page_views').run();
       await db.prepare('DELETE FROM activity_log').run();
       await db.prepare('DELETE FROM activity_sessions').run();
-      // Finance
       await db.prepare('DELETE FROM loan_payments').run();
       await db.prepare('DELETE FROM loans').run();
       await db.prepare('DELETE FROM dividends').run();
@@ -905,16 +918,23 @@ api.post('/data-reset', authMiddleware, async (c) => {
       await db.prepare('DELETE FROM tax_rules').run();
       await db.prepare('DELETE FROM assets').run();
       await db.prepare('DELETE FROM period_snapshots').run();
-      // Referrals usage
       await db.prepare('UPDATE referral_codes SET uses_count = 0, paid_uses_count = 0').run();
-      // Reset all auto-increments
-      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('leads','lead_comments','lead_articles','page_views','activity_log','activity_sessions','loans','loan_payments','dividends','other_income_expenses','expenses','employee_bonuses','tax_payments','tax_rules','assets','period_snapshots')").run(); } catch {}
-      results.push('✅ ПОЛНЫЙ СБРОС: все операционные данные очищены. Конфигурация сохранена.');
+      try { await db.prepare('DELETE FROM employee_vacations').run(); } catch {}
+      try { await db.prepare('DELETE FROM uploads').run(); } catch {}
+      try { await db.prepare('DELETE FROM audit_log').run(); } catch {}
+      try { await db.prepare("DELETE FROM sqlite_sequence WHERE name IN ('leads','lead_comments','lead_articles','page_views','activity_log','activity_sessions','loans','loan_payments','dividends','other_income_expenses','expenses','employee_bonuses','employee_vacations','tax_payments','tax_rules','assets','period_snapshots','uploads','audit_log')").run(); } catch {}
+      results.push('ПОЛНЫЙ СБРОС: все операционные данные очищены. Конфигурация сохранена.');
     }
     
     if (results.length === 0) {
       return c.json({ error: 'Не выбрано ни одной категории для сброса' }, 400);
     }
+    
+    // Log the reset action
+    try {
+      await db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity_type, new_value) VALUES (?,?,?,?,?)')
+        .bind(caller.sub || 0, caller.display_name || 'admin', 'data_reset', 'system', JSON.stringify({ targets, results_count: results.length })).run();
+    } catch {}
     
     return c.json({ success: true, results });
   } catch (err: any) {
@@ -931,7 +951,7 @@ api.get('/data-counts', authMiddleware, async (c) => {
   
   const db = c.env.DB;
   try {
-    const [leads, comments, articles, pageViews, activityLogs, sessions, loans, expenses, dividends, snapshots, taxPayments, assets, otherIE, bonuses, taxRules, refUses] = await Promise.all([
+    const [leads, comments, articles, pageViews, activityLogs, sessions, loans, loanPayments, expenses, dividends, snapshots, taxPayments, assets, otherIE, bonuses, taxRules, refUses, vacations, uploads, auditLogs] = await Promise.all([
       db.prepare('SELECT COUNT(*) as cnt FROM leads').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM lead_comments').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM lead_articles').first(),
@@ -939,6 +959,7 @@ api.get('/data-counts', authMiddleware, async (c) => {
       db.prepare('SELECT COUNT(*) as cnt FROM activity_log').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM activity_sessions').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM loans').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM loan_payments').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM expenses').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM dividends').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM period_snapshots').first(),
@@ -948,13 +969,19 @@ api.get('/data-counts', authMiddleware, async (c) => {
       db.prepare('SELECT COUNT(*) as cnt FROM employee_bonuses').first(),
       db.prepare('SELECT COUNT(*) as cnt FROM tax_rules').first(),
       db.prepare('SELECT COALESCE(SUM(uses_count),0) as cnt FROM referral_codes').first(),
+      db.prepare('SELECT COUNT(*) as cnt FROM employee_vacations').first().catch(() => ({cnt:0})),
+      db.prepare('SELECT COUNT(*) as cnt FROM uploads').first().catch(() => ({cnt:0})),
+      db.prepare('SELECT COUNT(*) as cnt FROM audit_log').first().catch(() => ({cnt:0})),
     ]);
     
     return c.json({
       leads: { leads: leads?.cnt || 0, comments: comments?.cnt || 0, articles: articles?.cnt || 0 },
       analytics: { page_views: pageViews?.cnt || 0, activity_logs: activityLogs?.cnt || 0, sessions: sessions?.cnt || 0 },
-      finance: { loans: loans?.cnt || 0, expenses: expenses?.cnt || 0, dividends: dividends?.cnt || 0, snapshots: snapshots?.cnt || 0, tax_payments: taxPayments?.cnt || 0, assets: assets?.cnt || 0, other_ie: otherIE?.cnt || 0, bonuses: bonuses?.cnt || 0, tax_rules: taxRules?.cnt || 0 },
+      finance: { loans: loans?.cnt || 0, loan_payments: loanPayments?.cnt || 0, expenses: expenses?.cnt || 0, dividends: dividends?.cnt || 0, snapshots: snapshots?.cnt || 0, tax_payments: taxPayments?.cnt || 0, assets: assets?.cnt || 0, other_ie: otherIE?.cnt || 0, tax_rules: taxRules?.cnt || 0 },
       referrals: { total_uses: refUses?.cnt || 0 },
+      employees: { bonuses: bonuses?.cnt || 0, vacations: vacations?.cnt || 0 },
+      uploads: { files: uploads?.cnt || 0 },
+      audit: { logs: auditLogs?.cnt || 0 },
     });
   } catch (err: any) {
     return c.json({ error: err?.message || 'unknown' }, 500);
