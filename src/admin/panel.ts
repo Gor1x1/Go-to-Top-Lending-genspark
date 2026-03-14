@@ -19,7 +19,7 @@ export function getAdminHTML(): string {
   .nav-item { padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s; border-left: 3px solid transparent; }
   .nav-item:hover { background: #334155; }
   .nav-item.active { background: rgba(139,92,246,0.15); border-left-color: #8B5CF6; color: #a78bfa; }
-  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; }
+  .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 24px; overflow: hidden; }
   .btn { padding: 10px 20px; border-radius: 8px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: none; font-size: 0.9rem; }
   .btn-primary { background: #8B5CF6; color: white; }
   .btn-primary:hover { background: #7C3AED; }
@@ -3568,7 +3568,8 @@ function renderLeads() {
       if (pkgName) h += '<span class="badge" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.15));color:#FBBF24;font-weight:700;border:1px solid rgba(245,158,11,0.25)"><i class="fas fa-cube" style="margin-right:3px"></i>' + escHtml(pkgName) + '</span>';
       if (l.articles_count > 0) h += '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + ' \u0430\u0440\u0442.</span>';
       if (freeSvcs.length > 0) h += '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>';
-      var _invNum = 'INV-' + String(l.lead_number || l.id).padStart(3, '0');
+      var _invPrefix = (data.pdfTemplate && data.pdfTemplate.invoice_prefix) || 'INV';
+      var _invNum = _invPrefix + '-' + String(l.id).padStart(4, '0');
       h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-file-invoice" style="margin-right:3px"></i>' + _invNum + '</span>';
       h += '</div>';
       // Right: age + actions
@@ -3674,7 +3675,7 @@ function renderLeads() {
       }
       
       // ========== EXPANDABLE DETAIL AREA ==========
-      h += '<div id="lead-detail-' + l.id + '" style="display:none;margin-top:12px;border-top:2px solid #334155;padding-top:16px">';
+      h += '<div id="lead-detail-' + l.id + '" style="display:none;border-top:2px solid #334155;padding:16px;overflow:hidden">';
 
       // ===== SECTION 1: CLIENT INFO =====
       h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(99,102,241,0.04));border:1px solid rgba(139,92,246,0.2);border-radius:12px">';
@@ -3728,7 +3729,7 @@ function renderLeads() {
       for (var pki2 = 0; pki2 < availPkgs.length; pki2++) {
         var ap = availPkgs[pki2];
         var apSelected = pkgId && Number(pkgId) === Number(ap.id) ? ' selected' : '';
-        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + Number(ap.price || 0).toLocaleString('ru-RU') + ' \u058F)</option>';
+        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + Number(ap.package_price || ap.price || 0).toLocaleString('ru-RU') + ' \u058F)</option>';
       }
       h += '</select>';
       h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(245,158,11,0.15);color:#FBBF24;border:1px solid rgba(245,158,11,0.3)" onclick="attachPackageToLead(' + l.id + ')"><i class="fas fa-link" style="margin-right:4px"></i>\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C</button>';
@@ -3906,10 +3907,10 @@ function renderLeads() {
       h += '</div></div>'; // end svc-body & section 4
 
       // ===== SECTION 5: ARTICLES =====
-      h += '<div id="articles-' + l.id + '" style="margin-bottom:16px"></div>';
+      h += '<div id="articles-' + l.id + '" style="margin-bottom:16px;overflow:hidden"></div>';
 
       // ===== SECTION 6: COMMENTS =====
-      h += '<div id="comments-' + l.id + '" style="margin-bottom:16px"></div>';
+      h += '<div id="comments-' + l.id + '" style="margin-bottom:16px;overflow:hidden"></div>';
 
       // ===== ACTIONS BAR =====
       h += '<div style="padding:14px 16px;background:linear-gradient(135deg,rgba(34,197,94,0.06),rgba(16,185,129,0.03));border:1px solid rgba(34,197,94,0.2);border-radius:12px;display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">';
@@ -4338,7 +4339,7 @@ function renderArticlesSection(leadId) {
   var articles = data.leadArticles[leadId] || [];
   var totalSum = 0;
   for (var ti = 0; ti < articles.length; ti++) { totalSum += Number(articles[ti].total_price || 0); }
-  var h = '<div style="margin-top:12px;border-top:1px solid #334155;padding-top:12px">' +
+  var h = '<div style="border-top:1px solid #334155;padding-top:12px;max-width:100%;overflow:hidden">' +
     '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;art-body-' + leadId + '&apos;,&apos;art-arrow-' + leadId + '&apos;)">' +
     '<span style="font-size:0.85rem;font-weight:700;color:#fb923c"><i class="fas fa-box" style="margin-right:6px"></i>Артикулы WB (' + articles.length + ') — <span style="color:#F59E0B">' + Number(totalSum).toLocaleString('ru-RU') + '&nbsp;֏</span></span>' +
     '<div style="display:flex;align-items:center;gap:8px"><button class="btn btn-primary" style="padding:4px 12px;font-size:0.78rem" onclick="event.stopPropagation();showArticleModal(' + leadId + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
@@ -4705,6 +4706,7 @@ async function saveLeadAll(leadId) {
   var nameEl = document.getElementById('lead-name-' + leadId);
   var contactEl = document.getElementById('lead-contact-' + leadId);
   var productEl = document.getElementById('lead-product-' + leadId);
+  var serviceEl = document.getElementById('lead-service-' + leadId);
   var notesEl = document.getElementById('lead-notes-' + leadId);
   var tgEl = document.getElementById('lead-tg-' + leadId);
   var tzEl = document.getElementById('lead-tz-' + leadId);
@@ -4715,6 +4717,7 @@ async function saveLeadAll(leadId) {
   if (nameEl) updateData.name = nameEl.value;
   if (contactEl) updateData.contact = contactEl.value;
   if (productEl) updateData.product = productEl.value;
+  if (serviceEl) updateData.service = serviceEl.value;
   if (notesEl) updateData.notes = notesEl.value;
   if (tgEl) updateData.telegram_group = tgEl.value;
   if (tzEl) updateData.tz_link = tzEl.value;
@@ -4778,14 +4781,14 @@ async function attachPackageToLead(leadId) {
     id: pkg.id,
     name_ru: pkg.name_ru || pkg.name || '',
     name_am: pkg.name_am || '',
-    package_price: Number(pkg.price || 0),
-    original_price: Number(pkg.original_price || pkg.price || 0),
+    package_price: Number(pkg.package_price || pkg.price || 0),
+    original_price: Number(pkg.original_price || pkg.package_price || pkg.price || 0),
     items: pkgItems
   };
   // Recalc total
   var newTotal = 0;
   for (var j = 0; j < (calcData.items || []).length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
-  newTotal += Number(pkg.price || 0);
+  newTotal += Number(pkg.package_price || pkg.price || 0);
   calcData.total = newTotal;
   await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
   lead.calc_data = JSON.stringify(calcData);

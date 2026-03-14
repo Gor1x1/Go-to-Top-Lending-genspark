@@ -706,7 +706,9 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     } catch {}
   }
   
-  const totalAmount = Math.max(0, subtotalAmount - discountAmount);
+  // Include package price in total
+  const packagePrice = existingCalcData?.package ? (Number(existingCalcData.package.package_price) || 0) : 0;
+  const totalAmount = Math.max(0, subtotalAmount + packagePrice - discountAmount);
   
   // Compute commission from payment method
   let commissionAmount = 0;
@@ -724,6 +726,8 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   }
   
   // Update lead total_amount, commission_amount and calc_data (for PDF)
+  // PRESERVE existing package data from calc_data
+  const existingPackage = existingCalcData?.package || null;
   const calcData = JSON.stringify({
     items: allItems,
     subtotal: subtotalAmount,
@@ -734,14 +738,17 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     referralCode: referralCode,
     discountPercent: discountPercent,
     discountAmount: discountAmount,
-    freeServices: refFreeServices
+    freeServices: refFreeServices,
+    ...(existingPackage ? { package: existingPackage } : {})
   });
   // Ensure commission_amount column exists
   try { await db.prepare("SELECT commission_amount FROM leads LIMIT 1").first(); } catch { try { await db.prepare("ALTER TABLE leads ADD COLUMN commission_amount REAL DEFAULT 0").run(); } catch {} }
   await db.prepare('UPDATE leads SET total_amount = ?, commission_amount = ?, calc_data = ? WHERE id = ?')
     .bind(totalAmount, commissionAmount, calcData, leadId).run();
-  // Set source to calculator_pdf so PDF route works — update regardless of current source
-  await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND source != 'calculator_pdf'").bind(leadId).run();
+  // Set source to calculator_pdf ONLY if lead has calc_data with items (not for manual leads)
+  if (allItems.length > 0) {
+    await db.prepare("UPDATE leads SET source = 'calculator_pdf' WHERE id = ? AND source NOT IN ('calculator_pdf','manual','popup')").bind(leadId).run();
+  }
   await updateLeadArticlesCount(db, Number(leadId));
   return c.json({ success: true, total_amount: totalAmount, commission_amount: commissionAmount, articles_count: articles.length, calc_data: JSON.parse(calcData) });
 });
