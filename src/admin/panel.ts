@@ -11023,7 +11023,8 @@ function renderEmployees() {
     var onVacation = isUserOnVacation(u.id);
     var activity = getUserActivity(u.id);
     var isDisabled = !u.is_active;
-    var workDuration = calcWorkDuration(u.hire_date, u.end_date);
+    var workDuration = calcWorkDuration(u.hire_date, null); // СТАЖ: always hire_date → today
+    var contractDuration = u.end_date ? calcWorkDuration(u.hire_date, u.end_date) : null; // Срок договора: hire → end
 
     // Card wrapper with gradient border-top and hover effect
     h += '<div class="card emp-card" style="padding:0;overflow:hidden;border-radius:16px;border-top:3px solid ' + (isDisabled ? '#475569' : rColor) + ';' + (isDisabled ? 'opacity:0.55;filter:grayscale(0.3);' : '') + '">';
@@ -11072,7 +11073,13 @@ function renderEmployees() {
       h += '<div style="color:#475569;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px"><i class="fas fa-briefcase" style="margin-right:3px"></i>Стаж</div>';
       h += '<div style="display:flex;align-items:baseline;gap:6px"><span style="color:#a78bfa;font-weight:700;font-size:0.95rem">' + (workDuration || '\u2014') + '</span>';
       h += '<span style="color:#475569;font-size:0.68rem">c ' + escHtml(u.hire_date) + '</span></div>';
-      if (u.end_date) h += '<div style="color:#f87171;font-size:0.7rem;margin-top:2px"><i class="fas fa-calendar-times" style="margin-right:3px"></i>По ' + escHtml(u.end_date) + '</div>';
+      h += '</div>';
+    }
+    if (u.hire_date && u.end_date) {
+      h += '<div style="flex:1;min-width:120px;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(245,158,11,0.03));border:1px solid rgba(245,158,11,0.15);border-radius:10px;padding:10px 14px">';
+      h += '<div style="color:#475569;font-size:0.68rem;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px"><i class="fas fa-file-contract" style="margin-right:3px"></i>Срок договора</div>';
+      h += '<div style="display:flex;align-items:baseline;gap:6px"><span style="color:#f59e0b;font-weight:700;font-size:0.95rem">' + (contractDuration || '\u2014') + '</span></div>';
+      h += '<div style="color:#f87171;font-size:0.7rem;margin-top:2px"><i class="fas fa-calendar-times" style="margin-right:3px"></i>По ' + escHtml(u.end_date) + '</div>';
       h += '</div>';
     }
     h += '</div>';
