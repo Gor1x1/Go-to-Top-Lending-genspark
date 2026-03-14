@@ -3561,13 +3561,15 @@ function renderLeads() {
       // Left: # + badges
       h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
       h += '<span style="font-size:1.15rem;font-weight:900;color:#a78bfa">#' + (l.lead_number || l.id) + '</span>';
-      h += '<span class="badge badge-purple">' + (l.source || 'form') + '</span>';
+      var _srcLabels = { calculator_pdf: '🧮 Калькулятор', contact_form: '📋 Форма', form: '📋 Форма', telegram: '📱 Telegram', manual: '✍️ Ручной', unknown: '❓ Прочее' };
+      h += '<span class="badge badge-purple">' + (_srcLabels[l.source] || escHtml(l.source || 'Форма')) + '</span>';
       if (l.lang) h += '<span class="badge" style="background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.15);color:#fb923c' : 'rgba(59,130,246,0.15);color:#60a5fa') + ';font-weight:700">' + (l.lang === 'am' ? '\uD83C\uDDE6\uD83C\uDDF2 AM' : '\uD83C\uDDF7\uD83C\uDDFA RU') + '</span>';
       if (l.referral_code) h += '<span class="badge badge-amber">\uD83C\uDFF7 ' + escHtml(l.referral_code) + (discPct > 0 ? ' \u2212' + discPct + '%' : '') + '</span>';
       if (pkgName) h += '<span class="badge" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.15));color:#FBBF24;font-weight:700;border:1px solid rgba(245,158,11,0.25)"><i class="fas fa-cube" style="margin-right:3px"></i>' + escHtml(pkgName) + '</span>';
       if (l.articles_count > 0) h += '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + ' \u0430\u0440\u0442.</span>';
       if (freeSvcs.length > 0) h += '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>';
-      if (l.pdf_template_version) h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-file-pdf" style="margin-right:3px"></i>v' + escHtml(String(l.pdf_template_version)) + '</span>';
+      var _invNum = 'INV-' + String(l.lead_number || l.id).padStart(3, '0');
+      h += '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa"><i class="fas fa-file-invoice" style="margin-right:3px"></i>' + _invNum + '</span>';
       h += '</div>';
       // Right: age + actions
       h += '<div style="display:flex;align-items:center;gap:10px">';
@@ -3577,23 +3579,25 @@ function renderLeads() {
       h += '</div></div>';
 
       // === ROW 2: Main content — full width 4-zone layout ===
-      h += '<div style="display:grid;grid-template-columns:minmax(220px,1.2fr) minmax(200px,1fr) minmax(200px,1fr) minmax(180px,auto);gap:0;min-height:100px">';
+      h += '<div style="display:grid;grid-template-columns:1.2fr 1fr 1fr auto;gap:0;min-height:100px;overflow:hidden">';
 
       // --- ZONE 1: Client ---
       h += '<div style="padding:16px 20px;border-right:1px solid #1e293b">';
       h += '<div style="font-size:1.25rem;font-weight:800;color:#e2e8f0;margin-bottom:6px;line-height:1.2">' + escHtml(l.name || '\u2014') + '</div>';
       h += '<div style="font-size:1rem;color:#a78bfa;font-weight:600;margin-bottom:8px"><i class="fas fa-phone" style="margin-right:6px;font-size:0.85rem"></i>' + escHtml(l.contact || '\u2014') + '</div>';
       // Assignee
+      h += '<div id="lead-assignee-zone-' + l.id + '">';
       if (l.assigned_to) {
         h += '<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:6px;font-size:0.85rem;color:#86efac;font-weight:600"><i class="fas fa-user-check"></i>' + escHtml(getAssigneeName(l.assigned_to)) + '</div>';
       } else {
         h += '<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.85rem;color:#fca5a5;font-weight:600"><i class="fas fa-user-slash"></i>\u041D\u0435 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D</div>';
       }
+      h += '</div>';
       // Quick links
       if (l.telegram_group || l.tz_link) {
-        h += '<div style="display:flex;gap:10px;margin-top:8px">';
-        if (l.telegram_group) h += '<a href="' + escHtml(l.telegram_group) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.85rem;color:#0EA5E9;text-decoration:none;font-weight:600"><i class="fab fa-telegram" style="margin-right:4px;font-size:1rem"></i>Telegram</a>';
-        if (l.tz_link) h += '<a href="' + escHtml(l.tz_link) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.85rem;color:#F59E0B;text-decoration:none;font-weight:600"><i class="fas fa-file-alt" style="margin-right:4px;font-size:0.9rem"></i>\u0422\u0417</a>';
+        h += '<div style="display:flex;gap:10px;margin-top:8px;flex-wrap:wrap">';
+        if (l.telegram_group) h += '<a href="' + escHtml(l.telegram_group) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.85rem;color:#0EA5E9;text-decoration:none;font-weight:600;white-space:nowrap"><i class="fab fa-telegram" style="margin-right:4px;font-size:1rem"></i>\u0413\u0440\u0443\u043F\u043F\u0430</a>';
+        if (l.tz_link) h += '<a href="' + escHtml(l.tz_link) + '" target="_blank" onclick="event.stopPropagation()" style="font-size:0.85rem;color:#F59E0B;text-decoration:none;font-weight:600;white-space:nowrap"><i class="fas fa-file-alt" style="margin-right:4px;font-size:0.9rem"></i>\u0422\u0417</a>';
         h += '</div>';
       }
       h += '</div>';
@@ -3647,12 +3651,10 @@ function renderLeads() {
       if (leadAmt > 0) {
         if (leadCommission > 0) {
           h += '<div style="font-size:0.78rem;color:#64748b;text-decoration:line-through">' + Number(leadAmt).toLocaleString('ru-RU') + ' \u058F</div>';
-          h += '<div style="font-size:1.8rem;font-weight:900;color:#22C55E;line-height:1.1">' + Number(leadFinalTotal).toLocaleString('ru-RU') + '</div>';
-          h += '<div style="font-size:0.85rem;color:#22C55E;font-weight:600">\u058F</div>';
+          h += '<div style="font-size:1.6rem;font-weight:900;color:#22C55E;line-height:1.2;white-space:nowrap">' + Number(leadFinalTotal).toLocaleString('ru-RU') + ' \u058F</div>';
           h += '<div style="font-size:0.72rem;color:#3B82F6;font-weight:600;margin-top:2px">+' + Number(leadCommission).toLocaleString('ru-RU') + ' \u058F \u043A\u043E\u043C.</div>';
         } else {
-          h += '<div style="font-size:1.8rem;font-weight:900;color:#8B5CF6;line-height:1.1">' + Number(leadAmt).toLocaleString('ru-RU') + '</div>';
-          h += '<div style="font-size:0.85rem;color:#8B5CF6;font-weight:600">\u058F</div>';
+          h += '<div style="font-size:1.6rem;font-weight:900;color:#8B5CF6;line-height:1.2;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + ' \u058F</div>';
         }
       } else {
         h += '<div style="font-size:1.2rem;color:#475569;font-weight:600">\u2014</div>';
@@ -3661,6 +3663,15 @@ function renderLeads() {
       h += '</div>';
 
       h += '</div>'; // end 4-zone grid
+
+      // === Notes preview row (collapsed view) ===
+      if (l.notes && l.notes.trim()) {
+        var notePreview = l.notes.trim().length > 120 ? l.notes.trim().substring(0, 120) + '...' : l.notes.trim();
+        h += '<div id="lead-note-preview-' + l.id + '" style="padding:8px 18px;background:rgba(251,191,36,0.05);border-top:1px solid rgba(251,191,36,0.15);display:flex;align-items:center;gap:8px;overflow:hidden">';
+        h += '<i class="fas fa-sticky-note" style="color:#FBBF24;font-size:0.8rem;flex-shrink:0"></i>';
+        h += '<span style="font-size:0.82rem;color:#fbbf24;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(notePreview) + '</span>';
+        h += '</div>';
+      }
       
       // ========== EXPANDABLE DETAIL AREA ==========
       h += '<div id="lead-detail-' + l.id + '" style="display:none;margin-top:12px;border-top:2px solid #334155;padding-top:16px">';
@@ -3669,13 +3680,13 @@ function renderLeads() {
       h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(99,102,241,0.04));border:1px solid rgba(139,92,246,0.2);border-radius:12px">';
       h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#8B5CF6,#6366F1);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-user" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#c4b5fd">Клиент</span></div>';
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
-      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя</label><input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..."></div>';
-      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон</label><input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..."></div>';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-user-edit" style="margin-right:4px;color:#a78bfa"></i>Имя</label><input class="input" id="lead-name-' + l.id + '" value="' + escHtml(l.name||'') + '" style="font-size:0.88rem;padding:8px" placeholder="Имя клиента..." oninput="autoSaveLeadField(' + l.id + ',&apos;name&apos;,&apos;lead-name-' + l.id + '&apos;)"></div>';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-phone" style="margin-right:4px;color:#10B981"></i>Телефон</label><input class="input" id="lead-contact-' + l.id + '" value="' + escHtml(l.contact||'') + '" style="font-size:0.88rem;padding:8px" placeholder="+374..." oninput="autoSaveLeadField(' + l.id + ',&apos;contact&apos;,&apos;lead-contact-' + l.id + '&apos;)"></div>';
       h += '</div>';
       // Row 2: TG + TZ
       h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">';
-      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Telegram группа</label><input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..."></div>';
-      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента</label><input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..."></div>';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Группа</label><input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..." oninput="autoSaveLeadField(' + l.id + ',&apos;telegram_group&apos;,&apos;lead-tg-' + l.id + '&apos;)"></div>';
+      h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента</label><input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..." oninput="autoSaveLeadField(' + l.id + ',&apos;tz_link&apos;,&apos;lead-tz-' + l.id + '&apos;)"></div>';
       h += '</div>';
       // Row 3: Product + Service (for non-calc leads)
       if (l.product || l.service || !isCalc) {
@@ -3693,11 +3704,11 @@ function renderLeads() {
       }
       // Notes
       h += '<div style="margin-top:10px"><label style="font-size:0.72rem;font-weight:600;color:#fbbf24;display:block;margin-bottom:4px"><i class="fas fa-sticky-note" style="margin-right:4px"></i>Заметка</label>';
-      h += '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте...">' + escHtml(l.notes||'') + '</textarea></div>';
+      h += '<textarea class="input" id="lead-notes-' + l.id + '" style="min-height:40px;font-size:0.82rem;padding:8px" placeholder="Добавить заметку о клиенте..." oninput="autoSaveLeadField(' + l.id + ',&apos;notes&apos;,&apos;lead-notes-' + l.id + '&apos;)">' + escHtml(l.notes||'') + '</textarea></div>';
       // Info badges row: created_at, source, lang, PDF version
       h += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:12px;padding-top:10px;border-top:1px solid rgba(139,92,246,0.15)">';
       h += '<span style="font-size:0.7rem;color:#94a3b8;padding:3px 8px;background:rgba(100,116,139,0.1);border-radius:6px"><i class="fas fa-calendar" style="margin-right:4px"></i>Создан: ' + formatArmTime(l.created_at) + '</span>';
-      h += '<span style="font-size:0.7rem;color:#a78bfa;padding:3px 8px;background:rgba(139,92,246,0.1);border-radius:6px"><i class="fas fa-link" style="margin-right:4px"></i>Источник: ' + escHtml(l.source || 'form') + '</span>';
+      h += '<span style="font-size:0.7rem;color:#a78bfa;padding:3px 8px;background:rgba(139,92,246,0.1);border-radius:6px"><i class="fas fa-link" style="margin-right:4px"></i>\u0418\u0441\u0442\u043E\u0447\u043D\u0438\u043A: ' + (_srcLabels[l.source] || escHtml(l.source || '\u0424\u043E\u0440\u043C\u0430')) + '</span>';
       if (l.lang) h += '<span style="font-size:0.7rem;padding:3px 8px;border-radius:6px;background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.1);color:#fb923c' : 'rgba(59,130,246,0.1);color:#60a5fa') + '">' + (l.lang === 'am' ? '\uD83C\uDDE6\uD83C\uDDF2 AM' : '\uD83C\uDDF7\uD83C\uDDFA RU') + '</span>';
       if (l.pdf_template_version) h += '<span style="font-size:0.7rem;color:#60a5fa;padding:3px 8px;background:rgba(59,130,246,0.1);border-radius:6px"><i class="fas fa-file-pdf" style="margin-right:4px"></i>PDF v' + escHtml(String(l.pdf_template_version)) + '</span>';
       if (l.status_changed_at) h += '<span style="font-size:0.7rem;color:#94a3b8;padding:3px 8px;background:rgba(100,116,139,0.1);border-radius:6px"><i class="fas fa-clock" style="margin-right:4px"></i>Обновлён: ' + formatArmTime(l.status_changed_at) + '</span>';
@@ -3706,9 +3717,24 @@ function renderLeads() {
       h += '</div>'; // END section 1
 
       // ===== SECTION 2: PACKAGE & PROMO =====
+      h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(251,191,36,0.03));border:1px solid rgba(245,158,11,0.2);border-radius:12px">';
+      h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-cube" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#FBBF24">\u041F\u0430\u043A\u0435\u0442 \u0438 \u043F\u0440\u043E\u043C\u043E</span></div>';
+      // Package selector (always available)
+      var availPkgs = data.calcPackages || [];
+      h += '<div style="margin-bottom:12px"><label style="font-size:0.72rem;font-weight:600;color:#FBBF24;display:block;margin-bottom:4px"><i class="fas fa-cube" style="margin-right:4px"></i>\u041F\u0440\u0438\u0432\u044F\u0437\u0430\u0442\u044C \u043F\u0430\u043A\u0435\u0442</label>';
+      h += '<div style="display:flex;gap:8px;align-items:center">';
+      h += '<select class="input" id="lead-pkg-select-' + l.id + '" style="flex:1;font-size:0.85rem;padding:8px;border-color:rgba(245,158,11,0.3)">';
+      h += '<option value="">-- \u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u0430\u043A\u0435\u0442 --</option>';
+      for (var pki2 = 0; pki2 < availPkgs.length; pki2++) {
+        var ap = availPkgs[pki2];
+        var apSelected = pkgId && Number(pkgId) === Number(ap.id) ? ' selected' : '';
+        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + Number(ap.price || 0).toLocaleString('ru-RU') + ' \u058F)</option>';
+      }
+      h += '</select>';
+      h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(245,158,11,0.15);color:#FBBF24;border:1px solid rgba(245,158,11,0.3)" onclick="attachPackageToLead(' + l.id + ')"><i class="fas fa-link" style="margin-right:4px"></i>\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C</button>';
+      if (pkgData) h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="detachPackageFromLead(' + l.id + ')"><i class="fas fa-unlink" style="margin-right:4px"></i>\u0423\u0431\u0440\u0430\u0442\u044C</button>';
+      h += '</div></div>';
       if (pkgData || freeSvcs.length > 0 || l.referral_code) {
-        h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(251,191,36,0.03));border:1px solid rgba(245,158,11,0.2);border-radius:12px">';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-cube" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#FBBF24">Пакет и промо</span></div>';
         // Package card
         if (pkgData) {
           var pkgDiscountPct = (pkgOrigPrice > 0 && pkgOrigPrice > pkgPrice) ? Math.round((1 - pkgPrice / pkgOrigPrice) * 100) : 0;
@@ -3786,20 +3812,20 @@ function renderLeads() {
           h += '<div id="lead-refcode-info-' + l.id + '"></div>';
         }
         h += '</div>'; // end referral
-        h += '</div>'; // END section 2
-      } else {
-        // No package/promo — still need referral code section
+      } // end if (pkgData || freeSvcs || referral)
+      // Always show referral code section when not already shown
+      if (!pkgData && !freeSvcs.length && !l.referral_code) {
         var leadRefCode = l.referral_code || '';
-        h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(16,185,129,0.06),rgba(16,185,129,0.03));border:1px solid rgba(16,185,129,0.2);border-radius:12px">';
-        h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#10B981,#059669);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-tag" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#34D399">Промокод</span></div>';
+        h += '<div>';
+        h += '<label style="font-size:0.72rem;font-weight:600;color:#10B981;display:block;margin-bottom:4px"><i class="fas fa-tag" style="margin-right:4px"></i>\u0420\u0435\u0444\u0435\u0440\u0430\u043B\u044C\u043D\u044B\u0439 \u043A\u043E\u0434</label>';
         h += '<div style="display:flex;gap:8px;align-items:center">';
-        h += '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="Введите промокод...">';
-        h += '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>Применить</button>';
-        if (leadRefCode) h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="removeLeadRefCode(' + l.id + ')"><i class="fas fa-times" style="margin-right:4px"></i>Отменить</button>';
+        h += '<input class="input" id="lead-refcode-' + l.id + '" value="' + escHtml(leadRefCode) + '" style="font-size:0.85rem;padding:8px;flex:1;border-color:rgba(16,185,129,0.3)" placeholder="\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043F\u0440\u043E\u043C\u043E\u043A\u043E\u0434...">';
+        h += '<button class="btn btn-success" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap" onclick="applyLeadRefCode(' + l.id + ')"><i class="fas fa-check" style="margin-right:4px"></i>\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C</button>';
         h += '</div>';
         h += '<div id="lead-refcode-info-' + l.id + '"></div>';
         h += '</div>';
       }
+      h += '</div>'; // END section 2
 
       // ===== SECTION 3: FINANCES =====
       h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(99,102,241,0.03));border:1px solid rgba(59,130,246,0.2);border-radius:12px">';
@@ -3945,7 +3971,38 @@ async function saveLeadNotes(id) {
   await api('/leads/' + id, { method:'PUT', body: JSON.stringify({ notes: el.value }) });
   var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
   if (lead) lead.notes = el.value;
-  toast('Заметка сохранена');
+  // Update note preview in collapsed view
+  var notePreviewEl = document.getElementById('lead-note-preview-' + id);
+  if (notePreviewEl) {
+    if (el.value && el.value.trim()) {
+      var noteText = el.value.trim().length > 120 ? el.value.trim().substring(0, 120) + '...' : el.value.trim();
+      notePreviewEl.style.display = 'flex';
+      notePreviewEl.innerHTML = '<i class="fas fa-sticky-note" style="color:#FBBF24;font-size:0.8rem;flex-shrink:0"></i><span style="font-size:0.82rem;color:#fbbf24;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escHtml(noteText) + '</span>';
+    } else {
+      notePreviewEl.style.display = 'none';
+    }
+  }
+  toast('\u0417\u0430\u043C\u0435\u0442\u043A\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0430');
+}
+
+// Debounced auto-save for individual lead fields
+var _leadAutoSaveTimers = {};
+function autoSaveLeadField(leadId, fieldName, fieldId) {
+  var key = leadId + '_' + fieldName;
+  if (_leadAutoSaveTimers[key]) clearTimeout(_leadAutoSaveTimers[key]);
+  _leadAutoSaveTimers[key] = setTimeout(function() {
+    var el = document.getElementById(fieldId);
+    if (!el) return;
+    var updateData = {};
+    updateData[fieldName] = el.value;
+    api('/leads/' + leadId, { method:'PUT', body: JSON.stringify(updateData) }).then(function() {
+      var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+      if (lead) lead[fieldName] = el.value;
+      // Flash green border briefly to indicate save
+      el.style.borderColor = '#22C55E';
+      setTimeout(function() { el.style.borderColor = ''; }, 1000);
+    });
+  }, 800);
 }
 
 async function applyLeadRefCode(leadId) {
@@ -4108,15 +4165,33 @@ async function loadLeadsData() {
 async function updateLeadStatus(id, status) {
   await api('/leads/' + id, { method: 'PUT', body: JSON.stringify({ status: status }) });
   var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
-  if (lead) lead.status = status;
-  toast('Статус обновлён');
+  if (lead) {
+    lead.status = status;
+    lead.status_changed_at = new Date().toISOString();
+    if (status === 'done') lead.completed_at = new Date().toISOString();
+  }
+  toast('\u0421\u0442\u0430\u0442\u0443\u0441 \u043E\u0431\u043D\u043E\u0432\u043B\u0451\u043D');
+  // Update card border color without full re-render
+  var statusColors = { new:'#10B981', contacted:'#3B82F6', in_progress:'#F59E0B', checking:'#8B5CF6', done:'#10B981', rejected:'#EF4444' };
+  var card = document.getElementById('lead-detail-' + id);
+  if (card && card.parentElement) card.parentElement.style.borderLeftColor = statusColors[status] || '#334155';
 }
 
 async function assignLead(id, userId) {
   await api('/leads/' + id, { method: 'PUT', body: JSON.stringify({ assigned_to: userId ? Number(userId) : null }) });
   var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === id; });
   if (lead) lead.assigned_to = userId ? Number(userId) : null;
-  toast('Ответственный назначен');
+  toast('\u041E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0439 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D');
+  // Update assignee display in Zone 1 without full re-render
+  var assigneeZone = document.getElementById('lead-assignee-zone-' + id);
+  if (assigneeZone) {
+    if (userId) {
+      var uName = getAssigneeName(Number(userId));
+      assigneeZone.innerHTML = '<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.2);border-radius:6px;font-size:0.85rem;color:#86efac;font-weight:600"><i class="fas fa-user-check"></i>' + escHtml(uName) + '</div>';
+    } else {
+      assigneeZone.innerHTML = '<div style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.2);border-radius:6px;font-size:0.85rem;color:#fca5a5;font-weight:600"><i class="fas fa-user-slash"></i>\u041D\u0435 \u043D\u0430\u0437\u043D\u0430\u0447\u0435\u043D</div>';
+    }
+  }
 }
 
 async function deleteLead(id) {
@@ -4675,6 +4750,73 @@ async function saveLeadAll(leadId) {
     toast('Данные сохранены');
   }
   // 3. Refresh
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); loadComments(leadId); }
+  }, 100);
+}
+
+// Attach package to lead
+async function attachPackageToLead(leadId) {
+  var sel = document.getElementById('lead-pkg-select-' + leadId);
+  if (!sel || !sel.value) { toast('\u0412\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043F\u0430\u043A\u0435\u0442', 'error'); return; }
+  var pkgId = Number(sel.value);
+  var pkg = (data.calcPackages || []).find(function(p) { return p.id === pkgId; });
+  if (!pkg) { toast('\u041F\u0430\u043A\u0435\u0442 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D', 'error'); return; }
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (!lead) return;
+  var calcData = { items: [], total: 0 };
+  try { if (lead.calc_data) calcData = JSON.parse(lead.calc_data); } catch(e) {}
+  // Parse package items  
+  var pkgItems = [];
+  try { pkgItems = JSON.parse(pkg.items || '[]'); } catch(e) {}
+  calcData.package = {
+    package_id: pkg.id,
+    id: pkg.id,
+    name_ru: pkg.name_ru || pkg.name || '',
+    name_am: pkg.name_am || '',
+    package_price: Number(pkg.price || 0),
+    original_price: Number(pkg.original_price || pkg.price || 0),
+    items: pkgItems
+  };
+  // Recalc total
+  var newTotal = 0;
+  for (var j = 0; j < (calcData.items || []).length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
+  newTotal += Number(pkg.price || 0);
+  calcData.total = newTotal;
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
+  lead.calc_data = JSON.stringify(calcData);
+  lead.total_amount = newTotal;
+  toast('\u041F\u0430\u043A\u0435\u0442 \u00AB' + (pkg.name_ru || pkg.name) + '\u00BB \u043F\u0440\u0438\u0432\u044F\u0437\u0430\u043D');
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+  var resLeads = await api('/leads?limit=500');
+  data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); }
+  }, 100);
+}
+
+// Detach package from lead
+async function detachPackageFromLead(leadId) {
+  var lead = ((data.leads && data.leads.leads)||[]).find(function(x) { return x.id === leadId; });
+  if (!lead) return;
+  var calcData = { items: [], total: 0 };
+  try { if (lead.calc_data) calcData = JSON.parse(lead.calc_data); } catch(e) {}
+  var removedPkgPrice = calcData.package ? Number(calcData.package.package_price || 0) : 0;
+  delete calcData.package;
+  var newTotal = 0;
+  for (var j = 0; j < (calcData.items || []).length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
+  calcData.total = newTotal;
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
+  lead.calc_data = JSON.stringify(calcData);
+  lead.total_amount = newTotal;
+  toast('\u041F\u0430\u043A\u0435\u0442 \u0443\u0431\u0440\u0430\u043D');
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   var resLeads = await api('/leads?limit=500');
   data.leads = resLeads || { leads: [], total: 0 };
   render();
