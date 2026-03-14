@@ -652,7 +652,7 @@ function renderDashboard() {
   } else {
     var srcTotal = 0; for (var xi = 0; xi < sources.length; xi++) srcTotal += Number(sources[xi].count || 0);
     var srcColors = ['#8B5CF6','#3B82F6','#10B981','#F59E0B','#EF4444','#EC4899','#6366F1','#14B8A6'];
-    var srcNames = { calculator_pdf: '🧮 Калькулятор', contact_form: '📋 Форма', telegram: '📱 Telegram', unknown: '❓ Прочее', manual: '✍️ Ручной' };
+    var srcNames = { calculator_pdf: '🧮 Калькулятор', form: '📋 Форма связи', popup: '📨 Попап форма', manual: '✍️ Ручной', unknown: '❓ Прочее' };
     for (var xi = 0; xi < sources.length; xi++) {
       var src = sources[xi];
       var srcPct = srcTotal > 0 ? Math.round((src.count / srcTotal) * 100) : 0;
@@ -3561,7 +3561,7 @@ function renderLeads() {
       // Left: # + badges
       h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">';
       h += '<span style="font-size:1.15rem;font-weight:900;color:#a78bfa">#' + (l.lead_number || l.id) + '</span>';
-      var _srcLabels = { calculator_pdf: '🧮 Калькулятор', contact_form: '📋 Форма', form: '📋 Форма', telegram: '📱 Telegram', manual: '✍️ Ручной', unknown: '❓ Прочее' };
+      var _srcLabels = { calculator_pdf: '🧮 Калькулятор', form: '📋 Форма связи', popup: '📨 Попап форма', manual: '✍️ Ручной' };
       h += '<span class="badge badge-purple">' + (_srcLabels[l.source] || escHtml(l.source || 'Форма')) + '</span>';
       if (l.lang) h += '<span class="badge" style="background:' + (l.lang === 'am' ? 'rgba(249,115,22,0.15);color:#fb923c' : 'rgba(59,130,246,0.15);color:#60a5fa') + ';font-weight:700">' + (l.lang === 'am' ? '\uD83C\uDDE6\uD83C\uDDF2 AM' : '\uD83C\uDDF7\uD83C\uDDFA RU') + '</span>';
       if (l.referral_code) h += '<span class="badge badge-amber">\uD83C\uDFF7 ' + escHtml(l.referral_code) + (discPct > 0 ? ' \u2212' + discPct + '%' : '') + '</span>';
