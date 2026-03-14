@@ -318,6 +318,7 @@ img{max-width:100%;height:auto}
 .bottom-nav-item.active{color:var(--purple)}
 .bottom-nav-item:hover,.bottom-nav-item:active{color:var(--purple)}
 .bottom-nav-item i{font-size:1.15rem;width:24px;height:24px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.bottom-nav-item i.fa-hand-holding{transform:translateY(-1px)}
 .bottom-nav-item span{white-space:normal;overflow:hidden;text-overflow:ellipsis;max-width:100%;font-size:0.6rem;text-align:center;line-height:1.15;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:break-word;flex-shrink:0}
 .bottom-nav-more{position:relative}
 .bottom-nav-more.active{color:var(--purple)}
