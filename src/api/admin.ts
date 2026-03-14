@@ -143,6 +143,77 @@ api.post('/init-db', authMiddleware, async (c) => {
   return c.json({ success: true, message: 'Database initialized' });
 });
 
+// ===== OPENAPI / SWAGGER DOCUMENTATION =====
+api.get('/api-docs', async (c) => {
+  const spec = {
+    openapi: '3.0.3',
+    info: {
+      title: 'GoToTop CRM API',
+      version: '2.0.0',
+      description: 'Complete API documentation for GoToTop Landing & CRM system. Includes public endpoints, admin CRM, analytics, and financial management.',
+      contact: { name: 'GoToTop', url: 'https://goo-to-top.com' }
+    },
+    servers: [{ url: '/api/admin', description: 'Admin API' }, { url: '/', description: 'Public API' }],
+    components: {
+      securitySchemes: {
+        bearerAuth: { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }
+      }
+    },
+    security: [{ bearerAuth: [] }],
+    paths: {
+      '/api/lead': { post: { tags: ['Public'], summary: 'Create lead from contact form', security: [], requestBody: { content: { 'application/json': { schema: { type: 'object', properties: { name: {type:'string'}, contact: {type:'string'}, product: {type:'string'}, service: {type:'string'}, message: {type:'string'}, lang: {type:'string',enum:['ru','am','en']}, referral_code: {type:'string'} }}}}}, responses: { '200': { description: 'Lead created' }, '429': { description: 'Rate limited' }}}},
+      '/api/generate-pdf': { post: { tags: ['Public'], summary: 'Generate PDF invoice and create lead', security: [], responses: { '200': { description: 'PDF lead created with URL' }, '429': { description: 'Rate limited' }}}},
+      '/api/site-data': { get: { tags: ['Public'], summary: 'Get all site content for rendering', security: [], responses: { '200': { description: 'Site data JSON' }}}},
+      '/api/health': { get: { tags: ['Public'], summary: 'Health check', security: [], responses: { '200': { description: 'OK' }}}},
+      '/api/referral/check': { post: { tags: ['Public'], summary: 'Validate referral/promo code', security: [], responses: { '200': { description: 'Validation result' }}}},
+      '/login': { post: { tags: ['Auth'], summary: 'Admin login', security: [], responses: { '200': { description: 'JWT token + user info' }}}},
+      '/refresh-token': { post: { tags: ['Auth'], summary: 'Refresh JWT token', responses: { '200': { description: 'New token' }}}},
+      '/change-password': { post: { tags: ['Auth'], summary: 'Change password', responses: { '200': { description: 'Success' }}}},
+      '/leads': { get: { tags: ['Leads'], summary: 'List leads with filtering', parameters: [{name:'status',in:'query'},{name:'source',in:'query'},{name:'limit',in:'query'},{name:'offset',in:'query'}], responses: { '200': { description: 'Leads list' }}}, post: { tags: ['Leads'], summary: 'Create lead manually', responses: { '200': { description: 'Success' }}}},
+      '/leads/{id}': { put: { tags: ['Leads'], summary: 'Update lead (tracks status_changed_at, completed_at)', responses: { '200': { description: 'Success' }}}, delete: { tags: ['Leads'], summary: 'Delete lead', responses: { '200': { description: 'Success' }}}},
+      '/leads/export': { get: { tags: ['Leads'], summary: 'Export leads as CSV', responses: { '200': { description: 'CSV file' }}}},
+      '/leads/analytics': { get: { tags: ['Analytics'], summary: 'Lead analytics (basic)', responses: { '200': { description: 'Analytics data' }}}},
+      '/business-analytics': { get: { tags: ['Analytics'], summary: 'Comprehensive business analytics with KPIs (CAC, ROAS, funnel, forecast, cohort)', parameters: [{name:'from',in:'query'},{name:'to',in:'query'},{name:'month',in:'query'}], responses: { '200': { description: 'Full analytics payload' }}}},
+      '/stats': { get: { tags: ['Dashboard'], summary: 'Dashboard statistics', responses: { '200': { description: 'Dashboard stats' }}}},
+      '/users': { get: { tags: ['Employees'], summary: 'List employees', responses: { '200': { description: 'Users list' }}}, post: { tags: ['Employees'], summary: 'Create employee', responses: { '200': { description: 'Success' }}}},
+      '/expenses': { get: { tags: ['Finance'], summary: 'List expenses (filtered by period)', responses: { '200': { description: 'Expenses list' }}}},
+      '/pnl/{periodKey}': { get: { tags: ['Finance'], summary: 'P&L report for period', responses: { '200': { description: 'P&L data' }}}},
+      '/audit-log': { get: { tags: ['Audit'], summary: 'View audit log', parameters: [{name:'entity_type',in:'query'},{name:'entity_id',in:'query'},{name:'limit',in:'query'}], responses: { '200': { description: 'Audit log entries' }}}},
+      '/db-backup': { get: { tags: ['System'], summary: 'Export full DB backup as JSON', responses: { '200': { description: 'JSON backup file' }}}},
+      '/overdue-leads': { get: { tags: ['Notifications'], summary: 'Get overdue leads (new > 24h without assignment)', responses: { '200': { description: 'Overdue leads list' }}}},
+      '/auto-close-month': { post: { tags: ['Finance'], summary: 'Auto-close month (create locked snapshot)', responses: { '200': { description: 'Month closed' }}}},
+      '/referrals': { get: { tags: ['Referrals'], summary: 'List referral codes', responses: { '200': { description: 'Referral codes' }}}},
+      '/period-snapshots': { get: { tags: ['Finance'], summary: 'List period snapshots', responses: { '200': { description: 'Snapshots' }}}},
+    },
+    tags: [
+      { name: 'Public', description: 'Public-facing API endpoints (no auth required)' },
+      { name: 'Auth', description: 'Authentication endpoints' },
+      { name: 'Leads', description: 'Lead/CRM management' },
+      { name: 'Analytics', description: 'Business analytics and KPIs' },
+      { name: 'Dashboard', description: 'Dashboard statistics' },
+      { name: 'Employees', description: 'Employee management' },
+      { name: 'Finance', description: 'Financial management (P&L, expenses, loans, taxes)' },
+      { name: 'Audit', description: 'Audit log for financial operations' },
+      { name: 'System', description: 'System administration (backup, DB init)' },
+      { name: 'Notifications', description: 'Overdue leads and alerts' },
+      { name: 'Referrals', description: 'Referral/promo code management' },
+    ]
+  };
+  return c.json(spec);
+});
+
+// Swagger UI HTML page
+api.get('/docs', async (c) => {
+  const html = `<!DOCTYPE html><html><head><title>GoToTop API Docs</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+</head><body>
+<div id="swagger-ui"></div>
+<script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+<script>SwaggerUIBundle({url:'/api/admin/api-docs',dom_id:'#swagger-ui',presets:[SwaggerUIBundle.presets.apis],layout:'BaseLayout'})</script>
+</body></html>`;
+  return c.html(html);
+});
+
 // ===== REGISTER ALL ROUTE MODULES =====
 registerContent(api, authMiddleware);
 registerStats(api, authMiddleware);

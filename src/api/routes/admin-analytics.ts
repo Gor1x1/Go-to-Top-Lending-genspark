@@ -105,11 +105,16 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const doneArticles = statusData.done?.articles || 0;
     const doneCount = statusData.done?.count || 0;
 
-    // 3. Expenses
+    // 3. Expenses — BUG-FIX: filter expenses by period (start_date/end_date)
+    // Only include expenses where the period falls within [start_date, end_date]
+    const currentPeriod = monthParam || (dateFrom && dateTo ? dateFrom : new Date().toISOString().slice(0,7));
     const expenseRes = await db.prepare(`SELECT e.*, ec.is_marketing, ec.name as cat_name, eft.name as freq_name, eft.multiplier_monthly
       FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id
       LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
-      WHERE e.is_active = 1`).all().catch(() => ({ results: [] }));
+      WHERE e.is_active = 1
+      AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?)
+      AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`)
+      .bind(currentPeriod + '-31', currentPeriod + '-01').all().catch(() => ({ results: [] }));
     let totalExpenses = 0, marketingExpenses = 0, commercialExpenses = 0;
     for (const exp of (expenseRes.results || [])) {
       const amt = Math.round((Number(exp.amount) || 0) * 100) / 100;
@@ -152,11 +157,11 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // Articles net (articles minus refunds)
     const articlesNet = Math.max(0, Math.round((articlesTotal - totalRefunds) * 100) / 100);
 
-    // 6. Order fulfillment time
+    // 6. Order fulfillment time — BUG-FIX: use completed_at instead of now() for accurate calculation
     let avgFulfillmentDays = 0;
     try {
       const dfNoAlias = dateFilter.replace(/l\./g, '');
-      const ftRes = await db.prepare("SELECT AVG(julianday('now') - julianday(created_at)) as avg_days FROM leads WHERE status = 'done'" + dfNoAlias).bind(...dateParams).first();
+      const ftRes = await db.prepare("SELECT AVG(julianday(COALESCE(completed_at, 'now')) - julianday(created_at)) as avg_days FROM leads WHERE status = 'done'" + dfNoAlias).bind(...dateParams).first();
       avgFulfillmentDays = Math.round(Number(ftRes?.avg_days || 0) * 10) / 10;
     } catch {}
 
@@ -445,12 +450,12 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       rejectedLeads = rejRes.results || [];
     } catch {}
 
-    // 14. Stage timings (avg days per stage)
+    // 14. Stage timings (avg days per stage) — BUG-FIX: use status_changed_at for accurate timing
     const stageTimings: Record<string, number> = {};
     try {
       for (const st of allStatuses) {
         if (st === 'new') continue;
-        const tRes = await db.prepare("SELECT AVG(julianday('now') - julianday(l.created_at)) as avg_days FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first();
+        const tRes = await db.prepare("SELECT AVG(julianday(COALESCE(l.status_changed_at, l.created_at)) - julianday(l.created_at)) as avg_days FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first();
         stageTimings[st] = Math.round((Number(tRes?.avg_days || 0)) * 10) / 10;
       }
     } catch {}
@@ -661,6 +666,77 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       };
     } catch {}
 
+    // ===== DASHBOARD KPIs: CAC, ROAS =====
+    const newLeadsCount = statusData.new?.count || 0;
+    const totalLeadsAll = Object.values(statusData).reduce((a: number, s: any) => a + (Number(s.count) || 0), 0);
+    // CAC = marketing_expenses / new leads in period
+    const cac = totalLeadsAll > 0 ? Math.round(marketingExpenses / totalLeadsAll * 100) / 100 : 0;
+    // ROAS = revenue / marketing spend
+    const roas = marketingExpenses > 0 ? Math.round(servicesTotal / marketingExpenses * 100) / 100 : 0;
+
+    // ===== SALES FUNNEL BY DATES =====
+    let funnelByDate: any[] = [];
+    try {
+      const funnelQ = monthParam 
+        ? `SELECT date(status_changed_at) as day, status, COUNT(*) as cnt FROM leads WHERE status_changed_at IS NOT NULL AND strftime('%Y-%m', status_changed_at) = ? GROUP BY day, status ORDER BY day`
+        : `SELECT date(status_changed_at) as day, status, COUNT(*) as cnt FROM leads WHERE status_changed_at IS NOT NULL AND date(status_changed_at) >= date('now','-30 days') GROUP BY day, status ORDER BY day`;
+      const funnelParams = monthParam ? [monthParam] : [];
+      const funnelRes = await db.prepare(funnelQ).bind(...funnelParams).all();
+      // Group by date
+      const funnelMap: Record<string, Record<string, number>> = {};
+      for (const r of (funnelRes.results || [])) {
+        const day = r.day as string;
+        const st = r.status as string;
+        if (!funnelMap[day]) funnelMap[day] = {};
+        funnelMap[day][st] = Number(r.cnt || 0);
+      }
+      funnelByDate = Object.entries(funnelMap).map(([day, statuses]) => ({ day, ...statuses }));
+    } catch {}
+
+    // ===== REVENUE FORECASTING =====
+    // forecast = in_progress leads count * conversion_rate * avg_check
+    const inProgressCount = statusData.in_progress?.count || 0;
+    const historicalConvRate = totalLeadsCount > 0 ? doneCount / totalLeadsCount : 0;
+    const revenueForecast = Math.round(inProgressCount * historicalConvRate * avgCheck);
+
+    // ===== COHORT ANALYSIS (repeat customers by first contact month) =====
+    let cohortData: any[] = [];
+    try {
+      const cohortQ = `SELECT strftime('%Y-%m', MIN(created_at)) as cohort_month,
+        contact, COUNT(*) as orders, COALESCE(SUM(total_amount),0) as total_spent
+        FROM leads WHERE contact IS NOT NULL AND contact != ''
+        AND status IN ('done','in_progress','checking')
+        GROUP BY contact HAVING orders > 0`;
+      const cohortRes = await db.prepare(cohortQ).all();
+      const cohortMap: Record<string, { customers: number; repeat: number; total_orders: number; total_revenue: number }> = {};
+      for (const r of (cohortRes.results || [])) {
+        const cm = r.cohort_month as string;
+        if (!cohortMap[cm]) cohortMap[cm] = { customers: 0, repeat: 0, total_orders: 0, total_revenue: 0 };
+        cohortMap[cm].customers++;
+        cohortMap[cm].total_orders += Number(r.orders || 0);
+        cohortMap[cm].total_revenue += Number(r.total_spent || 0);
+        if (Number(r.orders) > 1) cohortMap[cm].repeat++;
+      }
+      cohortData = Object.entries(cohortMap).map(([month, data]) => ({
+        month,
+        ...data,
+        repeat_rate: data.customers > 0 ? Math.round(data.repeat / data.customers * 1000) / 10 : 0,
+        avg_orders: data.customers > 0 ? Math.round(data.total_orders / data.customers * 100) / 100 : 0,
+        avg_revenue: data.customers > 0 ? Math.round(data.total_revenue / data.customers) : 0
+      })).sort((a, b) => a.month.localeCompare(b.month));
+    } catch {}
+
+    // ===== OVERDUE LEADS NOTIFICATIONS (new > 24h without assignment) =====
+    let overdueLeads: any[] = [];
+    try {
+      const overdueRes = await db.prepare(`SELECT id, lead_number, name, contact, source, created_at,
+        ROUND((julianday('now') - julianday(created_at)) * 24, 1) as hours_since_creation
+        FROM leads WHERE status = 'new' AND (assigned_to IS NULL OR assigned_to = 0)
+        AND julianday('now') - julianday(created_at) > 1.0
+        ORDER BY created_at ASC LIMIT 50`).all();
+      overdueLeads = overdueRes.results || [];
+    } catch {}
+
     return c.json({
       status_data: statusData,
       financial: {
@@ -697,6 +773,16 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       packages_total_revenue: totalPkgRevenue,
       packages_total_count: totalPkgCount,
       total_leads: totalLeadsCount,
+      // New KPIs
+      kpi: {
+        cac, roas,
+        revenue_forecast: revenueForecast,
+        in_progress_count: inProgressCount,
+        historical_conversion_rate: Math.round(historicalConvRate * 1000) / 10,
+      },
+      funnel_by_date: funnelByDate,
+      cohort_data: cohortData,
+      overdue_leads: overdueLeads,
       date_from: dateFrom,
       date_to: dateTo,
       month: monthParam,

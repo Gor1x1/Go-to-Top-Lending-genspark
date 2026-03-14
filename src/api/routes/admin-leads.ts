@@ -59,7 +59,22 @@ api.put('/leads/:id', authMiddleware, async (c) => {
   const d = await c.req.json();
   const fields: string[] = [];
   const vals: any[] = [];
-  if (d.status !== undefined) { fields.push('status=?'); vals.push(d.status); }
+  // Track old values for audit log
+  let oldLead: any = null;
+  if (d.status !== undefined || d.total_amount !== undefined || d.referral_code !== undefined || d.refund_amount !== undefined) {
+    oldLead = await db.prepare('SELECT status, total_amount, referral_code, refund_amount, assigned_to FROM leads WHERE id = ?').bind(id).first();
+  }
+  if (d.status !== undefined) {
+    fields.push('status=?'); vals.push(d.status);
+    // BUG-FIX: Track status_changed_at when status changes
+    if (!oldLead || oldLead.status !== d.status) {
+      fields.push('status_changed_at=CURRENT_TIMESTAMP');
+    }
+    // BUG-FIX: Track completed_at when lead is marked as done
+    if (d.status === 'done') {
+      fields.push('completed_at=CURRENT_TIMESTAMP');
+    }
+  }
   if (d.notes !== undefined) { fields.push('notes=?'); vals.push(d.notes); }
   if (d.assigned_to !== undefined) { fields.push('assigned_to=?'); vals.push(d.assigned_to || null); }
   if (d.name !== undefined) { fields.push('name=?'); vals.push(d.name); }
@@ -78,6 +93,20 @@ api.put('/leads/:id', authMiddleware, async (c) => {
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
   vals.push(id);
   await db.prepare(`UPDATE leads SET ${fields.join(',')} WHERE id=?`).bind(...vals).run();
+  // Audit log for significant changes
+  try {
+    const caller = c.get('user');
+    const userName = caller?.display_name || caller?.username || 'System';
+    const changes: string[] = [];
+    if (d.status !== undefined && oldLead && oldLead.status !== d.status) changes.push(`status: ${oldLead.status} -> ${d.status}`);
+    if (d.total_amount !== undefined && oldLead && oldLead.total_amount !== d.total_amount) changes.push(`amount: ${oldLead.total_amount} -> ${d.total_amount}`);
+    if (d.refund_amount !== undefined && oldLead && oldLead.refund_amount !== d.refund_amount) changes.push(`refund: ${oldLead.refund_amount || 0} -> ${d.refund_amount}`);
+    if (d.assigned_to !== undefined && oldLead && oldLead.assigned_to !== d.assigned_to) changes.push(`assigned: ${oldLead.assigned_to || 'none'} -> ${d.assigned_to || 'none'}`);
+    if (changes.length > 0) {
+      await db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity_type, entity_id, old_value, new_value) VALUES (?,?,?,?,?,?,?)')
+        .bind(caller?.sub || 0, userName, 'lead_update', 'lead', Number(id), JSON.stringify(oldLead || {}), JSON.stringify(changes)).run();
+    }
+  } catch {}
   return c.json({ success: true });
 });
 

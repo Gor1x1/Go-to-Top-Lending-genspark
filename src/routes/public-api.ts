@@ -8,6 +8,18 @@ import { notifyTelegram } from '../helpers/telegram'
 
 type Bindings = { DB: D1Database }
 
+// Simple in-memory rate limiter (per worker instance)
+const rateLimits: Record<string, { count: number; resetAt: number }> = {};
+function checkRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  if (!rateLimits[key] || rateLimits[key].resetAt < now) {
+    rateLimits[key] = { count: 1, resetAt: now + windowMs };
+    return true;
+  }
+  rateLimits[key].count++;
+  return rateLimits[key].count <= maxRequests;
+}
+
 export function register(app: Hono<{ Bindings: Bindings }>) {
 // ===== PUBLIC API: Site data from D1 (for dynamic rendering) =====
 app.get('/api/site-data', async (c) => {
@@ -249,6 +261,11 @@ app.get('/api/site-data', async (c) => {
 
 app.post('/api/lead', async (c) => {
   try {
+    // Rate limit: 10 leads per minute per IP
+    const clientIp = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    if (!checkRateLimit('lead:' + clientIp, 10, 60000)) {
+      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
+    }
     const db = c.env.DB;
     await initDatabase(db);
     const body = await c.req.json();
@@ -275,6 +292,11 @@ app.post('/api/lead', async (c) => {
 // API endpoint for popup form -> save + notify
 app.post('/api/popup-lead', async (c) => {
   try {
+    // Rate limit: 10 popup leads per minute per IP
+    const clientIp = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    if (!checkRateLimit('popup:' + clientIp, 10, 60000)) {
+      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
+    }
     const db = c.env.DB;
     await initDatabase(db);
     const body = await c.req.json();

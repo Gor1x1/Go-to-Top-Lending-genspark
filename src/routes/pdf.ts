@@ -7,9 +7,26 @@ import { notifyTelegram } from '../helpers/telegram'
 
 type Bindings = { DB: D1Database }
 
+// Rate limiter for PDF generation
+const pdfRateLimits: Record<string, { count: number; resetAt: number }> = {};
+function checkPdfRateLimit(key: string, maxRequests: number, windowMs: number): boolean {
+  const now = Date.now();
+  if (!pdfRateLimits[key] || pdfRateLimits[key].resetAt < now) {
+    pdfRateLimits[key] = { count: 1, resetAt: now + windowMs };
+    return true;
+  }
+  pdfRateLimits[key].count++;
+  return pdfRateLimits[key].count <= maxRequests;
+}
+
 export function register(app: Hono<{ Bindings: Bindings }>) {
 app.post('/api/generate-pdf', async (c) => {
   try {
+    // Rate limit: 5 PDF generations per minute per IP
+    const clientIp = c.req.header('CF-Connecting-IP') || c.req.header('X-Forwarded-For') || 'unknown';
+    if (!checkPdfRateLimit('pdf:' + clientIp, 5, 60000)) {
+      return c.json({ error: 'Too many requests. Please try again later.' }, 429);
+    }
     const db = c.env.DB;
     const body = await c.req.json();
     const lang = body.lang || 'ru';
@@ -142,8 +159,8 @@ app.post('/api/generate-pdf', async (c) => {
       freeServices,
       package: packageData || undefined
     });
-    const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount) VALUES (?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'calculator_pdf', clientName, clientContact, calcDataJson, lang, referralCode, ua.substring(0,200), finalTotal).run();
+    const leadResult = await db.prepare('INSERT INTO leads (lead_number, source, name, contact, calc_data, lang, referral_code, user_agent, total_amount, pdf_template_version) VALUES (?,?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'calculator_pdf', clientName, clientContact, calcDataJson, lang, referralCode, ua.substring(0,200), finalTotal, tpl?.id ? String(tpl.id) + ':' + (tpl.updated_at || '') : 'default').run();
     const leadId = leadResult.meta?.last_row_id || 0;
     // Increment referral code usage (normalize to uppercase to match DB storage)
     if (referralCode) {

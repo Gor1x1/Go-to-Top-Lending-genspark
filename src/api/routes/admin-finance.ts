@@ -397,6 +397,8 @@ api.post('/dividends', authMiddleware, async (c) => {
   try { await db.prepare("ALTER TABLE dividends ADD COLUMN calc_base TEXT DEFAULT 'after_loans'").run(); } catch {}
   await db.prepare('INSERT INTO dividends (amount, recipient, payment_date, period_key, tax_amount, notes, schedule, dividend_pct, calc_base) VALUES (?,?,?,?,?,?,?,?,?)')
     .bind(d.amount||0, d.recipient||'', d.payment_date||'', d.period_key||'', d.tax_amount||0, d.notes||'', d.schedule||'monthly', d.dividend_pct||0, d.calc_base||'after_loans').run();
+  // Audit log
+  try { const caller = c.get('user'); await db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity_type, new_value) VALUES (?,?,?,?,?)').bind(caller?.sub||0, caller?.display_name||'admin', 'dividend_create', 'dividend', JSON.stringify({amount: d.amount, recipient: d.recipient, period: d.period_key})).run(); } catch {}
   return c.json({ success: true });
 });
 
@@ -539,14 +541,16 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     COALESCE((SELECT SUM(CASE WHEN eb.bonus_type IN ('penalty','fine') OR (eb.bonus_type IS NULL AND eb.amount < 0) THEN ABS(eb.amount) ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as total_penalties
     FROM users u WHERE u.salary > 0`)
     .bind(periodEnd, periodStart, periodEnd, periodStart, periodStart, periodEnd, periodStart, periodEnd).first();
-  // Expenses from expenses table (commercial & marketing)
+  // Expenses from expenses table (commercial & marketing) -- BUG-FIX: filter by period
   const expData = await db.prepare(`SELECT 
     COALESCE(SUM(CASE WHEN ec.is_marketing = 0 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as commercial,
     COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as marketing
     FROM expenses e 
     LEFT JOIN expense_categories ec ON e.category_id = ec.id
     LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
-    WHERE e.is_active = 1`).first();
+    WHERE e.is_active = 1
+    AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?)
+    AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`).bind(periodKey + '-31', periodKey + '-01').first();
   // Commission data for this period
   let periodCommissions = 0;
   let periodCommByMethod: any[] = [];

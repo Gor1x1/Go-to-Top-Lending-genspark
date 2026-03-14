@@ -92,9 +92,10 @@ api.get('/stats', authMiddleware, async (c) => {
   // Refunds total
   const dashRefunds = await db.prepare("SELECT COALESCE(SUM(refund_amount),0) as total FROM leads WHERE refund_amount > 0 AND status IN ('in_progress','checking','done')").first().catch(() => ({ total: 0 }));
   
-  // Expenses (monthly)
-  const dashExpenses = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE is_active = 1").first().catch(() => ({ total: 0 }));
-  const dashMarketingExp = await db.prepare("SELECT COALESCE(SUM(e.amount),0) as total FROM expenses e JOIN expense_categories ec ON e.category_id = ec.id WHERE e.is_active = 1 AND ec.is_marketing = 1").first().catch(() => ({ total: 0 }));
+  // Expenses (monthly) -- BUG-FIX: filter by current period (start_date/end_date)
+  const curPeriod = new Date().toISOString().slice(0, 7);
+  const dashExpenses = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM expenses WHERE is_active = 1 AND (start_date IS NULL OR start_date = '' OR start_date <= ?) AND (end_date IS NULL OR end_date = '' OR end_date >= ?)").bind(curPeriod + '-31', curPeriod + '-01').first().catch(() => ({ total: 0 }));
+  const dashMarketingExp = await db.prepare("SELECT COALESCE(SUM(e.amount),0) as total FROM expenses e JOIN expense_categories ec ON e.category_id = ec.id WHERE e.is_active = 1 AND ec.is_marketing = 1 AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?) AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)").bind(curPeriod + '-31', curPeriod + '-01').first().catch(() => ({ total: 0 }));
   
   // Net profit (simplified: turnover - expenses - refunds)
   const dashNetProfit = dashTurnover - Number(dashExpenses?.total || 0) - Number(dashRefunds?.total || 0);

@@ -3024,6 +3024,49 @@ function renderSettings() {
       '<button class="btn btn-success" style="padding:8px 16px;font-size:0.82rem;white-space:nowrap" onclick="addPaymentMethod()"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить</button>' +
     '</div></div>';
 
+    // ===== SYSTEM TOOLS: Audit Log, DB Backup, Auto-close Month, Swagger Docs =====
+    h += '<div class="card" style="max-width:800px;margin-top:24px;margin-bottom:20px;border:1px solid rgba(59,130,246,0.3)">' +
+      '<h3 style="font-weight:700;margin-bottom:8px"><i class="fas fa-tools" style="color:#3B82F6;margin-right:8px"></i>Системные инструменты</h3>' +
+      '<p style="color:#94a3b8;font-size:0.82rem;margin-bottom:16px">Резервное копирование, аудит, закрытие месяца и документация API.</p>' +
+
+      // Row 1: DB Backup + Auto-close Month
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">' +
+        '<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="fas fa-database" style="color:#3B82F6;font-size:1.1rem"></i><span style="font-weight:700;font-size:0.92rem">Бэкап базы данных</span></div>' +
+          '<p style="color:#64748b;font-size:0.78rem;margin-bottom:12px;line-height:1.4">Экспорт всех данных из D1 в формате JSON. Скачайте файл для хранения.</p>' +
+          '<button class="btn btn-primary" style="width:100%;font-size:0.85rem" onclick="downloadDbBackup()"><i class="fas fa-download" style="margin-right:6px"></i>Скачать бэкап</button>' +
+          '<div id="backupResult" style="margin-top:8px;font-size:0.78rem"></div>' +
+        '</div>' +
+        '<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="fas fa-calendar-check" style="color:#10B981;font-size:1.1rem"></i><span style="font-weight:700;font-size:0.92rem">Автозакрытие месяца</span></div>' +
+          '<p style="color:#64748b;font-size:0.78rem;margin-bottom:12px;line-height:1.4">Создать снимок (snapshot) за прошлый месяц. Фиксирует финансовые показатели.</p>' +
+          '<button class="btn btn-success" style="width:100%;font-size:0.85rem" onclick="autoCloseMonth()"><i class="fas fa-lock" style="margin-right:6px"></i>Закрыть месяц</button>' +
+          '<div id="autoCloseResult" style="margin-top:8px;font-size:0.78rem"></div>' +
+        '</div>' +
+      '</div>' +
+
+      // Row 2: Audit Log + Swagger Docs
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px">' +
+        '<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="fas fa-history" style="color:#F59E0B;font-size:1.1rem"></i><span style="font-weight:700;font-size:0.92rem">Аудит-лог</span></div>' +
+          '<p style="color:#64748b;font-size:0.78rem;margin-bottom:12px;line-height:1.4">Просмотр журнала финансовых операций: изменения расходов, закрытие месяцев и т.д.</p>' +
+          '<button class="btn btn-outline" style="width:100%;font-size:0.85rem" onclick="showAuditLog()"><i class="fas fa-list-alt" style="margin-right:6px"></i>Открыть аудит-лог</button>' +
+        '</div>' +
+        '<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="fas fa-book" style="color:#a78bfa;font-size:1.1rem"></i><span style="font-weight:700;font-size:0.92rem">Swagger / API документация</span></div>' +
+          '<p style="color:#64748b;font-size:0.78rem;margin-bottom:12px;line-height:1.4">Интерактивная OpenAPI-документация всех эндпоинтов API админки.</p>' +
+          '<a href="/api/admin/docs" target="_blank" class="btn btn-outline" style="display:block;width:100%;font-size:0.85rem;text-decoration:none;text-align:center"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть Swagger</a>' +
+        '</div>' +
+      '</div>' +
+
+      // Row 3: Overdue leads quick link
+      '<div style="background:#0f172a;border:1px solid #1e293b;border-radius:10px;padding:16px;margin-bottom:6px">' +
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px"><i class="fas fa-bell" style="color:#EF4444;font-size:1.1rem"></i><span style="font-weight:700;font-size:0.92rem">Просроченные лиды</span></div>' +
+        '<p style="color:#64748b;font-size:0.78rem;margin-bottom:12px;line-height:1.4">Посмотреть список лидов без назначенного исполнителя более 24 часов.</p>' +
+        '<button class="btn btn-outline" style="width:100%;font-size:0.85rem;border-color:rgba(239,68,68,0.3);color:#f87171" onclick="navigate(&apos;analytics&apos;);bizAnalyticsTab=&apos;funnel&apos;;render()"><i class="fas fa-arrow-right" style="margin-right:6px"></i>Перейти в Воронка и Детали</button>' +
+      '</div>' +
+    '</div>';
+
     h += '<div class="card" style="max-width:800px;margin-top:24px;border:1px solid rgba(239,68,68,0.3)">' +
       '<h3 style="font-weight:700;margin-bottom:8px;color:#f87171"><i class="fas fa-exclamation-triangle" style="margin-right:8px"></i>Сброс данных</h3>' +
       '<p style="color:#94a3b8;font-size:0.85rem;margin-bottom:16px;line-height:1.5">Очистка операционных данных перед запуском. Выберите категории для удаления.</p>' +
@@ -3190,6 +3233,83 @@ async function deletePaymentMethod(id) {
   toast('Способ оплаты удалён');
   try { var pmData = await api('/payment-methods'); data.paymentMethods = (pmData && pmData.methods) || []; } catch(e) { }
   render();
+}
+
+// ===== SYSTEM TOOLS: DB Backup, Auto-close Month, Audit Log =====
+async function downloadDbBackup() {
+  var resultEl = document.getElementById('backupResult');
+  if (resultEl) resultEl.innerHTML = '<span style="color:#94a3b8"><i class="fas fa-spinner fa-spin"></i> Экспорт данных...</span>';
+  try {
+    var resp = await fetch('/api/admin/db-backup', { headers: { Authorization: 'Bearer ' + token, 'Cache-Control': 'no-cache' } });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var blob = await resp.blob();
+    var url = window.URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'db_backup_' + new Date().toISOString().slice(0,10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    window.URL.revokeObjectURL(url);
+    if (resultEl) resultEl.innerHTML = '<span style="color:#22C55E"><i class="fas fa-check-circle"></i> Бэкап скачан</span>';
+    toast('Бэкап базы данных скачан');
+    setTimeout(function() { if (resultEl) resultEl.innerHTML = ''; }, 5000);
+  } catch(e) {
+    if (resultEl) resultEl.innerHTML = '<span style="color:#EF4444"><i class="fas fa-times-circle"></i> Ошибка: ' + (e.message || 'unknown') + '</span>';
+    toast('Ошибка при скачивании бэкапа', 'error');
+  }
+}
+
+async function autoCloseMonth() {
+  var resultEl = document.getElementById('autoCloseResult');
+  if (!confirm('Закрыть предыдущий месяц? Будет создан фиксированный снимок (snapshot) за прошлый месяц.')) return;
+  if (resultEl) resultEl.innerHTML = '<span style="color:#94a3b8"><i class="fas fa-spinner fa-spin"></i> Закрытие месяца...</span>';
+  try {
+    var res = await api('/auto-close-month', { method: 'POST' });
+    if (res && res.success) {
+      if (resultEl) resultEl.innerHTML = '<span style="color:#22C55E"><i class="fas fa-check-circle"></i> Месяц закрыт: ' + (res.closed_month || '') + '</span>';
+      toast('Месяц успешно закрыт: ' + (res.closed_month || ''));
+    } else {
+      if (resultEl) resultEl.innerHTML = '<span style="color:#F59E0B"><i class="fas fa-info-circle"></i> ' + (res?.message || res?.error || 'Месяц уже закрыт') + '</span>';
+      toast(res?.message || res?.error || 'Месяц уже закрыт', 'info');
+    }
+  } catch(e) {
+    if (resultEl) resultEl.innerHTML = '<span style="color:#EF4444"><i class="fas fa-times-circle"></i> Ошибка</span>';
+    toast('Ошибка при закрытии месяца', 'error');
+  }
+}
+
+async function showAuditLog() {
+  showModal('<div style="max-width:800px;width:100%"><h2 style="font-weight:800;margin-bottom:16px;color:#e2e8f0"><i class="fas fa-history" style="color:#F59E0B;margin-right:8px"></i>Аудит-лог</h2><div id="auditLogContent"><span style="color:#94a3b8"><i class="fas fa-spinner fa-spin"></i> Загрузка...</span></div></div>');
+  try {
+    var res = await api('/audit-log?limit=50');
+    var entries = (res && res.entries) || (res && Array.isArray(res) ? res : []);
+    var el = document.getElementById('auditLogContent');
+    if (!el) return;
+    if (entries.length === 0) {
+      el.innerHTML = '<div style="text-align:center;color:#64748b;padding:32px"><i class="fas fa-check-circle" style="font-size:1.5rem;display:block;margin-bottom:8px;color:#475569"></i>Аудит-лог пуст. Записи появятся при финансовых операциях.</div>';
+      return;
+    }
+    var h = '<div style="max-height:500px;overflow-y:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead style="position:sticky;top:0;background:#1e293b;z-index:1"><tr><th style="padding:8px 12px;text-align:left;color:#94a3b8">Дата</th><th style="padding:8px;text-align:left;color:#94a3b8">Пользователь</th><th style="padding:8px;text-align:left;color:#94a3b8">Действие</th><th style="padding:8px;text-align:left;color:#94a3b8">Тип</th><th style="padding:8px;text-align:left;color:#94a3b8">Значение</th></tr></thead><tbody>';
+    for (var ai2 = 0; ai2 < entries.length; ai2++) {
+      var entry = entries[ai2];
+      var dt = entry.created_at ? new Date(entry.created_at) : null;
+      var dtStr = dt ? dt.toLocaleDateString('ru-RU') + ' ' + dt.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '\u2014';
+      var actionColors = { auto_close_month: '#10B981', update: '#F59E0B', create: '#3B82F6', delete: '#EF4444' };
+      var actColor = actionColors[entry.action] || '#94a3b8';
+      h += '<tr style="border-bottom:1px solid #1e293b">';
+      h += '<td style="padding:8px 12px;color:#64748b;font-size:0.75rem;white-space:nowrap">' + dtStr + '</td>';
+      h += '<td style="padding:8px;font-weight:600">' + escHtml(entry.user_name || '\u2014') + '</td>';
+      h += '<td style="padding:8px"><span style="padding:2px 8px;border-radius:6px;font-size:0.72rem;font-weight:600;background:' + actColor + '22;color:' + actColor + '">' + escHtml(entry.action || '\u2014') + '</span></td>';
+      h += '<td style="padding:8px;color:#a78bfa;font-size:0.78rem">' + escHtml(entry.entity_type || '\u2014') + '</td>';
+      h += '<td style="padding:8px;color:#94a3b8;font-size:0.75rem;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="' + escHtml(entry.new_value || '') + '">' + escHtml((entry.new_value || '').substring(0, 60)) + '</td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table></div>';
+    el.innerHTML = h;
+  } catch(e) {
+    var el2 = document.getElementById('auditLogContent');
+    if (el2) el2.innerHTML = '<div style="color:#EF4444">Ошибка загрузки аудит-лога: ' + (e.message || '') + '</div>';
+  }
 }
 
 async function loadDataCounts() {
@@ -3429,6 +3549,7 @@ function renderLeads() {
               (l.articles_count > 0 ? '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c;font-size:0.7rem"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + '</span>' : '') +
               (pkgName ? '<span class="badge" style="background:linear-gradient(135deg,rgba(245,158,11,0.2),rgba(251,191,36,0.15));color:#FBBF24;font-size:0.7rem;font-weight:700;border:1px solid rgba(245,158,11,0.25)"><i class="fas fa-cube" style="margin-right:3px"></i>' + escHtml(pkgName) + '</span>' : '') +
               (freeSvcs.length > 0 ? '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399;font-size:0.7rem"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>' : '') +
+              (l.pdf_template_version ? '<span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;font-size:0.65rem" title="PDF шаблон версия ' + escHtml(String(l.pdf_template_version)) + '"><i class="fas fa-file-pdf" style="margin-right:3px"></i>v' + escHtml(String(l.pdf_template_version)) + '</span>' : '') +
             '</div>' +
             '<div style="font-size:1.05rem;font-weight:700;color:#e2e8f0">' + escHtml(l.name || '—') + '</div>' +
             '<div style="font-size:0.9rem;color:#a78bfa;margin-top:2px">' + escHtml(l.contact || '—') + '</div>' +
@@ -7138,6 +7259,42 @@ function renderBizOverviewV2(d, sd, fin) {
   }
   h += '</div></div>';
 
+  // ---- SECTION: CAC, ROAS & Revenue Forecast (from backend KPI) ----
+  var kpiBackend = d.kpi || {};
+  var cacVal = Number(kpiBackend.cac) || 0;
+  var roasVal = Number(kpiBackend.roas) || 0;
+  var revForecast = Number(kpiBackend.revenue_forecast) || 0;
+  var inProgCount = Number(kpiBackend.in_progress_count) || 0;
+  var histConvRate = Number(kpiBackend.historical_conversion_rate) || 0;
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-bullseye" style="color:#F97316;margin-right:8px"></i>Маркетинговые KPI</h3>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:16px;line-height:1.5">CAC — стоимость привлечения клиента (маркетинг / количество лидов). ROAS — возврат на рекламные расходы (доход услуг / маркетинг). Прогноз — потенциальная выручка от текущих лидов в работе.</div>';
+  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px">';
+  // CAC card
+  var cacColor = cacVal > 0 ? (cacVal < 5000 ? '#22C55E' : cacVal < 15000 ? '#F59E0B' : '#EF4444') : '#64748b';
+  h += '<div class="card" style="padding:24px;text-align:center;background:linear-gradient(135deg,rgba(249,115,22,0.1),transparent);border:1px solid rgba(249,115,22,0.25)">';
+  h += '<i class="fas fa-user-plus" style="color:#F97316;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
+  h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">CAC (стоимость привлечения)</div>';
+  h += '<div style="font-size:2rem;font-weight:900;color:' + cacColor + '">' + fmtAmt(cacVal) + '</div>';
+  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">Маркетинг расходы / Всего лидов за период</div>';
+  h += '</div>';
+  // ROAS card
+  var roasColor = roasVal > 0 ? (roasVal >= 3 ? '#22C55E' : roasVal >= 1 ? '#F59E0B' : '#EF4444') : '#64748b';
+  h += '<div class="card" style="padding:24px;text-align:center;background:linear-gradient(135deg,rgba(59,130,246,0.1),transparent);border:1px solid rgba(59,130,246,0.25)">';
+  h += '<i class="fas fa-chart-bar" style="color:#3B82F6;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
+  h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">ROAS (возврат на рекл. расходы)</div>';
+  h += '<div style="font-size:2rem;font-weight:900;color:' + roasColor + '">' + roasVal.toFixed(2) + 'x</div>';
+  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">Доход услуг / Маркетинг расходы' + (roasVal >= 3 ? ' <span style="color:#22C55E">\\u2714 Отличный</span>' : roasVal >= 1 ? ' <span style="color:#F59E0B">\\u26A0 Нормальный</span>' : roasVal > 0 ? ' <span style="color:#EF4444">\\u26D4 Низкий</span>' : '') + '</div>';
+  h += '</div>';
+  // Revenue Forecast card
+  h += '<div class="card" style="padding:24px;text-align:center;background:linear-gradient(135deg,rgba(16,185,129,0.1),transparent);border:1px solid rgba(16,185,129,0.25)">';
+  h += '<i class="fas fa-crystal-ball fa-magic" style="color:#10B981;font-size:1.4rem;margin-bottom:10px;display:block"></i>';
+  h += '<div style="font-size:0.82rem;color:#94a3b8;margin-bottom:6px">Прогноз выручки</div>';
+  h += '<div style="font-size:2rem;font-weight:900;color:#10B981">' + fmtAmt(revForecast) + '</div>';
+  h += '<div style="font-size:0.68rem;color:#475569;margin-top:8px;line-height:1.4">' + inProgCount + ' лидов в работе &times; ' + fmtPct(histConvRate) + ' конверсия &times; ср. чек</div>';
+  h += '</div>';
+  h += '</div></div>';
+
   // ---- SECTION: LTV Details ----
   var ltvD = fin.ltv_data || {};
   if (ltvD.unique_customers > 0) {
@@ -8070,6 +8227,86 @@ function renderBizFunnelV2(d, sd, fin) {
     h += '<div style="padding:14px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px"><div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px">\u041b\u0438\u0434\u043e\u0432 \u0441 \u043e\u043f\u043b\u0430\u0442\u043e\u0439</div><div style="font-size:1.2rem;font-weight:800;color:#F59E0B">' + fmtNum(commDataFun.leads_with_method || 0) + '</div></div>';
     h += '</div></div>';
   }
+
+  // ---- SECTION: Overdue Leads (no assignee > 24h) ----
+  var overdueLeads = d.overdue_leads || [];
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-exclamation-triangle" style="color:#EF4444;margin-right:8px"></i>Просроченные лиды <span class="badge" style="background:rgba(239,68,68,0.2);color:#f87171;margin-left:8px">' + overdueLeads.length + '</span></h3>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:12px">Лиды со статусом "new", у которых нет назначенного исполнителя более 24 часов. Требуют срочного внимания.</div>';
+  if (overdueLeads.length === 0) {
+    h += '<div class="card" style="padding:24px;text-align:center;color:#22C55E"><i class="fas fa-check-circle" style="font-size:1.5rem;margin-bottom:8px;display:block"></i>Нет просроченных лидов. Все новые заявки обработаны вовремя!</div>';
+  } else {
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">#</th><th style="padding:10px;text-align:left;color:#94a3b8">Имя</th><th style="padding:10px;text-align:left;color:#94a3b8">Контакт</th><th style="padding:10px;text-align:left;color:#94a3b8">Источник</th><th style="padding:10px;text-align:right;color:#94a3b8">Сумма</th><th style="padding:10px;text-align:left;color:#94a3b8">Создан</th><th style="padding:10px;text-align:right;color:#94a3b8">Часов назад</th></tr></thead><tbody>';
+    for (var oi = 0; oi < Math.min(overdueLeads.length, 20); oi++) {
+      var ol = overdueLeads[oi];
+      var createdDate = ol.created_at ? new Date(ol.created_at) : null;
+      var hoursAgo = createdDate ? Math.round((Date.now() - createdDate.getTime()) / 3600000) : 0;
+      var urgencyColor = hoursAgo > 72 ? '#EF4444' : hoursAgo > 48 ? '#F97316' : '#F59E0B';
+      h += '<tr style="border-bottom:1px solid #1e293b;cursor:pointer" onclick="navigate(&apos;leads&apos;);setLeadsFilter(&apos;status&apos;,&apos;new&apos;)">';
+      h += '<td style="padding:8px 16px;font-weight:600;color:' + urgencyColor + '">#' + (ol.lead_number || ol.id || '') + '</td>';
+      h += '<td style="padding:8px;font-weight:600">' + escHtml(ol.name || '\u2014') + '</td>';
+      h += '<td style="padding:8px;color:#94a3b8">' + escHtml(ol.contact || '\u2014') + '</td>';
+      h += '<td style="padding:8px;color:#94a3b8">' + escHtml(ol.source || '\u2014') + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#a78bfa">' + fmtAmt(Number(ol.total_amount) || 0) + '</td>';
+      h += '<td style="padding:8px;color:#64748b;font-size:0.75rem">' + (createdDate ? createdDate.toLocaleDateString('ru-RU') + ' ' + createdDate.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '\u2014') + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:700;color:' + urgencyColor + '">' + hoursAgo + ' ч</td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
+
+  // ---- SECTION: Cohort Analysis ----
+  var cohortData = d.cohort_data || [];
+  h += '<div style="margin-bottom:32px">';
+  h += '<h3 style="font-weight:700;margin-bottom:8px;font-size:1.1rem;color:#e2e8f0"><i class="fas fa-users-cog" style="color:#8B5CF6;margin-right:8px"></i>Когортный анализ</h3>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-bottom:12px">Группировка клиентов по месяцу первого заказа. Показывает количество клиентов, повторных покупателей и общий доход по когортам.</div>';
+  if (cohortData.length === 0) {
+    h += '<div class="card" style="padding:24px;text-align:center;color:#64748b"><i class="fas fa-users-cog" style="font-size:1.5rem;margin-bottom:8px;display:block;color:#475569"></i>Нет данных для когортного анализа. Данные появятся, когда накопится история заказов за несколько месяцев.</div>';
+  } else {
+    // Summary KPIs
+    var totalCohortCustomers = 0, totalCohortRepeat = 0, totalCohortRevenue = 0;
+    for (var ci2 = 0; ci2 < cohortData.length; ci2++) {
+      totalCohortCustomers += Number(cohortData[ci2].customers) || 0;
+      totalCohortRepeat += Number(cohortData[ci2].repeat) || 0;
+      totalCohortRevenue += Number(cohortData[ci2].total_revenue) || 0;
+    }
+    var avgRepeatRate = totalCohortCustomers > 0 ? Math.round(totalCohortRepeat / totalCohortCustomers * 100) : 0;
+    h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #8B5CF6"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Когорт</div><div style="font-size:1.3rem;font-weight:800;color:#8B5CF6">' + cohortData.length + '</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #3B82F6"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Всего клиентов</div><div style="font-size:1.3rem;font-weight:800;color:#3B82F6">' + fmtNum(totalCohortCustomers) + '</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #22C55E"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Повторных</div><div style="font-size:1.3rem;font-weight:800;color:#22C55E">' + avgRepeatRate + '%</div></div>';
+    h += '<div class="card" style="padding:14px;text-align:center;border-left:3px solid #F59E0B"><div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">Общий доход</div><div style="font-size:1.3rem;font-weight:800;color:#F59E0B">' + fmtAmt(totalCohortRevenue) + '</div></div>';
+    h += '</div>';
+    // Cohort table
+    h += '<div class="card" style="padding:0;overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:0.82rem">';
+    h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:10px 16px;text-align:left;color:#94a3b8">Когорта (месяц)</th><th style="padding:10px;text-align:center;color:#94a3b8">Клиентов</th><th style="padding:10px;text-align:center;color:#94a3b8">Повторных</th><th style="padding:10px;text-align:center;color:#94a3b8">% повторных</th><th style="padding:10px;text-align:center;color:#94a3b8">Заказов</th><th style="padding:10px;text-align:right;color:#94a3b8">Доход</th><th style="padding:10px;text-align:right;color:#94a3b8">Ср. доход / клиент</th></tr></thead><tbody>';
+    var mNamesShort = ['','Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
+    for (var ci3 = 0; ci3 < cohortData.length; ci3++) {
+      var coh = cohortData[ci3];
+      var cohMonth = (coh.month || '').split('-');
+      var cohLabel = cohMonth.length === 2 ? mNamesShort[parseInt(cohMonth[1])] + ' ' + cohMonth[0] : (coh.month || '\u2014');
+      var cohCust = Number(coh.customers) || 0;
+      var cohRepeat = Number(coh.repeat) || 0;
+      var cohOrders = Number(coh.total_orders) || 0;
+      var cohRev = Number(coh.total_revenue) || 0;
+      var cohRepeatPct = cohCust > 0 ? Math.round(cohRepeat / cohCust * 100) : 0;
+      var cohAvgRev = cohCust > 0 ? Math.round(cohRev / cohCust) : 0;
+      var barW2 = totalCohortRevenue > 0 ? Math.round(cohRev / totalCohortRevenue * 100) : 0;
+      h += '<tr style="border-bottom:1px solid #1e293b">';
+      h += '<td style="padding:8px 16px;font-weight:600;color:#a78bfa"><i class="fas fa-calendar-alt" style="margin-right:6px;color:#8B5CF6"></i>' + cohLabel + '</td>';
+      h += '<td style="padding:8px;text-align:center;font-weight:700">' + cohCust + '</td>';
+      h += '<td style="padding:8px;text-align:center;color:#22C55E;font-weight:600">' + cohRepeat + '</td>';
+      h += '<td style="padding:8px;text-align:center"><span style="padding:2px 8px;border-radius:6px;font-size:0.75rem;font-weight:600;background:' + (cohRepeatPct > 20 ? 'rgba(34,197,94,0.15);color:#22C55E' : 'rgba(245,158,11,0.15);color:#F59E0B') + '">' + cohRepeatPct + '%</span></td>';
+      h += '<td style="padding:8px;text-align:center;color:#94a3b8">' + cohOrders + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:700;color:#F59E0B">' + fmtAmt(cohRev) + '</td>';
+      h += '<td style="padding:8px;text-align:right"><div style="display:flex;align-items:center;gap:6px;justify-content:flex-end"><div style="width:50px;height:5px;background:#1e293b;border-radius:3px;overflow:hidden"><div style="width:' + barW2 + '%;height:100%;background:#8B5CF6;border-radius:3px"></div></div><span style="font-size:0.78rem;font-weight:600;color:#a78bfa">' + fmtAmt(cohAvgRev) + '</span></div></td>';
+      h += '</tr>';
+    }
+    h += '</tbody></table></div>';
+  }
+  h += '</div>';
 
   return h;
 }

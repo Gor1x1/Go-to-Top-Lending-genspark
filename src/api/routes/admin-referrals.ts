@@ -31,6 +31,8 @@ api.post('/referrals', authMiddleware, async (c) => {
   const { code, description, discount_percent, max_uses, apply_to_packages, linked_packages, linked_services, is_active } = await c.req.json();
   await db.prepare('INSERT INTO referral_codes (code, description, discount_percent, max_uses, apply_to_packages, linked_packages, linked_services, is_active) VALUES (?,?,?,?,?,?,?,?)')
     .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, max_uses || 0, apply_to_packages ? 1 : 0, JSON.stringify(linked_packages || []), JSON.stringify(linked_services || []), is_active ?? 1).run();
+  // Audit log
+  try { const caller = c.get('user'); await db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity_type, new_value) VALUES (?,?,?,?,?)').bind(caller?.sub||0, caller?.display_name||'admin', 'referral_create', 'referral_code', code || '').run(); } catch {}
   return c.json({ success: true });
 });
 
@@ -38,8 +40,12 @@ api.put('/referrals/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
   const { code, description, discount_percent, is_active, max_uses, apply_to_packages, linked_packages, linked_services } = await c.req.json();
+  // Get old value for audit
+  const oldRef = await db.prepare('SELECT * FROM referral_codes WHERE id = ?').bind(id).first();
   await db.prepare('UPDATE referral_codes SET code=?, description=?, discount_percent=?, is_active=?, max_uses=?, apply_to_packages=?, linked_packages=?, linked_services=? WHERE id=?')
     .bind((code || '').trim().toUpperCase(), description || '', discount_percent || 0, is_active ?? 1, max_uses || 0, apply_to_packages ? 1 : 0, JSON.stringify(linked_packages || []), JSON.stringify(linked_services || []), id).run();
+  // Audit log
+  try { const caller = c.get('user'); await db.prepare('INSERT INTO audit_log (user_id, user_name, action, entity_type, entity_id, old_value, new_value) VALUES (?,?,?,?,?,?,?)').bind(caller?.sub||0, caller?.display_name||'admin', 'referral_update', 'referral_code', Number(id), JSON.stringify(oldRef || {}), JSON.stringify({code, discount_percent, is_active, max_uses})).run(); } catch {}
   return c.json({ success: true });
 });
 

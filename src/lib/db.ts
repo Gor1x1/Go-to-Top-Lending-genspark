@@ -169,6 +169,9 @@ CREATE TABLE IF NOT EXISTS leads (
   custom_fields TEXT DEFAULT '',
   ip TEXT DEFAULT '',
   user_agent TEXT DEFAULT '',
+  status_changed_at DATETIME DEFAULT NULL,
+  completed_at DATETIME DEFAULT NULL,
+  pdf_template_version TEXT DEFAULT '',
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -758,6 +761,33 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   // v25: Ensure leads has referral_code and lang columns
   try { await db.prepare("ALTER TABLE leads ADD COLUMN referral_code TEXT DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE leads ADD COLUMN lang TEXT DEFAULT 'ru'").run(); } catch {}
+  // v30: status_changed_at and completed_at for funnel timing and fulfillment time
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN status_changed_at DATETIME DEFAULT NULL").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN completed_at DATETIME DEFAULT NULL").run(); } catch {}
+  // v30: PDF template versioning
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN pdf_template_version TEXT DEFAULT ''").run(); } catch {}
+  // v30: Audit log table for financial operations
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    user_name TEXT DEFAULT '',
+    action TEXT NOT NULL DEFAULT '',
+    entity_type TEXT DEFAULT '',
+    entity_id INTEGER DEFAULT NULL,
+    old_value TEXT DEFAULT '',
+    new_value TEXT DEFAULT '',
+    ip TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_audit_log_entity ON audit_log(entity_type, entity_id)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_audit_log_user ON audit_log(user_id)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_audit_log_date ON audit_log(created_at)').run(); } catch {}
+  // v30: Indexes for leads date queries
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_leads_status ON leads(status)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_leads_created ON leads(created_at)').run(); } catch {}
+  try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_leads_status_changed ON leads(status_changed_at)').run(); } catch {}
+  // v30: Backfill status_changed_at for existing leads that don't have it
+  try { await db.prepare("UPDATE leads SET status_changed_at = created_at WHERE status_changed_at IS NULL").run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
