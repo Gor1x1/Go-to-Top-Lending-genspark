@@ -311,19 +311,19 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       try {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
         let da = Number(cd.discountAmount || 0);
-        let svcSub = Number(cd.servicesSubtotal || 0);
+        let svcSub = 0;
+        // Always iterate items for services subtotal
+        if (cd.items && Array.isArray(cd.items)) {
+          for (const item of cd.items) {
+            if (!item.wb_article) svcSub += Number(item.subtotal || 0);
+          }
+        }
 
         // FALLBACK: if lead has referral_code but discountAmount=0 in calc_data,
         // recalculate discount dynamically from services items + referral_codes table
         if (da === 0 && rc) {
           const refInfo = refCodesLookup[rc.toUpperCase()];
           if (refInfo && refInfo.discount_percent > 0) {
-            // Calculate services subtotal from items if not stored
-            if (svcSub === 0 && cd.items && Array.isArray(cd.items)) {
-              for (const item of cd.items) {
-                if (!item.wb_article) svcSub += Number(item.subtotal || 0);
-              }
-            }
             // Also try legacy subtotal field
             if (svcSub === 0) svcSub = Number(cd.subtotal || 0);
             if (svcSub > 0) {
@@ -391,16 +391,17 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       try {
         const cd = JSON.parse((lead.calc_data as string) || '{}');
         let da = Number(cd.discountAmount || 0);
-        let svcSub = Number(cd.servicesSubtotal || 0);
+        let svcSub = 0;
+        // Always iterate items for services subtotal
+        if (cd.items && Array.isArray(cd.items)) {
+          for (const item of cd.items) {
+            if (!item.wb_article) svcSub += Number(item.subtotal || 0);
+          }
+        }
         // FALLBACK: same logic as main promo stats — recalc if needed
         if (da === 0 && rc) {
           const refInfo = refCodesLookup[rc.toUpperCase()];
           if (refInfo && refInfo.discount_percent > 0) {
-            if (svcSub === 0 && cd.items && Array.isArray(cd.items)) {
-              for (const item of cd.items) {
-                if (!item.wb_article) svcSub += Number(item.subtotal || 0);
-              }
-            }
             if (svcSub === 0) svcSub = Number(cd.subtotal || 0);
             if (svcSub > 0) da = Math.round(svcSub * refInfo.discount_percent / 100);
           }
