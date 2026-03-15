@@ -582,26 +582,31 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     } catch {}
   } else {
     // Open month (current or past-but-not-locked) — calculate LIVE from leads
-    const turnoverStatuses = ['in_progress', 'checking', 'done'];
-    const liveSvcLeads = await db.prepare(
-      `SELECT calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
+    // Use the SAME logic as analytics: SUM(total_amount) is ground truth for revenue,
+    // then break down by iterating items (NOT using servicesSubtotal which may be stale)
+    const liveLeads = await db.prepare(
+      `SELECT id, total_amount, calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
     ).bind(periodKey).all();
     let grossSvc = 0;
-    for (const row of (liveSvcLeads.results || [])) {
+    for (const row of (liveLeads.results || [])) {
       try {
         const cd = JSON.parse(row.calc_data as string || '{}');
-        if (cd.servicesSubtotal) grossSvc += Number(cd.servicesSubtotal);
-        else if (cd.items) {
-          for (const it of cd.items) { if (!it.wb_article) grossSvc += Number(it.subtotal || 0); }
+        // Services: iterate items, count only non-article items (same as analytics)
+        if (cd.items && Array.isArray(cd.items)) {
+          for (const it of cd.items) {
+            if (!it.wb_article) grossSvc += Number(it.subtotal || 0);
+          }
         }
+        // Packages from calc_data
         if (cd.package && cd.package.package_price) {
           revenuePackages += Number(cd.package.package_price || 0);
         }
+        // Discounts
         revenueDiscounts += Number(cd.discountAmount || 0);
       } catch {}
     }
-    revenueServices = Math.max(0, grossSvc - revenueDiscounts); // NET services
-    // Articles from lead_articles
+    revenueServices = Math.max(0, grossSvc - revenueDiscounts); // NET services (same as analytics)
+    // Articles from lead_articles table (single source of truth, same as analytics)
     const liveArt = await db.prepare(
       `SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`
     ).bind(periodKey).first();

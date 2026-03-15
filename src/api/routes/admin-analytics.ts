@@ -511,12 +511,9 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         for (const row of (svcItemsRes.results || [])) {
           try {
             const cd = JSON.parse(row.calc_data as string || '{}');
-            // Use servicesSubtotal if available (from recalc), otherwise sum items
-            if (cd.servicesSubtotal) {
-              svcTotal += Number(cd.servicesSubtotal);
-            } else {
-              const items = cd.items || cd.services || [];
-              for (const it of items) {
+            // Always iterate items to count services (don't use servicesSubtotal — may be stale)
+            if (cd.items && Array.isArray(cd.items)) {
+              for (const it of cd.items) {
                 if (!it.wb_article) svcTotal += Number(it.subtotal) || ((Number(it.price) || 0) * (Number(it.qty) || Number(it.quantity) || 1));
               }
             }
@@ -538,8 +535,8 @@ api.get('/business-analytics', authMiddleware, async (c) => {
             if (da === 0 && mdr.referral_code) {
               const ri = refCodesLookup[(mdr.referral_code as string).toUpperCase()];
               if (ri && ri.discount_percent > 0) {
-                let ss = Number(cd.servicesSubtotal || 0);
-                if (ss === 0 && cd.items) {
+                let ss = 0;
+                if (cd.items && Array.isArray(cd.items)) {
                   for (const it of cd.items) { if (!it.wb_article) ss += Number(it.subtotal || 0); }
                 }
                 if (ss === 0) ss = Number(cd.subtotal || 0);

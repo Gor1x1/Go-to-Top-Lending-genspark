@@ -589,8 +589,8 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
     for (const row of (svcLeads.results || [])) {
       try {
         const cd = JSON.parse(row.calc_data as string || '{}');
-        if (cd.servicesSubtotal) revServices += Number(cd.servicesSubtotal);
-        else if (cd.items) {
+        // Always iterate items to count services (same logic as analytics)
+        if (cd.items && Array.isArray(cd.items)) {
           for (const it of cd.items) { if (!it.wb_article) revServices += Number(it.subtotal || 0); }
         }
         // Package revenue — real money from client
