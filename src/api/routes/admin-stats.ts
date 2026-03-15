@@ -58,8 +58,8 @@ api.get('/stats', authMiddleware, async (c) => {
   // Status breakdown with date filter
   const statusSQL = "SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount, COALESCE(SUM(commission_amount),0) as commission FROM leads l WHERE 1=1" + dateFilter + " GROUP BY status";
   const refundSQL = "SELECT COALESCE(SUM(refund_amount),0) as total FROM leads l WHERE refund_amount > 0 AND status IN ('in_progress','checking','done')" + dateFilter;
-  // Services + packages revenue (excluding transit articles)
-  const svcPkgSQL = "SELECT COALESCE(SUM(CASE WHEN json_extract(l.calc_data, '$.services') IS NOT NULL THEN CAST(json_extract(l.calc_data, '$.services') AS REAL) ELSE l.total_amount END),0) as svc, COALESCE(SUM(CASE WHEN json_extract(l.calc_data, '$.package_price') IS NOT NULL THEN CAST(json_extract(l.calc_data, '$.package_price') AS REAL) ELSE 0 END),0) as pkg FROM leads l WHERE l.status IN ('in_progress','checking','done')" + dateFilter;
+  // Articles from lead_articles for active leads
+  const artSQL = "SELECT COALESCE(SUM(la.total_price),0) as total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter;
   const curPeriod = new Date().toISOString().slice(0, 7);
   
   const [statusBreakdown, dashRefunds, dashExpenses, dashMarketingExp, leadsThisWeek, leadsLastWeek, leadsBySource, leadsByAssignee, pmUsage, recentLeads, leadsToday, dailyLeads, dashSvcPkg] = await Promise.all([
@@ -88,10 +88,10 @@ api.get('/stats', authMiddleware, async (c) => {
     db.prepare("SELECT strftime('%H', created_at) as hour, COUNT(*) as count FROM leads WHERE date(created_at) = date('now') GROUP BY hour ORDER BY hour").all().catch(() => ({ results: [] })),
     // Daily leads for last 14 days (for chart)
     db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE created_at >= datetime('now', '-14 days') GROUP BY date(created_at) ORDER BY day DESC").all().catch(() => ({ results: [] })),
-    // Services + packages
+    // Articles total
     (dateParams.length > 0
-      ? db.prepare(svcPkgSQL).bind(...dateParams)
-      : db.prepare(svcPkgSQL)
+      ? db.prepare(artSQL).bind(...dateParams)
+      : db.prepare(artSQL)
     ).first().catch(() => null)
   ]);
 
@@ -114,9 +114,13 @@ api.get('/stats', authMiddleware, async (c) => {
   const dashTotalLeadsCount = Object.values(statusMap).reduce((s, v) => s + v.count, 0);
   const dashConversion = dashTotalLeadsCount > 0 ? Math.round((dashDoneCount / dashTotalLeadsCount) * 1000) / 10 : 0;
   const dashAvgCheck = dashDoneCount > 0 ? Math.round(dashDoneAmount / dashDoneCount) : 0;
-  const dashServicesRev = Number(dashSvcPkg?.svc || 0);
-  const dashPackagesRev = Number(dashSvcPkg?.pkg || 0);
-  const dashNetProfit = dashServicesRev + dashPackagesRev - Number(dashExpenses?.total || 0);
+  const dashArticlesRev = Number(dashSvcPkg?.total || 0);
+  const dashServicesAndPackages = dashTurnover - dashArticlesRev; // turnover minus articles = services + packages
+  // Total expenses = expenses from table + salaries + bonuses
+  const dashSalaries = await db.prepare("SELECT COALESCE(SUM(salary),0) as total FROM users WHERE salary > 0 AND is_active = 1").first().catch(() => ({ total: 0 }));
+  const dashBonuses = await db.prepare("SELECT COALESCE(SUM(CASE WHEN bonus_type='bonus' OR (bonus_type IS NULL AND amount > 0) THEN amount ELSE 0 END),0) as bon, COALESCE(SUM(CASE WHEN bonus_type IN ('penalty','fine') OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END),0) as pen FROM employee_bonuses WHERE bonus_date >= ? AND bonus_date <= ?").bind(curPeriod + '-01', curPeriod + '-31').first().catch(() => ({ bon: 0, pen: 0 }));
+  const dashTotalExp = Number(dashExpenses?.total || 0) + Number(dashSalaries?.total || 0) + Number(dashBonuses?.bon || 0) - Number(dashBonuses?.pen || 0);
+  const dashNetProfit = dashServicesAndPackages - dashTotalExp;
 
   return c.json({
     period,
@@ -149,7 +153,7 @@ api.get('/stats', authMiddleware, async (c) => {
       conversion: dashConversion,
       avg_check: dashAvgCheck,
       refunds: Number(dashRefunds?.total || 0),
-      total_expenses: Number(dashExpenses?.total || 0),
+      total_expenses: dashTotalExp,
       marketing_expenses: Number(dashMarketingExp?.total || 0),
       net_profit: dashNetProfit,
       leads_this_week: Number(leadsThisWeek?.count || 0),
