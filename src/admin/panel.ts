@@ -6735,7 +6735,8 @@ async function saveLoanPaymentInline(loanId) {
     await api('/loans/' + loanId + '/payments', { method: 'POST', body: JSON.stringify(d), _silent: true });
   }
   var bulk = await api('/bulk-data', { _silent: true });
-  if (bulk && !bulk.error) { data.loans = bulk.loans || []; data.loanPayments = bulk.loanPayments || []; }
+    var lo = await api('/loans', { _silent: true });
+  if (lo && !lo.error) { data.loans = lo.loans || []; data.loanPayments = lo.payments || []; }
   pnlData = null; loadPnlData(); toast(isEdit ? '\u041f\u043b\u0430\u0442\u0451\u0436 \u043e\u0431\u043d\u043e\u0432\u043b\u0451\u043d' : '\u041f\u043b\u0430\u0442\u0451\u0436 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d');
 }
 function editLoanPayment(loanId, paymentId) {
