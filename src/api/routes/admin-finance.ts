@@ -566,18 +566,60 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   } catch {}
 
   // Build P&L cascade (before taxes)
-  const revenueServices = snap ? (snap.revenue_services as number || 0) : 0;
-  const revenueArticles = snap ? (snap.revenue_articles as number || 0) : 0;
-  // Package revenue stored in custom_data.revenue_packages (from auto-close-month)
+  // If snapshot exists AND is locked, use snapshot data.
+  // If snapshot doesn't exist or is NOT locked (open month), calculate LIVE from leads.
+  let revenueServices = 0;
+  let revenueArticles = 0;
   let revenuePackages = 0;
-  try {
-    const snapCD = JSON.parse((snap?.custom_data as string) || '{}');
-    revenuePackages = Number(snapCD.revenue_packages || 0);
-  } catch {}
+  let revenueDiscounts = 0; // track gross-to-net discount
+  if (snap && snap.is_locked) {
+    // Closed month — use snapshot
+    revenueServices = snap.revenue_services as number || 0;
+    revenueArticles = snap.revenue_articles as number || 0;
+    try {
+      const snapCD = JSON.parse((snap.custom_data as string) || '{}');
+      revenuePackages = Number(snapCD.revenue_packages || 0);
+    } catch {}
+  } else {
+    // Open month (current or past-but-not-locked) — calculate LIVE from leads
+    const turnoverStatuses = ['in_progress', 'checking', 'done'];
+    const liveSvcLeads = await db.prepare(
+      `SELECT calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
+    ).bind(periodKey).all();
+    let grossSvc = 0;
+    for (const row of (liveSvcLeads.results || [])) {
+      try {
+        const cd = JSON.parse(row.calc_data as string || '{}');
+        if (cd.servicesSubtotal) grossSvc += Number(cd.servicesSubtotal);
+        else if (cd.items) {
+          for (const it of cd.items) { if (!it.wb_article) grossSvc += Number(it.subtotal || 0); }
+        }
+        if (cd.package && cd.package.package_price) {
+          revenuePackages += Number(cd.package.package_price || 0);
+        }
+        revenueDiscounts += Number(cd.discountAmount || 0);
+      } catch {}
+    }
+    revenueServices = Math.max(0, grossSvc - revenueDiscounts); // NET services
+    // Articles from lead_articles
+    const liveArt = await db.prepare(
+      `SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`
+    ).bind(periodKey).first();
+    revenueArticles = Number(liveArt?.art_total || 0);
+  }
   const revenue = revenueServices + revenueArticles + revenuePackages; // revenue = svc + art + pkg (total client payment)
   const totalTurnover = revenueServices + revenueArticles + revenuePackages; // total money coming in
   const turnoverExclTransit = revenueServices; // services only (excluding transit buyouts)
-  const refunds = snap ? (snap.refunds as number || 0) : 0;
+  let refunds = 0;
+  if (snap && snap.is_locked) {
+    refunds = snap.refunds as number || 0;
+  } else {
+    // Live refunds
+    const liveRef = await db.prepare(
+      `SELECT COALESCE(SUM(refund_amount),0) as total FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
+    ).bind(periodKey).first();
+    refunds = Number(liveRef?.total || 0);
+  }
   const cogs = expData ? (expData.commercial as number || 0) : 0;
   const grossProfit = revenue - cogs;
   const salariesBase = salaryData?.total_salaries as number || 0;
@@ -769,8 +811,16 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
         try { const cd = JSON.parse(ps.custom_data as string || '{}'); ytdPackages += Number(cd.revenue_packages || 0); } catch {}
       }
     } catch {}
-    const ytdRevenue = ((ytdSnaps?.revenue_svc as number) || 0) + ((ytdSnaps?.revenue_art as number) || 0) + ytdPackages;
+    // YTD revenue from snapshots (only locked months)
+    const ytdSnapRevSvc = (ytdSnaps?.revenue_svc as number) || 0;
+    const ytdSnapRevArt = (ytdSnaps?.revenue_art as number) || 0;
+    let ytdRevenue = ytdSnapRevSvc + ytdSnapRevArt + ytdPackages;
     const ytdRefunds = (ytdSnaps?.refunds as number) || 0;
+    // If current period is not locked (open), its revenue is NOT in snapshots,
+    // so add the live-calculated current period revenue to YTD
+    if (!snap || !snap.is_locked) {
+      ytdRevenue += current.revenue;
+    }
     const ytdCogs = current.cogs * monthsInFiscalYear;
     const ytdSalary = current.salary_total * monthsInFiscalYear;
     const ytdMarketing = current.marketing * monthsInFiscalYear;

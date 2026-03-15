@@ -5568,18 +5568,28 @@ function renderPnlCascade(p) {
   h += '</div>';
   
   // Revenue
-  h += pnlRow('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (Revenue)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0443\u0441\u043b\u0443\u0433 \u0438\u0437 \u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432'), p.revenue, {bold:true, color:'#22C55E', icon:'fa-coins', mom:mom.revenue, momPct:mp.revenue, ytd:ytd.revenue});
+  h += pnlRow('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 (Revenue)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0443\u0441\u043b\u0443\u0433 + \u0432\u044b\u043a\u0443\u043f\u044b + \u043f\u0430\u043a\u0435\u0442\u044b \u2212 \u0441\u043a\u0438\u0434\u043a\u0438. \u0414\u043b\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0445 \u043c\u0435\u0441\u044f\u0446\u0435\u0432 \u0441\u0447\u0438\u0442\u0430\u0435\u0442\u0441\u044f \u0432 \u0440\u0435\u0430\u043b\u044c\u043d\u043e\u043c \u0432\u0440\u0435\u043c\u0435\u043d\u0438 \u0438\u0437 \u043b\u0438\u0434\u043e\u0432'), p.revenue, {bold:true, color:'#22C55E', icon:'fa-coins', mom:mom.revenue, momPct:mp.revenue, ytd:ytd.revenue});
+  // Revenue component breakdown from P&L data (services/articles/packages)
+  var pnlSvcRev = Number(p.revenue_services) || 0;
+  var pnlArtRev = Number(p.revenue_articles) || 0;
+  var pnlPkgRev2 = Number(p.revenue_packages) || 0;
+  if (pnlSvcRev > 0) {
+    h += pnlRow('  \u0423\u0441\u043b\u0443\u0433\u0438 (\u043d\u0435\u0442\u0442\u043e)' + tip('\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u0443\u0441\u043b\u0443\u0433 \u0437\u0430 \u0432\u044b\u0447\u0435\u0442\u043e\u043c \u0441\u043a\u0438\u0434\u043e\u043a'), pnlSvcRev, {indent:2, color:'#8B5CF6', sub:true, icon:'fa-concierge-bell'});
+  }
+  if (pnlArtRev > 0) {
+    h += pnlRow('  \u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0432\u044b\u043a\u0443\u043f\u043e\u0432 \u043f\u043e \u0430\u0440\u0442\u0438\u043a\u0443\u043b\u0430\u043c'), pnlArtRev, {indent:2, color:'#F59E0B', sub:true, icon:'fa-shopping-bag'});
+  }
   // Package revenue breakdown in cascade
-  var pnlPkgRev = Number((analyticsData && analyticsData.packages_total_revenue) || 0);
+  var pnlPkgRev = Number(p.revenue_packages) || Number((analyticsData && analyticsData.packages_total_revenue) || 0);
   var pnlPkgCnt = Number((analyticsData && analyticsData.packages_total_count) || 0);
   if (pnlPkgRev > 0) {
-    h += pnlRow('  \u0438\u0437 \u043d\u0438\u0445 \u043f\u0430\u043a\u0435\u0442\u044b (' + pnlPkgCnt + ' \u0448\u0442)' + tip('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u043e\u0442 \u043f\u0440\u043e\u0434\u0430\u0436\u0438 \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0443\u0441\u043b\u0443\u0433. \u0412\u0445\u043e\u0434\u0438\u0442 \u0432 \u043e\u0431\u0449\u0443\u044e \u0432\u044b\u0440\u0443\u0447\u043a\u0443.'), pnlPkgRev, {indent:2, color:'#F59E0B', sub:true, icon:'fa-box-open'});
+    h += pnlRow('  \u0438\u0437 \u043d\u0438\u0445 \u043f\u0430\u043a\u0435\u0442\u044b (' + pnlPkgCnt + ' \u0448\u0442)' + tip('\u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u043e\u0442 \u043f\u0440\u043e\u0434\u0430\u0436\u0438 \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0443\u0441\u043b\u0443\u0433. \u0412\u0445\u043e\u0434\u0438\u0442 \u0432 \u043e\u0431\u0449\u0443\u044e \u0432\u044b\u0440\u0443\u0447\u043a\u0443.'), pnlPkgRev, {indent:2, color:'#FBBF24', sub:true, icon:'fa-box-open'});
   }
   // Discount impact (from promo codes)
   var pnlDiscCost = Number((analyticsData && analyticsData.total_discount_cost) || 0);
   var pnlDiscLeads = Number((analyticsData && analyticsData.total_discount_leads) || 0);
   if (pnlDiscCost > 0) {
-    h += pnlRow('  \u0421\u043a\u0438\u0434\u043a\u0438 \u043f\u043e \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434\u0430\u043c (' + pnlDiscLeads + ' \u043b\u0438\u0434\u043e\u0432)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0441\u043a\u0438\u0434\u043e\u043a \u043a\u043b\u0438\u0435\u043d\u0442\u0430\u043c \u043f\u043e \u0440\u0435\u0444\u0435\u0440\u0430\u043b\u044c\u043d\u044b\u043c \u043a\u043e\u0434\u0430\u043c. \u0423\u043c\u0435\u043d\u044c\u0448\u0430\u0435\u0442 \u0432\u044b\u0440\u0443\u0447\u043a\u0443.'), -pnlDiscCost, {indent:2, color:'#FBBF24', sub:true, icon:'fa-gift'});
+    h += pnlRow('  \u0421\u043a\u0438\u0434\u043a\u0438 \u043f\u043e \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434\u0430\u043c (' + pnlDiscLeads + ' \u043b\u0438\u0434\u043e\u0432)' + tip('\u0421\u0443\u043c\u043c\u0430 \u0441\u043a\u0438\u0434\u043e\u043a. \u0423\u0436\u0435 \u0432\u044b\u0447\u0442\u0435\u043d\u0430 \u0438\u0437 \u0443\u0441\u043b\u0443\u0433 \u0432\u044b\u0448\u0435 (\u0438\u043d\u0444\u043e\u0440\u043c\u0430\u0446\u0438\u043e\u043d\u043d\u043e).'), -pnlDiscCost, {indent:2, color:'#FBBF24', sub:true, icon:'fa-gift'});
   }
   h += pnlRow('\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b', -(p.refunds||0), {indent:1, color:'#EF4444', sub:true});
   h += pnlRow('\u0427\u0438\u0441\u0442\u0430\u044f \u0432\u044b\u0440\u0443\u0447\u043a\u0430', p.net_revenue, {indent:1, color:'#22C55E', sub:true, ytd:ytd.net_revenue});
@@ -5688,7 +5698,7 @@ function renderPnlCascade(p) {
   // Formula reference block
   h += '<details style="margin-top:20px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-info-circle" style="margin-right:6px;color:#8B5CF6"></i>\u0424\u043e\u0440\u043c\u0443\u043b\u044b \u0440\u0430\u0441\u0447\u0451\u0442\u043e\u0432</summary>';
   h += '<div class="card" style="margin-top:8px;font-size:0.8rem;color:#94a3b8;line-height:1.8">';
-  h += '<div><b style="color:#22C55E">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> = \u0441\u0443\u043c\u043c\u0430 \u0443\u0441\u043b\u0443\u0433 \u0438\u0437 \u0437\u0430\u043a\u0440\u044b\u0442\u044b\u0445 \u043f\u0435\u0440\u0438\u043e\u0434\u043e\u0432 (period_snapshots.revenue_services)</div>';
+  h += '<div><b style="color:#22C55E">\u0412\u044b\u0440\u0443\u0447\u043a\u0430</b> = \u0443\u0441\u043b\u0443\u0433\u0438 (\u043d\u0435\u0442\u0442\u043e) + \u0432\u044b\u043a\u0443\u043f\u044b + \u043f\u0430\u043a\u0435\u0442\u044b. \u0414\u043b\u044f \u043e\u0442\u043a\u0440\u044b\u0442\u044b\u0445 \u043c\u0435\u0441\u044f\u0446\u0435\u0432 \u2014 LIVE \u0438\u0437 \u043b\u0438\u0434\u043e\u0432</div>';
   h += '<div><b style="color:#F59E0B">COGS</b> = \u041a\u043e\u043c\u043c\u0435\u0440\u0447\u0435\u0441\u043a\u0438\u0435 \u0437\u0430\u0442\u0440\u0430\u0442\u044b (\u0431\u043b\u043e\u043a \u0417\u0430\u0442\u0440\u0430\u0442\u044b, is_marketing=0)</div>';
   h += '<div><b style="color:#22C55E">\u0412\u0430\u043b\u043e\u0432\u0430\u044f</b> = \u0412\u044b\u0440\u0443\u0447\u043a\u0430 \u2212 COGS</div>';
   h += '<div><b style="color:#3B82F6">EBIT</b> = \u0412\u0430\u043b\u043e\u0432\u0430\u044f \u2212 \u0417\u041f \u2212 \u041c\u0430\u0440\u043a\u0435\u0442\u0438\u043d\u0433 \u2212 \u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f</div>';
@@ -5704,7 +5714,7 @@ function renderPnlCascade(p) {
   // Data sources — collapsible
   h += '<details style="margin-top:12px"><summary style="cursor:pointer;color:#64748b;font-size:0.85rem;font-weight:600"><i class="fas fa-link" style="margin-right:6px;color:#22C55E"></i>Откуда данные в P&L</summary>';
   h += '<div class="card" style="margin-top:8px;font-size:0.78rem;color:#94a3b8;line-height:1.8">';
-  h += '<div><span style="color:#22C55E">✓</span> <b>Выручка</b> ← Периоды (закрытые периоды)</div>';
+  h += '<div><span style="color:#22C55E">✓</span> <b>Выручка</b> ← Закрытые: снапшот, Открытые: LIVE из лидов (усл+выкупы+пак-скидки)</div>';
   h += '<div><span style="color:#22C55E">✓</span> <b>COGS</b> ← Затраты (коммерческие, is_marketing=0)</div>';
   h += '<div><span style="color:#22C55E">✓</span> <b>ЗП + Бонусы − Штрафы</b> ← Сотрудники</div>';
   h += '<div><span style="color:#22C55E">✓</span> <b>Маркетинг</b> ← Затраты (is_marketing=1)</div>';
@@ -7287,12 +7297,13 @@ function renderBizOverviewV2(d, sd, fin) {
     var isExcl = !!excludedStatuses[st.key];
     var cnt = Number(rawV.count) || 0; var amt = Number(rawV.amount) || 0;
     var svcAmt = Number(rawV.services) || 0; var artAmt = Number(rawV.articles) || 0;
+    var pkgAmt = Number(rawV.packages) || 0;
     var opacity = isExcl ? '0.35' : '1';
     h += '<div class="card" style="padding:16px;text-align:center;border-left:3px solid ' + st.color + ';cursor:pointer;opacity:' + opacity + '" onclick="navigate(&apos;leads&apos;);setLeadsFilter(&apos;status&apos;,&apos;' + st.key + '&apos;)">';
     h += '<div style="font-size:0.75rem;color:#94a3b8;margin-bottom:4px"><i class="fas ' + st.icon + '" style="color:' + st.color + ';margin-right:4px"></i>' + st.label + '</div>';
     h += '<div style="font-size:1.8rem;font-weight:800;color:' + st.color + '">' + cnt + '</div>';
     h += '<div style="font-size:0.82rem;color:#e2e8f0;margin-top:4px;font-weight:600">' + fmtAmt(amt) + '</div>';
-    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.68rem;color:#475569"><span>\u0423\u0441\u043b: ' + fmtAmt(svcAmt) + '</span><span>\u0417\u0430\u043a: ' + fmtAmt(artAmt) + '</span></div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.68rem;color:#475569;flex-wrap:wrap;gap:2px"><span>\u0423\u0441\u043b: ' + fmtAmt(svcAmt) + '</span><span>\u0417\u0430\u043a: ' + fmtAmt(artAmt) + '</span>' + (pkgAmt > 0 ? '<span style="color:#FBBF24">\u041f\u0430\u043a: ' + fmtAmt(pkgAmt) + '</span>' : '') + '</div>';
     h += '</div>';
   }
   h += '</div></div>';
@@ -8807,6 +8818,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (mChecking || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (mTurnover ? fmtAmt(mTurnover) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (mArt ? fmtAmt(mArt) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (mPkg ? fmtAmt(mPkg) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (mRefunds ? '-' + fmtAmt(Math.abs(mRefunds)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (mSvc ? fmtAmt(mSvc) : '\u2014') + '</td>';
     // Monthly discount from promo codes — use monthly_data.discounts (per-month, independent of date picker)
@@ -8936,6 +8948,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + yearTotals.checking + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#a78bfa">' + fmtAmt(yearTotals.turnover) + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (yearTotals.articles ? fmtAmt(yearTotals.articles) : '\u2014') + '</td>';
+  h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (yearTotals.packages ? fmtAmt(yearTotals.packages) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (yearTotals.refunds ? '-' + fmtAmt(Math.abs(yearTotals.refunds)) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (yearTotals.services ? fmtAmt(yearTotals.services) : '\u2014') + '</td>';
   h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (yearTotals.discounts > 0 ? '-' + fmtAmt(yearTotals.discounts) : '\u2014') + '</td>';
@@ -8962,6 +8975,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:right;color:#3B82F6" title="На проверке">Проверка</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#a78bfa">Приход</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B">Выкупы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#FBBF24">Пакеты</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#f87171">Возврат</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6">Услуги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444">Расходы</th>';
@@ -8980,7 +8994,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     var qIsCurrent = qNum === currentQ;
     var qLocked = qSnap && qSnap.is_locked;
     var closedInQ = 0;
-    var qTurnover = 0, qSvc = 0, qArt = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0, qTaxes = 0, qInProg = 0, qRejected = 0, qChecking = 0;
+    var qTurnover = 0, qSvc = 0, qArt = 0, qPkg = 0, qRef = 0, qExp = 0, qProfit = 0, qDone = 0, qTaxes = 0, qInProg = 0, qRejected = 0, qChecking = 0;
     for (var qmi = 0; qmi < 3; qmi++) {
       var qmNum = qMonthsMap[qi2][qmi];
       var qmKey = currentYear + '-' + String(qmNum).padStart(2,'0');
@@ -8996,6 +9010,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         var cExp = Number(fin.total_expenses)||0;
         qSvc += cSvc;
         qArt += cArt;
+        qPkg += cPkg;
         qRef += Number(fin.refunds)||0;
         qExp += cExp;
         qTurnover += cSvc + cArt + cPkg;
@@ -9014,6 +9029,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; qmPkg = Number(qmCD.revenue_packages)||0; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch(e) {}
         qSvc += qmSvc;
         qArt += qmArt;
+        qPkg += qmPkg;
         qRef += Number(qmSnap.refunds)||0;
         qExp += qmExp;
         qTurnover += qmSvc + qmArt + qmPkg;
@@ -9032,6 +9048,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       qTurnover = qlSvc + qlArt + qlPkg;
       qSvc = qlSvc;
       qArt = qlArt;
+      qPkg = qlPkg;
       qRef = Number(qSnap.refunds)||0;
       qExp = qlExp;
       qProfit = (qlSvc + qlArt + qlPkg) - qlExp;
@@ -9075,6 +9092,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     h += '<td style="padding:8px 6px;text-align:right;color:#3B82F6">' + (qChecking || '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;font-weight:600;color:#a78bfa">' + (qTurnover ? fmtAmt(qTurnover) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#F59E0B">' + (qArt ? fmtAmt(qArt) : '\u2014') + '</td>';
+    h += '<td style="padding:8px 6px;text-align:right;color:#FBBF24">' + (qPkg ? fmtAmt(qPkg) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#f87171">' + (qRef ? '-' + fmtAmt(Math.abs(qRef)) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#8B5CF6">' + (qSvc ? fmtAmt(qSvc) : '\u2014') + '</td>';
     h += '<td style="padding:8px 6px;text-align:right;color:#EF4444">' + (qExp ? '-' + fmtAmt(Math.abs(qExp)) : '\u2014') + '</td>';
