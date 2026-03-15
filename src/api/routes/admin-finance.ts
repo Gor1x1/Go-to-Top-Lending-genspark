@@ -818,7 +818,8 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     const ytdRefunds = (ytdSnaps?.refunds as number) || 0;
     // If current period is not locked (open), its revenue is NOT in snapshots,
     // so add the live-calculated current period revenue to YTD
-    if (!snap || !snap.is_locked) {
+    const currentSnap = await db.prepare("SELECT is_locked FROM period_snapshots WHERE period_key = ? AND period_type = 'month'").bind(periodKey).first();
+    if (!currentSnap || !currentSnap.is_locked) {
       ytdRevenue += current.revenue;
     }
     const ytdCogs = current.cogs * monthsInFiscalYear;
