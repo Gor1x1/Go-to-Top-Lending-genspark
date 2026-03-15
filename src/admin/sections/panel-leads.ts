@@ -40,11 +40,11 @@ function renderLeads() {
         leadDisc = Number(cd.discountAmount || 0);
       }
     }
-    stats[st].svc += leadSvc;
+    stats[st].svc += Math.max(0, leadSvc - leadDisc);
     stats[st].art += leadArt;
     stats[st].pkg += leadPkg;
     stats[st].disc += leadDisc;
-    // Total = total_amount from DB (svc + art + pkg - discount) = real client payment
+    // Total = total_amount from DB = real client payment
     var amt = Number(al.total_amount || 0);
     stats[st].a += amt;
     totalAmount += amt;
@@ -93,7 +93,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
     '<div style="color:#fbbf24;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span>' + (stats.in_progress.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.in_progress.pkg) + '</span>' : '') + (stats.in_progress.disc > 0 ? '<br><span style="color:#EF4444">Скид: -' + fmtA(stats.in_progress.disc) + '</span>' : '') + '</div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span>' + (stats.in_progress.disc > 0 ? ' <span style="color:#EF4444;font-size:0.6rem">(-' + fmtA(stats.in_progress.disc) + ' скидка)</span>' : '') + '<br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span>' + (stats.in_progress.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.in_progress.pkg) + '</span>' : '') + '</div></div>';
   // 4. Отклонен
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;rejected&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
@@ -109,7 +109,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
     '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span>' + (stats.done.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.done.pkg) + '</span>' : '') + (stats.done.disc > 0 ? '<br><span style="color:#EF4444">Скид: -' + fmtA(stats.done.disc) + '</span>' : '') + '</div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span>' + (stats.done.disc > 0 ? ' <span style="color:#EF4444;font-size:0.6rem">(-' + fmtA(stats.done.disc) + ' скидка)</span>' : '') + '<br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span>' + (stats.done.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.done.pkg) + '</span>' : '') + '</div></div>';
   h += '</div>';
   
   // Filters row — 6 statuses only
