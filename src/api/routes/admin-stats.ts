@@ -58,9 +58,11 @@ api.get('/stats', authMiddleware, async (c) => {
   // Status breakdown with date filter
   const statusSQL = "SELECT status, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount, COALESCE(SUM(commission_amount),0) as commission FROM leads l WHERE 1=1" + dateFilter + " GROUP BY status";
   const refundSQL = "SELECT COALESCE(SUM(refund_amount),0) as total FROM leads l WHERE refund_amount > 0 AND status IN ('in_progress','checking','done')" + dateFilter;
+  // Services + packages revenue (excluding transit articles)
+  const svcPkgSQL = "SELECT COALESCE(SUM(CASE WHEN json_extract(l.calc_data, '$.services') IS NOT NULL THEN CAST(json_extract(l.calc_data, '$.services') AS REAL) ELSE l.total_amount END),0) as svc, COALESCE(SUM(CASE WHEN json_extract(l.calc_data, '$.package_price') IS NOT NULL THEN CAST(json_extract(l.calc_data, '$.package_price') AS REAL) ELSE 0 END),0) as pkg FROM leads l WHERE l.status IN ('in_progress','checking','done')" + dateFilter;
   const curPeriod = new Date().toISOString().slice(0, 7);
   
-  const [statusBreakdown, dashRefunds, dashExpenses, dashMarketingExp, leadsThisWeek, leadsLastWeek, leadsBySource, leadsByAssignee, pmUsage, recentLeads, leadsToday, dailyLeads] = await Promise.all([
+  const [statusBreakdown, dashRefunds, dashExpenses, dashMarketingExp, leadsThisWeek, leadsLastWeek, leadsBySource, leadsByAssignee, pmUsage, recentLeads, leadsToday, dailyLeads, dashSvcPkg] = await Promise.all([
     (dateParams.length > 0
       ? db.prepare(statusSQL).bind(...dateParams)
       : db.prepare(statusSQL)
@@ -85,7 +87,12 @@ api.get('/stats', authMiddleware, async (c) => {
     db.prepare("SELECT id, name, contact, status, total_amount, commission_amount, source, created_at FROM leads ORDER BY created_at DESC LIMIT 5").all().catch(() => ({ results: [] })),
     db.prepare("SELECT strftime('%H', created_at) as hour, COUNT(*) as count FROM leads WHERE date(created_at) = date('now') GROUP BY hour ORDER BY hour").all().catch(() => ({ results: [] })),
     // Daily leads for last 14 days (for chart)
-    db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE created_at >= datetime('now', '-14 days') GROUP BY date(created_at) ORDER BY day DESC").all().catch(() => ({ results: [] }))
+    db.prepare("SELECT date(created_at) as day, COUNT(*) as count, COALESCE(SUM(total_amount),0) as amount FROM leads WHERE created_at >= datetime('now', '-14 days') GROUP BY date(created_at) ORDER BY day DESC").all().catch(() => ({ results: [] })),
+    // Services + packages
+    (dateParams.length > 0
+      ? db.prepare(svcPkgSQL).bind(...dateParams)
+      : db.prepare(svcPkgSQL)
+    ).first().catch(() => null)
   ]);
 
   // Process status breakdown
@@ -107,7 +114,9 @@ api.get('/stats', authMiddleware, async (c) => {
   const dashTotalLeadsCount = Object.values(statusMap).reduce((s, v) => s + v.count, 0);
   const dashConversion = dashTotalLeadsCount > 0 ? Math.round((dashDoneCount / dashTotalLeadsCount) * 1000) / 10 : 0;
   const dashAvgCheck = dashDoneCount > 0 ? Math.round(dashDoneAmount / dashDoneCount) : 0;
-  const dashNetProfit = dashTurnover - Number(dashExpenses?.total || 0) - Number(dashRefunds?.total || 0);
+  const dashServicesRev = Number(dashSvcPkg?.svc || 0);
+  const dashPackagesRev = Number(dashSvcPkg?.pkg || 0);
+  const dashNetProfit = dashServicesRev + dashPackagesRev - Number(dashExpenses?.total || 0);
 
   return c.json({
     period,
