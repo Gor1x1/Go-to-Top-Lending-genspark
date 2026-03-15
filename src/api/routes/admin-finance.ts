@@ -655,7 +655,9 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     refunds = Number(liveRef?.total || 0);
   }
   const cogs = expData ? (expData.commercial as number || 0) : 0;
-  const grossProfit = revenue - cogs;
+  // Articles (WB buyouts) are transit client money — treated as cost of goods sold
+  const cogsWithArticles = cogs + revenueArticles;
+  const grossProfit = revenue - cogsWithArticles;
   const salariesBase = salaryData?.total_salaries as number || 0;
   const bonusesVal = salaryData?.total_bonuses as number || 0;
   const penalties = salaryData?.total_penalties as number || 0;
@@ -668,7 +670,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const interestExpense = loanPayments ? (loanPayments.total_interest as number || 0) : 0;
   const otherNet = otherIncome - otherExpenses;
   const ebt = ebit + otherNet - interestExpense;
-  const totalExpensesAll = cogs + totalOpex; // for income-minus-expenses base
+  const totalExpensesAll = cogsWithArticles + totalOpex; // for income-minus-expenses base
 
   // Auto-calculate tax amounts for taxes with is_auto=1
   // tax_base: 'revenue', 'ebt', 'income_minus_expenses', 'payroll', 'vat_inclusive', 'fixed', 'total_turnover', 'turnover_excl_transit'
@@ -724,7 +726,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     revenue, revenue_services: revenueServices, revenue_articles: revenueArticles, revenue_packages: revenuePackages,
     total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit,
     refunds, net_revenue: revenue - refunds,
-    cogs, gross_profit: grossProfit,
+    cogs: cogsWithArticles, cogs_commercial: cogs, cogs_articles: revenueArticles, gross_profit: grossProfit,
     gross_margin: revenue > 0 ? Math.round(grossProfit / revenue * 10000) / 100 : 0,
     salaries: salariesBase, bonuses: bonusesVal, penalties, salary_total: salaryTotal,
     active_employee_count: activeEmployeeCount,
