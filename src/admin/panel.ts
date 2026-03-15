@@ -8733,7 +8733,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       mExpMkt = Math.abs(Number(mSnap.expense_marketing)||0);
       mExp = mExpSal + mExpComm + mExpMkt;
       mTurnover = mSvc + mArt + mPkg;
-      mProfit = (mSvc + mArt + mPkg) - mExp + mAdjTotal;
+      mProfit = (mSvc + mPkg) - mExp + mAdjTotal; // articles excluded (transit money)
     } else if ((isCurrent || isPast) && mData) {
       // ALWAYS use monthly_data for both current and past months — this data
       // is grouped by actual created_at month, not affected by date picker
@@ -8764,7 +8764,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         }
       }
       mTurnover = mSvc + mArt + mPkg;
-      mProfit = (mSvc + mArt + mPkg) - mExp + mAdjTotal;
+      mProfit = (mSvc + mPkg) - mExp + mAdjTotal; // articles excluded (transit money)
     } else if (isCurrent) {
       // Fallback: current month but no mData (first day, no leads yet)
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
@@ -9013,7 +9013,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         qRef += Number(fin.refunds)||0;
         qExp += cExp;
         qTurnover += cSvc + cArt + cPkg;
-        qProfit += (cSvc + cArt + cPkg) - cExp;
+        qProfit += (cSvc + cPkg) - cExp; // articles excluded (transit)
         qDone += (sd.done ? Number(sd.done.count)||0 : 0);
         qInProg += (sd.in_progress ? Number(sd.in_progress.count)||0 : 0) + (sd.contacted ? Number(sd.contacted.count)||0 : 0);
         qRejected += (sd.rejected ? Number(sd.rejected.count)||0 : 0);
@@ -9032,7 +9032,7 @@ function renderBizPeriodsV2(d, sd, fin) {
         qRef += Number(qmSnap.refunds)||0;
         qExp += qmExp;
         qTurnover += qmSvc + qmArt + qmPkg;
-        qProfit += (qmSvc + qmArt + qmPkg) - qmExp + qmAdj;
+        qProfit += (qmSvc + qmPkg) - qmExp + qmAdj; // articles excluded
         qDone += Number(qmSnap.leads_done)||0;
         try { var qmCD2 = JSON.parse(qmSnap.custom_data || '{}'); qInProg += Number(qmCD2.in_progress_count)||0; qRejected += Number(qmCD2.rejected_count)||0; qChecking += Number(qmCD2.checking_count)||0; } catch(e) {}
       }
@@ -9050,7 +9050,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       qPkg = qlPkg;
       qRef = Number(qSnap.refunds)||0;
       qExp = qlExp;
-      qProfit = (qlSvc + qlArt + qlPkg) - qlExp;
+      qProfit = (qlSvc + qlPkg) - qlExp; // articles excluded
       qDone = Number(qSnap.leads_done)||0;
     }
     // Sum taxes for this quarter from tax_payments
@@ -9266,18 +9266,9 @@ function renderBizPeriodsV2(d, sd, fin) {
       }
       var exp1 = snap1ExpSal + snap1ExpComm + snap1ExpMkt;
       var exp2 = snap2ExpSal + snap2ExpComm + snap2ExpMkt;
-      // Recompute net_profit from expenses if snapshot had corrupted negative expenses or zero expenses enriched from live
-      var snap1NP = Number(snap1.net_profit)||0;
-      var snap2NP = snap2 ? Number(snap2.net_profit)||0 : 0;
-      // Check if any expense was negative (corrupted) or if we enriched from live data — then recalculate profit
-      var snap1Corrupted = Number(snap1.expense_commercial) < 0 || Number(snap1.expense_salaries) < 0 || Number(snap1.expense_marketing) < 0;
-      var snap1Enriched = (snap1.period_key === liveMonth) && (Math.abs(Number(snap1.expense_marketing)||0) === 0 || Math.abs(Number(snap1.expense_salaries)||0) === 0);
-      if (snap1Corrupted || snap1Enriched) {
-        snap1NP = (Number(snap1.revenue_services)||0) - exp1;
-      }
-      if (snap2 && (Number(snap2.expense_commercial) < 0 || Number(snap2.expense_salaries) < 0 || Number(snap2.expense_marketing) < 0 || ((snap2.period_key === liveMonth) && (Math.abs(Number(snap2.expense_marketing)||0) === 0 || Math.abs(Number(snap2.expense_salaries)||0) === 0)))) {
-        snap2NP = (Number(snap2.revenue_services)||0) - exp2;
-      }
+      // Always compute net_profit from services - expenses (articles are transit money, not profit)
+      var snap1NP = (Number(snap1.revenue_services)||0) - exp1;
+      var snap2NP = snap2 ? (Number(snap2.revenue_services)||0) - exp2 : 0;
       // Helper: get valid avg_check (0 if no leads_done)
       var snap1AvgCheck = (Number(snap1.leads_done)||0) > 0 ? Number(snap1.avg_check)||0 : 0;
       var snap2AvgCheck = snap2 ? ((Number(snap2.leads_done)||0) > 0 ? Number(snap2.avg_check)||0 : 0) : 0;
