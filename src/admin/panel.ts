@@ -5480,13 +5480,6 @@ function renderPnLTab() {
   h += '<input type="month" class="input" style="padding:4px 10px;width:160px;font-size:0.85rem" value="' + pnlPeriod + '" onchange="pnlPeriod=this.value;pnlData=null;loadPnlData()">';
   h += '<span style="color:#64748b;font-size:0.78rem;margin-left:6px">\u0432\u0430\u043b\u044e\u0442\u0430: AMD</span>';
   if (p.prev_period) h += '<span style="color:#475569;font-size:0.72rem;margin-left:8px">vs ' + p.prev_period + '</span>';
-  // Fiscal year start selector
-  h += '<span style="color:#475569;margin-left:8px">|</span>';
-  h += '<span style="color:#64748b;font-size:0.78rem;margin-left:6px">\u0424\u0438\u0441\u043a. \u0433\u043e\u0434 \u0441:</span>';
-  h += '<select class="input" style="width:100px;padding:3px 8px;font-size:0.78rem;margin-left:4px" onchange="saveFiscalYearStart(this.value)">';
-  var fmNames = ["\u042f\u043d\u0432","\u0424\u0435\u0432","\u041c\u0430\u0440","\u0410\u043f\u0440","\u041c\u0430\u0439","\u0418\u044e\u043d","\u0418\u044e\u043b","\u0410\u0432\u0433","\u0421\u0435\u043d","\u041e\u043a\u0442","\u041d\u043e\u044f","\u0414\u0435\u043a"];
-  for (var fi = 1; fi <= 12; fi++) h += '<option value="' + fi + '"' + ((p.fiscal_year_start_month || pnlFiscalMonth || 1) === fi ? ' selected' : '') + '>' + fmNames[fi-1] + ' (' + fi + ')</option>';
-  h += '</select>';
   h += '</div>';
   // Sub-tabs
   var subTabs = [{id:'cascade',icon:'fa-stream',label:'P&L \u041a\u0430\u0441\u043a\u0430\u0434'},{id:'taxes',icon:'fa-landmark',label:'\u041d\u0430\u043b\u043e\u0433\u0438'},{id:'assets',icon:'fa-building',label:'\u0410\u043c\u043e\u0440\u0442\u0438\u0437\u0430\u0446\u0438\u044f'},{id:'loans',icon:'fa-hand-holding-usd',label:'\u041a\u0440\u0435\u0434\u0438\u0442\u044b'},{id:'dividends',icon:'fa-money-check-alt',label:'\u0414\u0438\u0432\u0438\u0434\u0435\u043d\u0434\u044b'},{id:'other',icon:'fa-exchange-alt',label:'\u041f\u0440\u043e\u0447\u0435\u0435'},{id:'scenario',icon:'fa-flask',label:'\u0421\u0446\u0435\u043d\u0430\u0440\u0438\u0438'},{id:'summary',icon:'fa-clipboard-list',label:'\u0421\u0432\u043e\u0434\u043a\u0430'}];

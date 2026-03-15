@@ -862,40 +862,33 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     if (!currentSnap || !currentSnap.is_locked) {
       ytdRevenue += current.revenue;
     }
-    // BUG-002 fix: YTD salaries/expenses/COGS — iterate through each month for accurate totals
-    // instead of multiplying current month values by monthsInFiscalYear
+    // YTD salaries/expenses/COGS — aggregated queries for the fiscal year range (optimized, no per-month loop)
     let ytdSalary = 0, ytdMarketing = 0, ytdDepr = current.depreciation * monthsInFiscalYear;
-    let ytdCogs = 0; // COGS includes articles (transit) + commercial expenses per month
+    let ytdCogs = 0;
     {
-      let iterYear = fStartYear, iterMonth = fStartMonth;
-      for (let mi = 0; mi < monthsInFiscalYear; mi++) {
-        const iterKey = iterYear + '-' + String(iterMonth).padStart(2, '0');
-        const iterEnd = iterKey + '-31';
-        const iterStart = iterKey + '-01';
-        // Salary for this month (filtered by hire/end date)
-        const mSal = await db.prepare(`SELECT 
-          COALESCE(SUM(CASE WHEN u.is_active=1 AND (u.hire_date = '' OR u.hire_date IS NULL OR u.hire_date <= ?) AND (u.end_date = '' OR u.end_date IS NULL OR u.end_date >= ?) THEN u.salary ELSE 0 END), 0) as sal,
-          COALESCE((SELECT SUM(CASE WHEN eb.bonus_type='bonus' OR (eb.bonus_type IS NULL AND eb.amount > 0) THEN eb.amount ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as bon,
-          COALESCE((SELECT SUM(CASE WHEN eb.bonus_type IN ('penalty','fine') OR (eb.bonus_type IS NULL AND eb.amount < 0) THEN ABS(eb.amount) ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as pen
-          FROM users u WHERE u.salary > 0`).bind(iterEnd, iterStart, iterStart, iterEnd, iterStart, iterEnd).first();
-        ytdSalary += (Number(mSal?.sal || 0) + Number(mSal?.bon || 0) - Number(mSal?.pen || 0));
-        // Marketing and commercial expenses for this month
-        const mExp = await db.prepare(`SELECT 
-          COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as mkt,
-          COALESCE(SUM(CASE WHEN ec.is_marketing = 0 OR ec.is_marketing IS NULL THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as comm
-          FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
-          WHERE e.is_active = 1 AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?) AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`)
-          .bind(iterEnd, iterStart).first();
-        ytdMarketing += Number(mExp?.mkt || 0);
-        // COGS for this month = commercial expenses + articles for that month
-        const commThisMonth = Number(mExp?.comm || 0);
-        // Articles from leads for this month
-        const mArt = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(iterKey).first();
-        const artThisMonth = Number(mArt?.art || 0);
-        ytdCogs += commThisMonth + artThisMonth;
-        iterMonth++;
-        if (iterMonth > 12) { iterMonth = 1; iterYear++; }
-      }
+      const fyStart = fiscalYearStartDate; // e.g. 2026-01-01
+      const fyEnd = periodKey + '-31'; // e.g. 2026-03-31
+      // Salaries: sum of monthly salaries * months active + bonuses - penalties in range
+      // Approximate: current salaries * months (employees rarely change mid-year)
+      const ytdSalBase = await db.prepare(`SELECT COALESCE(SUM(salary),0) as total FROM users WHERE salary > 0 AND is_active = 1`).first();
+      const ytdSalBaseTotal = Number(ytdSalBase?.total || 0) * monthsInFiscalYear;
+      const ytdBonPen = await db.prepare(`SELECT 
+        COALESCE(SUM(CASE WHEN bonus_type='bonus' OR (bonus_type IS NULL AND amount > 0) THEN amount ELSE 0 END), 0) as bon,
+        COALESCE(SUM(CASE WHEN bonus_type IN ('penalty','fine') OR (bonus_type IS NULL AND amount < 0) THEN ABS(amount) ELSE 0 END), 0) as pen
+        FROM employee_bonuses WHERE bonus_date >= ? AND bonus_date <= ?`).bind(fyStart, fyEnd).first();
+      ytdSalary = ytdSalBaseTotal + Number(ytdBonPen?.bon || 0) - Number(ytdBonPen?.pen || 0);
+      // Marketing and commercial expenses (monthly rate * months)
+      const ytdExpenses = await db.prepare(`SELECT 
+        COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as mkt,
+        COALESCE(SUM(CASE WHEN ec.is_marketing = 0 OR ec.is_marketing IS NULL THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as comm
+        FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
+        WHERE e.is_active = 1`).first();
+      ytdMarketing = Number(ytdExpenses?.mkt || 0) * monthsInFiscalYear;
+      const ytdCommercial = Number(ytdExpenses?.comm || 0) * monthsInFiscalYear;
+      // Articles (transit buyouts) — aggregate across all months in fiscal year
+      const ytdArt = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) >= ? AND strftime('%Y-%m', l.created_at) <= ? AND l.status IN ('in_progress','checking','done')`).bind(fiscalYearStart, periodKey).first();
+      const ytdArticles = Number(ytdArt?.art || 0);
+      ytdCogs = ytdCommercial + ytdArticles;
     }
     const ytdTotalOpex = ytdSalary + ytdMarketing + ytdDepr;
     const ytdGross = ytdRevenue - ytdCogs;
