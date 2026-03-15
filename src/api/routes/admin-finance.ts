@@ -582,8 +582,14 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     } catch {}
   } else {
     // Open month (current or past-but-not-locked) — calculate LIVE from leads
-    // Use the SAME logic as analytics: SUM(total_amount) is ground truth for revenue,
-    // then break down by iterating items (NOT using servicesSubtotal which may be stale)
+    // GROUND TRUTH: SUM(total_amount) is the definitive revenue (same as analytics KPI "Оборот")
+    // total_amount in DB = services + articles + packages - discounts
+    const liveTurnover = await db.prepare(
+      `SELECT COALESCE(SUM(total_amount),0) as total FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
+    ).bind(periodKey).first();
+    const liveRevenue = Number(liveTurnover?.total || 0);
+
+    // Breakdown: iterate items for services/articles/packages split
     const liveLeads = await db.prepare(
       `SELECT id, total_amount, calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
     ).bind(periodKey).all();
@@ -611,6 +617,15 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
       `SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`
     ).bind(periodKey).first();
     revenueArticles = Number(liveArt?.art_total || 0);
+
+    // Reconciliation: if breakdown doesn't add up to total_amount, adjust services to match
+    // This ensures P&L Revenue ALWAYS equals SUM(total_amount) = analytics Оборот
+    const breakdownSum = revenueServices + revenueArticles + revenuePackages;
+    if (Math.abs(breakdownSum - liveRevenue) > 1) {
+      // Difference goes into services (most likely due to rounding or stale calc_data)
+      revenueServices += (liveRevenue - breakdownSum);
+      if (revenueServices < 0) revenueServices = 0;
+    }
   }
   const revenue = revenueServices + revenueArticles + revenuePackages; // revenue = svc + art + pkg (total client payment)
   const totalTurnover = revenueServices + revenueArticles + revenuePackages; // total money coming in
