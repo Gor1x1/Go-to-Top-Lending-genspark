@@ -589,6 +589,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     ).bind(periodKey).first();
     const liveRevenue = Number(liveTurnover?.total || 0);
 
+    // DEBUG: log what SQL returns
     // Breakdown: iterate items for services/articles/packages split
     const liveLeads = await db.prepare(
       `SELECT id, total_amount, calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
@@ -618,13 +619,26 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     ).bind(periodKey).first();
     revenueArticles = Number(liveArt?.art_total || 0);
 
-    // Reconciliation: if breakdown doesn't add up to total_amount, adjust services to match
+    // FIX: Force revenue = SUM(total_amount) from DB (ground truth)
+    // Then compute packages separately from analytics-compatible query
     // This ensures P&L Revenue ALWAYS equals SUM(total_amount) = analytics Оборот
+    // If breakdown doesn't match, adjust services (they include packages too in calc_data items)
     const breakdownSum = revenueServices + revenueArticles + revenuePackages;
-    if (Math.abs(breakdownSum - liveRevenue) > 1) {
-      // Difference goes into services (most likely due to rounding or stale calc_data)
+    if (Math.abs(breakdownSum - liveRevenue) > 1 && liveRevenue > 0) {
+      // Difference goes into services (most likely packages not parsed correctly from calc_data, or rounding)
       revenueServices += (liveRevenue - breakdownSum);
       if (revenueServices < 0) revenueServices = 0;
+    }
+    // If packages still 0 but we know total > services + articles, infer packages
+    if (revenuePackages === 0 && liveRevenue > (revenueServices + revenueArticles + 1)) {
+      // packages are the unexplained portion
+      const inferred = liveRevenue - revenueServices - revenueArticles;
+      if (inferred > 0) {
+        revenuePackages = inferred;
+        // Re-adjust services (reconciliation over-added)
+        revenueServices = liveRevenue - revenueArticles - revenuePackages;
+        if (revenueServices < 0) revenueServices = 0;
+      }
     }
   }
   const revenue = revenueServices + revenueArticles + revenuePackages; // revenue = svc + art + pkg (total client payment)
@@ -752,6 +766,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     commissions_by_method: periodCommByMethod,
     // BUG-007: total revenue including commissions (for full cash flow picture)
     revenue_with_commissions: revenue + periodCommissions,
+
     _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
 }
