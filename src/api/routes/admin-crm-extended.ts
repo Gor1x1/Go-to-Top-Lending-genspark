@@ -370,8 +370,8 @@ api.get('/salary-summary/:month', authMiddleware, async (c) => {
   const month = c.req.param('month'); // Format: YYYY-MM
   if (!month || !/^\d{4}-\d{2}$/.test(month)) return c.json({ error: 'Invalid month format (YYYY-MM)' }, 400);
   try {
-    // Total active salaries (all active employees with salary > 0)
-    const salaryRes = await db.prepare("SELECT COALESCE(SUM(salary), 0) as total_salary FROM users WHERE is_active = 1 AND salary > 0").first();
+    // Total active salaries (only employees active during this month — filter by hire_date/end_date)
+    const salaryRes = await db.prepare("SELECT COALESCE(SUM(salary), 0) as total_salary FROM users WHERE is_active = 1 AND salary > 0 AND (hire_date IS NULL OR hire_date = '' OR hire_date <= ?) AND (end_date IS NULL OR end_date = '' OR end_date >= ?)").bind(month + '-31', month + '-01').first();
     const totalSalaries = Math.round((Number(salaryRes?.total_salary || 0)) * 100) / 100;
 
     // Bonuses and fines for the specific month
@@ -380,14 +380,16 @@ api.get('/salary-summary/:month', authMiddleware, async (c) => {
     const totalFines = Math.round((Number(bonusRes?.total_fines || 0)) * 100) / 100;
     const bonusesNet = Math.round((Number(bonusRes?.net_total || 0)) * 100) / 100;
 
-    // Expenses breakdown (marketing vs commercial) -- BUG-FIX: filter by period
-    const expRes = await db.prepare(`SELECT e.amount, ec.is_marketing FROM expenses e 
-      LEFT JOIN expense_categories ec ON e.category_id = ec.id WHERE e.is_active = 1
+    // Expenses breakdown (marketing vs commercial) — with multiplier_monthly for correct monthly amounts
+    const expRes = await db.prepare(`SELECT e.amount, ec.is_marketing, COALESCE(eft.multiplier_monthly, 1) as multiplier FROM expenses e 
+      LEFT JOIN expense_categories ec ON e.category_id = ec.id
+      LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
+      WHERE e.is_active = 1
       AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?)
       AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`).bind(month + '-31', month + '-01').all();
     let marketingExpenses = 0, commercialExpenses = 0;
     for (const exp of (expRes.results || [])) {
-      const amt = Math.round((Number(exp.amount) || 0) * 100) / 100;
+      const amt = Math.round((Number(exp.amount) || 0) * Number(exp.multiplier || 1) * 100) / 100;
       if (exp.is_marketing) marketingExpenses += amt;
       else commercialExpenses += amt;
     }
@@ -606,12 +608,20 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
     // Articles revenue
     const artRes = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(prevMonth).first();
     const revArticles = Number(artRes?.art_total || 0);
+    // Revenue reconciliation: ensure breakdown matches SUM(total_amount) as ground truth (BUG-004 fix)
+    const liveTotalRes = await db.prepare(`SELECT COALESCE(SUM(total_amount),0) as total FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`).bind(prevMonth).first();
+    const liveRevenue = Number(liveTotalRes?.total || 0);
+    const breakdownSum = revServices + revArticles + revPackages;
+    if (Math.abs(breakdownSum - liveRevenue) > 1 && liveRevenue > 0) {
+      revServices += (liveRevenue - breakdownSum);
+      if (revServices < 0) revServices = 0;
+    }
     // Refunds
     const refRes = await db.prepare(`SELECT COALESCE(SUM(refund_amount),0) as total FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`).bind(prevMonth).first();
-    // Expenses
-    const expRes = await db.prepare(`SELECT COALESCE(SUM(CASE WHEN ec.is_marketing = 0 THEN e.amount ELSE 0 END),0) as commercial, COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount ELSE 0 END),0) as marketing FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id WHERE e.is_active = 1 AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?) AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`).bind(prevMonth + '-31', prevMonth + '-01').first();
-    // Salaries
-    const salRes = await db.prepare("SELECT COALESCE(SUM(salary),0) as total FROM users WHERE is_active = 1 AND salary > 0").first();
+    // Expenses — with multiplier_monthly for correct monthly amounts (BUG-001 fix)
+    const expRes = await db.prepare(`SELECT COALESCE(SUM(CASE WHEN ec.is_marketing = 0 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END),0) as commercial, COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END),0) as marketing FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id WHERE e.is_active = 1 AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?) AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`).bind(prevMonth + '-31', prevMonth + '-01').first();
+    // Salaries — filter by hire_date/end_date (BUG-005 fix for auto-close)
+    const salRes = await db.prepare("SELECT COALESCE(SUM(salary),0) as total FROM users WHERE is_active = 1 AND salary > 0 AND (hire_date IS NULL OR hire_date = '' OR hire_date <= ?) AND (end_date IS NULL OR end_date = '' OR end_date >= ?)").bind(prevMonth + '-31', prevMonth + '-01').first();
     const bonRes = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM employee_bonuses WHERE strftime('%Y-%m', bonus_date) = ?").bind(prevMonth).first();
     const totalSalaries = Number(salRes?.total || 0) + Number(bonRes?.total || 0);
     const leadsCount = Number(leadsRes?.cnt || 0);

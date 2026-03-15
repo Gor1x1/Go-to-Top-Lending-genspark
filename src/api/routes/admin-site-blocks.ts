@@ -707,8 +707,10 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   }
   
   // Include package price in total
+  // BUG-006 fix: discount applies ONLY to services, not articles — separate the subtraction
   const packagePrice = existingCalcData?.package ? (Number(existingCalcData.package.package_price) || 0) : 0;
-  const totalAmount = Math.max(0, subtotalAmount + packagePrice - discountAmount);
+  const servicesAfterDiscount = Math.max(0, servicesTotalAmount - discountAmount);
+  const totalAmount = servicesAfterDiscount + articlesTotalAmount + packagePrice;
   
   // Compute commission from payment method
   let commissionAmount = 0;

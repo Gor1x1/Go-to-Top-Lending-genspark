@@ -519,7 +519,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const totalDividends = (divs.results || []).reduce((s: number, d: any) => {
     const amt = Number(d.amount) || 0;
     // Only count tax when there's an actual dividend amount
-    const tax = amt > 0 ? (Number(d.tax_amount) || 0) : 0;
+    const tax = Number(d.tax_amount) || 0; // BUG-009 fix: don't force tax=0 when amount=0 (allows correction entries)
     return s + amt + tax;
   }, 0);
   // Dividends YTD
@@ -697,7 +697,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   const totalLoanPaymentsPeriod = Number(loanPayments?.total_payments) || 0;
   const totalLoanMonthlyPlan = Number(loanSummary?.total_monthly) || 0;
   // Use the greater of actual payments or planned monthly — so if no payments recorded, plan is used
-  const effectiveLoanPayments = Math.max(totalLoanPaymentsPeriod, totalLoanMonthlyPlan);
+  // BUG-008 fix: use actual payments if any exist, otherwise use plan as estimate
+  const effectiveLoanPayments = totalLoanPaymentsPeriod > 0 ? totalLoanPaymentsPeriod : totalLoanMonthlyPlan;
   const netProfitAfterLoans = netProfit - effectiveLoanPayments;
   const retainedEarnings = netProfitAfterLoans - totalDividends;
 
@@ -749,6 +750,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     // Commission data
     commissions_total: periodCommissions,
     commissions_by_method: periodCommByMethod,
+    // BUG-007: total revenue including commissions (for full cash flow picture)
+    revenue_with_commissions: revenue + periodCommissions,
     _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
 }
@@ -843,9 +846,33 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
       ytdRevenue += current.revenue;
     }
     const ytdCogs = current.cogs * monthsInFiscalYear;
-    const ytdSalary = current.salary_total * monthsInFiscalYear;
-    const ytdMarketing = current.marketing * monthsInFiscalYear;
-    const ytdDepr = current.depreciation * monthsInFiscalYear;
+    // BUG-002 fix: YTD salaries/expenses — iterate through each month for accurate totals
+    // instead of multiplying current month values by monthsInFiscalYear
+    let ytdSalary = 0, ytdMarketing = 0, ytdDepr = current.depreciation * monthsInFiscalYear;
+    {
+      let iterYear = fStartYear, iterMonth = fStartMonth;
+      for (let mi = 0; mi < monthsInFiscalYear; mi++) {
+        const iterKey = iterYear + '-' + String(iterMonth).padStart(2, '0');
+        const iterEnd = iterKey + '-31';
+        const iterStart = iterKey + '-01';
+        // Salary for this month (filtered by hire/end date)
+        const mSal = await db.prepare(`SELECT 
+          COALESCE(SUM(CASE WHEN u.is_active=1 AND (u.hire_date = '' OR u.hire_date IS NULL OR u.hire_date <= ?) AND (u.end_date = '' OR u.end_date IS NULL OR u.end_date >= ?) THEN u.salary ELSE 0 END), 0) as sal,
+          COALESCE((SELECT SUM(CASE WHEN eb.bonus_type='bonus' OR (eb.bonus_type IS NULL AND eb.amount > 0) THEN eb.amount ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as bon,
+          COALESCE((SELECT SUM(CASE WHEN eb.bonus_type IN ('penalty','fine') OR (eb.bonus_type IS NULL AND eb.amount < 0) THEN ABS(eb.amount) ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as pen
+          FROM users u WHERE u.salary > 0`).bind(iterEnd, iterStart, iterStart, iterEnd, iterStart, iterEnd).first();
+        ytdSalary += (Number(mSal?.sal || 0) + Number(mSal?.bon || 0) - Number(mSal?.pen || 0));
+        // Marketing expenses for this month
+        const mExp = await db.prepare(`SELECT 
+          COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as mkt
+          FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
+          WHERE e.is_active = 1 AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?) AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`)
+          .bind(iterEnd, iterStart).first();
+        ytdMarketing += Number(mExp?.mkt || 0);
+        iterMonth++;
+        if (iterMonth > 12) { iterMonth = 1; iterYear++; }
+      }
+    }
     const ytdTotalOpex = ytdSalary + ytdMarketing + ytdDepr;
     const ytdGross = ytdRevenue - ytdCogs;
     const ytdEbit = ytdGross - ytdTotalOpex;
