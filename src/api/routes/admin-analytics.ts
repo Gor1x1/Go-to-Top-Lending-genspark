@@ -159,7 +159,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     // 5. Financial metrics (profit from services only — articles are transit client money)
     // Fines (negative bonuses) reduce salary cost, so net effect: salaries + bonuses + fines + expenses
     const allExpensesSum = totalSalaries + totalBonuses + totalFines + totalExpenses;
-    const netProfit = Math.round((servicesTotal - allExpensesSum) * 100) / 100;
+    const netProfit = Math.round((servicesTotal + packagesTotal - allExpensesSum) * 100) / 100;
     const marginality = servicesTotal > 0 ? Math.round((netProfit / servicesTotal) * 1000) / 10 : 0;
     const roi = allExpensesSum > 0 ? Math.round((netProfit / allExpensesSum) * 1000) / 10 : 0;
     const romi = marketingExpenses > 0 ? Math.round(((servicesTotal - marketingExpenses) / marketingExpenses) * 1000) / 10 : 0;

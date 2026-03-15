@@ -5128,7 +5128,7 @@ function renderLeadsAnalytics() {
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px">';
   var quickKpis = [
     {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)',desc:'Усл: '+fmtAmt(fin.services)+' | Вык: '+fmtAmt(fin.articles)+(fin.packages > 0 ? ' | Пак: '+fmtAmt(fin.packages) : '')},
-    {label:'Чистая прибыль',val:fmtAmt((fin.services||0) - (fin.total_expenses||0)),icon:((fin.services||0) - (fin.total_expenses||0))>=0?'fa-arrow-up':'fa-arrow-down',color:((fin.services||0) - (fin.total_expenses||0))>=0?'#22C55E':'#EF4444',bg:((fin.services||0) - (fin.total_expenses||0))>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',desc:'Услуги: '+fmtAmt(fin.services)+' \\u2212 Расх: '+fmtAmt(fin.total_expenses)},
+    {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',desc:'Усл: '+fmtAmt(fin.services)+' + Пак: '+fmtAmt(fin.packages||0)+' \\u2212 Расх: '+fmtAmt(fin.total_expenses)},
     {label:'Конверсия',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)',desc:fmtNum((sd.done||{}).count||0)+' из '+fmtNum(fin.totalLeads)+' лидов'},
     {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Услуги / кол-во завершённых'},
     {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)',desc:'Нов: '+fmtNum((sd.new||{}).count||0)+' | Связь: '+fmtNum((sd.contacted||{}).count||0)+' | Раб: '+fmtNum((sd.in_progress||{}).count||0)+' | Пров: '+fmtNum((sd.checking||{}).count||0)+' | Откл: '+fmtNum((sd.rejected||{}).count||0)+' | Гот: '+fmtNum((sd.done||{}).count||0)},
@@ -7318,7 +7318,8 @@ function renderBizOverviewV2(d, sd, fin) {
   var bonusesExp = Number(fin.bonuses) || 0;
   var commExp = Number(fin.commercial_expenses) || 0;
   var mktExp = Number(fin.marketing_expenses) || 0;
-  var servicesProfit = serviceRev - totalExpenses;
+  var packagesRev = Number(fin.packages) || 0;
+  var servicesProfit = serviceRev + packagesRev - totalExpenses;
   var profitColor = servicesProfit >= 0 ? '#22C55E' : '#EF4444';
 
   h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
@@ -7347,7 +7348,7 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<div class="card" style="padding:20px;background:linear-gradient(135deg,rgba(' + (servicesProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.12),transparent);border:1px solid rgba(' + (servicesProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.3)">';
   h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-' + (servicesProfit >= 0 ? 'arrow-up' : 'arrow-down') + '" style="margin-right:4px"></i>\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div>';
   h += '<div style="font-size:2rem;font-weight:800;color:' + profitColor + '">' + fmtAmt(servicesProfit) + '</div>';
-  h += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px">\u0423\u0441\u043b\u0443\u0433\u0438 (' + fmtAmt(serviceRev) + ') \u2212 \u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b (' + fmtAmt(totalExpenses) + ')</div>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px">\u0423\u0441\u043b. (' + fmtAmt(serviceRev) + ') + \u041f\u0430\u043a. (' + fmtAmt(packagesRev) + ') \u2212 \u0420\u0430\u0441\u0445. (' + fmtAmt(totalExpenses) + ')</div>';
   h += '</div>';
   // Total expenses
   h += '<div class="card" style="padding:20px;border-left:3px solid #EF4444">';
@@ -7699,7 +7700,7 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '</tbody></table></div>';
 
   // P&L table — mini overview (services-only profit)
-  var miniNetProfit = serviceRev - totalExpenses;
+  var miniNetProfit = serviceRev + (Number(fin.packages)||0) - totalExpenses;
   var miniProfitColor = miniNetProfit >= 0 ? '#22C55E' : '#EF4444';
   h += '<div class="card" style="overflow-x:auto;padding:0;margin-top:16px"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8" colspan="2">\u041f\u0440\u0438\u0431\u044b\u043b\u0438 \u0438 \u0443\u0431\u044b\u0442\u043a\u0438 (P&L)</th></tr></thead><tbody>';
