@@ -23,10 +23,8 @@ function renderLeads() {
     if (al.calc_data) { try { cd = JSON.parse(al.calc_data); } catch(e) {} }
     var leadSvc = 0, leadArt = 0, leadPkg = 0, leadDisc = 0;
     if (cd) {
-      if (cd.servicesSubtotal !== undefined && cd.articlesSubtotal !== undefined) {
-        leadSvc = Number(cd.servicesSubtotal || 0);
-        leadArt = Number(cd.articlesSubtotal || 0);
-      } else if (cd.items) {
+      // Always iterate items for services/articles split (don't use servicesSubtotal — may be stale)
+      if (cd.items) {
         for (var ci = 0; ci < cd.items.length; ci++) {
           var it = cd.items[ci];
           if (it.wb_article) { leadArt += Number(it.subtotal||0); }
