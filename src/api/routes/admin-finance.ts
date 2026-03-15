@@ -590,8 +590,6 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     const liveRevenue = Number(liveTurnover?.total || 0);
 
     // DEBUG: log what SQL returns
-    const _debugLive = { sqlSum: liveRevenue };
-
     // Breakdown: iterate items for services/articles/packages split
     const liveLeads = await db.prepare(
       `SELECT id, total_amount, calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`
@@ -768,7 +766,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     commissions_by_method: periodCommByMethod,
     // BUG-007: total revenue including commissions (for full cash flow picture)
     revenue_with_commissions: revenue + periodCommissions,
-    _debug: { revenue, revenueServices, revenueArticles, revenuePackages, revenueDiscounts },
+
     _bases: { revenue, ebt, payroll: salariesBase + bonusesVal, total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit },
   };
 }
@@ -790,30 +788,6 @@ api.get('/tax-summary/:periodKey', authMiddleware, async (c) => {
   } catch (err: any) {
     return c.json({ error: 'Tax summary error: ' + (err?.message || 'unknown') }, 500);
   }
-});
-
-// DEBUG endpoint — temporary, to diagnose revenue discrepancy
-api.get('/pnl-debug/:periodKey', authMiddleware, async (c) => {
-  const db = c.env.DB;
-  const pk = c.req.param('periodKey');
-  try {
-    const sumRes = await db.prepare(`SELECT COUNT(*) as cnt, COALESCE(SUM(total_amount),0) as total FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`).bind(pk).first();
-    const allLeads = await db.prepare(`SELECT id, total_amount, status, calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`).bind(pk).all();
-    const leads = allLeads.results || [];
-    let pkgs = 0, svc = 0, disc = 0, parseFail = 0;
-    const samples: any[] = [];
-    for (const row of leads) {
-      try {
-        const cd = JSON.parse(row.calc_data as string || '{}');
-        if (cd.items) for (const it of (cd.items as any[])) { if (!(it as any).wb_article) svc += Number((it as any).subtotal || 0); }
-        if (cd.package) pkgs += Number(cd.package.package_price || 0);
-        disc += Number(cd.discountAmount || 0);
-        if (samples.length < 2) samples.push({ id: row.id, ta: row.total_amount, hasPkg: !!cd.package, pkgPrice: cd.package?.package_price, cdKeys: Object.keys(cd) });
-      } catch { parseFail++; }
-    }
-    const snap = await db.prepare("SELECT * FROM period_snapshots WHERE period_key = ? AND period_type = 'month'").bind(pk).first();
-    return c.json({ sqlCount: Number(sumRes?.cnt || 0), sqlSum: Number(sumRes?.total || 0), iterCount: leads.length, parsedSvc: svc, parsedPkgs: pkgs, parsedDisc: disc, parseFail, hasSnapshot: !!snap, snapshotLocked: snap?.is_locked, snapshotRevSvc: snap?.revenue_services, snapshotRevArt: snap?.revenue_articles, snapshotTurnover: snap?.total_turnover, samples });
-  } catch (e: any) { return c.json({ error: e.message }); }
 });
 
 api.get('/pnl/:periodKey', authMiddleware, async (c) => {
