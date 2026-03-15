@@ -7320,19 +7320,26 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<div style="font-size:2rem;font-weight:800;color:#a78bfa">' + fmtAmt(turnover) + '</div>';
   if (turnover > 0) {
     var svcPct = Math.round(serviceRev / turnover * 100) || 0;
+    var artPct = Math.round(articlesRev / turnover * 100) || 0;
+    var pkgPctBar = Math.max(0, 100 - svcPct - artPct);
     h += '<div style="display:flex;height:6px;border-radius:3px;overflow:hidden;margin-top:10px;background:#1e293b">';
     h += '<div style="width:' + svcPct + '%;background:#8B5CF6" title="\u0423\u0441\u043b\u0443\u0433\u0438"></div>';
-    h += '<div style="width:' + (100 - svcPct) + '%;background:#F59E0B" title="\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b"></div></div>';
-    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.72rem;color:#64748b">';
+    h += '<div style="width:' + artPct + '%;background:#F59E0B" title="\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b"></div>';
+    if (pkgPctBar > 0) h += '<div style="width:' + pkgPctBar + '%;background:#FBBF24" title="\u041f\u0430\u043a\u0435\u0442\u044b"></div>';
+    h += '</div>';
+    h += '<div style="display:flex;justify-content:space-between;margin-top:6px;font-size:0.72rem;color:#64748b;flex-wrap:wrap;gap:4px">';
     h += '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#8B5CF6;margin-right:4px"></span>\u0423\u0441\u043b\u0443\u0433\u0438 ' + fmtAmt(serviceRev) + ' (' + svcPct + '%)</span>';
-    h += '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:4px"></span>\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b ' + fmtAmt(articlesRev) + ' (' + (100-svcPct) + '%)</span></div>';
+    h += '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#F59E0B;margin-right:4px"></span>\u0410\u0440\u0442\u0438\u043a\u0443\u043b\u044b ' + fmtAmt(articlesRev) + ' (' + artPct + '%)</span>';
+    var pkgRevPie = Number(fin.packages) || 0;
+    if (pkgRevPie > 0) h += '<span><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:#FBBF24;margin-right:4px"></span>\u041f\u0430\u043a\u0435\u0442\u044b ' + fmtAmt(pkgRevPie) + ' (' + pkgPctBar + '%)</span>';
+    h += '</div>';
   }
   h += '</div>';
   // Net profit
   h += '<div class="card" style="padding:20px;background:linear-gradient(135deg,rgba(' + (netProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.12),transparent);border:1px solid rgba(' + (netProfit >= 0 ? '34,197,94' : '239,68,68') + ',0.3)">';
   h += '<div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-' + (netProfit >= 0 ? 'arrow-up' : 'arrow-down') + '" style="margin-right:4px"></i>\u0427\u0438\u0441\u0442\u0430\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div>';
   h += '<div style="font-size:2rem;font-weight:800;color:' + profitColor + '">' + fmtAmt(netProfit) + '</div>';
-  h += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px">\u0423\u0441\u043b\u0443\u0433\u0438 (' + fmtAmt(serviceRev) + ') \u2212 \u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b (' + fmtAmt(totalExpenses) + ')</div>';
+  h += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px">\u041e\u0431\u043e\u0440\u043e\u0442 (' + fmtAmt(turnover) + ') \u2212 \u0412\u0441\u0435 \u0440\u0430\u0441\u0445\u043e\u0434\u044b (' + fmtAmt(totalExpenses) + ')</div>';
   h += '</div>';
   // Total expenses
   h += '<div class="card" style="padding:20px;border-left:3px solid #EF4444">';

@@ -585,6 +585,7 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
     const svcLeads = await db.prepare(`SELECT calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`).bind(prevMonth).all();
     let revServices = 0;
     let revPackages = 0;
+    let revDiscounts = 0;
     for (const row of (svcLeads.results || [])) {
       try {
         const cd = JSON.parse(row.calc_data as string || '{}');
@@ -596,8 +597,12 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
         if (cd.package && cd.package.package_price) {
           revPackages += Number(cd.package.package_price || 0);
         }
+        // Discount — subtract from services so svc + art + pkg = turnover
+        revDiscounts += Number(cd.discountAmount || 0);
       } catch {}
     }
+    // NET services = gross - discounts
+    revServices = Math.max(0, revServices - revDiscounts);
     // Articles revenue
     const artRes = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(prevMonth).first();
     const revArticles = Number(artRes?.art_total || 0);

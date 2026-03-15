@@ -34,7 +34,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const statusData: Record<string, any> = {};
     for (const st of allStatuses) {
       const res = await db.prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first().catch(() => null);
-      statusData[st] = { count: Number(res?.cnt || 0), amount: Number(res?.amt || 0), services: 0, articles: 0, packages: 0 };
+      statusData[st] = { count: Number(res?.cnt || 0), amount: Number(res?.amt || 0), services: 0, articles: 0, packages: 0, discounts: 0 };
     }
 
     // Parse calc_data for SERVICES only; articles come exclusively from lead_articles table to avoid double-counting
@@ -76,6 +76,12 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         if (cd.package) {
           const pPrice2 = Number(cd.package.package_price || 0);
           if (statusData[st]) statusData[st].packages += pPrice2;
+        }
+        // Track discount per status — subtract from services so svc + art + pkg = amount
+        const discAmt = Number(cd.discountAmount || 0);
+        if (discAmt > 0 && statusData[st]) {
+          statusData[st].services = Math.max(0, statusData[st].services - discAmt);
+          statusData[st].discounts += discAmt;
         }
       } catch {}
     }
@@ -202,7 +208,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       const byAssRes = await db.prepare("SELECT l.assigned_to, u.display_name, u.role, u.position_title, COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l LEFT JOIN users u ON l.assigned_to=u.id WHERE l.status IN ('in_progress','checking','done')" + dateFilter + " GROUP BY l.assigned_to ORDER BY amt DESC").bind(...dateParams).all();
       for (const r of (byAssRes.results || [])) {
         // Calculate per-assignee services only from calc_data (articles from lead_articles)
-        let assServices = 0, assArticles = 0;
+        let assServices = 0, assArticles = 0, assDiscount = 0;
         for (const lead of (allLeads.results || [])) {
           if (Number(lead.assigned_to) !== Number(r.assigned_to)) continue;
           if (!['in_progress','checking','done'].includes(lead.status as string)) continue;
@@ -215,8 +221,10 @@ api.get('/business-analytics', authMiddleware, async (c) => {
                 }
               }
             }
+            assDiscount += Number(cd.discountAmount || 0);
           } catch {}
         }
+        assServices = Math.max(0, assServices - assDiscount);
         // Get articles for this assignee from lead_articles table
         try {
           const artAss = await db.prepare("SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l3 ON la.lead_id = l3.id WHERE l3.assigned_to = ? AND l3.status IN ('in_progress','checking','done')" + dateFilter.replace(/l\./g, 'l3.')).bind(r.assigned_to, ...dateParams).first();
@@ -518,9 +526,9 @@ api.get('/business-analytics', authMiddleware, async (c) => {
             }
           } catch {}
         }
-        // Discount total for this month — only from turnover leads
+        // Discount total for this month — from ALL turnover leads (not just those with referral_code)
         const monthDiscRes = await db.prepare(`SELECT calc_data, referral_code FROM leads 
-          WHERE strftime('%Y-%m', created_at) = ? AND referral_code IS NOT NULL AND referral_code != '' 
+          WHERE strftime('%Y-%m', created_at) = ? 
           AND status IN ('in_progress','checking','done')`).bind(mk).all().catch(() => ({results:[]}));
         let monthDiscTotal = 0;
         for (const mdr of (monthDiscRes.results || [])) {
@@ -541,7 +549,8 @@ api.get('/business-analytics', authMiddleware, async (c) => {
             monthDiscTotal += da;
           } catch {}
         }
-        (md as any).services = svcTotal;
+        // Services = NET (gross - discount) so that svc + art + pkg = turnover
+        (md as any).services = Math.max(0, svcTotal - monthDiscTotal);
         (md as any).articles = Number((artRes as any)?.art_total) || 0;
         (md as any).packages = pkgTotal;
         (md as any).discounts = monthDiscTotal;
