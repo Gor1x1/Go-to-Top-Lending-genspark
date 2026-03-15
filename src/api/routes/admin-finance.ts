@@ -568,9 +568,15 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
   // Build P&L cascade (before taxes)
   const revenueServices = snap ? (snap.revenue_services as number || 0) : 0;
   const revenueArticles = snap ? (snap.revenue_articles as number || 0) : 0;
-  const revenue = revenueServices; // revenue for P&L = services only
-  const totalTurnover = revenueServices + revenueArticles; // total money coming in
-  const turnoverExclTransit = revenueServices; // excluding transit (buyouts)
+  // Package revenue stored in custom_data.revenue_packages (from auto-close-month)
+  let revenuePackages = 0;
+  try {
+    const snapCD = JSON.parse((snap?.custom_data as string) || '{}');
+    revenuePackages = Number(snapCD.revenue_packages || 0);
+  } catch {}
+  const revenue = revenueServices + revenueArticles + revenuePackages; // revenue = svc + art + pkg (total client payment)
+  const totalTurnover = revenueServices + revenueArticles + revenuePackages; // total money coming in
+  const turnoverExclTransit = revenueServices; // services only (excluding transit buyouts)
   const refunds = snap ? (snap.refunds as number || 0) : 0;
   const cogs = expData ? (expData.commercial as number || 0) : 0;
   const grossProfit = revenue - cogs;
@@ -638,7 +644,7 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
 
   return {
     period_key: periodKey,
-    revenue, revenue_services: revenueServices, revenue_articles: revenueArticles,
+    revenue, revenue_services: revenueServices, revenue_articles: revenueArticles, revenue_packages: revenuePackages,
     total_turnover: totalTurnover, turnover_excl_transit: turnoverExclTransit,
     refunds, net_revenue: revenue - refunds,
     cogs, gross_profit: grossProfit,
@@ -740,7 +746,7 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     
     // YTD accumulation (fiscal year start through current month)
     let ytd: any = {};
-    const ytdSnaps = await db.prepare("SELECT COALESCE(SUM(revenue_services),0) as revenue, COALESCE(SUM(refunds),0) as refunds FROM period_snapshots WHERE period_type='month' AND period_key >= ? AND period_key <= ?")
+    const ytdSnaps = await db.prepare("SELECT COALESCE(SUM(revenue_services),0) as revenue_svc, COALESCE(SUM(revenue_articles),0) as revenue_art, COALESCE(SUM(refunds),0) as refunds FROM period_snapshots WHERE period_type='month' AND period_key >= ? AND period_key <= ?")
       .bind(fiscalYearStart, periodKey).first();
     const ytdTaxes = await db.prepare("SELECT COALESCE(SUM(amount),0) as total FROM tax_payments WHERE period_key >= ? AND period_key <= ?")
       .bind(fiscalYearStart, periodKey).first();
@@ -753,7 +759,17 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     const ytdDivs = await db.prepare("SELECT COALESCE(SUM(amount),0) as amount, COALESCE(SUM(tax_amount),0) as tax FROM dividends WHERE period_key >= ? AND period_key <= ?")
       .bind(fiscalYearStart, periodKey).first();
     // For YTD salaries/expenses, multiply monthly rates by number of months in fiscal year
-    const ytdRevenue = (ytdSnaps?.revenue as number) || 0;
+    // BUG FIX: YTD revenue must include services + articles + packages
+    // Packages are stored in custom_data.revenue_packages of each snapshot
+    let ytdPackages = 0;
+    try {
+      const pkgSnaps = await db.prepare("SELECT custom_data FROM period_snapshots WHERE period_type='month' AND period_key >= ? AND period_key <= ? AND custom_data IS NOT NULL")
+        .bind(fiscalYearStart, periodKey).all();
+      for (const ps of (pkgSnaps.results || [])) {
+        try { const cd = JSON.parse(ps.custom_data as string || '{}'); ytdPackages += Number(cd.revenue_packages || 0); } catch {}
+      }
+    } catch {}
+    const ytdRevenue = ((ytdSnaps?.revenue_svc as number) || 0) + ((ytdSnaps?.revenue_art as number) || 0) + ytdPackages;
     const ytdRefunds = (ytdSnaps?.refunds as number) || 0;
     const ytdCogs = current.cogs * monthsInFiscalYear;
     const ytdSalary = current.salary_total * monthsInFiscalYear;

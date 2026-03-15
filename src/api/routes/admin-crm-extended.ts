@@ -584,12 +584,17 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
     // Revenue from services (calc_data items without wb_article) for turnover statuses
     const svcLeads = await db.prepare(`SELECT calc_data FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status IN ('in_progress','checking','done')`).bind(prevMonth).all();
     let revServices = 0;
+    let revPackages = 0;
     for (const row of (svcLeads.results || [])) {
       try {
         const cd = JSON.parse(row.calc_data as string || '{}');
         if (cd.servicesSubtotal) revServices += Number(cd.servicesSubtotal);
         else if (cd.items) {
           for (const it of cd.items) { if (!it.wb_article) revServices += Number(it.subtotal || 0); }
+        }
+        // Package revenue — real money from client
+        if (cd.package && cd.package.package_price) {
+          revPackages += Number(cd.package.package_price || 0);
         }
       } catch {}
     }
@@ -609,24 +614,38 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
     const avgCheck = leadsDone > 0 ? Math.round(Number(doneRes?.amt || 0) / leadsDone) : 0;
     const commercialExp = Number(expRes?.commercial || 0);
     const marketingExp = Number(expRes?.marketing || 0);
-    const netProfit = revServices - totalSalaries - commercialExp - marketingExp;
+    const netProfit = (revServices + revArticles + revPackages) - totalSalaries - commercialExp - marketingExp;
+    // Build custom_data with extra analytics (in_progress, rejected, checking counts + packages)
+    let customDataForSnapshot: Record<string, any> = {};
+    try {
+      const ipRes = await db.prepare(`SELECT COUNT(*) as cnt FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status = 'in_progress'`).bind(prevMonth).first();
+      const rejRes2 = await db.prepare(`SELECT COUNT(*) as cnt FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status = 'rejected'`).bind(prevMonth).first();
+      const chkRes = await db.prepare(`SELECT COUNT(*) as cnt FROM leads WHERE strftime('%Y-%m', created_at) = ? AND status = 'checking'`).bind(prevMonth).first();
+      customDataForSnapshot = {
+        in_progress_count: Number(ipRes?.cnt || 0),
+        rejected_count: Number(rejRes2?.cnt || 0),
+        checking_count: Number(chkRes?.cnt || 0),
+        revenue_packages: revPackages
+      };
+    } catch {}
+    const customDataJson = JSON.stringify(customDataForSnapshot);
     // Upsert snapshot
     if (existing) {
       await db.prepare(`UPDATE period_snapshots SET revenue_services=?, revenue_articles=?, total_turnover=?, refunds=?,
         expense_salaries=?, expense_commercial=?, expense_marketing=?, net_profit=?,
-        leads_count=?, leads_done=?, avg_check=?, is_locked=1, closed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
+        leads_count=?, leads_done=?, avg_check=?, custom_data=?, is_locked=1, closed_at=CURRENT_TIMESTAMP, updated_at=CURRENT_TIMESTAMP
         WHERE id=?`).bind(
-        revServices, revArticles, revServices + revArticles, Number(refRes?.total || 0),
+        revServices, revArticles, revServices + revArticles + revPackages, Number(refRes?.total || 0),
         totalSalaries, commercialExp, marketingExp, netProfit,
-        leadsCount, leadsDone, avgCheck, existing.id
+        leadsCount, leadsDone, avgCheck, customDataJson, existing.id
       ).run();
     } else {
       await db.prepare(`INSERT INTO period_snapshots (period_type, period_key, revenue_services, revenue_articles, total_turnover, refunds,
-        expense_salaries, expense_commercial, expense_marketing, net_profit, leads_count, leads_done, avg_check, is_locked, closed_at)
-        VALUES ('month',?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP)`).bind(
-        prevMonth, revServices, revArticles, revServices + revArticles, Number(refRes?.total || 0),
+        expense_salaries, expense_commercial, expense_marketing, net_profit, leads_count, leads_done, avg_check, custom_data, is_locked, closed_at)
+        VALUES ('month',?,?,?,?,?,?,?,?,?,?,?,?,?,1,CURRENT_TIMESTAMP)`).bind(
+        prevMonth, revServices, revArticles, revServices + revArticles + revPackages, Number(refRes?.total || 0),
         totalSalaries, commercialExp, marketingExp, netProfit,
-        leadsCount, leadsDone, avgCheck
+        leadsCount, leadsDone, avgCheck, customDataJson
       ).run();
     }
     // Audit log
@@ -637,7 +656,7 @@ api.post('/auto-close-month', authMiddleware, async (c) => {
     return c.json({
       success: true,
       period: prevMonth,
-      summary: { revenue_services: revServices, revenue_articles: revArticles, net_profit: netProfit, leads_count: leadsCount, leads_done: leadsDone }
+      summary: { revenue_services: revServices, revenue_articles: revArticles, revenue_packages: revPackages, net_profit: netProfit, leads_count: leadsCount, leads_done: leadsDone }
     });
   } catch (err: any) {
     return c.json({ error: 'Auto-close failed: ' + (err?.message || 'unknown') }, 500);

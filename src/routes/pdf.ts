@@ -376,8 +376,9 @@ app.get('/pdf/:id', async (c) => {
         pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
       }
     }
-    // afterDiscount = services subtotal (minus discount if any) + package price (minus pkg discount if any)
-    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + pkgPrice - pkgDiscountAmount;
+    // afterDiscount = services subtotal (minus discount if any) + articles subtotal + package price (minus pkg discount if any)
+    // BUG FIX: articles subtotal was NOT included in total — client pays for BOTH services AND articles
+    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + artSubtotal + pkgPrice - pkgDiscountAmount;
     const beforeCommission = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
     
     // Load payment method + service names in parallel for speed
@@ -544,7 +545,7 @@ app.get('/pdf/:id', async (c) => {
     
     const orderMsg = String(tpl['order_message' + lSuffix] || (isEn ? 'Hello! I would like to place an order:' : isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:'))
       + '\n' + invoicePrefix + '-' + id
-      + '\n' + L.total + ' ' + Number(total).toLocaleString('ru-RU') + ' \u058f';
+      + '\n' + L.total + ' ' + Number(finalTotal).toLocaleString('ru-RU') + ' \u058f';
     const orderMsgFull = orderMsg
       + (clientName ? '\n' + (isEn ? 'Name' : isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '')
       + (clientContact ? '\n' + (isEn ? 'Contact' : isAm ? '\u053f\u0561\u057a' : '\u041a\u043e\u043d\u0442\u0430\u043a\u0442') + ': ' + clientContact : '');
@@ -637,8 +638,10 @@ app.get('/pdf/:id', async (c) => {
         + (pkgOriginalPrice > 0 && pkgOriginalPrice > pkgPrice ? '<span style="background:#059669;color:white;padding:2px 8px;border-radius:10px;font-size:0.75rem;font-weight:700">-' + Math.round((1 - pkgPrice / pkgOriginalPrice) * 100) + '%</span>' : '')
         + '</div></div>' : '')
       + '<table><thead><tr><th style="text-align:center;width:35px">' + L.num + '</th><th>' + L.svc + '</th><th style="text-align:center">' + L.qty + '</th><th style="text-align:right">' + L.price + '</th><th style="text-align:right">' + L.sum + '</th></tr></thead><tbody>' + rows
-      // Subtotal row: only show if there are actual service items (subtotal > 0)
-      + (Number(subtotal) > 0 ? '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.subtotal + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>' : '')
+      // Subtotal row: show combined services+articles subtotal when articles exist, otherwise services-only subtotal
+      // When articles exist, individual subtotals (services/articles) are already shown above
+      + (Number(subtotal) > 0 && articleItems.length === 0 ? '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + L.subtotal + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + subtotalFormatted + '\u00a0\u058f</td></tr>' : '')
+      + (articleItems.length > 0 ? '<tr class="tr"><td colspan="4" style="padding:12px;text-align:right">' + (isEn ? 'Grand subtotal:' : isAm ? '\u0538\u0576\u0564\u0570\u0561\u0576\u0578\u0582\u0580 \u0565\u0576\u0569\u0561\u0570\u0561\u0577\u057e\u0561\u0580\u056f:' : '\u041E\u0431\u0449\u0438\u0439 \u043F\u043E\u0434\u0438\u0442\u043E\u0433:') + '</td><td style="padding:12px;text-align:right;color:' + accentColor + ';font-size:18px;white-space:nowrap">' + (svcSubtotal + artSubtotal).toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       // Package row: show package price as addition if services exist, or as standalone
       + (pkgData && Number(subtotal) > 0 ? '<tr style="background:#FFFBEB"><td colspan="4" style="padding:10px 12px;text-align:right;color:#B45309;font-weight:600"><i class="fas fa-box-open" style="margin-right:4px;color:#F59E0B"></i>' + (isEn ? 'Package' : isAm ? '\u0553\u0561\u0569\u0565\u0569' : '\u041f\u0430\u043a\u0435\u0442') + ': ' + (isAm ? (pkgData.name_am || pkgData.name_ru || pkgData.name || '') : (pkgData.name_ru || pkgData.name || '')) + '</td><td style="padding:10px 12px;text-align:right;color:#B45309;font-weight:700;font-size:15px;white-space:nowrap">+' + pkgPrice.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')
       + (calcDiscountAmount > 0 && articleItems.length === 0 ? '<tr style="background:' + accentColor + '08"><td colspan="4" style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:600"><i class="fas fa-gift" style="margin-right:4px"></i>' + (isEn ? 'Promo discount (services)' : isAm ? '\u0536\u0565\u0572\u0573 (\u056e\u0561\u057c\u0561\u0575\u0578\u0582\u0569\u0575\u0578\u0582\u0576\u0576\u0565\u0580)' : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438') + ' (' + referralCode + ' -' + calcDiscountPercent + '%):</td><td style="padding:10px 12px;text-align:right;color:' + accentColor + ';font-weight:700;font-size:15px;white-space:nowrap">-' + calcDiscountAmount.toLocaleString('ru-RU') + '\u00a0\u058f</td></tr>' : '')

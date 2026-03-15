@@ -3477,26 +3477,43 @@ function renderLeads() {
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
   
-  // --- Analytics mini-dashboard with per-status sums + services/articles split ---
-  var stats = { new: {c:0,a:0,svc:0,art:0}, contacted: {c:0,a:0,svc:0,art:0}, in_progress: {c:0,a:0,svc:0,art:0}, checking: {c:0,a:0,svc:0,art:0}, done: {c:0,a:0,svc:0,art:0}, rejected: {c:0,a:0,svc:0,art:0} };
+  // --- Analytics mini-dashboard with per-status sums + services/articles/packages split ---
+  // total_amount = svc + art + pkg - discount (real money from client)
+  var stats = { new: {c:0,a:0,svc:0,art:0,pkg:0}, contacted: {c:0,a:0,svc:0,art:0,pkg:0}, in_progress: {c:0,a:0,svc:0,art:0,pkg:0}, checking: {c:0,a:0,svc:0,art:0,pkg:0}, done: {c:0,a:0,svc:0,art:0,pkg:0}, rejected: {c:0,a:0,svc:0,art:0,pkg:0} };
   var totalAmount = 0;
   for (var ai = 0; ai < leads.length; ai++) {
     var al = leads[ai];
-    var amt = Number(al.total_amount || 0);
-    totalAmount += amt;
     var st = al.status || 'new';
-    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0};
-    stats[st].c++; stats[st].a += amt;
-    // Split services vs articles from calc_data
+    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0,pkg:0};
+    stats[st].c++;
+    // Split services vs articles vs packages from calc_data
     var cd = null;
     if (al.calc_data) { try { cd = JSON.parse(al.calc_data); } catch(e) {} }
-    if (cd && cd.items) {
-      for (var ci = 0; ci < cd.items.length; ci++) {
-        var it = cd.items[ci];
-        if (it.wb_article) { stats[st].art += Number(it.subtotal||0); }
-        else { stats[st].svc += Number(it.subtotal||0); }
+    var leadSvc = 0, leadArt = 0, leadPkg = 0;
+    if (cd) {
+      // Use pre-computed subtotals if available (set by /recalc)
+      if (cd.servicesSubtotal !== undefined && cd.articlesSubtotal !== undefined) {
+        leadSvc = Number(cd.servicesSubtotal || 0);
+        leadArt = Number(cd.articlesSubtotal || 0);
+      } else if (cd.items) {
+        for (var ci = 0; ci < cd.items.length; ci++) {
+          var it = cd.items[ci];
+          if (it.wb_article) { leadArt += Number(it.subtotal||0); }
+          else { leadSvc += Number(it.subtotal||0); }
+        }
+      }
+      // Package price — real money from client
+      if (cd.package && cd.package.package_price) {
+        leadPkg = Number(cd.package.package_price || 0);
       }
     }
+    stats[st].svc += leadSvc;
+    stats[st].art += leadArt;
+    stats[st].pkg += leadPkg;
+    // Total = total_amount from DB (svc + art + pkg - discount) = real client payment
+    var amt = Number(al.total_amount || 0);
+    stats[st].a += amt;
+    totalAmount += amt;
   }
   
   // --- Filter leads ---
@@ -3542,7 +3559,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
     '<div style="color:#fbbf24;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span></div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span>' + (stats.in_progress.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.in_progress.pkg) + '</span>' : '') + '</div></div>';
   // 4. Отклонен
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;rejected&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
@@ -3558,7 +3575,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
     '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span></div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span>' + (stats.done.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.done.pkg) + '</span>' : '') + '</div></div>';
   h += '</div>';
   
   // Filters row — 6 statuses only
@@ -4543,15 +4560,23 @@ async function submitArticle(e, leadId, articleId) {
   var modal = document.querySelector('[style*="fixed"][style*="z-index:999"]');
   if (modal) modal.remove();
   await loadArticles(leadId);
-  // Update lead data to refresh articles count badge
+  // Recalc total so total_amount includes services + articles
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
+  // Update lead data to refresh articles count badge and total
   var resLeads = await api('/leads?limit=500');
   data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); loadComments(leadId); }
+  }, 100);
 }
 
 async function updateArticleStatus(articleId, leadId, status) {
   await api('/leads/articles/' + articleId, { method: 'PUT', body: JSON.stringify({ status: status }) });
   toast('Статус артикула обновлён');
   await loadArticles(leadId);
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   var resLeads = await api('/leads?limit=500');
   data.leads = resLeads || { leads: [], total: 0 };
 }
@@ -4567,8 +4592,15 @@ async function deleteArticle(articleId, leadId) {
   await api('/leads/articles/' + articleId, { method: 'DELETE' });
   toast('Артикул удалён');
   await loadArticles(leadId);
+  // Recalc total so total_amount reflects articles removal
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   var resLeads = await api('/leads?limit=500');
   data.leads = resLeads || { leads: [], total: 0 };
+  render();
+  setTimeout(function() {
+    var el = document.getElementById('lead-detail-' + leadId);
+    if (el) { el.style.display = 'block'; loadArticles(leadId); loadComments(leadId); }
+  }, 100);
 }
 
 async function recalcLeadTotal(leadId) {
@@ -4696,11 +4728,13 @@ async function addSelectedServicesToLead(leadId) {
     }
     calcData.items.push({ name: svc.name_ru, qty: qty, price: price, subtotal: price * qty });
   }
-  var newTotal = 0;
-  for (var j = 0; j < calcData.items.length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
-  calcData.total = newTotal;
-  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
-  if (lead) { lead.calc_data = JSON.stringify(calcData); lead.total_amount = newTotal; }
+  // Save calc_data (services only) — total will be recalculated by /recalc including articles
+  var svcTotal = 0;
+  for (var j = 0; j < calcData.items.length; j++) { if (!calcData.items[j].wb_article) svcTotal += Number(calcData.items[j].subtotal || 0); }
+  calcData.servicesSubtotal = svcTotal;
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData) }) });
+  // Recalc total: services + articles + package - discount
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   toast(keys.length + ' услуг(а) добавлено');
   _leadCalcSelected = {};
   var modal = document.getElementById('leadCalcModal');
@@ -4763,12 +4797,14 @@ async function removeLeadService(leadId, serviceIndex) {
   if (serviceIndex < 0 || serviceIndex >= serviceItems.length) return;
   serviceItems.splice(serviceIndex, 1);
   calcData.items = serviceItems.concat(otherItems);
-  // Recalculate total
-  var newTotal = 0;
-  for (var j = 0; j < calcData.items.length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
-  calcData.total = newTotal;
-  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
-  if (lead) { lead.calc_data = JSON.stringify(calcData); lead.total_amount = newTotal; }
+  // Recalculate services total
+  var svcTotal2 = 0;
+  for (var j = 0; j < serviceItems.length; j++) { svcTotal2 += Number(serviceItems[j].subtotal || 0); }
+  calcData.servicesSubtotal = svcTotal2;
+  // Save calc_data — total will be recalculated by /recalc including articles
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData) }) });
+  // Recalc total: services + articles + package - discount
+  await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   toast('Услуга удалена');
   var resLeads = await api('/leads?limit=500');
   data.leads = resLeads || { leads: [], total: 0 };
@@ -4864,14 +4900,8 @@ async function attachPackageToLead(leadId) {
     original_price: Number(pkg.original_price || pkg.package_price || pkg.price || 0),
     items: pkgItems
   };
-  // Recalc total
-  var newTotal = 0;
-  for (var j = 0; j < (calcData.items || []).length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
-  newTotal += Number(pkg.package_price || pkg.price || 0);
-  calcData.total = newTotal;
-  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
-  lead.calc_data = JSON.stringify(calcData);
-  lead.total_amount = newTotal;
+  // Save calc_data with package — total will be recalculated by /recalc including articles
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData) }) });
   toast('\u041F\u0430\u043A\u0435\u0442 \u00AB' + (pkg.name_ru || pkg.name) + '\u00BB \u043F\u0440\u0438\u0432\u044F\u0437\u0430\u043D');
   await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   var resLeads = await api('/leads?limit=500');
@@ -4891,12 +4921,8 @@ async function detachPackageFromLead(leadId) {
   try { if (lead.calc_data) calcData = JSON.parse(lead.calc_data); } catch(e) {}
   var removedPkgPrice = calcData.package ? Number(calcData.package.package_price || 0) : 0;
   delete calcData.package;
-  var newTotal = 0;
-  for (var j = 0; j < (calcData.items || []).length; j++) { newTotal += Number(calcData.items[j].subtotal || 0); }
-  calcData.total = newTotal;
-  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData), total_amount: newTotal }) });
-  lead.calc_data = JSON.stringify(calcData);
-  lead.total_amount = newTotal;
+  // Save calc_data without package — total will be recalculated by /recalc including articles
+  await api('/leads/' + leadId, { method:'PUT', body: JSON.stringify({ calc_data: JSON.stringify(calcData) }) });
   toast('\u041F\u0430\u043A\u0435\u0442 \u0443\u0431\u0440\u0430\u043D');
   await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   var resLeads = await api('/leads?limit=500');
@@ -4996,7 +5022,7 @@ function getActiveStatusData(sd) {
 function recalcFinancials(sd, fin) {
   // Recalculate financials based on active (non-excluded) statuses
   var turnoverStatuses = ['in_progress','checking','done'];
-  var turnover = 0, svcTotal = 0, artTotal = 0;
+  var turnover = 0, svcTotal = 0, artTotal = 0, pkgTotal = 0;
   for (var i = 0; i < turnoverStatuses.length; i++) {
     var st = turnoverStatuses[i];
     var v = sd[st] || {};
@@ -5004,6 +5030,7 @@ function recalcFinancials(sd, fin) {
     turnover += Number(v.amount) || 0;
     svcTotal += Number(v.services) || 0;
     artTotal += Number(v.articles) || 0;
+    pkgTotal += Number(v.packages) || 0;
   }
   var done = sd.done || {};
   var doneCount = done.excluded ? 0 : (Number(done.count) || 0);
@@ -5042,6 +5069,7 @@ function recalcFinancials(sd, fin) {
     romi: Number(fin.romi) || 0,
     break_even: Number(fin.break_even) || 0,
     avg_fulfillment_days: Number(fin.avg_fulfillment_days) || 0,
+    packages: Math.max(0, Math.round(pkgTotal * 100) / 100),
     totalLeads: totalLeads
   };
 }
@@ -5095,12 +5123,12 @@ function renderLeadsAnalytics() {
   // Quick KPI strip at top
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px">';
   var quickKpis = [
-    {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)',desc:'Услуги: '+fmtAmt(fin.services)+' | Выкупы: '+fmtAmt(fin.articles)},
-    {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',desc:'Усл: '+fmtAmt(fin.services)+' \\u2212 Расх: '+fmtAmt(fin.total_expenses)},
+    {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)',desc:'Усл: '+fmtAmt(fin.services)+' | Вык: '+fmtAmt(fin.articles)+(fin.packages > 0 ? ' | Пак: '+fmtAmt(fin.packages) : '')},
+    {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',desc:'Приход: '+fmtAmt(fin.turnover)+' \\u2212 Расх: '+fmtAmt(fin.total_expenses)},
     {label:'Конверсия',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)',desc:fmtNum((sd.done||{}).count||0)+' из '+fmtNum(fin.totalLeads)+' лидов'},
     {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Услуги / кол-во завершённых'},
     {label:'Всего лидов',val:fmtNum(fin.totalLeads),icon:'fa-users',color:'#10B981',bg:'rgba(16,185,129,0.08)',desc:'Нов: '+fmtNum((sd.new||{}).count||0)+' | Связь: '+fmtNum((sd.contacted||{}).count||0)+' | Раб: '+fmtNum((sd.in_progress||{}).count||0)+' | Пров: '+fmtNum((sd.checking||{}).count||0)+' | Откл: '+fmtNum((sd.rejected||{}).count||0)+' | Гот: '+fmtNum((sd.done||{}).count||0)},
-    {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)',desc:'Усл: '+fmtAmt(Number((sd.done||{}).services)||0)+' | Вык: '+fmtAmt(Number((sd.done||{}).articles)||0)},
+    {label:'Завершено',val:fmtNum((sd.done||{}).count)+' / '+fmtAmt(fin.done_amount||((sd.done||{}).amount||0)),icon:'fa-check-circle',color:'#22C55E',bg:'rgba(34,197,94,0.08)',desc:'Усл: '+fmtAmt(Number((sd.done||{}).services)||0)+' | Вык: '+fmtAmt(Number((sd.done||{}).articles)||0)+(Number((sd.done||{}).packages)||0 > 0 ? ' | Пак: '+fmtAmt(Number((sd.done||{}).packages)||0) : '')},
   ];
   for (var qi = 0; qi < quickKpis.length; qi++) {
     var qk = quickKpis[qi];
@@ -7315,12 +7343,16 @@ function renderBizOverviewV2(d, sd, fin) {
   }
   h += '</div></div>';
 
-  // Revenue detail row (services vs articles + refunds)
-  h += '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:16px">';
+  // Revenue detail row (services vs articles vs packages + refunds)
+  var pkgRevLocal = Number(fin.packages) || 0;
+  h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:16px">';
   h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-concierge-bell" style="margin-right:4px"></i>\u0414\u043e\u0445\u043e\u0434 (\u0443\u0441\u043b\u0443\u0433\u0438)</div><div style="font-size:1.5rem;font-weight:700;color:#8B5CF6">' + fmtAmt(serviceRev) + '</div><div style="font-size:0.65rem;color:#475569;margin-top:4px">\u041c\u043e\u044f \u043f\u0440\u0438\u0431\u044b\u043b\u044c</div></div>';
   h += '<div class="card" style="padding:16px"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-shopping-bag" style="margin-right:4px"></i>\u0412\u044b\u043a\u0443\u043f\u044b (\u0430\u0440\u0442\u0438\u043a\u0443\u043b\u044b)</div>';
   h += '<div style="font-size:1.5rem;font-weight:700;color:#F59E0B">' + fmtAmt(articlesRev) + '</div>';
   h += '<div style="font-size:0.65rem;color:#475569;margin-top:4px">\u0414\u0435\u043d\u044c\u0433\u0438 \u043a\u043b\u0438\u0435\u043d\u0442\u043e\u0432</div></div>';
+  h += '<div class="card" style="padding:16px;border-left:3px solid #FBBF24"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-box-open" style="margin-right:4px;color:#FBBF24"></i>\u041f\u0430\u043a\u0435\u0442\u044b</div>';
+  h += '<div style="font-size:1.5rem;font-weight:700;color:#FBBF24">' + fmtAmt(pkgRevLocal) + '</div>';
+  h += '<div style="font-size:0.65rem;color:#475569;margin-top:4px">\u0421\u0442\u043e\u0438\u043c\u043e\u0441\u0442\u044c \u043f\u0430\u043a\u0435\u0442\u043e\u0432 \u0443\u0441\u043b\u0443\u0433</div></div>';
   h += '<div class="card" style="padding:16px;border-left:3px solid #EF4444"><div style="font-size:0.8rem;color:#94a3b8;margin-bottom:4px"><i class="fas fa-undo" style="margin-right:4px"></i>\u0412\u043e\u0437\u0432\u0440\u0430\u0442\u044b</div>';
   h += '<div style="font-size:1.5rem;font-weight:700;color:#EF4444">' + (refunds > 0 ? '-' + fmtAmt(refunds) : '0 \u058f') + '</div>';
   h += '<div style="font-size:0.65rem;color:#475569;margin-top:4px">\u0412\u044b\u0447\u0442\u0435\u043d\u043e \u0438\u0437 \u0432\u044b\u043a\u0443\u043f\u043e\u0432</div></div>';
@@ -8627,13 +8659,14 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap" title="В работе / на связи">В работе</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap" title="Отказы">Отказы</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#3B82F6;white-space:nowrap" title="На проверке">Проверка</th>';
-  h += '<th style="padding:8px 6px;text-align:right;color:#a78bfa;white-space:nowrap" title="Услуги + Выкупы (оплата клиента)">Приход (итого)</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#a78bfa;white-space:nowrap" title="Услуги + Выкупы + Пакеты (оплата клиента)">Приход (итого)</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap">Выкупы</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#FBBF24;white-space:nowrap" title="Стоимость пакетов">Пакеты</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#f87171;white-space:nowrap" title="Возвраты клиентам от выкупов">Возврат</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6;white-space:nowrap">Услуги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#FBBF24;white-space:nowrap" title="Скидки по промокодам">Скидки</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap">Расходы</th>';
-  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E;white-space:nowrap" title="Услуги - Расходы">Прибыль</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E;white-space:nowrap" title="Приход - Расходы">Прибыль</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B;white-space:nowrap" title="Налоги за месяц">Налоги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444;white-space:nowrap" title="Платежи по кредитам">Кредиты</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6;white-space:nowrap" title="Дивиденды за месяц">Дивид.</th>';
@@ -8642,7 +8675,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;width:60px"></th>';
   h += '</tr></thead><tbody>';
   var monthNames = ['Янв','Фев','Мар','Апр','Май','Июн','Июл','Авг','Сен','Окт','Ноя','Дек'];
-  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, refunds:0, expenses:0, profit:0, taxes:0, loanPayments:0, dividends:0, netProfit:0, discounts:0};
+  var yearTotals = {done:0, inProgress:0, rejected:0, checking:0, turnover:0, services:0, articles:0, packages:0, refunds:0, expenses:0, profit:0, taxes:0, loanPayments:0, dividends:0, netProfit:0, discounts:0};
   for (var mi3 = 1; mi3 <= 12; mi3++) {
     var mKey = currentYear + '-' + String(mi3).padStart(2,'0');
     var mSnap = snapshots.find(function(s){return s.period_type==='month' && s.period_key===mKey;});
@@ -8654,7 +8687,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     var isEditing = editingMonthKey === mKey;
     // Lead counts by status
     var mDone, mInProg, mRejected, mChecking;
-    var mSvc, mArt, mRefunds, mExp, mProfit, mTurnover;
+    var mSvc, mArt, mPkg, mRefunds, mExp, mProfit, mTurnover;
     // Check for snapshot adjustments (works for any month that has a snapshot)
     var mAdjs = [];
     var mAdjTotal = 0;
@@ -8669,13 +8702,14 @@ function renderBizPeriodsV2(d, sd, fin) {
       mChecking = Number(snapCD.checking_count)||0;
       mSvc = Number(mSnap.revenue_services)||0;
       mArt = Number(mSnap.revenue_articles)||0;
+      try { var snapPkg = JSON.parse(mSnap.custom_data || '{}'); mPkg = Number(snapPkg.revenue_packages)||0; } catch(e) { mPkg = 0; }
       mRefunds = Number(mSnap.refunds)||0;
       mExpSal = Math.abs(Number(mSnap.expense_salaries)||0);
       mExpComm = Math.abs(Number(mSnap.expense_commercial)||0);
       mExpMkt = Math.abs(Number(mSnap.expense_marketing)||0);
       mExp = mExpSal + mExpComm + mExpMkt;
-      mTurnover = mSvc + mArt;
-      mProfit = mSvc - mExp + mAdjTotal;
+      mTurnover = mSvc + mArt + mPkg;
+      mProfit = (mSvc + mArt + mPkg) - mExp + mAdjTotal;
     } else if ((isCurrent || isPast) && mData) {
       // ALWAYS use monthly_data for both current and past months — this data
       // is grouped by actual created_at month, not affected by date picker
@@ -8685,6 +8719,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       mChecking = Number(mData.checking_count)||0;
       mSvc = Number(mData.services)||0;
       mArt = Number(mData.articles)||0;
+      mPkg = Number(mData.packages)||0;
       mRefunds = Number(mData.refunds)||0;
       // Try to get expenses from salSummaryCache (loaded async)
       if (isCurrent) {
@@ -8704,12 +8739,12 @@ function renderBizPeriodsV2(d, sd, fin) {
           mExp = 0;
         }
       }
-      mTurnover = mSvc + mArt;
-      mProfit = mSvc - mExp + mAdjTotal;
+      mTurnover = mSvc + mArt + mPkg;
+      mProfit = (mSvc + mArt + mPkg) - mExp + mAdjTotal;
     } else if (isCurrent) {
       // Fallback: current month but no mData (first day, no leads yet)
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
-      mSvc = 0; mArt = 0; mRefunds = 0;
+      mSvc = 0; mArt = 0; mPkg = 0; mRefunds = 0;
       mExpSal = (Number(fin.salaries)||0) + (Number(fin.bonuses)||0) + (Number(fin.fines)||0);
       mExpComm = Number(fin.commercial_expenses)||0;
       mExpMkt = Number(fin.marketing_expenses)||0;
@@ -8718,7 +8753,7 @@ function renderBizPeriodsV2(d, sd, fin) {
       mProfit = -mExp + mAdjTotal;
     } else {
       mDone = 0; mInProg = 0; mRejected = 0; mChecking = 0;
-      mSvc = 0; mArt = 0; mRefunds = 0; mExp = 0; mTurnover = 0; mProfit = 0;
+      mSvc = 0; mArt = 0; mPkg = 0; mRefunds = 0; mExp = 0; mTurnover = 0; mProfit = 0;
     }
     // Tax data for this month (from tax_payments in bulk data)
     var mTaxes = 0;
@@ -8743,7 +8778,7 @@ function renderBizPeriodsV2(d, sd, fin) {
     yearTotals.done += mDone; yearTotals.inProgress += mInProg;
     yearTotals.rejected += mRejected; yearTotals.checking += mChecking;
     yearTotals.turnover += mTurnover; yearTotals.services += mSvc;
-    yearTotals.articles += mArt; yearTotals.refunds += mRefunds;
+    yearTotals.articles += mArt; yearTotals.packages += mPkg; yearTotals.refunds += mRefunds;
     yearTotals.expenses += mExp; yearTotals.profit += mProfit;
     yearTotals.taxes += mTaxes; yearTotals.loanPayments += mLoanPayments;
     yearTotals.dividends += mDivs; yearTotals.netProfit += mNetProfit;
@@ -8828,9 +8863,9 @@ function renderBizPeriodsV2(d, sd, fin) {
       h += '</div>';
       // Auto-fetch salary breakdown from DB for editing month (triggered by edit button onclick)
       // Row 2.5: Computed summary (read-only, matches table headers)
-      var editTurnover = mSvc + mArt;
+      var editTurnover = mSvc + mArt + mPkg;
       var editExpTotal = mExpSal + mExpComm + mExpMkt;
-      var editProfit = mSvc - editExpTotal + mAdjTotal;
+      var editProfit = (mSvc + mArt + mPkg) - editExpTotal + mAdjTotal;
       var editTaxes = mTaxes;
       var editNetProfit = editProfit - editTaxes;
       h += '<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:10px;padding:10px 12px;background:#0f172a;border-radius:8px;border:1px solid #1e293b">';
@@ -8916,7 +8951,7 @@ function renderBizPeriodsV2(d, sd, fin) {
   h += '<th style="padding:8px 6px;text-align:right;color:#f87171">Возврат</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6">Услуги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444">Расходы</th>';
-  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E" title="Услуги - Расходы">Прибыль</th>';
+  h += '<th style="padding:8px 6px;text-align:right;color:#22C55E" title="Приход - Расходы">Прибыль</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#F59E0B" title="Налоги за квартал">Налоги</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#EF4444" title="Кредиты за квартал">Кредиты</th>';
   h += '<th style="padding:8px 6px;text-align:right;color:#8B5CF6" title="Дивиденды за квартал">Дивид.</th>';
@@ -8943,13 +8978,14 @@ function renderBizPeriodsV2(d, sd, fin) {
         // ALWAYS use live data for current month (unless locked)
         var cSvc = Number(fin.services)||0;
         var cArt = Number(fin.articles)||0;
+        var cPkg = Number(fin.packages)||0;
         var cExp = Number(fin.total_expenses)||0;
         qSvc += cSvc;
         qArt += cArt;
         qRef += Number(fin.refunds)||0;
         qExp += cExp;
-        qTurnover += cSvc + cArt;
-        qProfit += cSvc - cExp;
+        qTurnover += cSvc + cArt + cPkg;
+        qProfit += (cSvc + cArt + cPkg) - cExp;
         qDone += (sd.done ? Number(sd.done.count)||0 : 0);
         qInProg += (sd.in_progress ? Number(sd.in_progress.count)||0 : 0) + (sd.contacted ? Number(sd.contacted.count)||0 : 0);
         qRejected += (sd.rejected ? Number(sd.rejected.count)||0 : 0);
@@ -8960,13 +8996,14 @@ function renderBizPeriodsV2(d, sd, fin) {
         var qmArt = Number(qmSnap.revenue_articles)||0;
         var qmExp = Math.abs(Number(qmSnap.expense_salaries)||0)+Math.abs(Number(qmSnap.expense_commercial)||0)+Math.abs(Number(qmSnap.expense_marketing)||0);
         var qmAdj = 0;
-        try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch(e) {}
+        var qmPkg = 0;
+        try { var qmCD = JSON.parse(qmSnap.custom_data || '{}'); var qmAdjs = qmCD.adjustments || []; qmPkg = Number(qmCD.revenue_packages)||0; for (var qai = 0; qai < qmAdjs.length; qai++) { qmAdj += qmAdjs[qai].type === 'outflow' ? -Math.abs(qmAdjs[qai].amount) : Math.abs(qmAdjs[qai].amount); } } catch(e) {}
         qSvc += qmSvc;
         qArt += qmArt;
         qRef += Number(qmSnap.refunds)||0;
         qExp += qmExp;
-        qTurnover += qmSvc + qmArt;
-        qProfit += qmSvc - qmExp + qmAdj;
+        qTurnover += qmSvc + qmArt + qmPkg;
+        qProfit += (qmSvc + qmArt + qmPkg) - qmExp + qmAdj;
         qDone += Number(qmSnap.leads_done)||0;
         try { var qmCD2 = JSON.parse(qmSnap.custom_data || '{}'); qInProg += Number(qmCD2.in_progress_count)||0; qRejected += Number(qmCD2.rejected_count)||0; qChecking += Number(qmCD2.checking_count)||0; } catch(e) {}
       }
@@ -8974,13 +9011,16 @@ function renderBizPeriodsV2(d, sd, fin) {
     // Use quarter snapshot if locked
     if (qLocked) {
       var qlSvc = Number(qSnap.revenue_services)||0;
+      var qlArt = Number(qSnap.revenue_articles)||0;
+      var qlPkg = 0;
+      try { var qlCD = JSON.parse(qSnap.custom_data || '{}'); qlPkg = Number(qlCD.revenue_packages)||0; } catch(e) {}
       var qlExp = Math.abs(Number(qSnap.expense_salaries)||0)+Math.abs(Number(qSnap.expense_commercial)||0)+Math.abs(Number(qSnap.expense_marketing)||0);
-      qTurnover = qlSvc + (Number(qSnap.revenue_articles)||0);
+      qTurnover = qlSvc + qlArt + qlPkg;
       qSvc = qlSvc;
-      qArt = Number(qSnap.revenue_articles)||0;
+      qArt = qlArt;
       qRef = Number(qSnap.refunds)||0;
       qExp = qlExp;
-      qProfit = qSvc - qExp; // Прибыль = Услуги - Расходы
+      qProfit = (qlSvc + qlArt + qlPkg) - qlExp;
       qDone = Number(qSnap.leads_done)||0;
     }
     // Sum taxes for this quarter from tax_payments

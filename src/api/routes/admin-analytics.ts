@@ -34,7 +34,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const statusData: Record<string, any> = {};
     for (const st of allStatuses) {
       const res = await db.prepare("SELECT COUNT(*) as cnt, COALESCE(SUM(l.total_amount),0) as amt FROM leads l WHERE l.status = ?" + dateFilter).bind(st, ...dateParams).first().catch(() => null);
-      statusData[st] = { count: Number(res?.cnt || 0), amount: Number(res?.amt || 0), services: 0, articles: 0 };
+      statusData[st] = { count: Number(res?.cnt || 0), amount: Number(res?.amt || 0), services: 0, articles: 0, packages: 0 };
     }
 
     // Parse calc_data for SERVICES only; articles come exclusively from lead_articles table to avoid double-counting
@@ -72,6 +72,11 @@ api.get('/business-analytics', authMiddleware, async (c) => {
           totalPkgRevenue += pPrice;
           totalPkgCount++;
         }
+        // Track package price per status (for all statuses)
+        if (cd.package) {
+          const pPrice2 = Number(cd.package.package_price || 0);
+          if (statusData[st]) statusData[st].packages += pPrice2;
+        }
       } catch {}
     }
     const packagesList = Object.values(pkgStats).sort((a, b) => b.revenue - a.revenue);
@@ -86,13 +91,17 @@ api.get('/business-analytics', authMiddleware, async (c) => {
       }
     } catch {}
 
+    // amount = total_amount from DB = svc + art + pkg - discount = real money from client
+    // No override needed — total_amount IS the correct revenue figure
+
     // 2. Financial summary
-    // TURNOVER = total_amount of in_progress + checking + done leads (all money in company)
-    let turnover = 0, servicesTotal = 0, articlesTotal = 0;
+    // TURNOVER = total_amount of in_progress + checking + done leads (real client payments)
+    let turnover = 0, servicesTotal = 0, articlesTotal = 0, packagesTotal = 0;
     for (const st of turnoverStatuses) {
       turnover += statusData[st]?.amount || 0;
       servicesTotal += statusData[st]?.services || 0;
       articlesTotal += statusData[st]?.articles || 0;
+      packagesTotal += statusData[st]?.packages || 0;
     }
     // Ensure turnover is never negative, sanitize big-number issues
     turnover = Math.max(0, Math.round(turnover * 100) / 100);
@@ -141,13 +150,13 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     const totalBonuses = Math.round((Number(bonusRes?.total_bonuses || 0)) * 100) / 100;
     const totalFines = Math.round((Number(bonusRes?.total_fines || 0)) * 100) / 100;
 
-    // 5. Financial metrics (profit from services, not articles — articles are client money)
+    // 5. Financial metrics (profit from total revenue = services + articles)
     // Fines (negative bonuses) reduce salary cost, so net effect: salaries + bonuses + fines + expenses
     const allExpensesSum = totalSalaries + totalBonuses + totalFines + totalExpenses;
-    const netProfit = Math.round((servicesTotal - allExpensesSum) * 100) / 100;
-    const marginality = servicesTotal > 0 ? Math.round((netProfit / servicesTotal) * 1000) / 10 : 0;
+    const netProfit = Math.round((turnover - allExpensesSum) * 100) / 100;
+    const marginality = turnover > 0 ? Math.round((netProfit / turnover) * 1000) / 10 : 0;
     const roi = allExpensesSum > 0 ? Math.round((netProfit / allExpensesSum) * 1000) / 10 : 0;
-    const romi = marketingExpenses > 0 ? Math.round(((servicesTotal - marketingExpenses) / marketingExpenses) * 1000) / 10 : 0;
+    const romi = marketingExpenses > 0 ? Math.round(((turnover - marketingExpenses) / marketingExpenses) * 1000) / 10 : 0;
     // AVG CHECK = only from services of completed leads (excluding purchases/articles)
     const avgCheck = doneCount > 0 ? Math.round(doneServices / doneCount) : 0;
     const totalLeadsCount = Object.values(statusData).reduce((a: number, s: any) => a + (Number(s.count) || 0), 0);
@@ -213,6 +222,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
           const artAss = await db.prepare("SELECT COALESCE(SUM(la.total_price),0) as art_total FROM lead_articles la JOIN leads l3 ON la.lead_id = l3.id WHERE l3.assigned_to = ? AND l3.status IN ('in_progress','checking','done')" + dateFilter.replace(/l\./g, 'l3.')).bind(r.assigned_to, ...dateParams).first();
           assArticles = Number(artAss?.art_total || 0);
         } catch {}
+        // amount = total_amount from DB (svc + art + pkg - discount = real client payment)
         byAssignee.push({ 
           user_id: r.assigned_to, display_name: r.display_name || 'Не назначен', 
           role: r.role || '', position_title: r.position_title || '',
@@ -489,6 +499,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         const svcItemsRes = await db.prepare(`SELECT l.calc_data FROM leads l 
           WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(mk).all().catch(() => ({results:[]}));
         let svcTotal = 0;
+        let pkgTotal = 0;
         for (const row of (svcItemsRes.results || [])) {
           try {
             const cd = JSON.parse(row.calc_data as string || '{}');
@@ -500,6 +511,10 @@ api.get('/business-analytics', authMiddleware, async (c) => {
               for (const it of items) {
                 if (!it.wb_article) svcTotal += Number(it.subtotal) || ((Number(it.price) || 0) * (Number(it.qty) || Number(it.quantity) || 1));
               }
+            }
+            // Package price — real money from client
+            if (cd.package && cd.package.package_price) {
+              pkgTotal += Number(cd.package.package_price || 0);
             }
           } catch {}
         }
@@ -528,6 +543,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         }
         (md as any).services = svcTotal;
         (md as any).articles = Number((artRes as any)?.art_total) || 0;
+        (md as any).packages = pkgTotal;
         (md as any).discounts = monthDiscTotal;
       }
       monthlyData = mDataArr;
@@ -743,7 +759,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     return c.json({
       status_data: statusData,
       financial: {
-        turnover, services: servicesTotal, articles: articlesTotal, articles_net: articlesNet, refunds: totalRefunds,
+        turnover, services: servicesTotal, articles: articlesTotal, packages: packagesTotal, articles_net: articlesNet, refunds: totalRefunds,
         salaries: totalSalaries, bonuses: totalBonuses, fines: totalFines, commercial_expenses: commercialExpenses,
         marketing_expenses: marketingExpenses, total_expenses: allExpensesSum,
         net_profit: netProfit, marginality, roi, romi,

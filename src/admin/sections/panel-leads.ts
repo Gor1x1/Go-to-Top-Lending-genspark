@@ -10,26 +10,40 @@ function renderLeads() {
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : [];
   var total = (data.leads && data.leads.total) ? data.leads.total : 0;
   
-  // --- Analytics mini-dashboard with per-status sums + services/articles split ---
-  var stats = { new: {c:0,a:0,svc:0,art:0}, contacted: {c:0,a:0,svc:0,art:0}, in_progress: {c:0,a:0,svc:0,art:0}, checking: {c:0,a:0,svc:0,art:0}, done: {c:0,a:0,svc:0,art:0}, rejected: {c:0,a:0,svc:0,art:0} };
+  // --- Analytics mini-dashboard with per-status sums + services/articles/packages split ---
+  var stats = { new: {c:0,a:0,svc:0,art:0,pkg:0}, contacted: {c:0,a:0,svc:0,art:0,pkg:0}, in_progress: {c:0,a:0,svc:0,art:0,pkg:0}, checking: {c:0,a:0,svc:0,art:0,pkg:0}, done: {c:0,a:0,svc:0,art:0,pkg:0}, rejected: {c:0,a:0,svc:0,art:0,pkg:0} };
   var totalAmount = 0;
   for (var ai = 0; ai < leads.length; ai++) {
     var al = leads[ai];
-    var amt = Number(al.total_amount || 0);
-    totalAmount += amt;
     var st = al.status || 'new';
-    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0};
-    stats[st].c++; stats[st].a += amt;
-    // Split services vs articles from calc_data
+    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0,pkg:0};
+    stats[st].c++;
+    // Split services vs articles vs packages from calc_data
     var cd = null;
     if (al.calc_data) { try { cd = JSON.parse(al.calc_data); } catch(e) {} }
-    if (cd && cd.items) {
-      for (var ci = 0; ci < cd.items.length; ci++) {
-        var it = cd.items[ci];
-        if (it.wb_article) { stats[st].art += Number(it.subtotal||0); }
-        else { stats[st].svc += Number(it.subtotal||0); }
+    var leadSvc = 0, leadArt = 0, leadPkg = 0;
+    if (cd) {
+      if (cd.servicesSubtotal !== undefined && cd.articlesSubtotal !== undefined) {
+        leadSvc = Number(cd.servicesSubtotal || 0);
+        leadArt = Number(cd.articlesSubtotal || 0);
+      } else if (cd.items) {
+        for (var ci = 0; ci < cd.items.length; ci++) {
+          var it = cd.items[ci];
+          if (it.wb_article) { leadArt += Number(it.subtotal||0); }
+          else { leadSvc += Number(it.subtotal||0); }
+        }
+      }
+      if (cd.package && cd.package.package_price) {
+        leadPkg = Number(cd.package.package_price || 0);
       }
     }
+    stats[st].svc += leadSvc;
+    stats[st].art += leadArt;
+    stats[st].pkg += leadPkg;
+    // Total = total_amount from DB (svc + art + pkg - discount) = real client payment
+    var amt = Number(al.total_amount || 0);
+    stats[st].a += amt;
+    totalAmount += amt;
   }
   
   // --- Filter leads ---
@@ -75,7 +89,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
     '<div style="color:#fbbf24;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span></div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span>' + (stats.in_progress.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.in_progress.pkg) + '</span>' : '') + '</div></div>';
   // 4. Отклонен
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;rejected&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
@@ -91,7 +105,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
     '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span></div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span>' + (stats.done.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.done.pkg) + '</span>' : '') + '</div></div>';
   h += '</div>';
   
   // Filters row — 6 statuses only
