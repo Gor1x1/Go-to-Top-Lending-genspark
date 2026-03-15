@@ -2668,7 +2668,9 @@ function renderBizOverviewV2(d, sd, fin) {
   h += '<tr style="border-top:2px solid #8B5CF6;font-weight:700"><td></td><td style="padding:10px 16px">\\u0418\\u0422\\u041e\\u0413\\u041e (активные)</td><td style="padding:10px;text-align:right">' + totalLeads2 + '</td><td style="padding:10px;text-align:right">' + fmtAmt(totalAmt2) + '</td><td style="padding:10px;text-align:right;color:#8B5CF6">' + fmtAmt(totalSvc) + '</td><td style="padding:10px;text-align:right;color:#F59E0B">' + fmtAmt(totalArt) + '</td></tr>';
   h += '</tbody></table></div>';
 
-  // P&L table
+  // P&L table — mini overview (services-only profit = services - expenses)
+  var miniNetProfit = serviceRev - totalExpenses;
+  var miniProfitColor = miniNetProfit >= 0 ? '#22C55E' : '#EF4444';
   h += '<div class="card" style="overflow-x:auto;padding:0;margin-top:16px"><table style="width:100%;border-collapse:collapse;font-size:0.85rem">';
   h += '<thead><tr style="background:#0f172a;border-bottom:2px solid #334155"><th style="padding:12px 16px;text-align:left;color:#94a3b8" colspan="2">\\u041f\\u0440\\u0438\\u0431\\u044b\\u043b\\u0438 \\u0438 \\u0443\\u0431\\u044b\\u0442\\u043a\\u0438 (P&L)</th></tr></thead><tbody>';
   var plRows = [
@@ -2677,7 +2679,7 @@ function renderBizOverviewV2(d, sd, fin) {
     { label: '\\u00a0\\u00a0\\u041a\\u043e\\u043c\\u043c\\u0435\\u0440\\u0447\\u0435\\u0441\\u043a\\u0438\\u0435 \\u0437\\u0430\\u0442\\u0440\\u0430\\u0442\\u044b', value: -commExp, color: '#EF4444' },
     { label: '\\u00a0\\u00a0\\u041c\\u0430\\u0440\\u043a\\u0435\\u0442\\u0438\\u043d\\u0433 / \\u0420\\u0435\\u043a\\u043b\\u0430\\u043c\\u0430', value: -mktExp, color: '#EF4444' },
     { label: '\\u0418\\u0422\\u041e\\u0413\\u041e \\u0440\\u0430\\u0441\\u0445\\u043e\\u0434\\u043e\\u0432', value: -totalExpenses, color: '#F97316', bold: true },
-    { label: '\\u0427\\u0418\\u0421\\u0422\\u0410\\u042f \\u041f\\u0420\\u0418\\u0411\\u042b\\u041b\\u042c', value: netProfit, color: profitColor, bold: true, big: true },
+    { label: '\\u0427\\u0418\\u0421\\u0422\\u0410\\u042f \\u041f\\u0420\\u0418\\u0411\\u042b\\u041b\\u042c', value: miniNetProfit, color: miniProfitColor, bold: true, big: true },
   ];
   for (var pli = 0; pli < plRows.length; pli++) {
     var pr = plRows[pli]; var prVal = Number(pr.value) || 0;

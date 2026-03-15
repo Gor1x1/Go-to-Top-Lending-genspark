@@ -89,6 +89,9 @@ api.put('/leads/:id', authMiddleware, async (c) => {
   if (d.telegram_group !== undefined) { fields.push('telegram_group=?'); vals.push(d.telegram_group); }
   if (d.tz_link !== undefined) { fields.push('tz_link=?'); vals.push(d.tz_link); }
   if (d.refund_amount !== undefined) { fields.push('refund_amount=?'); vals.push(d.refund_amount); }
+  if (d.payment_method_id !== undefined) { fields.push('payment_method_id=?'); vals.push(d.payment_method_id); }
+  if (d.source !== undefined) { fields.push('source=?'); vals.push(d.source); }
+  if (d.email !== undefined) { fields.push('email=?'); vals.push(d.email); }
   if (d.lang !== undefined) { fields.push('lang=?'); vals.push(d.lang); }
   if (fields.length === 0) return c.json({ error: 'No fields to update' }, 400);
   vals.push(id);
