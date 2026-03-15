@@ -3484,12 +3484,12 @@ function renderLeads() {
   for (var ai = 0; ai < leads.length; ai++) {
     var al = leads[ai];
     var st = al.status || 'new';
-    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0,pkg:0};
+    if (!stats[st]) stats[st] = {c:0,a:0,svc:0,art:0,pkg:0,disc:0};
     stats[st].c++;
     // Split services vs articles vs packages from calc_data
     var cd = null;
     if (al.calc_data) { try { cd = JSON.parse(al.calc_data); } catch(e) {} }
-    var leadSvc = 0, leadArt = 0, leadPkg = 0;
+    var leadSvc = 0, leadArt = 0, leadPkg = 0, leadDisc = 0;
     if (cd) {
       // Use pre-computed subtotals if available (set by /recalc)
       if (cd.servicesSubtotal !== undefined && cd.articlesSubtotal !== undefined) {
@@ -3506,10 +3506,15 @@ function renderLeads() {
       if (cd.package && cd.package.package_price) {
         leadPkg = Number(cd.package.package_price || 0);
       }
+      // Discount amount
+      if (cd.discountAmount) {
+        leadDisc = Number(cd.discountAmount || 0);
+      }
     }
     stats[st].svc += leadSvc;
     stats[st].art += leadArt;
     stats[st].pkg += leadPkg;
+    stats[st].disc += leadDisc;
     // Total = total_amount from DB (svc + art + pkg - discount) = real client payment
     var amt = Number(al.total_amount || 0);
     stats[st].a += amt;
@@ -3559,7 +3564,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#F59E0B">' + stats.in_progress.c + '</span><span style="font-size:1.4rem">🔄</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">В работе</div>' +
     '<div style="color:#fbbf24;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.in_progress.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span>' + (stats.in_progress.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.in_progress.pkg) + '</span>' : '') + '</div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.in_progress.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.in_progress.art) + '</span>' + (stats.in_progress.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.in_progress.pkg) + '</span>' : '') + (stats.in_progress.disc > 0 ? '<br><span style="color:#EF4444">Скид: -' + fmtA(stats.in_progress.disc) + '</span>' : '') + '</div></div>';
   // 4. Отклонен
   h += '<div class="stat-card" style="cursor:pointer;padding:14px;background:linear-gradient(135deg,rgba(239,68,68,0.12),rgba(239,68,68,0.04));border-color:rgba(239,68,68,0.25)" onclick="setLeadsFilter(&apos;status&apos;,&apos;rejected&apos;)">' +
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#EF4444">' + stats.rejected.c + '</span><span style="font-size:1.4rem">❌</span></div>' +
@@ -3575,7 +3580,7 @@ function renderLeads() {
     '<div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:1.6rem;font-weight:900;color:#10B981">' + stats.done.c + '</span><span style="font-size:1.4rem">✅</span></div>' +
     '<div style="color:#94a3b8;font-size:0.75rem;margin-top:4px">Завершён</div>' +
     '<div style="color:#34d399;font-size:0.88rem;font-weight:700;margin-top:2px">' + fmtA(stats.done.a) + '</div>' +
-    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span>' + (stats.done.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.done.pkg) + '</span>' : '') + '</div></div>';
+    '<div style="margin-top:4px;font-size:0.7rem;color:#94a3b8"><span style="color:#a78bfa">Усл: ' + fmtA(stats.done.svc) + '</span><br><span style="color:#fb923c">Зак: ' + fmtA(stats.done.art) + '</span>' + (stats.done.pkg > 0 ? '<br><span style="color:#FBBF24">Пак: ' + fmtA(stats.done.pkg) + '</span>' : '') + (stats.done.disc > 0 ? '<br><span style="color:#EF4444">Скид: -' + fmtA(stats.done.disc) + '</span>' : '') + '</div></div>';
   h += '</div>';
   
   // Filters row — 6 statuses only
