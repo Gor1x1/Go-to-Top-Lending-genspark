@@ -760,8 +760,8 @@ async function computePnlForPeriod(db: D1Database, periodKey: string) {
     loan_repayment_mode: loanRepayMode,
     loan_aggressive_pct: loanAggrPct,
     loan_standard_extra_pct: loanStdExtraPct,
-    loan_load_on_revenue: revenue > 0 ? Math.round(totalLoanPaymentsPeriod / revenue * 10000) / 100 : 0,
-    loan_load_on_profit: netProfit > 0 ? Math.round(totalLoanMonthlyPlan / netProfit * 10000) / 100 : 0,
+    loan_load_on_revenue: revenue > 0 ? Math.round(effectiveLoanPayments / revenue * 10000) / 100 : 0,
+    loan_load_on_profit: netProfit > 0 ? Math.round(effectiveLoanPayments / netProfit * 10000) / 100 : 0,
     tax_rules: taxRules.results || [],
     // Commission data
     commissions_total: periodCommissions,
@@ -862,10 +862,10 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
     if (!currentSnap || !currentSnap.is_locked) {
       ytdRevenue += current.revenue;
     }
-    const ytdCogs = current.cogs * monthsInFiscalYear;
-    // BUG-002 fix: YTD salaries/expenses — iterate through each month for accurate totals
+    // BUG-002 fix: YTD salaries/expenses/COGS — iterate through each month for accurate totals
     // instead of multiplying current month values by monthsInFiscalYear
     let ytdSalary = 0, ytdMarketing = 0, ytdDepr = current.depreciation * monthsInFiscalYear;
+    let ytdCogs = 0; // COGS includes articles (transit) + commercial expenses per month
     {
       let iterYear = fStartYear, iterMonth = fStartMonth;
       for (let mi = 0; mi < monthsInFiscalYear; mi++) {
@@ -879,13 +879,20 @@ api.get('/pnl/:periodKey', authMiddleware, async (c) => {
           COALESCE((SELECT SUM(CASE WHEN eb.bonus_type IN ('penalty','fine') OR (eb.bonus_type IS NULL AND eb.amount < 0) THEN ABS(eb.amount) ELSE 0 END) FROM employee_bonuses eb WHERE eb.bonus_date >= ? AND eb.bonus_date <= ?), 0) as pen
           FROM users u WHERE u.salary > 0`).bind(iterEnd, iterStart, iterStart, iterEnd, iterStart, iterEnd).first();
         ytdSalary += (Number(mSal?.sal || 0) + Number(mSal?.bon || 0) - Number(mSal?.pen || 0));
-        // Marketing expenses for this month
+        // Marketing and commercial expenses for this month
         const mExp = await db.prepare(`SELECT 
-          COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as mkt
+          COALESCE(SUM(CASE WHEN ec.is_marketing = 1 THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as mkt,
+          COALESCE(SUM(CASE WHEN ec.is_marketing = 0 OR ec.is_marketing IS NULL THEN e.amount * COALESCE(eft.multiplier_monthly, 1) ELSE 0 END), 0) as comm
           FROM expenses e LEFT JOIN expense_categories ec ON e.category_id = ec.id LEFT JOIN expense_frequency_types eft ON e.frequency_type_id = eft.id
           WHERE e.is_active = 1 AND (e.start_date IS NULL OR e.start_date = '' OR e.start_date <= ?) AND (e.end_date IS NULL OR e.end_date = '' OR e.end_date >= ?)`)
           .bind(iterEnd, iterStart).first();
         ytdMarketing += Number(mExp?.mkt || 0);
+        // COGS for this month = commercial expenses + articles for that month
+        const commThisMonth = Number(mExp?.comm || 0);
+        // Articles from leads for this month
+        const mArt = await db.prepare(`SELECT COALESCE(SUM(la.total_price),0) as art FROM lead_articles la JOIN leads l ON la.lead_id = l.id WHERE strftime('%Y-%m', l.created_at) = ? AND l.status IN ('in_progress','checking','done')`).bind(iterKey).first();
+        const artThisMonth = Number(mArt?.art || 0);
+        ytdCogs += commThisMonth + artThisMonth;
         iterMonth++;
         if (iterMonth > 12) { iterMonth = 1; iterYear++; }
       }
