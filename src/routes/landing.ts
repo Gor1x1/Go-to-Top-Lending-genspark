@@ -2193,28 +2193,41 @@ function toggleFaq(el) {
 var _lbPhotos = [];
 var _lbIdx = 0;
 function openLightbox(elOrUrl) {
-  var src = typeof elOrUrl === 'string' ? elOrUrl : elOrUrl.querySelector('img').src;
-  // Collect all photos from the current carousel or gallery for navigation
+  var imgEl = typeof elOrUrl === 'string' ? null : (elOrUrl.tagName === 'IMG' ? elOrUrl : elOrUrl.querySelector('img'));
+  var src = typeof elOrUrl === 'string' ? elOrUrl : imgEl.src;
+  // Collect photos only from the SAME carousel/gallery as the clicked image
   _lbPhotos = [];
   _lbIdx = 0;
-  // Try to get photos from the reviews carousel
-  var rvTrack = document.querySelector('.rv-track');
-  if (rvTrack) {
-    var slides = rvTrack.querySelectorAll('.rv-slide img');
+  // Find the closest carousel or photo block container
+  var parentCarousel = imgEl ? imgEl.closest('.rv-track') : null;
+  var parentPbGallery = imgEl ? imgEl.closest('.pb-grid, .pb-gallery, [class*="photo-block"]') : null;
+  
+  if (parentCarousel) {
+    // Photos from same carousel only
+    var slides = parentCarousel.querySelectorAll('.rv-slide img');
     for (var si = 0; si < slides.length; si++) {
       _lbPhotos.push(slides[si].src);
-      if (slides[si].src === src || slides[si].src.indexOf(src) >= 0 || src.indexOf(slides[si].getAttribute('src')) >= 0) _lbIdx = si;
+      if (slides[si].src === src) _lbIdx = si;
+    }
+  } else if (parentPbGallery) {
+    // Photos from same photo block only
+    var pbImgs = parentPbGallery.querySelectorAll('img');
+    for (var pi = 0; pi < pbImgs.length; pi++) {
+      _lbPhotos.push(pbImgs[pi].src);
+      if (pbImgs[pi].src === src) _lbIdx = pi;
+    }
+  } else {
+    // Fallback: try to find in any parent section
+    var parentSection = imgEl ? imgEl.closest('section, [data-section-id]') : null;
+    if (parentSection) {
+      var sectionImgs = parentSection.querySelectorAll('.rv-slide img, .pb-card img, .pb-grid img');
+      for (var xi = 0; xi < sectionImgs.length; xi++) {
+        _lbPhotos.push(sectionImgs[xi].src);
+        if (sectionImgs[xi].src === src) _lbIdx = xi;
+      }
     }
   }
-  // If no carousel photos found, try photo blocks
-  if (_lbPhotos.length === 0) {
-    var pbCards = document.querySelectorAll('.pb-card img');
-    for (var pi = 0; pi < pbCards.length; pi++) {
-      _lbPhotos.push(pbCards[pi].src);
-      if (pbCards[pi].src === src) _lbIdx = pi;
-    }
-  }
-  // Fallback: single photo
+  // Last fallback: single photo
   if (_lbPhotos.length === 0) { _lbPhotos = [src]; _lbIdx = 0; }
   document.getElementById('lightboxImg').src = src;
   document.getElementById('lightbox').classList.add('show');
@@ -2409,7 +2422,7 @@ function showPopup() {
     ov.style.setProperty('justify-content', 'center', 'important');
     ov.style.setProperty('align-items', 'flex-end', 'important');
     ov.style.setProperty('padding', '0', 'important');
-    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:85vh !important;overflow-y:auto !important;padding:28px 16px !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;-webkit-overflow-scrolling:touch !important;overscroll-behavior:contain !important;';
+    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:85vh !important;overflow-y:auto !important;padding:28px 16px !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;-webkit-overflow-scrolling:touch !important;overscroll-behavior:contain !important;touch-action:pan-y !important;';
   } else {
     ov.style.setProperty('justify-content', 'center', 'important');
     ov.style.setProperty('align-items', 'center', 'important');
@@ -2437,9 +2450,8 @@ function showPopup() {
 function _preventOverlayScroll(e) {
   var card = document.querySelector('.popup-card');
   if (card && card.contains(e.target)) {
-    // Allow scroll inside card if it has overflow content
-    var isScrollable = card.scrollHeight > card.clientHeight;
-    if (isScrollable) return; // let card scroll
+    // Always allow scroll inside card — it has overflow-y:auto
+    return;
   }
   e.preventDefault();
 }
@@ -3180,7 +3192,7 @@ switchLang = function(l) {
               gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ֏</div>';
               gh += '<div class="calc-input"><button onclick="ccTiered(&apos;'+svcId+'&apos;,-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(&apos;'+svcId+'&apos;)"><button onclick="ccTiered(&apos;'+svcId+'&apos;,1)">+</button></div>';
               gh += '</div>';
-              gh += '<div class="buyout-tier-info"><strong>'+( lang==='am' ? 'Որքան շատ — այնքան էժան:' : 'Чем больше — тем дешевле:')+'</strong><br>';
+              gh += '<div class="buyout-tier-info"><strong data-ru="Чем больше — тем дешевле:" data-am="Որքան շատ — այնքան էժան:">'+( lang==='am' ? 'Որքան շատ — այնքան էժան:' : 'Чем больше — тем дешевле:')+'</strong><br>';
               gh += '<span>' + tiers.map(function(t) { 
                 var range = t.max >= 999 ? t.min+'+' : t.min+'-'+t.max;
                 return range + ' → ' + formatNum(t.price) + ' ֏'; 
@@ -5248,8 +5260,8 @@ async function checkRefCode() {
       '<span data-ru="Скачать расчёт (PDF)" data-am="Ներբեռնել հաշվարկ (PDF)">Скачать расчёт (PDF)</span>' +
     '</div>' +
     '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px" class="pdf-form-row">' +
-      '<input type="text" id="pdfClientName" placeholder="' + (lang==='am' ? 'Անուն *' : 'Имя *') + '" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.9rem;outline:none;width:100%">' +
-      '<input type="tel" id="pdfClientPhone" placeholder="' + (lang==='am' ? 'Հեռախոս *' : 'Телефон *') + '" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.9rem;outline:none;width:100%">' +
+      '<input type="text" id="pdfClientName" placeholder="' + (lang==='am' ? 'Անուն *' : 'Имя *') + '" data-placeholder-ru="Имя *" data-placeholder-am="Անուն *" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.9rem;outline:none;width:100%">' +
+      '<input type="tel" id="pdfClientPhone" placeholder="' + (lang==='am' ? 'Հեռախոս *' : 'Телефон *') + '" data-placeholder-ru="Телефон *" data-placeholder-am="Հեռախոс *" style="padding:10px 14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.9rem;outline:none;width:100%">' +
     '</div>' +
     '<div id="pdfFormError" style="display:none;color:#EF4444;font-size:0.82rem;margin-bottom:8px;padding:6px 10px;background:rgba(239,68,68,0.1);border-radius:8px"></div>' +
     '<button type="button" id="pdfDownloadBtn" style="margin-top:4px;background:linear-gradient(135deg,#F59E0B,#D97706);color:white;border:none;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;gap:8px;width:100%;justify-content:center;transition:all 0.3s">' +
