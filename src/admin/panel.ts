@@ -1154,24 +1154,71 @@ function switchNewBlockTab(tab) {
   document.getElementById('newBlockTabCopy').className = 'tab-btn' + (tab === 'copy' ? ' active' : '');
 }
 
-// Handle photo file upload → base64 preview (for blocks with photos)
+// ── Compress image file on client side before upload ──
+// Returns a Promise<File> with the compressed image (JPEG, max dimension, target size < 900KB for D1)
+function compressImageFile(file, maxDim, quality) {
+  maxDim = maxDim || 2000;
+  quality = quality || 0.82;
+  return new Promise(function(resolve, reject) {
+    // If file is already small enough (< 900KB), skip compression
+    if (file.size < 900 * 1024) { resolve(file); return; }
+    var img = new Image();
+    img.onload = function() {
+      var w = img.width, h = img.height;
+      // Scale down if needed
+      if (w > maxDim || h > maxDim) {
+        if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; }
+        else { w = Math.round(w * maxDim / h); h = maxDim; }
+      }
+      var canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+      // Try JPEG first, then reduce quality if still too big
+      var tryQuality = quality;
+      var attempt = function() {
+        canvas.toBlob(function(blob) {
+          if (!blob) { resolve(file); return; }
+          // If still > 900KB and quality can be reduced
+          if (blob.size > 900 * 1024 && tryQuality > 0.4) {
+            tryQuality -= 0.1;
+            attempt();
+            return;
+          }
+          var compressed = new File([blob], file.name.replace(/\.\w+$/, '.jpg'), { type: 'image/jpeg' });
+          resolve(compressed);
+        }, 'image/jpeg', tryQuality);
+      };
+      attempt();
+    };
+    img.onerror = function() { resolve(file); };
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// Handle photo file upload → compressed base64 preview (for blocks with photos)
 function handlePhotoUpload(input) {
   if (!input.files || !input.files[0]) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('nb_photo_url').value = e.target.result;
-    document.getElementById('nb_photo_preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:80px;border-radius:6px;margin-top:6px">';
-  };
-  reader.readAsDataURL(input.files[0]);
+  compressImageFile(input.files[0], 2000, 0.82).then(function(compressed) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('nb_photo_url').value = e.target.result;
+      document.getElementById('nb_photo_preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:80px;border-radius:6px;margin-top:6px">';
+    };
+    reader.readAsDataURL(compressed);
+  });
 }
 function handlePhotoUploadCopy(input) {
   if (!input.files || !input.files[0]) return;
-  var reader = new FileReader();
-  reader.onload = function(e) {
-    document.getElementById('nb_copy_photo_url').value = e.target.result;
-    document.getElementById('nb_copy_photo_preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:80px;border-radius:6px;margin-top:6px">';
-  };
-  reader.readAsDataURL(input.files[0]);
+  compressImageFile(input.files[0], 2000, 0.82).then(function(compressed) {
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      document.getElementById('nb_copy_photo_url').value = e.target.result;
+      document.getElementById('nb_copy_photo_preview').innerHTML = '<img src="' + e.target.result + '" style="max-width:120px;max-height:80px;border-radius:6px;margin-top:6px">';
+    };
+    reader.readAsDataURL(compressed);
+  });
 }
 
 // Submit new block creation
@@ -10393,8 +10440,9 @@ async function savePdfTemplate() {
 async function pdfUploadLogo(input) {
   var file = input.files && input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { toast('Файл слишком большой (макс. 5 МБ)', 'error'); return; }
-  toast('Загрузка логотипа...');
+  if (file.size > 25 * 1024 * 1024) { toast('Файл слишком большой (макс. 25 МБ)', 'error'); return; }
+  toast('Сжатие и загрузка логотипа...');
+  file = await compressImageFile(file, 1200, 0.85);
   var formData = new FormData();
   formData.append('file', file);
   formData.append('block_id', 'logo');
@@ -10783,7 +10831,8 @@ async function pbUploadPhotos(input, blockId) {
 
   for (var fi = 0; fi < files.length; fi++) {
     var file = files[fi];
-    if (file.size > 5 * 1024 * 1024) { toast('Пропущен: ' + file.name + ' (> 5 МБ)', 'error'); continue; }
+    if (file.size > 25 * 1024 * 1024) { toast('Пропущен: ' + file.name + ' (> 25 МБ)', 'error'); continue; }
+    file = await compressImageFile(file, 2000, 0.82);
     var formData = new FormData();
     formData.append('file', file);
     formData.append('block_id', 'photoblock_' + blockId);
@@ -10808,8 +10857,9 @@ async function pbUploadPhotos(input, blockId) {
 async function pbReplacePhoto(input, blockId, photoIdx) {
   var file = input.files && input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { toast('Файл слишком большой (макс. 5 МБ)', 'error'); return; }
-  toast('Загрузка фото...');
+  if (file.size > 25 * 1024 * 1024) { toast('Файл слишком большой (макс. 25 МБ)', 'error'); return; }
+  toast('Сжатие и загрузка фото...');
+  file = await compressImageFile(file, 2000, 0.82);
   var formData = new FormData();
   formData.append('file', file);
   formData.append('block_id', 'photoblock_' + blockId);
@@ -13869,8 +13919,9 @@ function sbRemovePhoto(blockId, idx) {
 async function sbUploadPhoto(input, blockId, target, idx) {
   var file = input.files && input.files[0];
   if (!file) return;
-  if (file.size > 5 * 1024 * 1024) { toast('Файл слишком большой (макс. 5 МБ)', 'error'); return; }
-  toast('Загрузка фото...');
+  if (file.size > 25 * 1024 * 1024) { toast('Файл слишком большой (макс. 25 МБ)', 'error'); return; }
+  toast('Сжатие и загрузка фото...');
+  file = await compressImageFile(file, 2000, 0.82);
   var formData = new FormData();
   formData.append('file', file);
   formData.append('block_id', String(blockId));
@@ -13928,7 +13979,8 @@ async function sbUploadPhotoBatch(input, blockId) {
   
   for (var fi = 0; fi < files.length; fi++) {
     var file = files[fi];
-    if (file.size > 5 * 1024 * 1024) { toast('Пропущен: ' + file.name + ' (> 5 МБ)', 'error'); continue; }
+    if (file.size > 25 * 1024 * 1024) { toast('Пропущен: ' + file.name + ' (> 25 МБ)', 'error'); continue; }
+    file = await compressImageFile(file, 2000, 0.82);
     var formData = new FormData();
     formData.append('file', file);
     formData.append('block_id', String(blockId));
