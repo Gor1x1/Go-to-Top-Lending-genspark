@@ -11,9 +11,8 @@ type Bindings = { DB: D1Database }
 
 export function register(app: Hono<{ Bindings: Bindings }>) {
 app.get('/', async (c) => {
-  c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-  c.header('Pragma', 'no-cache');
-  c.header('Expires', '0');
+  // Allow CDN caching for 60s, browser for 10s — stale-while-revalidate for instant repeat visits
+  c.header('Cache-Control', 'public, max-age=10, s-maxage=60, stale-while-revalidate=300');
   
   // Detect language early for all SSR needs (nav, OG tags, etc.)
   const reqPath = new URL(c.req.url).pathname;
@@ -240,11 +239,9 @@ app.get('/', async (c) => {
 <html lang="ru">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<meta http-equiv="Pragma" content="no-cache">
-<meta http-equiv="Expires" content="0">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Go to Top — Продвижение на Wildberries | Առաջխաղացում Wildberries-ում</title>
+<link rel="preload" href="/static/img/founder.jpg" as="image" fetchpriority="high">
 <meta name="description" content="Go to Top — продвижение карточек на Wildberries под ключ: выкупы живыми людьми и продающий контент. Собственный склад в Ереване.">
 <meta property="og:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
@@ -1102,7 +1099,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     </div>
   </div>
   <div class="hero-image">
-    <img src="/static/img/founder.jpg" alt="Go to Top">
+    <img src="/static/img/founder.jpg" alt="Go to Top" loading="eager" fetchpriority="high" decoding="async">
     <div class="hero-badge-img">
       <i class="fas fa-shield-alt"></i>
       <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">Надежный метод продвижения</span>
@@ -2945,7 +2942,7 @@ switchLang = function(l) {
 
 (async function loadSiteData() {
   try {
-    var res = await fetch('/api/site-data?_=' + Date.now());
+    var res = await fetch('/api/site-data');
     if (!res.ok) { console.log('[DB] API unavailable'); return; }
     var db = await res.json();
     
@@ -3674,12 +3671,15 @@ switchLang = function(l) {
         var section = document.querySelector('[data-section-id="' + sectionId + '"]');
         if (!section) return;
         
-        // Replace main photo if photo_url is set
+        // Replace main photo if photo_url is set AND different from current
         if (bf.photo_url) {
           var heroImg = section.querySelector('.hero-image img, img[alt]');
           if (heroImg) {
-            heroImg.setAttribute('src', bf.photo_url);
-            console.log('[DB] Photo replaced in', sectionId);
+            var currentSrc = heroImg.getAttribute('src') || '';
+            // Only replace if URL actually changed (avoid re-triggering image load)
+            if (currentSrc !== bf.photo_url && !currentSrc.endsWith(bf.photo_url.split('/').pop())) {
+              heroImg.setAttribute('src', bf.photo_url);
+            }
           }
         }
 

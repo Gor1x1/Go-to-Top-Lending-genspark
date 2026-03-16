@@ -223,9 +223,8 @@ app.get('/api/site-data', async (c) => {
       for (const row of (settingsRes.results || [])) { siteSettings[row.key as string] = row.value as string; }
     } catch {}
 
-    c.header('Cache-Control', 'no-cache, no-store, must-revalidate');
-    c.header('Pragma', 'no-cache');
-    c.header('Expires', '0');
+    // Allow short caching — data changes rarely, CDN + stale-while-revalidate for speed
+    c.header('Cache-Control', 'public, max-age=30, s-maxage=120, stale-while-revalidate=600');
     return c.json({
       content: dbContent,
       textMap, // original_ru -> {ru, am} for changed texts only
