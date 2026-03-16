@@ -1155,13 +1155,14 @@ function switchNewBlockTab(tab) {
 }
 
 // ── Compress image file on client side before upload ──
-// Returns a Promise<File> with the compressed image (JPEG, max dimension, target size < 900KB for D1)
+// Returns a Promise<File> with the compressed image (JPEG, max dimension, target size < 500KB for D1)
 function compressImageFile(file, maxDim, quality) {
   maxDim = maxDim || 2000;
   quality = quality || 0.82;
   return new Promise(function(resolve, reject) {
-    // If file is already small enough (< 900KB), skip compression
-    if (file.size < 900 * 1024) { resolve(file); return; }
+    // If not an image, skip
+    if (!file.type || !file.type.startsWith('image/')) { resolve(file); return; }
+    // Always compress through canvas to ensure D1-safe size
     var img = new Image();
     img.onload = function() {
       var w = img.width, h = img.height;
@@ -1175,13 +1176,14 @@ function compressImageFile(file, maxDim, quality) {
       canvas.height = h;
       var ctx = canvas.getContext('2d');
       ctx.drawImage(img, 0, 0, w, h);
-      // Try JPEG first, then reduce quality if still too big
+      URL.revokeObjectURL(img.src);
+      // Try JPEG, reduce quality until < 500KB (D1 base64 safe limit)
       var tryQuality = quality;
       var attempt = function() {
         canvas.toBlob(function(blob) {
           if (!blob) { resolve(file); return; }
-          // If still > 900KB and quality can be reduced
-          if (blob.size > 900 * 1024 && tryQuality > 0.4) {
+          // If still > 500KB and quality can be reduced
+          if (blob.size > 500 * 1024 && tryQuality > 0.3) {
             tryQuality -= 0.1;
             attempt();
             return;
