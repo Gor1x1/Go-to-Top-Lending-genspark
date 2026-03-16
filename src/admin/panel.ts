@@ -3825,8 +3825,10 @@ function renderLeads() {
       // ===== SECTION 2: PACKAGE & PROMO =====
       h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(245,158,11,0.06),rgba(251,191,36,0.03));border:1px solid rgba(245,158,11,0.2);border-radius:12px">';
       h += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:14px"><div style="width:28px;height:28px;background:linear-gradient(135deg,#F59E0B,#D97706);border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-cube" style="color:#fff;font-size:0.75rem"></i></div><span style="font-size:0.88rem;font-weight:700;color:#FBBF24">\u041F\u0430\u043A\u0435\u0442 \u0438 \u043F\u0440\u043E\u043C\u043E</span></div>';
-      // Package selector (always available)
-      var availPkgs = data.calcPackages || [];
+      // Package selector — only show active packages (+ currently attached package even if deactivated)
+      var allPkgs = data.calcPackages || [];
+      var availPkgs = allPkgs.filter(function(p) { return p.is_active || (pkgId && Number(p.id) === Number(pkgId)); });
+      if (availPkgs.length > 0) {
       h += '<div style="margin-bottom:12px"><label style="font-size:0.72rem;font-weight:600;color:#FBBF24;display:block;margin-bottom:4px"><i class="fas fa-cube" style="margin-right:4px"></i>\u041F\u0440\u0438\u0432\u044F\u0437\u0430\u0442\u044C \u043F\u0430\u043A\u0435\u0442</label>';
       h += '<div style="display:flex;gap:8px;align-items:center">';
       h += '<select class="input" id="lead-pkg-select-' + l.id + '" style="flex:1;font-size:0.85rem;padding:8px;border-color:rgba(245,158,11,0.3)">';
@@ -3834,12 +3836,14 @@ function renderLeads() {
       for (var pki2 = 0; pki2 < availPkgs.length; pki2++) {
         var ap = availPkgs[pki2];
         var apSelected = pkgId && Number(pkgId) === Number(ap.id) ? ' selected' : '';
-        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + Number(ap.package_price || ap.price || 0).toLocaleString('ru-RU') + ' \u058F)</option>';
+        var apInactive = !ap.is_active ? ' (\u041D\u0435\u0430\u043A\u0442\u0438\u0432\u0435\u043D)' : '';
+        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + Number(ap.package_price || ap.price || 0).toLocaleString('ru-RU') + ' \u058F)' + apInactive + '</option>';
       }
       h += '</select>';
       h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(245,158,11,0.15);color:#FBBF24;border:1px solid rgba(245,158,11,0.3)" onclick="attachPackageToLead(' + l.id + ')"><i class="fas fa-link" style="margin-right:4px"></i>\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C</button>';
       if (pkgData) h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)" onclick="detachPackageFromLead(' + l.id + ')"><i class="fas fa-unlink" style="margin-right:4px"></i>\u0423\u0431\u0440\u0430\u0442\u044C</button>';
       h += '</div></div>';
+      } // end if (availPkgs.length > 0)
       if (pkgData || freeSvcs.length > 0 || l.referral_code) {
         // Package card
         if (pkgData) {
