@@ -613,7 +613,9 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
   z-index:100000;
   justify-content:center;align-items:center;
   padding:20px;
-  overflow-y:auto;
+  overflow:hidden;
+  -webkit-overflow-scrolling:none;
+  touch-action:none;
 }
 .popup-overlay.show{
   display:flex !important;
@@ -2398,15 +2400,16 @@ function showPopup() {
   ov.style.setProperty('height', '100vh', 'important');
   ov.style.setProperty('background', 'rgba(0,0,0,0.85)', 'important');
   ov.style.setProperty('z-index', '100000', 'important');
-  ov.style.setProperty('overflow-y', 'auto', 'important');
+  ov.style.setProperty('overflow', 'hidden', 'important');
   ov.style.setProperty('visibility', 'visible', 'important');
   ov.style.setProperty('opacity', '1', 'important');
+  ov.style.setProperty('touch-action', 'none', 'important');
   
   if (isMobile) {
     ov.style.setProperty('justify-content', 'center', 'important');
     ov.style.setProperty('align-items', 'flex-end', 'important');
     ov.style.setProperty('padding', '0', 'important');
-    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:90vh !important;overflow-y:auto !important;padding:28px 16px !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;';
+    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:85vh !important;overflow-y:auto !important;padding:28px 16px !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;-webkit-overflow-scrolling:touch !important;overscroll-behavior:contain !important;';
   } else {
     ov.style.setProperty('justify-content', 'center', 'important');
     ov.style.setProperty('align-items', 'center', 'important');
@@ -2421,7 +2424,24 @@ function showPopup() {
   if (successWrap) successWrap.style.display = 'none';
   
   document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.width = '100%';
+  document.body.style.top = '-' + window.scrollY + 'px';
+  document.body.dataset.popupScrollY = String(window.scrollY);
+  // Prevent touch scroll on overlay (iOS bounce prevention)
+  ov.addEventListener('touchmove', _preventOverlayScroll, { passive: false });
   console.log('[Popup] Shown on ' + (isMobile ? 'mobile' : 'desktop') + ', w=' + window.innerWidth);
+}
+
+// Prevent scroll on popup overlay (but allow scroll inside popup card)
+function _preventOverlayScroll(e) {
+  var card = document.querySelector('.popup-card');
+  if (card && card.contains(e.target)) {
+    // Allow scroll inside card if it has overflow content
+    var isScrollable = card.scrollHeight > card.clientHeight;
+    if (isScrollable) return; // let card scroll
+  }
+  e.preventDefault();
 }
 
 function hidePopup() {
@@ -2429,8 +2449,15 @@ function hidePopup() {
   if (ov) {
     ov.classList.remove('show');
     ov.style.cssText = 'display:none;visibility:hidden;opacity:0;';
+    ov.removeEventListener('touchmove', _preventOverlayScroll);
   }
+  // Restore body scroll position
+  var scrollY = parseInt(document.body.dataset.popupScrollY || '0', 10);
   document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.width = '';
+  document.body.style.top = '';
+  window.scrollTo(0, scrollY);
   console.log('[Popup] Hidden');
 }
 
