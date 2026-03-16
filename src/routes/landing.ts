@@ -3772,7 +3772,7 @@ switchLang = function(l) {
                 }
                 cH += '<div class="rv-slide">' +
                   '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
-                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="eager" data-lightbox-url="' + (p.url||'').replace(/"/g,'&quot;') + '">' +
+                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="eager" data-lightbox-url="' + (p.url||'').replace(/"/g,'&quot;') + '" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.rv-badge\')&&(this.parentNode.querySelector(\'.rv-badge\').style.display=\'none\')">' +
                   '<div class="rv-caption"><div class="rv-caption-text" data-ru="' + captionRu.replace(/"/g,'&quot;') + '" data-am="' + captionAm.replace(/"/g,'&quot;') + '"><i class="fas fa-quote-left" style="font-size:0.7em;margin-right:6px;opacity:0.5;vertical-align:top"></i>' + captionText + '</div></div>' +
                 '</div>';
               });
