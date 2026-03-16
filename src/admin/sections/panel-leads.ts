@@ -402,6 +402,7 @@ function renderLeads() {
         '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
         '<button class="btn btn-primary" style="padding:10px 20px;font-size:0.88rem" onclick="generateLeadKP(' + l.id + ')"><i class="fas fa-file-pdf" style="margin-right:6px"></i>Сгенерировать PDF (КП)</button>' +
         (isCalc ? '<a href="/pdf/' + l.id + '" target="_blank" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть PDF</a>' : '') +
+        (isCalc ? '<button class="btn" style="padding:10px 16px;font-size:0.82rem;background:rgba(239,68,68,0.12);color:#f87171;border:1px solid rgba(239,68,68,0.25)" onclick="resetLeadPdf(' + l.id + ')"><i class="fas fa-undo" style="margin-right:5px"></i>Сбросить PDF</button>' : '') +
         '</div>' +
         '<button class="btn btn-success" style="padding:10px 24px;font-size:0.88rem" onclick="saveLeadAll(' + l.id + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить все изменения</button></div>';
 
@@ -1207,6 +1208,21 @@ async function generateLeadKP(leadId) {
     window.open('/pdf/' + leadId, '_blank');
   } else {
     toast('Ошибка создания КП', 'error');
+  }
+}
+
+// Reset PDF data for a lead (clear calc_data, set source to manual)
+async function resetLeadPdf(leadId) {
+  if (!confirm('Сбросить PDF данные лида #' + leadId + '? Расчёт калькулятора будет удалён.')) return;
+  toast('Сброс PDF...', 'info');
+  var res = await api('/leads/' + leadId, { method: 'PUT', body: JSON.stringify({ calc_data: '{}', source: 'manual' }) });
+  if (res) {
+    var lead = ((data.leads && data.leads.leads) || []).find(function(x) { return x.id === leadId; });
+    if (lead) { lead.calc_data = '{}'; lead.source = 'manual'; }
+    toast('PDF данные сброшены', 'success');
+    await loadData(); render();
+  } else {
+    toast('Ошибка сброса', 'error');
   }
 }
 

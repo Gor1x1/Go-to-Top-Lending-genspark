@@ -247,11 +247,15 @@ app.get('/pdf/:id', async (c) => {
     try { calcData = JSON.parse(lead.calc_data as string); } catch { calcData = { items: [], total: 0 }; }
     const items = calcData.items || [];
     const total = calcData.total || 0;
-    // Compute services subtotal ONLY from items array — never fall back to total
-    // because total may already include package price
+    // Compute services subtotal ONLY from service items (exclude articles with wb_article)
+    // BUG FIX: previously summed ALL items including articles, then artSubtotal was added again → double-counting
     let computedSvcSubtotal = 0;
-    for (const ci of items) { computedSvcSubtotal += Number(ci.subtotal || 0); }
-    // Use computed subtotal from items, or servicesSubtotal from saved data, or plain subtotal
+    for (const ci of items) {
+      if (!ci.wb_article) {
+        computedSvcSubtotal += Number(ci.subtotal || 0);
+      }
+    }
+    // Use computed subtotal from service items only, or servicesSubtotal from saved data, or plain subtotal
     // NEVER fall back to total — total includes package price and would cause double-counting
     const subtotal = computedSvcSubtotal > 0 ? computedSvcSubtotal : (calcData.servicesSubtotal || calcData.subtotal || 0);
     const clientName = (lead.name as string) || '';
