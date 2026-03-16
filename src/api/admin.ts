@@ -31,11 +31,14 @@ api.onError((err, c) => {
 })
 
 // Prevent caching of admin API responses — ensures fresh data on every request
+// Exception: /uploads/ serves static images and should be cached
 api.use('*', async (c, next) => {
   await next();
-  c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
-  c.header('Pragma', 'no-cache');
-  c.header('Expires', '0');
+  if (!c.req.path.includes('/uploads/')) {
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0');
+    c.header('Pragma', 'no-cache');
+    c.header('Expires', '0');
+  }
 })
 
 // ===== AUTH MIDDLEWARE =====
