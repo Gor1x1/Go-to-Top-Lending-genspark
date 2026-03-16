@@ -14,6 +14,15 @@ app.get('/', async (c) => {
   // Allow CDN caching for 60s, browser for 10s — stale-while-revalidate for instant repeat visits
   c.header('Cache-Control', 'public, max-age=10, s-maxage=60, stale-while-revalidate=300');
   
+  // Start site-data fetch in parallel with SSR (will be awaited at the end)
+  const siteDataPromise = (async () => {
+    try {
+      const req = new Request(new URL('/api/site-data', c.req.url).toString());
+      const resp = await app.fetch(req, c.env);
+      return resp.ok ? await resp.text() : null;
+    } catch { return null; }
+  })();
+  
   // Detect language early for all SSR needs (nav, OG tags, etc.)
   const reqPath = new URL(c.req.url).pathname;
   const pathLang = reqPath === '/am' ? 'am' : (reqPath === '/ru' ? 'ru' : '');
@@ -2942,9 +2951,13 @@ switchLang = function(l) {
 
 (async function loadSiteData() {
   try {
-    var res = await fetch('/api/site-data');
-    if (!res.ok) { console.log('[DB] API unavailable'); return; }
-    var db = await res.json();
+    // Use SSR-inlined data if available (no extra fetch needed!)
+    var db = window.__SITE_DATA || null;
+    if (!db) {
+      var res = await fetch('/api/site-data');
+      if (!res.ok) { console.log('[DB] API unavailable'); return; }
+      db = await res.json();
+    }
     
     var hasContent = db.textMap && Object.keys(db.textMap).length > 0;
     var hasCalc = db.tabs && db.tabs.length && db.services && db.services.length;
@@ -6364,6 +6377,12 @@ async function checkRefCode() {
       "let lang = localStorage.getItem('gtt_lang') || 'am';",
       "let lang = 'am'; localStorage.setItem('gtt_lang','am');"
     );
+  }
+
+  // === Inline site-data (started in parallel at the beginning) ===
+  const siteDataJson = await siteDataPromise;
+  if (siteDataJson) {
+    pageHtml = pageHtml.replace('</head>', '<script>window.__SITE_DATA=' + siteDataJson + '</script>\n</head>');
   }
 
   return c.html(pageHtml);

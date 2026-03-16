@@ -27,27 +27,43 @@ app.get('/api/site-data', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     
-    // Load all content sections from DB
-    const contentRes = await db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all();
+    // === PARALLEL: Run all DB queries at once for speed ===
+    const [
+      contentRes, tabsRes, svcsRes, pkgsRes, pkgItemsRes,
+      tgRes, scriptsRes, sectionOrderRes, slotCountersRes,
+      photoBlocksRes, tickerBlock, footerBlock, blocksRes, settingsRes
+    ] = await Promise.all([
+      db.prepare('SELECT section_key, content_json FROM site_content ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM calculator_tabs WHERE is_active = 1 ORDER BY sort_order').all(),
+      db.prepare('SELECT cs.*, ct.tab_key FROM calculator_services cs JOIN calculator_tabs ct ON cs.tab_id = ct.id WHERE cs.is_active = 1 ORDER BY cs.tab_id, cs.sort_order').all(),
+      db.prepare('SELECT * FROM calculator_packages WHERE is_active = 1 ORDER BY sort_order, id').all().catch(() => ({ results: [] })),
+      db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am, cs.price as service_price, cs.price_type, cs.price_tiers_json FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all().catch(() => ({ results: [] })),
+      db.prepare('SELECT * FROM telegram_messages WHERE is_active = 1 ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM custom_scripts WHERE is_active = 1 ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM section_order ORDER BY sort_order').all(),
+      db.prepare('SELECT * FROM slot_counter WHERE show_timer = 1 ORDER BY id').all(),
+      db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all(),
+      db.prepare("SELECT texts_ru, texts_am, images FROM site_blocks WHERE block_key = 'ticker' LIMIT 1").first().catch(() => null),
+      db.prepare("SELECT social_links FROM site_blocks WHERE block_key = 'footer' LIMIT 1").first().catch(() => null),
+      db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all().catch(() => ({ results: [] })),
+      db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%'").all().catch(() => ({ results: [] })),
+    ]);
+    
+    // Parse content
     const dbContent: Record<string, any[]> = {};
     for (const row of contentRes.results) {
       try { dbContent[row.section_key as string] = JSON.parse(row.content_json as string); } catch { dbContent[row.section_key as string] = []; }
     }
     
-    // Build text_map: original_ru -> {ru, am} using smart content-aware matching
-    // The HTML has data-ru="original text" hardcoded from seed. We need to find which DB items
-    // correspond to which seed items, even when DB has fewer items (missing CTA buttons etc.)
+    // Build text_map: original_ru -> {ru, am}
     const textMap: Record<string, {ru: string, am: string}> = {};
     for (const seedSection of SEED_CONTENT_SECTIONS) {
       const dbItems = dbContent[seedSection.key] || [];
       if (!dbItems.length) continue;
-      
       const seedLen = seedSection.items.length;
       const dbLen = dbItems.length;
       const seedMatched = new Array(seedLen).fill(-1);
       const dbMatched = new Array(dbLen).fill(-1);
-      
-      // First pass: exact text matches (prefer same position, then nearby)
       for (let si = 0; si < seedLen; si++) {
         const seedRu = seedSection.items[si].ru;
         if (si < dbLen && dbMatched[si] === -1 && dbItems[si].ru === seedRu) {
@@ -62,19 +78,14 @@ app.get('/api/site-data', async (c) => {
           if (seedMatched[si] !== -1) break;
         }
       }
-      
-      // Second pass: match remaining unmatched items sequentially
       let nextUnmatchedDb = 0;
       for (let si = 0; si < seedLen; si++) {
         if (seedMatched[si] !== -1) continue;
         while (nextUnmatchedDb < dbLen && dbMatched[nextUnmatchedDb] !== -1) nextUnmatchedDb++;
         if (nextUnmatchedDb < dbLen) {
-          seedMatched[si] = nextUnmatchedDb;
-          dbMatched[nextUnmatchedDb] = si;
-          nextUnmatchedDb++;
+          seedMatched[si] = nextUnmatchedDb; dbMatched[nextUnmatchedDb] = si; nextUnmatchedDb++;
         }
       }
-      
       for (let si = 0; si < seedLen; si++) {
         const di = seedMatched[si];
         if (di === -1) continue;
@@ -86,35 +97,16 @@ app.get('/api/site-data', async (c) => {
       }
     }
     
-    // Load calculator tabs
-    const tabsRes = await db.prepare('SELECT * FROM calculator_tabs WHERE is_active = 1 ORDER BY sort_order').all();
+    // Packages with items
+    const itemsByPkg: Record<number, any[]> = {};
+    for (const it of (pkgItemsRes.results || [])) { const pid = it.package_id as number; if (!itemsByPkg[pid]) itemsByPkg[pid] = []; itemsByPkg[pid].push(it); }
+    const packagesData = (pkgsRes.results || []).map((p: any) => ({ ...p, items: itemsByPkg[p.id] || [] }));
     
-    // Load calculator services with tiers
-    const svcsRes = await db.prepare(`
-      SELECT cs.*, ct.tab_key 
-      FROM calculator_services cs 
-      JOIN calculator_tabs ct ON cs.tab_id = ct.id 
-      WHERE cs.is_active = 1 
-      ORDER BY cs.tab_id, cs.sort_order
-    `).all();
-    
-    // Load calculator packages with items
-    let packagesData: any[] = [];
-    try {
-      const pkgsRes = await db.prepare('SELECT * FROM calculator_packages WHERE is_active = 1 ORDER BY sort_order, id').all();
-      const pkgItemsRes = await db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am, cs.price as service_price, cs.price_type, cs.price_tiers_json FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all();
-      const itemsByPkg: Record<number, any[]> = {};
-      for (const it of pkgItemsRes.results) { const pid = it.package_id as number; if (!itemsByPkg[pid]) itemsByPkg[pid] = []; itemsByPkg[pid].push(it); }
-      packagesData = (pkgsRes.results || []).map((p: any) => ({ ...p, items: itemsByPkg[p.id] || [] }));
-    } catch {}
-    
-    // Load telegram messages
-    const tgRes = await db.prepare('SELECT * FROM telegram_messages WHERE is_active = 1 ORDER BY sort_order').all();
+    // Telegram messages
     const telegram: Record<string, any> = {};
     for (const row of tgRes.results) { telegram[row.button_key as string] = row; }
     
-    // Load custom scripts
-    const scriptsRes = await db.prepare('SELECT * FROM custom_scripts WHERE is_active = 1 ORDER BY sort_order').all();
+    // Scripts
     const scripts = { head: [] as string[], body_start: [] as string[], body_end: [] as string[] };
     for (const row of scriptsRes.results) {
       const p = row.placement as string;
@@ -124,104 +116,58 @@ app.get('/api/site-data', async (c) => {
       else if (p === 'body_end') scripts.body_end.push(code);
     }
     
-    // Load section order
-    const sectionOrderRes = await db.prepare('SELECT * FROM section_order ORDER BY sort_order').all();
-    
-    // Load slot counters (for frontend rendering)
-    const slotCountersRes = await db.prepare('SELECT * FROM slot_counter WHERE show_timer = 1 ORDER BY id').all();
-    
-    // Load photo blocks (for frontend rendering)
-    const photoBlocksRes = await db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all();
-    
-    // Load ticker items from site_blocks (editable in admin)
+    // Ticker
     let tickerItems: any[] = [];
-    try {
-      const tickerBlock = await db.prepare("SELECT texts_ru, texts_am, images FROM site_blocks WHERE block_key = 'ticker' LIMIT 1").first();
-      if (tickerBlock) {
+    if (tickerBlock) {
+      try {
         const tRu = JSON.parse(tickerBlock.texts_ru as string || '[]');
         const tAm = JSON.parse(tickerBlock.texts_am as string || '[]');
         const tIcons = JSON.parse(tickerBlock.images as string || '[]');
         for (let i = 0; i < Math.max(tRu.length, tAm.length); i++) {
           tickerItems.push({ icon: tIcons[i] || 'fa-check-circle', ru: tRu[i] || '', am: tAm[i] || '' });
         }
-      }
-    } catch(te) { /* ticker not yet imported */ }
+      } catch {}
+    }
 
-    // Load footer social links from site_blocks
+    // Footer socials
     let footerSocials: any[] = [];
-    try {
-      const footerBlock = await db.prepare("SELECT social_links FROM site_blocks WHERE block_key = 'footer' LIMIT 1").first();
-      if (footerBlock && footerBlock.social_links) {
-        footerSocials = JSON.parse(footerBlock.social_links as string || '[]');
-      }
-    } catch(fe) { /* footer not yet imported */ }
+    if (footerBlock && footerBlock.social_links) {
+      try { footerSocials = JSON.parse(footerBlock.social_links as string || '[]'); } catch {}
+    }
 
-    // Load all site_blocks for per-block features (social links, photos, slots, custom_html)
-    let siteBlockFeatures: any[] = [];
-    try {
-      // Ensure text_styles column exists (safe ALTER — no-op if already present)
-      try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN text_styles TEXT DEFAULT '[]'").run(); } catch {}
-      try { await db.prepare("ALTER TABLE site_blocks ADD COLUMN photo_url TEXT DEFAULT ''").run(); } catch {}
-      const blocksRes = await db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all();
-      for (const blk of (blocksRes.results || [])) {
-        let socials: any[] = [];
-        try { 
-          let parsed = JSON.parse(blk.social_links as string || '[]'); 
-          // Handle double-encoded JSON strings
-          if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch { parsed = []; } }
-          socials = Array.isArray(parsed) ? parsed : [];
-        } catch { socials = []; }
-        let blockOpts: any = {};
-        try { blockOpts = JSON.parse(blk.custom_html as string || '{}'); } catch { blockOpts = {}; }
-        let blockPhotos: any[] = [];
-        try { blockPhotos = Array.isArray(blockOpts.photos) ? blockOpts.photos : []; } catch { blockPhotos = []; }
-        let blockBtns: any[] = [];
-        try { blockBtns = JSON.parse(blk.buttons as string || '[]'); } catch { blockBtns = []; }
-        // Parse texts for slot_counter blocks (needed for labels)
-        let textsRu: string[] = [];
-        let textsAm: string[] = [];
-        try { textsRu = JSON.parse(blk.texts_ru as string || '[]'); } catch { textsRu = []; }
-        try { textsAm = JSON.parse(blk.texts_am as string || '[]'); } catch { textsAm = []; }
-        siteBlockFeatures.push({
-            key: blk.block_key,
-            social_links: socials,
-            social_settings: blockOpts.social_settings || {},
-            photos: blockPhotos,
-            photo_url: (blk as any).photo_url || blockOpts.photo_url || '',
-            show_socials: socials.length > 0 || blockOpts.show_socials || false,
-            show_photos: blockPhotos.length > 0 || blockOpts.show_photos || false,
-            show_slots: blockOpts.show_slots || false,
-            block_type: blk.block_type || 'section',
-            buttons: blockBtns,
-            // Slot counter data (from custom_html)
-            total_slots: blockOpts.total_slots || 0,
-            booked_slots: blockOpts.booked_slots || 0,
-            // Text labels for slot counters and other blocks
-            texts_ru: textsRu,
-            texts_am: textsAm,
-            text_styles: (() => { try { return JSON.parse((blk as any).text_styles as string || '[]'); } catch { return []; } })(),
-            // Nav links mapping (for nav block)
-            nav_links: blockOpts.nav_links || [],
-            // Element order within section (for frontend reordering)
-            element_order: blockOpts.element_order || [],
-            // Photo display settings
-            photo_settings: blockOpts.photo_settings || {},
-            // Swipe hint text (reviews blocks)
-            swipe_hint_ru: blockOpts.swipe_hint_ru || '',
-            swipe_hint_am: blockOpts.swipe_hint_am || '',
-            // Contact cards (for contact block messenger links)
-            options: { contact_cards: blockOpts.contact_cards || null },
-          });
-      }
-    } catch(bf) { /* blocks not yet imported */ }
+    // Block features
+    const siteBlockFeatures: any[] = [];
+    for (const blk of (blocksRes.results || [])) {
+      let socials: any[] = [];
+      try { let parsed = JSON.parse(blk.social_links as string || '[]'); if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch { parsed = []; } } socials = Array.isArray(parsed) ? parsed : []; } catch {}
+      let blockOpts: any = {};
+      try { blockOpts = JSON.parse(blk.custom_html as string || '{}'); } catch {}
+      let blockPhotos: any[] = [];
+      try { blockPhotos = Array.isArray(blockOpts.photos) ? blockOpts.photos : []; } catch {}
+      let blockBtns: any[] = [];
+      try { blockBtns = JSON.parse(blk.buttons as string || '[]'); } catch {}
+      let textsRu: string[] = []; let textsAm: string[] = [];
+      try { textsRu = JSON.parse(blk.texts_ru as string || '[]'); } catch {}
+      try { textsAm = JSON.parse(blk.texts_am as string || '[]'); } catch {}
+      siteBlockFeatures.push({
+        key: blk.block_key, social_links: socials, social_settings: blockOpts.social_settings || {},
+        photos: blockPhotos, photo_url: (blk as any).photo_url || blockOpts.photo_url || '',
+        show_socials: socials.length > 0 || blockOpts.show_socials || false,
+        show_photos: blockPhotos.length > 0 || blockOpts.show_photos || false,
+        show_slots: blockOpts.show_slots || false, block_type: blk.block_type || 'section',
+        buttons: blockBtns, total_slots: blockOpts.total_slots || 0, booked_slots: blockOpts.booked_slots || 0,
+        texts_ru: textsRu, texts_am: textsAm,
+        text_styles: (() => { try { return JSON.parse((blk as any).text_styles as string || '[]'); } catch { return []; } })(),
+        nav_links: blockOpts.nav_links || [], element_order: blockOpts.element_order || [],
+        photo_settings: blockOpts.photo_settings || {},
+        swipe_hint_ru: blockOpts.swipe_hint_ru || '', swipe_hint_am: blockOpts.swipe_hint_am || '',
+        options: { contact_cards: blockOpts.contact_cards || null },
+      });
+    }
 
-    // Set Cache-Control to no-cache so edits appear instantly
-    // Load site settings (package titles, etc.)
+    // Settings
     let siteSettings: Record<string, string> = {};
-    try {
-      const settingsRes = await db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%'").all();
-      for (const row of (settingsRes.results || [])) { siteSettings[row.key as string] = row.value as string; }
-    } catch {}
+    for (const row of (settingsRes.results || [])) { siteSettings[row.key as string] = row.value as string; }
 
     // Allow short caching — data changes rarely, CDN + stale-while-revalidate for speed
     c.header('Cache-Control', 'public, max-age=30, s-maxage=120, stale-while-revalidate=600');
