@@ -4827,6 +4827,12 @@ switchLang = function(l) {
       });
       var _footer = document.querySelector('footer.footer');
       if (_footer) { _footer.style.opacity = '1'; }
+      // Re-observe counters after sections are revealed (IntersectionObserver may have missed them)
+      setTimeout(function() {
+        document.querySelectorAll('.stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
+        document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
+        document.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
+      }, 100);
     } else {
       // Reveal sections one by one with a cascade delay
       var revealDelay = 0;
