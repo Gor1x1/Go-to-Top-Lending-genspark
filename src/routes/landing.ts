@@ -2583,6 +2583,15 @@ var sObs = new IntersectionObserver(function(entries) {
 }, {threshold:0.5});
 document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
 
+// Re-observe counters on server-injected pages (sections already revealed above)
+if (document.documentElement.classList.contains('server-injected')) {
+  setTimeout(function() {
+    document.querySelectorAll('.stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
+    document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
+    document.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
+  }, 100);
+}
+
 /* ===== SMOOTH SCROLL ===== */
 document.querySelectorAll('a[href^="#"]').forEach(function(a) {
   a.addEventListener('click', function(e) {
@@ -2948,6 +2957,20 @@ switchLang = function(l) {
   // Re-apply Telegram links with correct language message templates
   updateTelegramLinks();
 };
+
+// ===== IMMEDIATE SECTION REVEAL (before loadSiteData) =====
+// On server-injected pages, reveal all sections IMMEDIATELY — don't wait for data loading
+(function immediateReveal() {
+  var isServerInjected = document.documentElement.classList.contains('server-injected');
+  if (isServerInjected) {
+    document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(sec) {
+      sec.classList.add('section-revealed');
+      sec.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { el.classList.add('visible'); });
+    });
+    var ft = document.querySelector('footer.footer');
+    if (ft) ft.style.opacity = '1';
+  }
+})();
 
 (async function loadSiteData() {
   try {
@@ -3772,7 +3795,7 @@ switchLang = function(l) {
                 }
                 cH += '<div class="rv-slide">' +
                   '<div class="rv-badge">' + (pi + 1) + ' / ' + validPhotos.length + '</div>' +
-                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="eager" data-lightbox-url="' + (p.url||'').replace(/"/g,'&quot;') + '" onerror="this.style.display=\'none\';this.parentNode.querySelector(\'.rv-badge\')&&(this.parentNode.querySelector(\'.rv-badge\').style.display=\'none\')">' +
+                  '<img src="' + p.url + '" alt="' + captionText.replace(/"/g,'&quot;') + '" loading="eager" data-lightbox-url="' + (p.url||'').replace(/"/g,'&quot;') + '">' +
                   '<div class="rv-caption"><div class="rv-caption-text" data-ru="' + captionRu.replace(/"/g,'&quot;') + '" data-am="' + captionAm.replace(/"/g,'&quot;') + '"><i class="fas fa-quote-left" style="font-size:0.7em;margin-right:6px;opacity:0.5;vertical-align:top"></i>' + captionText + '</div></div>' +
                 '</div>';
               });
