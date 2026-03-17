@@ -255,21 +255,21 @@ app.get('/', async (c) => {
 <meta property="og:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="https://gototop.win">
-<meta property="og:image" content="https://gototop.win/static/img/og-image-dark.png">
+<meta property="og:url" content="https://gototopwb.ru">
+<meta property="og:image" content="https://gototopwb.ru/static/img/og-image-dark.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Go to Top - логотип">
 <meta property="og:site_name" content="Go to Top">
 <meta property="og:locale" content="ru_RU">
 <meta property="og:locale:alternate" content="hy_AM">
-<link rel="alternate" hreflang="ru" href="https://gototop.win">
-<link rel="alternate" hreflang="hy" href="https://gototop.win">
-<link rel="alternate" hreflang="x-default" href="https://gototop.win">
+<link rel="alternate" hreflang="ru" href="https://gototopwb.ru">
+<link rel="alternate" hreflang="hy" href="https://gototopwb.ru">
+<link rel="alternate" hreflang="x-default" href="https://gototopwb.ru">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
-<meta name="twitter:image" content="https://gototop.win/static/img/og-image-dark.png">
+<meta name="twitter:image" content="https://gototopwb.ru/static/img/og-image-dark.png">
 <link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css"></noscript>
@@ -6390,7 +6390,7 @@ async function checkRefCode() {
       // Update og:url to include /am path
       pageHtml = pageHtml.replace(
         /<meta property="og:url" content="[^"]*">/,
-        `<meta property="og:url" content="https://gototop.win/am">`
+        `<meta property="og:url" content="https://gototopwb.ru/am">`
       );
       // Set html lang
       pageHtml = pageHtml.replace('<html lang="ru"', '<html lang="hy"');

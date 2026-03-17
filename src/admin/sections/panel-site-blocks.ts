@@ -264,7 +264,7 @@ function renderSiteBlocks() {
           h += '<div style="font-size:0.72rem;color:#10B981;font-weight:600;margin-bottom:6px;text-transform:uppercase;letter-spacing:0.5px"><i class="fas fa-image" style="margin-right:4px"></i>Картинка (og:image) <span style="font-weight:400;color:#475569;font-size:0.65rem">рекомендуемый размер: 1200×630px</span></div>';
           h += '<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">';
           if (seoImage) h += '<img src="' + escHtml(seoImage) + '" style="width:120px;height:63px;object-fit:cover;border-radius:6px;border:1px solid #334155" onerror="this.style.display=&apos;none&apos;">';
-          h += '<input class="input" id="sb_mainphoto_' + b.id + '" value="' + escHtml(seoImage) + '" placeholder="https://gototop.win/static/img/og-image-dark.png" style="flex:1;font-size:0.82rem;color:#6ee7b7;min-width:200px" onchange="sbAutoSave(' + b.id + ')">';
+          h += '<input class="input" id="sb_mainphoto_' + b.id + '" value="' + escHtml(seoImage) + '" placeholder="https://gototopwb.ru/static/img/og-image-dark.png" style="flex:1;font-size:0.82rem;color:#6ee7b7;min-width:200px" onchange="sbAutoSave(' + b.id + ')">';
           h += '<label class="btn btn-primary" style="padding:6px 14px;font-size:0.72rem;cursor:pointer;white-space:nowrap;background:#10B981;border-color:#10B981"><i class="fas fa-upload" style="margin-right:4px"></i>Загрузить<input type="file" accept="image/*" style="display:none" onchange="sbUploadPhoto(this,' + b.id + ',&apos;main&apos;)"></label>';
           h += '</div></div>';
           

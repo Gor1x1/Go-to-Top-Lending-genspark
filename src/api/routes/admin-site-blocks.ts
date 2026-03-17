@@ -267,10 +267,10 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     let socialLinks: any[] = [];
     if (key === 'footer') {
       socialLinks = [
-        { type: 'instagram', url: 'https://instagram.com/gototop.win' },
-        { type: 'facebook', url: 'https://facebook.com/gototop.win' },
+        { type: 'instagram', url: 'https://instagram.com/gototopwb.ru' },
+        { type: 'facebook', url: 'https://facebook.com/gototopwb.ru' },
         { type: 'telegram', url: 'https://t.me/goo_to_top' },
-        { type: 'tiktok', url: 'https://tiktok.com/@gototop.win' }
+        { type: 'tiktok', url: 'https://tiktok.com/@gototopwb.ru' }
       ];
     }
     
