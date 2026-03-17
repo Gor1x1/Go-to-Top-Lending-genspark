@@ -6,6 +6,17 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
+
+  // ===== SMART PLACEMENT =====
+  // Run the Worker near the D1 database instead of the user's edge PoP.
+  // D1 round-trips drop from ~150-300ms (cross-ocean) to ~1-5ms (same DC).
+  // Combined with Cache API in index.tsx, most requests are still served
+  // from the edge closest to the user (~50ms), while cache-MISS requests
+  // benefit from fast DB access near Frankfurt/Europe.
+  "placement": {
+    "mode": "smart"
+  },
+
   "d1_databases": [
     {
       "binding": "DB",

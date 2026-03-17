@@ -39,6 +39,18 @@ api.use('*', async (c, next) => {
     c.header('Pragma', 'no-cache');
     c.header('Expires', '0');
   }
+  // Auto-purge edge cache after any successful admin write operation
+  // so that landing page reflects changes within seconds
+  if (['POST','PUT','PATCH','DELETE'].includes(c.req.method) && c.res.status < 400) {
+    try {
+      const cache = caches.default;
+      const origin = new URL(c.req.url).origin;
+      const paths = ['/', '/am', '/ru', '/?lang=am', '/?lang=ru'];
+      c.executionCtx.waitUntil(
+        Promise.all(paths.map(p => cache.delete(new Request(origin + p)).catch(() => false)))
+      );
+    } catch { /* cache purge is best-effort */ }
+  }
 })
 
 // ===== AUTH MIDDLEWARE =====
