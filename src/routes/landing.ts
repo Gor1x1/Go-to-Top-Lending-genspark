@@ -6339,7 +6339,25 @@ async function checkRefCode() {
     let seoTextsAm: string[] = [];
     try { seoTextsRu = JSON.parse(seoBlock.texts_ru || '[]'); } catch { seoTextsRu = []; }
     try { seoTextsAm = JSON.parse(seoBlock.texts_am || '[]'); } catch { seoTextsAm = []; }
-    const seoImage = (seoBlock.photo_url || '').trim();
+    let seoImage = (seoBlock.photo_url || '').trim();
+    // Validate internal upload URLs — if the upload doesn't exist in DB,
+    // fall back to the default static OG image so Telegram/WhatsApp always show a logo.
+    if (seoImage) {
+      const uploadMatch = seoImage.match(/\/api\/admin\/uploads\/(\d+)/);
+      if (uploadMatch) {
+        try {
+          const uploadId = uploadMatch[1];
+          const uploadRow = await c.env.DB.prepare('SELECT id FROM uploads WHERE id = ?').bind(uploadId).first();
+          if (!uploadRow) {
+            // Upload missing (DB reset / migration) — use default static image
+            seoImage = '/static/img/og-image-dark.png';
+          }
+        } catch {
+          // DB error — fall back to static image
+          seoImage = '/static/img/og-image-dark.png';
+        }
+      }
+    }
     // Make image URL absolute (Telegram needs full URL)
     const baseUrl = new URL(c.req.url).origin;
     const seoImageAbsolute = seoImage.startsWith('http') ? seoImage : (seoImage ? baseUrl + (seoImage.startsWith('/') ? '' : '/') + seoImage : '');
