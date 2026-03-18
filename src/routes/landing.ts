@@ -241,7 +241,8 @@ app.get('/', async (c) => {
         texts_ru: textsRu,
         texts_am: textsAm,
         nav_links: opts.nav_links || [],
-        contact_cards: opts.contact_cards || []
+        contact_cards: opts.contact_cards || [],
+        buttons: buttonMap[blk.block_key as string] || []
       });
     }
     (globalThis as any).__blockFeatures = bfArr;
@@ -1074,14 +1075,14 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
     <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
     <li><a href="#contact" data-ru="Контакты" data-am="Կոնտակտներ">Контакты</a></li>
-    <li class="nav-mobile-cta"><a href="https://wa.me/37441888389" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">Написать нам</span></a></li>
+    <li class="nav-mobile-cta"><a href="https://wa.me/37455226224" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">Написать нам</span></a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
       <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#fff"/><rect y="8" width="36" height="8" fill="#0039A6"/><rect y="16" width="36" height="8" fill="#D52B1E"/></svg></span><span class="lang-text">RU</span></button>
       <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#D90012"/><rect y="8" width="36" height="8" fill="#0033A0"/><rect y="16" width="36" height="8" fill="#F2A800"/></svg></span><span class="lang-text">AM</span></button>
     </div>
-    <a href="https://wa.me/37441888389" target="_blank" class="nav-cta">
+    <a href="https://wa.me/37455226224" target="_blank" class="nav-cta">
       <i class="fab fa-whatsapp"></i>
       <span data-ru="Написать нам" data-am="Գրել հիմա">Написать нам</span>
     </a>
@@ -1564,9 +1565,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
     </div>
     <div class="calc-cta" style="display:none">
-      <a href="https://t.me/goo_to_top" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
-        <i class="fab fa-telegram"></i>
-        <span data-ru="Заказать в Telegram" data-am="Պատվիրել հիմա">Заказать сейчас</span>
+      <a href="https://wa.me/37455226224" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
+        <i class="fab fa-whatsapp"></i>
+        <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">Заказать сейчас</span>
       </a>
     </div>
   </div>
@@ -1848,7 +1849,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </footer>
 
 <!-- FLOATING TG BUTTON -->
-<a href="https://wa.me/37441888389" target="_blank" class="tg-float">
+<a href="https://wa.me/37455226224" target="_blank" class="tg-float">
   <i class="fab fa-whatsapp"></i>
   <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">Написать нам</span>
 </a>
@@ -2950,16 +2951,21 @@ function updateTelegramLinks() {
   if (window._blockFeaturesBtns) {
     for (var bfKey in window._blockFeaturesBtns) {
       var bfBtns = window._blockFeaturesBtns[bfKey];
+      // Collect telegram entries for this section in order
+      var secEntries = [];
+      for (var tk2 in window._tgData) {
+        if (tk2.indexOf(bfKey + '_') === 0) {
+          secEntries.push(window._tgData[tk2]);
+        }
+      }
       for (var bi = 0; bi < bfBtns.length; bi++) {
         var bfBtn = bfBtns[bi];
         if (bfBtn.text_ru && !tgByLabel[bfBtn.text_ru.trim()]) {
-          // Find matching telegram message for this section
-          for (var tk2 in window._tgData) {
-            if (tk2.indexOf(bfKey + '_') === 0) {
-              tgByLabel[bfBtn.text_ru.trim()] = window._tgData[tk2];
-              if (bfBtn.text_am) tgByLabel[bfBtn.text_am.trim()] = window._tgData[tk2];
-              break;
-            }
+          // Match by position within section
+          var tmMatch = secEntries[bi] || secEntries[0];
+          if (tmMatch) {
+            tgByLabel[bfBtn.text_ru.trim()] = tmMatch;
+            if (bfBtn.text_am) tgByLabel[bfBtn.text_am.trim()] = tmMatch;
           }
         }
       }
@@ -3387,22 +3393,26 @@ switchLang = function(l) {
       // the tgByLabel map only has OLD labels (from telegram_messages table).
       // We need to also map NEW button labels to their telegram message data,
       // so that updateTelegramLinks() can find them after language switch.
-      if (hasBlockFeatures && serverInjected) {
+      if (hasBlockFeatures) {
         db.blockFeatures.forEach(function(bfTg) {
           if (!bfTg.buttons || bfTg.buttons.length === 0) return;
           var sKey = bfTg.key;
+          // Collect telegram entries for this section, sorted by key (preserves original button order)
+          var sectionTgEntries = [];
+          for (var tk in db.telegram) {
+            if (tk.indexOf(sKey + '_') === 0) {
+              sectionTgEntries.push(db.telegram[tk]);
+            }
+          }
           bfTg.buttons.forEach(function(btn, idx) {
             if (!btn.text_ru) return;
             var newLabel = btn.text_ru.trim();
             if (tgByLabel[newLabel]) return;
-            for (var tk in db.telegram) {
-              if (tk.indexOf(sKey + '_') === 0) {
-                var tm = db.telegram[tk];
-                if (tm && !tgByLabel[newLabel]) {
-                  tgByLabel[newLabel] = tm;
-                  break;
-                }
-              }
+            // Match by position: button[idx] maps to sectionTgEntries[idx]
+            var tm = sectionTgEntries[idx] || sectionTgEntries[0];
+            if (tm) {
+              tgByLabel[newLabel] = tm;
+              if (btn.text_am) tgByLabel[btn.text_am.trim()] = tm;
             }
           });
         });
@@ -5617,7 +5627,8 @@ async function checkRefCode() {
   // Replace hardcoded Telegram contact card URLs with admin-configured URLs (WhatsApp etc.)
   // This prevents users from clicking Telegram links before client-side JS loads
   {
-    const contactBf = blockFeatures.find((b: any) => b.key === 'contact');
+    const ssrBlockFeatures: any[] = (globalThis as any).__blockFeatures || [];
+    const contactBf = ssrBlockFeatures.find((b: any) => b.key === 'contact');
     const contactCards: any[] = contactBf?.contact_cards || [];
     if (contactCards.length > 0) {
       // Replace first contact card (Администратор)
@@ -5647,6 +5658,59 @@ async function checkRefCode() {
     }
   }
   
+  // ===== SERVER-SIDE FLOATING BUTTON REPLACEMENT =====
+  // Replace hardcoded floating button URL with admin-configured one
+  if (buttonMap['floating_tg'] && buttonMap['floating_tg'].length > 0) {
+    const floatDbBtn = buttonMap['floating_tg'][0];
+    if (floatDbBtn.url) {
+      const floatIsWa = floatDbBtn.url.includes('wa.me') || floatDbBtn.url.includes('whatsapp');
+      const floatIcon = (floatDbBtn.icon && floatDbBtn.icon !== 'auto') ? floatDbBtn.icon : (floatIsWa ? 'fab fa-whatsapp' : 'fab fa-telegram');
+      const floatTextRu = floatDbBtn.text_ru || 'Написать нам';
+      const floatTextAm = floatDbBtn.text_am || '\u0533\u0580\u0565\u056c \u0570\u056b\u0574\u0561';
+      const floatText = isArmenian ? floatTextAm : floatTextRu;
+      pageHtml = pageHtml.replace(
+        /<a href="https:\/\/wa\.me\/37455226224" target="_blank" class="tg-float">\s*<i class="fab fa-whatsapp"><\/i>\s*<span[^>]*>[^<]*<\/span>/,
+        `<a href="${floatDbBtn.url}" target="_blank" class="tg-float">\n  <i class="${floatIcon}"></i>\n  <span data-ru="${floatTextRu.replace(/"/g,'&quot;')}" data-am="${floatTextAm.replace(/"/g,'&quot;')}" data-no-rewrite="1">${floatText}</span>`
+      );
+    }
+  }
+
+  // ===== SERVER-SIDE NAV CTA REPLACEMENT =====
+  // Replace desktop nav CTA URL with admin floating_tg button URL  
+  if (buttonMap['floating_tg'] && buttonMap['floating_tg'].length > 0) {
+    const navDbBtn = buttonMap['floating_tg'][0];
+    if (navDbBtn.url) {
+      const navIsWa = navDbBtn.url.includes('wa.me') || navDbBtn.url.includes('whatsapp');
+      const navIcon = navIsWa ? 'fab fa-whatsapp' : 'fab fa-telegram';
+      const navTextRu = navDbBtn.text_ru || '\u041d\u0430\u043f\u0438\u0441\u0430\u0442\u044c \u043d\u0430\u043c';
+      const navTextAm = navDbBtn.text_am || '\u0533\u0580\u0565\u056c \u0570\u056b\u0574\u0561';
+      const navText = isArmenian ? navTextAm : navTextRu;
+      pageHtml = pageHtml.replace(
+        /<a href="https:\/\/wa\.me\/37455226224" target="_blank" class="nav-cta">\s*<i class="fab fa-whatsapp"><\/i>\s*<span[^>]*>[^<]*<\/span>\s*<\/a>/,
+        `<a href="${navDbBtn.url}" target="_blank" class="nav-cta">\n      <i class="${navIcon}"></i>\n      <span data-ru="${navTextRu.replace(/"/g,'&quot;')}" data-am="${navTextAm.replace(/"/g,'&quot;')}">${navText}</span>\n    </a>`
+      );
+    }
+  }
+  // Replace calc button URL if calculator has buttons, or use floating_tg URL as fallback
+  {
+    const calcBtns = buttonMap['calculator'];
+    const floatBtns = buttonMap['floating_tg'];
+    let calcUrl = '';
+    if (calcBtns && calcBtns.length > 0 && calcBtns[0].url) {
+      calcUrl = calcBtns[0].url;
+    } else if (floatBtns && floatBtns.length > 0 && floatBtns[0].url) {
+      calcUrl = floatBtns[0].url;
+    }
+    if (calcUrl) {
+      const calcIsWa = calcUrl.includes('wa.me') || calcUrl.includes('whatsapp');
+      const calcIcon = calcIsWa ? 'fab fa-whatsapp' : 'fab fa-telegram';
+      pageHtml = pageHtml.replace(
+        /<a href="https:\/\/wa\.me\/37455226224" id="calcTgBtn"/,
+        `<a href="${calcUrl}" id="calcTgBtn"`
+      );
+    }
+  }
+
   // ===== SERVER-SIDE CALC-CTA VISIBILITY =====
   // Show .calc-cta if calculator has buttons in DB, otherwise keep hidden
   if (buttonMap['calculator'] && buttonMap['calculator'].length > 0) {
@@ -6063,7 +6127,7 @@ async function checkRefCode() {
           contactHtml += `        <li><a href="${ct.url || '#'}" target="_blank"><i class="${ct.icon || 'fab fa-telegram'}"></i> <span data-ru="${nameRu}" data-am="${nameAm || nameRu}" data-no-rewrite="1">${ct.name_ru || ''}</span></a></li>\n`;
         }
       } else {
-        contactHtml += '        <li><a href="https://t.me/goo_to_top" target="_blank"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Ադմինիստրատոր" data-no-rewrite="1">Администратор</span></a></li>\n';
+        contactHtml += '        <li><a href="https://wa.me/37455226224" target="_blank"><i class="fab fa-whatsapp"></i> <span data-ru="\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440" data-am="\u0531\u0564\u0574\u056b\u0576\u056b\u057d\u057f\u0580\u0561\u057f\u0578\u0580" data-no-rewrite="1">\u0410\u0434\u043c\u0438\u043d\u0438\u0441\u0442\u0440\u0430\u0442\u043e\u0440</span></a></li>\n';
       }
       contactHtml += '      </ul>';
       
@@ -6343,7 +6407,7 @@ async function checkRefCode() {
         // Add mobile CTA (use floating_tg block data if available for correct URL and text)
         const floatBf = blockFeatures.find((b: any) => b.key === 'floating_tg');
         const floatBtn = floatBf?.buttons?.[0];
-        const mobCtaUrl = floatBtn?.url || 'https://wa.me/37441888389';
+        const mobCtaUrl = floatBtn?.url || 'https://wa.me/37455226224';
         const mobCtaRu = floatBtn?.text_ru || 'Написать нам';
         const mobCtaAm = floatBtn?.text_am || 'Գրել հիմա';
         const mobCtaIcon = floatBtn?.icon || 'fab fa-whatsapp';
