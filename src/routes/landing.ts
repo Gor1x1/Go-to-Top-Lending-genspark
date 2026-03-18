@@ -1077,8 +1077,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
-      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag">\u{1F1F7}\u{1F1FA}</span><span class="lang-text">RU</span></button>
-      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag">\u{1F1E6}\u{1F1F2}</span><span class="lang-text">AM</span></button>
+      <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#fff"/><rect y="8" width="36" height="8" fill="#0039A6"/><rect y="16" width="36" height="8" fill="#D52B1E"/></svg></span><span class="lang-text">RU</span></button>
+      <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#D90012"/><rect y="8" width="36" height="8" fill="#0033A0"/><rect y="16" width="36" height="8" fill="#F2A800"/></svg></span><span class="lang-text">AM</span></button>
     </div>
     <a href="https://wa.me/37441888389" target="_blank" class="nav-cta">
       <i class="fab fa-whatsapp"></i>
