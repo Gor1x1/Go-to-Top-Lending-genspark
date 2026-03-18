@@ -240,7 +240,8 @@ app.get('/', async (c) => {
         key: blk.block_key,
         texts_ru: textsRu,
         texts_am: textsAm,
-        nav_links: opts.nav_links || []
+        nav_links: opts.nav_links || [],
+        contact_cards: opts.contact_cards || []
       });
     }
     (globalThis as any).__blockFeatures = bfArr;
@@ -2199,7 +2200,13 @@ function recalc() {
   });
   document.getElementById('calcTotal').textContent = total.toLocaleString('ru-RU') + ' ֏';
   const msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ' + total.toLocaleString('ru-RU') + ' ֏';
-  document.getElementById('calcTgBtn').href = 'https://t.me/goo_to_top?text=' + encodeURIComponent(msg);
+  var _calcBtn = document.getElementById('calcTgBtn');
+  if (_calcBtn) {
+    var _curHref = _calcBtn.getAttribute('href') || '';
+    var _baseUrl = _curHref.split('?')[0] || 'https://wa.me/37455226224';
+    var _isWaCalc = _baseUrl.includes('wa.me') || _baseUrl.includes('whatsapp');
+    _calcBtn.href = _baseUrl + (_isWaCalc ? ((_baseUrl.includes('?') ? '&text=' : '?text=')) : '?text=') + encodeURIComponent(msg);
+  }
 }
 
 /* ===== FAQ ===== */
@@ -2880,7 +2887,21 @@ function recalcDynamic() {
       refResultEl.innerHTML = promoMsg;
     }
   }
-  var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || 'https://t.me/goo_to_top';
+  var tgUrl = (window._tgData && window._tgData.calc_order_msg && window._tgData.calc_order_msg.telegram_url) || '';
+  // PRIORITY: blockFeatures URL for calculator > telegram_messages URL
+  if (window._bfUrlByLabel) {
+    var calcBfLabel = document.getElementById('calcTgBtn');
+    if (calcBfLabel) {
+      var calcSpan = calcBfLabel.querySelector('span[data-ru]');
+      if (calcSpan) {
+        var calcLabel = calcSpan.getAttribute('data-ru');
+        if (calcLabel && window._bfUrlByLabel[calcLabel.trim()]) {
+          tgUrl = window._bfUrlByLabel[calcLabel.trim()].url;
+        }
+      }
+    }
+  }
+  if (!tgUrl) tgUrl = 'https://wa.me/37455226224';
   var greeting = lang === 'am' ? 'Ողջույն! Ուզում եմ պատվիրել:' : 'Здравствуйте! Хочу заказать:';
   var totalLabel = lang === 'am' ? 'Ընդամենը:' : 'Итого:';
   var msg = greeting + '\\n' + items.join('\\n');
@@ -2945,6 +2966,7 @@ function updateTelegramLinks() {
     }
   }
   // Match all links with t.me/ or wa.me/ or whatsapp
+  // PRIORITY: blockFeatures URL (admin panel) > telegram_messages URL
   document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
     if (a.id === 'calcTgBtn') return;
     var spanWithDataRu = a.querySelector('span[data-ru]');
@@ -2957,7 +2979,10 @@ function updateTelegramLinks() {
     var tgMsg = tgByLabel[buttonText];
     if (!tgMsg) return;
     var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
-    var mUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+    // PRIORITY: blockFeatures URL > telegram_messages URL
+    var bfEntry = window._bfUrlByLabel ? window._bfUrlByLabel[buttonText] : null;
+    var mUrl = (bfEntry && bfEntry.url) ? bfEntry.url : (tgMsg.telegram_url || '');
+    if (!mUrl) return;
     var isWa = mUrl.includes('wa.me') || mUrl.includes('whatsapp');
     if (msgTemplate) {
       if (isWa) {
@@ -3325,7 +3350,27 @@ switchLang = function(l) {
       }
     }
     
-    // ===== 3. APPLY TELEGRAM LINKS DYNAMICALLY =====
+    // ===== 3. APPLY TELEGRAM/MESSENGER LINKS DYNAMICALLY =====
+    // PRIORITY: blockFeatures URL > telegram_messages URL > hardcoded fallback
+    // blockFeatures stores the CURRENT admin-configured URLs (e.g. WhatsApp)
+    // telegram_messages stores OLD data and is only used for message templates
+    
+    // Build blockFeatures URL lookup: button_label_ru -> { url, sectionKey }
+    window._bfUrlByLabel = {};
+    if (hasBlockFeatures) {
+      db.blockFeatures.forEach(function(bf) {
+        if (!bf.buttons || bf.buttons.length === 0) return;
+        bf.buttons.forEach(function(btn) {
+          if (btn.text_ru && btn.url) {
+            window._bfUrlByLabel[btn.text_ru.trim()] = { url: btn.url, key: bf.key };
+          }
+          if (btn.text_am && btn.url) {
+            window._bfUrlByLabel[btn.text_am.trim()] = { url: btn.url, key: bf.key };
+          }
+        });
+      });
+    }
+    
     if (hasTg) {
       window._tgData = db.telegram;
       
@@ -3345,18 +3390,15 @@ switchLang = function(l) {
       if (hasBlockFeatures && serverInjected) {
         db.blockFeatures.forEach(function(bfTg) {
           if (!bfTg.buttons || bfTg.buttons.length === 0) return;
-          // Find telegram messages for this section
           var sKey = bfTg.key;
           bfTg.buttons.forEach(function(btn, idx) {
             if (!btn.text_ru) return;
             var newLabel = btn.text_ru.trim();
-            if (tgByLabel[newLabel]) return; // already mapped
-            // Try to find matching telegram message by section key pattern
+            if (tgByLabel[newLabel]) return;
             for (var tk in db.telegram) {
               if (tk.indexOf(sKey + '_') === 0) {
                 var tm = db.telegram[tk];
                 if (tm && !tgByLabel[newLabel]) {
-                  // Check if this telegram message was for the old label of this button position
                   tgByLabel[newLabel] = tm;
                   break;
                 }
@@ -3366,7 +3408,8 @@ switchLang = function(l) {
         });
       }
       
-      // Find all <a> tags pointing to t.me/ or wa.me/ and update their href with message template
+      // Find all <a> tags pointing to t.me/ or wa.me/ and update their href
+      // CRITICAL: Use blockFeatures URL (admin panel) as primary, telegram_messages only for message template
       document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
         if (a.id === 'calcTgBtn') return;
         var spanWithDataRu = a.querySelector('span[data-ru]');
@@ -3378,7 +3421,10 @@ switchLang = function(l) {
         var tgMsg = tgByLabel[buttonText];
         if (!tgMsg) return;
         var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
-        var mUrl = tgMsg.telegram_url || 'https://t.me/goo_to_top';
+        // PRIORITY: blockFeatures URL > telegram_messages URL
+        var bfEntry = window._bfUrlByLabel[buttonText];
+        var mUrl = (bfEntry && bfEntry.url) ? bfEntry.url : (tgMsg.telegram_url || '');
+        if (!mUrl) return;
         var isWa = mUrl.includes('wa.me') || mUrl.includes('whatsapp');
         if (msgTemplate) {
           a.href = isWa ? (mUrl + (mUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msgTemplate)) : (mUrl + '?text=' + encodeURIComponent(msgTemplate));
@@ -3387,9 +3433,6 @@ switchLang = function(l) {
         }
         updateMessengerIcon(a, mUrl);
         if (spanWithDataRu) {
-          // When server-injected, buttons already have correct labels from blockFeatures.
-          // telegram_messages may have OLD labels (e.g., "Написать в Telegram" instead of "Начать сейчас").
-          // Only update labels from telegram_messages when NOT server-injected.
           if (!serverInjected) {
             var newLabelRu = tgMsg.button_label_ru;
             var newLabelAm = tgMsg.button_label_am;
@@ -3398,8 +3441,6 @@ switchLang = function(l) {
             var currentLangText = spanWithDataRu.getAttribute('data-' + lang);
             if (currentLangText && spanWithDataRu.tagName !== 'INPUT') spanWithDataRu.textContent = currentLangText;
           } else {
-            // Server-injected: only update data-am from telegram if it provides Armenian translation
-            // but DON'T change data-ru or visible text (those come from blockFeatures buttons)
             if (tgMsg.button_label_am && !spanWithDataRu.getAttribute('data-am')) {
               spanWithDataRu.setAttribute('data-am', tgMsg.button_label_am);
             }
@@ -3409,11 +3450,11 @@ switchLang = function(l) {
       
       // Also update the contact form submit handler & popup form to use DB telegram URLs
       if (db.telegram.contact_form_msg) {
-        window._tgContactUrl = db.telegram.contact_form_msg.telegram_url || 'https://t.me/suport_admin_2';
+        window._tgContactUrl = db.telegram.contact_form_msg.telegram_url || '';
         window._tgContactTemplate = db.telegram.contact_form_msg.message_template_ru || '';
       }
       if (db.telegram.popup_form_msg) {
-        window._tgPopupUrl = db.telegram.popup_form_msg.telegram_url || 'https://t.me/suport_admin_2';
+        window._tgPopupUrl = db.telegram.popup_form_msg.telegram_url || '';
         window._tgPopupTemplate = db.telegram.popup_form_msg.message_template_ru || '';
       }
       
@@ -5570,6 +5611,40 @@ async function checkRefCode() {
       .transform(btnResponse);
     
     pageHtml = await btnRewritten.text();
+  }
+  
+  // ===== SERVER-SIDE CONTACT CARD REPLACEMENT =====
+  // Replace hardcoded Telegram contact card URLs with admin-configured URLs (WhatsApp etc.)
+  // This prevents users from clicking Telegram links before client-side JS loads
+  {
+    const contactBf = blockFeatures.find((b: any) => b.key === 'contact');
+    const contactCards: any[] = contactBf?.contact_cards || [];
+    if (contactCards.length > 0) {
+      // Replace first contact card (Администратор)
+      if (contactCards[0]?.url) {
+        const ccUrl = contactCards[0].url;
+        const ccIsWa = ccUrl.includes('wa.me') || ccUrl.includes('whatsapp');
+        const ccIcon = (contactCards[0].icon && contactCards[0].icon !== 'auto')
+          ? contactCards[0].icon
+          : (ccIsWa ? 'fab fa-whatsapp' : 'fab fa-telegram');
+        pageHtml = pageHtml.replace(
+          /<a href="https:\/\/t\.me\/goo_to_top" target="_blank" class="contact-card">\s*<i class="fab fa-telegram"><\/i>/,
+          `<a href="${ccUrl}" target="_blank" class="contact-card">\n      <i class="${ccIcon}"></i>`
+        );
+      }
+      // Replace second contact card (Менеджер)
+      if (contactCards.length > 1 && contactCards[1]?.url) {
+        const ccUrl2 = contactCards[1].url;
+        const ccIsWa2 = ccUrl2.includes('wa.me') || ccUrl2.includes('whatsapp');
+        const ccIcon2 = (contactCards[1].icon && contactCards[1].icon !== 'auto')
+          ? contactCards[1].icon
+          : (ccIsWa2 ? 'fab fa-whatsapp' : 'fab fa-telegram');
+        pageHtml = pageHtml.replace(
+          /<a href="https:\/\/t\.me\/suport_admin_2" target="_blank" class="contact-card">\s*<i class="fab fa-telegram"><\/i>/,
+          `<a href="${ccUrl2}" target="_blank" class="contact-card">\n      <i class="${ccIcon2}"></i>`
+        );
+      }
+    }
   }
   
   // ===== SERVER-SIDE CALC-CTA VISIBILITY =====
