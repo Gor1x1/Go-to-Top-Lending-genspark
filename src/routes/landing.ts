@@ -34,8 +34,8 @@ app.get('/', async (c) => {
   const pathLang = reqPath === '/am' ? 'am' : (reqPath === '/ru' ? 'ru' : '');
   const urlLang = pathLang || new URL(c.req.url).searchParams.get('lang') || '';
   const acceptLang = (c.req.header('Accept-Language') || '').toLowerCase();
-  const isArmenian = urlLang === 'am' || urlLang === 'hy' || 
-    (!urlLang && urlLang !== 'ru');
+  // Default language is Russian; Armenian only if explicitly requested via URL
+  const isArmenian = urlLang === 'am' || urlLang === 'hy';
   
   // Build textMap from DB so we can inject current texts into HTML server-side
   // Strategy: Match seed items to DB items per section using content-aware alignment
