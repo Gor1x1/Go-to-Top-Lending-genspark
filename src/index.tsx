@@ -80,7 +80,7 @@ app.get('/ru', async (c) => {
 // Cache key = full URL (normalized). On cache HIT the Worker returns
 // immediately without touching D1, giving ~50ms TTFB.
 // TTL = 600s (10 min). Admin saves auto-purge via /api/admin middleware.
-const CACHE_TTL = 600; // seconds — edge cache lifetime (10 min)
+const CACHE_TTL = 86400; // seconds — edge cache lifetime (24 hours; admin save auto-purges)
 const CACHEABLE_PATHS = new Set(['/', '/am', '/ru']);
 
 export default {
