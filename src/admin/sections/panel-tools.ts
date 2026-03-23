@@ -242,7 +242,17 @@ function renderPdfTemplate() {
   h += '<div class="card" style="margin-bottom:20px;background:rgba(139,92,246,0.04);border-color:rgba(139,92,246,0.2)">';
   h += '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-chart-bar" style="margin-right:8px"></i>\\u0421\\u0442\\u0430\\u0442\\u0438\\u0441\\u0442\\u0438\\u043a\\u0430 \\u043b\\u0438\\u0434\\u043e\\u0432 PDF</h3>';
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : (Array.isArray(data.leads) ? data.leads : []);
-  var pdfLeads = leads.filter(function(l) { return l.source === 'calculator_pdf'; });
+  var pdfLeads = leads.filter(function(l) {
+    if (l.source === 'calculator_pdf') return true;
+    // Count leads with PDF data (calc_data with items) regardless of source (admin or website)
+    if (l.calc_data) {
+      try {
+        var cd = typeof l.calc_data === 'string' ? JSON.parse(l.calc_data) : l.calc_data;
+        if (cd && cd.items && cd.items.length > 0) return true;
+      } catch(e) {}
+    }
+    return false;
+  });
   var totalRevenue = pdfLeads.reduce(function(s, l) { return s + (parseFloat(l.total_amount) || 0); }, 0);
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
   h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">' + pdfLeads.length + '</div><div style="font-size:0.72rem;color:#64748b">\\u0417\\u0430\\u044f\\u0432\\u043e\\u043a \\u0447\\u0435\\u0440\\u0435\\u0437 PDF</div></div>';

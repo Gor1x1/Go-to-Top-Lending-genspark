@@ -435,6 +435,14 @@ function renderSidebar() {
 function navigate(page) {
   currentPage = page;
   loanModeDetailsOpen = false; // reset repayment mode collapse on page change
+  // Refresh online data when navigating to employees or dashboard
+  if (page === 'employees' || page === 'dashboard') {
+    api('/activity/online', { _silent: true }).then(function(od) {
+      data.onlineUsers = (od && od.online) || [];
+      var mainEl2 = document.getElementById('mainArea');
+      if (mainEl2 && currentPage === page) mainEl2.innerHTML = getPageHtml();
+    }).catch(function() {});
+  }
   // Fast navigate: only update main area + sidebar active states
   var mainEl = document.getElementById('mainArea');
   if (mainEl) {
@@ -6903,6 +6911,8 @@ function onLoanModeChange(mode) {
   var aggrEl = document.getElementById('aggressiveModeFields');
   if (stdEl) stdEl.style.display = mode === 'standard' ? '' : 'none';
   if (aggrEl) aggrEl.style.display = mode === 'aggressive' ? '' : 'none';
+  // Auto-save when mode changes so calculations update immediately
+  saveLoanSettings();
 }
 function toggleLoanPayFields(loanId, payType) {
   var pw = document.getElementById('lp_princ_wrap_' + loanId);
@@ -10329,7 +10339,17 @@ function renderPdfTemplate() {
   h += '<div class="card" style="margin-bottom:20px;background:rgba(139,92,246,0.04);border-color:rgba(139,92,246,0.2)">';
   h += '<h3 style="font-weight:700;margin-bottom:12px;color:#a78bfa"><i class="fas fa-chart-bar" style="margin-right:8px"></i>\u0421\u0442\u0430\u0442\u0438\u0441\u0442\u0438\u043a\u0430 \u043b\u0438\u0434\u043e\u0432 PDF</h3>';
   var leads = (data.leads && data.leads.leads) ? data.leads.leads : (Array.isArray(data.leads) ? data.leads : []);
-  var pdfLeads = leads.filter(function(l) { return l.source === 'calculator_pdf'; });
+  var pdfLeads = leads.filter(function(l) {
+    if (l.source === 'calculator_pdf') return true;
+    // Count leads with PDF data (calc_data with items) regardless of source (admin or website)
+    if (l.calc_data) {
+      try {
+        var cd = typeof l.calc_data === 'string' ? JSON.parse(l.calc_data) : l.calc_data;
+        if (cd && cd.items && cd.items.length > 0) return true;
+      } catch(e) {}
+    }
+    return false;
+  });
   var totalRevenue = pdfLeads.reduce(function(s, l) { return s + (parseFloat(l.total_amount) || 0); }, 0);
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
   h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">' + pdfLeads.length + '</div><div style="font-size:0.72rem;color:#64748b">\u0417\u0430\u044f\u0432\u043e\u043a \u0447\u0435\u0440\u0435\u0437 PDF</div></div>';
@@ -11062,6 +11082,15 @@ function renderEmployees() {
   const rl = rolesConfig?.role_labels || {};
   const roles = rolesConfig?.roles || [];
   var roleColors = { main_admin: '#8B5CF6', developer: '#3B82F6', analyst: '#10B981', operator: '#F59E0B', buyer: '#EF4444', courier: '#6366F1' };
+  // Enrich role labels and colors with custom company roles
+  var compRolesAll = data.companyRoles || [];
+  for (var crj = 0; crj < compRolesAll.length; crj++) {
+    var crjItem = compRolesAll[crj];
+    if (crjItem.role_key) {
+      if (!rl[crjItem.role_key]) rl[crjItem.role_key] = getCompanyRoleName(crjItem);
+      if (!roleColors[crjItem.role_key]) roleColors[crjItem.role_key] = crjItem.color || '#8B5CF6';
+    }
+  }
   var filtered = filterEmployees(data.users);
   var onlineCount = data.users.filter(function(u) { return isUserOnline(u.id); }).length;
   var vacationCount = data.users.filter(function(u) { return isUserOnVacation(u.id); }).length;
@@ -11126,8 +11155,19 @@ function renderEmployees() {
   h += '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:#0f172a;padding:12px 16px;border-radius:12px;border:1px solid #1e293b">';
   h += '<div style="flex:1;min-width:220px;position:relative"><i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#64748b"></i><input class="input" style="padding-left:36px;border-radius:10px" placeholder="Поиск по имени, телефону, Telegram, должности..." value="' + escHtml(_empSearch) + '" oninput="_empSearch=this.value;render()"></div>';
   h += '<select class="input" style="width:auto;min-width:140px;border-radius:10px" onchange="_empFilterRole=this.value;render()"><option value="">Все роли</option>';
+  var filterRolesSet = {};
   for (var ri = 0; ri < roles.length; ri++) {
+    filterRolesSet[roles[ri]] = true;
     h += '<option value="' + roles[ri] + '"' + (_empFilterRole===roles[ri]?' selected':'') + '>' + escHtml(rl[roles[ri]]||roles[ri]) + '</option>';
+  }
+  // Also show custom company roles in filter
+  var compRolesFilter = data.companyRoles || [];
+  for (var crf = 0; crf < compRolesFilter.length; crf++) {
+    var crfKey = compRolesFilter[crf].role_key;
+    if (crfKey && !filterRolesSet[crfKey]) {
+      var crfLabel = getCompanyRoleName(compRolesFilter[crf]);
+      h += '<option value="' + escHtml(crfKey) + '"' + (_empFilterRole===crfKey?' selected':'') + '>' + escHtml(crfLabel || crfKey) + '</option>';
+    }
   }
   h += '</select>';
   h += '<select class="input" style="width:auto;min-width:140px;border-radius:10px" onchange="_empFilterStatus=this.value;render()"><option value="">Все статусы</option><option value="active"' + (_empFilterStatus==='active'?' selected':'') + '>Активные</option><option value="inactive"' + (_empFilterStatus==='inactive'?' selected':'') + '>Отключённые</option><option value="online"' + (_empFilterStatus==='online'?' selected':'') + '>Онлайн</option><option value="vacation"' + (_empFilterStatus==='vacation'?' selected':'') + '>В отпуске</option></select>';
@@ -11542,7 +11582,16 @@ function showEmployeeModal(userId) {
   }
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0420\u043e\u043b\u044c *</label><select class="input" id="empRole">';
-  for (const r of roles) { h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
+  // Merge hardcoded roles + custom company roles (deduplicated)
+  var allRolesSet = {};
+  for (const r of roles) { allRolesSet[r] = true; h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
+  for (var cri2 = 0; cri2 < compRoles.length; cri2++) {
+    var crKey = compRoles[cri2].role_key;
+    if (crKey && !allRolesSet[crKey]) {
+      var crLabel = getCompanyRoleName(compRoles[cri2]);
+      h += '<option value="' + escHtml(crKey) + '"' + (u?.role===crKey?' selected':'') + '>' + escHtml(crLabel || crKey) + '</option>';
+    }
+  }
   h += '</select></div>';
   // Position from company roles only (no manual entry)
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\u0414\u043e\u043b\u0436\u043d\u043e\u0441\u0442\u044c</label><select class="input" id="empPosition">';
@@ -12532,6 +12581,28 @@ function renderSiteBlocks() {
             var iconInList = iconOptions.some(function(io) { return io.v === currentIcon; });
             if (!iconInList && currentIcon) h += '<option value="' + escHtml(currentIcon) + '" selected>' + escHtml(currentIcon) + '</option>';
             h += '</select></div>';
+            // ── Section anchor selector for button link target ──
+            var btnIsAnchor = (btn.url || '').charAt(0) === '#';
+            var btnTargetKey = btnIsAnchor ? (btn.url || '').substring(1).replace(/-/g, '_') : '';
+            var btnSkipTypes = { ticker: true, nav: true, seo_og: true, popup: true, floating_buttons: true };
+            var btnSectionsList = [];
+            var _allBtnBlocks = data.siteBlocks || [];
+            for (var _bbi = 0; _bbi < _allBtnBlocks.length; _bbi++) {
+              var _bb = _allBtnBlocks[_bbi];
+              if (btnSkipTypes[_bb.block_type] || btnSkipTypes[_bb.block_key]) continue;
+              btnSectionsList.push({ id: _bb.block_key, label: (_bb.title_ru || _bb.block_key) });
+            }
+            h += '<div style="margin-top:8px;grid-column:1/-1;display:flex;align-items:center;gap:8px">';
+            h += '<span style="font-size:0.68rem;color:#60a5fa;font-weight:600;white-space:nowrap"><i class="fas fa-anchor" style="margin-right:3px"></i>Секция</span>';
+            h += '<select class="input" id="sb_btntarget_' + b.id + '_' + bti + '" style="flex:1;font-size:0.75rem;padding:3px 6px;background:#0f172a;border:1px solid #293548;color:#60a5fa;border-radius:6px" onchange="sbSetBtnTarget(' + b.id + ',' + bti + ',this.value)">';
+            h += '<option value="">\u2014 \u0432\u043d\u0435\u0448\u043d\u044f\u044f \u0441\u0441\u044b\u043b\u043a\u0430 \u2014</option>';
+            for (var bsi = 0; bsi < btnSectionsList.length; bsi++) {
+              var bs = btnSectionsList[bsi];
+              var bsKey = bs.id.replace(/-/g, '_');
+              h += '<option value="' + escHtml(bs.id) + '"' + (btnTargetKey === bsKey || btnTargetKey === bs.id ? ' selected' : '') + '>\u2693 ' + escHtml(bs.label) + '</option>';
+            }
+            h += '</select>';
+            h += '</div>';
             h += '</div></details>';
             h += '</div>';
           }
@@ -12798,6 +12869,28 @@ function renderSiteBlocks() {
           }
           h += '</select></div>';
           h += '<div><div style="font-size:0.68rem;color:#60a5fa;margin-bottom:3px"><i class="fas fa-link" style="margin-right:3px"></i>URL</div><input class="input" id="sb_btnurl_' + b.id + '_' + bti + '" value="' + escHtml(btn.url || '') + '" placeholder="https://t.me/..." style="font-size:0.78rem;color:#60a5fa" onchange="sbUpdateBtnField(' + b.id + ',' + bti + ',&apos;url&apos;,this.value);sbAutoSave(' + b.id + ')"></div>';
+          h += '</div>';
+          // ── Section anchor selector for button link target ──
+          var btnIsAnchor2 = (btn.url || '').charAt(0) === '#';
+          var btnTargetKey2 = btnIsAnchor2 ? (btn.url || '').substring(1).replace(/-/g, '_') : '';
+          var btnSkipTypes2 = { ticker: true, nav: true, seo_og: true, popup: true, floating_buttons: true };
+          var btnSectionsList2 = [];
+          var _allBtnBlocks2 = data.siteBlocks || [];
+          for (var _bbi2 = 0; _bbi2 < _allBtnBlocks2.length; _bbi2++) {
+            var _bb2 = _allBtnBlocks2[_bbi2];
+            if (btnSkipTypes2[_bb2.block_type] || btnSkipTypes2[_bb2.block_key]) continue;
+            btnSectionsList2.push({ id: _bb2.block_key, label: (_bb2.title_ru || _bb2.block_key) });
+          }
+          h += '<div style="margin-top:8px;display:flex;align-items:center;gap:8px">';
+          h += '<span style="font-size:0.68rem;color:#60a5fa;font-weight:600;white-space:nowrap"><i class="fas fa-anchor" style="margin-right:3px"></i>\u0421\u0435\u043a\u0446\u0438\u044f</span>';
+          h += '<select class="input" id="sb_btntarget_' + b.id + '_' + bti + '" style="flex:1;font-size:0.75rem;padding:3px 6px;background:#0f172a;border:1px solid #293548;color:#60a5fa;border-radius:6px" onchange="sbSetBtnTarget(' + b.id + ',' + bti + ',this.value)">';
+          h += '<option value="">\u2014 \u0432\u043d\u0435\u0448\u043d\u044f\u044f \u0441\u0441\u044b\u043b\u043a\u0430 \u2014</option>';
+          for (var bsi2 = 0; bsi2 < btnSectionsList2.length; bsi2++) {
+            var bs2 = btnSectionsList2[bsi2];
+            var bsKey2 = bs2.id.replace(/-/g, '_');
+            h += '<option value="' + escHtml(bs2.id) + '"' + (btnTargetKey2 === bsKey2 || btnTargetKey2 === bs2.id ? ' selected' : '') + '>\u2693 ' + escHtml(bs2.label) + '</option>';
+          }
+          h += '</select>';
           h += '</div>';
           // Message templates
           h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:8px;margin-top:8px">';
@@ -13741,6 +13834,24 @@ function sbUpdateBtnField(blockId, btnIdx, field, value) {
   b.buttons[btnIdx][field] = value;
 }
 
+// ── Set button link target to a section anchor ──
+function sbSetBtnTarget(blockId, btnIdx, sectionKey) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  if (!b || !b.buttons || !b.buttons[btnIdx]) return;
+  if (sectionKey) {
+    // Set URL to section anchor
+    var anchor = '#' + sectionKey.replace(/_/g, '-');
+    b.buttons[btnIdx].url = anchor;
+    b.buttons[btnIdx].action_type = 'anchor';
+    // Update URL input if visible
+    var urlInput = document.getElementById('sb_btnurl_' + blockId + '_' + btnIdx);
+    if (urlInput) urlInput.value = anchor;
+  }
+  // If empty — keep current URL (external link), user can edit URL field manually
+  sbAutoSave(blockId);
+  render();
+}
+
 // ── Remove button ──
 // ── Move button up/down ──
 function sbMoveButton(blockId, idx, direction) {
@@ -14601,10 +14712,21 @@ window.addEventListener('unhandledrejection', function(e) {
     }
     sendHeartbeat();
     setInterval(sendHeartbeat, 60000);
-    // Refresh online data every 90s
-    setInterval(async function() {
-      try { var od = await api('/activity/online'); data.onlineUsers = (od && od.online) || []; } catch(e) {}
-    }, 90000);
+    // Refresh online data every 30s and re-render if on employees/dashboard page
+    async function refreshOnlineStatus() {
+      try {
+        var od = await api('/activity/online', { _silent: true });
+        var newOnline = (od && od.online) || [];
+        // Check if online list changed
+        var oldIds = (data.onlineUsers || []).map(function(o) { return o.user_id; }).sort().join(',');
+        var newIds = newOnline.map(function(o) { return o.user_id; }).sort().join(',');
+        data.onlineUsers = newOnline;
+        if (oldIds !== newIds && (currentPage === 'employees' || currentPage === 'dashboard')) {
+          render();
+        }
+      } catch(e) {}
+    }
+    setInterval(refreshOnlineStatus, 30000);
   }
 })();
 </script>
