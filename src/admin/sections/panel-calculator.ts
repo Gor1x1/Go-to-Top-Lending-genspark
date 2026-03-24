@@ -4,6 +4,15 @@
  */
 export const CODE: string = `
 // ===== CALCULATOR =====
+// Fast reload: only fetch calc tabs, services, packages (skip leads, users, expenses etc.)
+async function reloadCalcData() {
+  var [tabs, services, pkgs] = await Promise.all([
+    api('/calc-tabs'), api('/calc-services'), api('/calc-packages')
+  ]);
+  data.calcTabs = tabs || [];
+  data.calcServices = services || [];
+  data.calcPackages = pkgs || [];
+}
 function renderCalculator() {
   let h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-calculator" style="color:#8B5CF6;margin-right:10px"></i>Калькулятор услуг</h1>' +
     '<p style="color:#94a3b8;margin-bottom:24px">Управление разделами и услугами. Каждый раздел = вкладка на сайте.</p>';
@@ -291,7 +300,7 @@ async function submitNewSection() {
   
   await api('/calc-tabs', { method: 'POST', body: JSON.stringify({ tab_key: key, name_ru: ru, name_am: am, sort_order: data.calcTabs.length + 1 }) });
   toast('\\u0420\\u0430\\u0437\\u0434\\u0435\\u043b \\u00ab' + ru + '\\u00bb \\u0441\\u043e\\u0437\\u0434\\u0430\\u043d! \\u0422\\u0435\\u043f\\u0435\\u0440\\u044c \\u0434\\u043e\\u0431\\u0430\\u0432\\u044c\\u0442\\u0435 \\u0443\\u0441\\u043b\\u0443\\u0433\\u0438.');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 function cancelNewSection() {
@@ -345,7 +354,7 @@ async function submitSvcToTab(tabId) {
   if (pType === 'tiered') { tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]); }
   await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_type: pType, price_tiers_json: tiersJson, sort_order: data.calcServices.length + 1 }) });
   toast('\\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u00ab' + ru + '\\u00bb \\u0434\\u043e\\u0431\\u0430\\u0432\\u043b\\u0435\\u043d\\u0430!');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function saveCalcTab(id) {
@@ -356,7 +365,7 @@ async function saveCalcTab(id) {
   if (!tab) return;
   await api('/calc-tabs/' + id, { method: 'PUT', body: JSON.stringify({ name_ru: ru, name_am: am, sort_order: tab.sort_order, is_active: tab.is_active ?? 1 }) });
   toast('\\u0420\\u0430\\u0437\\u0434\\u0435\\u043b \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0451\\u043d');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function saveCalcService(id, tabId) {
@@ -367,7 +376,7 @@ async function saveCalcService(id, tabId) {
   var price = parseInt(document.getElementById('svc_price_' + id).value) || 0;
   await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, tab_id: tabId || svc.tab_id }) });
   toast('\\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0435\\u043d\\u0430');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function saveTiers(svcId, count) {
@@ -385,7 +394,7 @@ async function saveTiers(svcId, count) {
   if (!svc) return;
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
   toast('\\u0422\\u0430\\u0440\\u0438\\u0444\\u044b \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0435\\u043d\\u044b! \\u041e\\u0431\\u043d\\u043e\\u0432\\u0438\\u0442\\u0435 \\u0441\\u0430\\u0439\\u0442 \\u0434\\u043b\\u044f \\u043f\\u0440\\u043e\\u0432\\u0435\\u0440\\u043a\\u0438.');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function addTier(svcId) {
@@ -397,7 +406,7 @@ async function addTier(svcId) {
   tiers.push({ min: lastMax + 1, max: lastMax + 20, price: 1000 });
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers) }) });
   toast('\\u0421\\u0442\\u0440\\u043e\\u043a\\u0430 \\u0434\\u043e\\u0431\\u0430\\u0432\\u043b\\u0435\\u043d\\u0430');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function deleteTier(svcId, tierIndex, totalTiers) {
@@ -411,14 +420,14 @@ async function deleteTier(svcId, tierIndex, totalTiers) {
   tiers.splice(tierIndex, 1);
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
   toast('\\u0421\\u0442\\u0440\\u043e\\u043a\\u0430 \\u0442\\u0430\\u0440\\u0438\\u0444\\u0430 \\u0443\\u0434\\u0430\\u043b\\u0435\\u043d\\u0430');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function deleteCalcService(id) {
   if (!confirm('\\u0423\\u0434\\u0430\\u043b\\u0438\\u0442\\u044c \\u044d\\u0442\\u0443 \\u0443\\u0441\\u043b\\u0443\\u0433\\u0443?')) return;
   await api('/calc-services/' + id, { method: 'DELETE' });
   toast('\\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u0443\\u0434\\u0430\\u043b\\u0435\\u043d\\u0430');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function enableTieredPricing(svcId) {
@@ -432,7 +441,7 @@ async function enableTieredPricing(svcId) {
   ];
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'tiered', price_tiers_json: JSON.stringify(defaultTiers) }) });
   toast('\\u0422\\u0430\\u0440\\u0438\\u0444\\u043d\\u0430\\u044f \\u0448\\u043a\\u0430\\u043b\\u0430 \\u0434\\u043e\\u0431\\u0430\\u0432\\u043b\\u0435\\u043d\\u0430! \\u041d\\u0430\\u0441\\u0442\\u0440\\u043e\\u0439\\u0442\\u0435 \\u0446\\u0435\\u043d\\u044b.');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function disableTieredPricing(svcId) {
@@ -441,14 +450,14 @@ async function disableTieredPricing(svcId) {
   if (!confirm('\\u0423\\u0431\\u0440\\u0430\\u0442\\u044c \\u0442\\u0430\\u0440\\u0438\\u0444\\u043d\\u0443\\u044e \\u0448\\u043a\\u0430\\u043b\\u0443? \\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u0441\\u0442\\u0430\\u043d\\u0435\\u0442 \\u0441 \\u0444\\u0438\\u043a\\u0441. \\u0446\\u0435\\u043d\\u043e\\u0439.')) return;
   await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'fixed', price_tiers_json: null }) });
   toast('\\u0422\\u0430\\u0440\\u0438\\u0444\\u043d\\u0430\\u044f \\u0448\\u043a\\u0430\\u043b\\u0430 \\u0443\\u0434\\u0430\\u043b\\u0435\\u043d\\u0430');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 async function deleteCalcTab(id) {
   if (!confirm('\\u0423\\u0434\\u0430\\u043b\\u0438\\u0442\\u044c \\u0440\\u0430\\u0437\\u0434\\u0435\\u043b \\u0438 \\u0432\\u0441\\u0435 \\u0435\\u0433\\u043e \\u0443\\u0441\\u043b\\u0443\\u0433\\u0438?')) return;
   await api('/calc-tabs/' + id, { method: 'DELETE' });
   toast('\\u0420\\u0430\\u0437\\u0434\\u0435\\u043b \\u0443\\u0434\\u0430\\u043b\\u0451\\u043d');
-  await loadData(); render();
+  await reloadCalcData(); render();
 }
 
 // ===== CALCULATOR PACKAGES =====

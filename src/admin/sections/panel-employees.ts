@@ -67,6 +67,15 @@ function renderEmployees() {
   const rl = rolesConfig?.role_labels || {};
   const roles = rolesConfig?.roles || [];
   var roleColors = { main_admin: '#8B5CF6', developer: '#3B82F6', analyst: '#10B981', operator: '#F59E0B', buyer: '#EF4444', courier: '#6366F1' };
+  // Enrich role labels and colors with custom company roles
+  var compRolesAll = data.companyRoles || [];
+  for (var crj = 0; crj < compRolesAll.length; crj++) {
+    var crjItem = compRolesAll[crj];
+    if (crjItem.role_key) {
+      if (!rl[crjItem.role_key]) rl[crjItem.role_key] = getCompanyRoleName(crjItem);
+      if (!roleColors[crjItem.role_key]) roleColors[crjItem.role_key] = crjItem.color || '#8B5CF6';
+    }
+  }
   var filtered = filterEmployees(data.users);
   var onlineCount = data.users.filter(function(u) { return isUserOnline(u.id); }).length;
   var vacationCount = data.users.filter(function(u) { return isUserOnVacation(u.id); }).length;
@@ -131,8 +140,19 @@ function renderEmployees() {
   h += '<div style="display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center;background:#0f172a;padding:12px 16px;border-radius:12px;border:1px solid #1e293b">';
   h += '<div style="flex:1;min-width:220px;position:relative"><i class="fas fa-search" style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#64748b"></i><input class="input" style="padding-left:36px;border-radius:10px" placeholder="Поиск по имени, телефону, Telegram, должности..." value="' + escHtml(_empSearch) + '" oninput="_empSearch=this.value;render()"></div>';
   h += '<select class="input" style="width:auto;min-width:140px;border-radius:10px" onchange="_empFilterRole=this.value;render()"><option value="">Все роли</option>';
+  var filterRolesSet = {};
   for (var ri = 0; ri < roles.length; ri++) {
+    filterRolesSet[roles[ri]] = true;
     h += '<option value="' + roles[ri] + '"' + (_empFilterRole===roles[ri]?' selected':'') + '>' + escHtml(rl[roles[ri]]||roles[ri]) + '</option>';
+  }
+  // Also show custom company roles in filter
+  var compRolesFilter = data.companyRoles || [];
+  for (var crf = 0; crf < compRolesFilter.length; crf++) {
+    var crfKey = compRolesFilter[crf].role_key;
+    if (crfKey && !filterRolesSet[crfKey]) {
+      var crfLabel = getCompanyRoleName(compRolesFilter[crf]);
+      h += '<option value="' + escHtml(crfKey) + '"' + (_empFilterRole===crfKey?' selected':'') + '>' + escHtml(crfLabel || crfKey) + '</option>';
+    }
   }
   h += '</select>';
   h += '<select class="input" style="width:auto;min-width:140px;border-radius:10px" onchange="_empFilterStatus=this.value;render()"><option value="">Все статусы</option><option value="active"' + (_empFilterStatus==='active'?' selected':'') + '>Активные</option><option value="inactive"' + (_empFilterStatus==='inactive'?' selected':'') + '>Отключённые</option><option value="online"' + (_empFilterStatus==='online'?' selected':'') + '>Онлайн</option><option value="vacation"' + (_empFilterStatus==='vacation'?' selected':'') + '>В отпуске</option></select>';
@@ -537,7 +557,16 @@ function showEmployeeModal(userId) {
   }
   h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">';
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\\u0420\\u043e\\u043b\\u044c *</label><select class="input" id="empRole">';
-  for (const r of roles) { h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
+  // Merge hardcoded roles + custom company roles (deduplicated)
+  var allRolesSet = {};
+  for (const r of roles) { allRolesSet[r] = rl[r] || r; h += '<option value="' + r + '"' + (u?.role===r?' selected':'') + '>' + escHtml(rl[r]||r) + '</option>'; }
+  for (var cri2 = 0; cri2 < compRoles.length; cri2++) {
+    var crKey = compRoles[cri2].role_key;
+    if (crKey && !allRolesSet[crKey]) {
+      var crLabel = getCompanyRoleName(compRoles[cri2]);
+      h += '<option value="' + escHtml(crKey) + '"' + (u?.role===crKey?' selected':'') + '>' + escHtml(crLabel || crKey) + '</option>';
+    }
+  }
   h += '</select></div>';
   // Position from company roles only (no manual entry)
   h += '<div style="margin-bottom:12px"><label style="font-size:0.8rem;color:#94a3b8;display:block;margin-bottom:4px">\\u0414\\u043e\\u043b\\u0436\\u043d\\u043e\\u0441\\u0442\\u044c</label><select class="input" id="empPosition">';

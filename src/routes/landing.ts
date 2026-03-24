@@ -1914,7 +1914,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
 /* ===== LANGUAGE ===== */
-let lang = localStorage.getItem('gtt_lang') || 'am';
+let lang = localStorage.getItem('gtt_lang') || 'ru';
 const AM = {
   "Услуги":"Ծառայություններ",
   "Калькулятор":"Հաշվիչ",
@@ -3081,6 +3081,9 @@ switchLang = function(l) {
           if (el.getAttribute('data-no-rewrite') === '1') return;
           // Also skip elements inside footer or floating buttons
           if (el.closest('.tg-float') || el.closest('.calc-float') || el.closest('footer')) return;
+          // Skip calculator section — its texts are managed by blockFeatures, not textMap
+          // (matches server-side HTMLRewriter behavior that skips data-section-id="calculator")
+          if (el.closest('[data-section-id="calculator"]')) return;
           var currentRu = el.getAttribute('data-ru');
           if (!currentRu) return;
           var newAm = amMap[currentRu.trim()];
@@ -3098,6 +3101,8 @@ switchLang = function(l) {
           // Skip elements with data-no-rewrite (floating buttons, footer)
           if (el.getAttribute('data-no-rewrite') === '1') return;
           if (el.closest('.tg-float') || el.closest('.calc-float') || el.closest('footer')) return;
+          // Skip calculator section — its texts are managed by blockFeatures, not textMap
+          if (el.closest('[data-section-id="calculator"]')) return;
           var origRu = el.getAttribute('data-ru');
           if (!origRu) return;
           var changed = db.textMap[origRu.trim()];
@@ -4139,7 +4144,7 @@ switchLang = function(l) {
                   newBtn.className = 'btn btn-primary';
                   newBtn.style.cssText = 'background:linear-gradient(135deg,#25D366,#128C7E);border:none';
                 }
-                newBtn.setAttribute('target', '_blank');
+                if (dbBtnNew.url && dbBtnNew.url.charAt(0) === '#') { newBtn.removeAttribute('target'); } else { newBtn.setAttribute('target', '_blank'); }
                 // Mark button if icon was manually set by admin
                 var _defs = ['fas fa-link','fas fa-arrow-right',''];
                 if (dbBtnNew.icon && _defs.indexOf(dbBtnNew.icon) < 0) newBtn.setAttribute('data-icon-manual', '1');
@@ -4158,7 +4163,7 @@ switchLang = function(l) {
                 var btnIcon2 = resolveIcon(dbBtn2.icon, dbBtn2.url);
                 var eBtn = existingBtns[dbBtnIdx];
                 if (dbBtn2.url) eBtn.href = dbBtn2.url;
-                eBtn.setAttribute('target', '_blank');
+                if (dbBtn2.url && dbBtn2.url.charAt(0) === '#') { eBtn.removeAttribute('target'); } else { eBtn.setAttribute('target', '_blank'); }
                 // Mark button if icon was manually set by admin
                 var _defs2 = ['fas fa-link','fas fa-arrow-right',''];
                 if (dbBtn2.icon && _defs2.indexOf(dbBtn2.icon) < 0) eBtn.setAttribute('data-icon-manual', '1');
@@ -5582,8 +5587,15 @@ async function checkRefCode() {
           if (dbBtn.url) {
             el.setAttribute('href', dbBtn.url);
           }
-          // Set target
-          el.setAttribute('target', '_blank');
+          // Set target: internal anchor links (#calculator etc.) should not open in new tab
+          const btnHref = dbBtn.url || el.getAttribute('href') || '';
+          if (btnHref.startsWith('#')) {
+            // Use _self (not removeAttribute) — HTMLRewriter removeAttribute is unreliable
+            // when the attribute doesn't exist yet or was set by a previous handler
+            el.setAttribute('target', '_self');
+          } else {
+            el.setAttribute('target', '_blank');
+          }
           
           // Determine icon class — DB value is PRIORITY, URL auto-detect only for defaults
           let iconClass = dbBtn.icon || '';
@@ -6577,7 +6589,7 @@ async function checkRefCode() {
   
   // Add marker so client-side JS knows server already handled reordering
   if (sectionOrder.length > 0) {
-    pageHtml = pageHtml.replace('<html lang="ru"', '<html lang="ru" data-server-ordered="1"');
+    pageHtml = pageHtml.replace(/<html lang="(ru|hy)"/, '<html lang="$1" data-server-ordered="1"');
   }
   
   // ===== FINAL: SERVER-SIDE ARMENIAN TEXT RENDERING =====
@@ -6599,7 +6611,7 @@ async function checkRefCode() {
     pageHtml = await amRewritten.text();
     // Set correct initial lang variable in JS so client doesn't flash Russian
     pageHtml = pageHtml.replace(
-      "let lang = localStorage.getItem('gtt_lang') || 'am';",
+      "let lang = localStorage.getItem('gtt_lang') || 'ru';",
       "let lang = 'am'; localStorage.setItem('gtt_lang','am');"
     );
   }

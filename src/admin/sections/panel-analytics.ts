@@ -1888,6 +1888,8 @@ function onLoanModeChange(mode) {
   var aggrEl = document.getElementById('aggressiveModeFields');
   if (stdEl) stdEl.style.display = mode === 'standard' ? '' : 'none';
   if (aggrEl) aggrEl.style.display = mode === 'aggressive' ? '' : 'none';
+  // Auto-save when mode changes so calculations update immediately
+  saveLoanSettings();
 }
 function toggleLoanPayFields(loanId, payType) {
   var pw = document.getElementById('lp_princ_wrap_' + loanId);
