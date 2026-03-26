@@ -655,13 +655,15 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
   display:none;
   position:fixed;top:0;left:0;right:0;bottom:0;
   width:100%;height:100%;
+  height:100dvh;
   background:rgba(0,0,0,0.85);
   z-index:100000;
   justify-content:center;align-items:center;
   padding:20px;
-  overflow-y:auto;
-  -webkit-overflow-scrolling:touch;
+  overflow:hidden;
   overscroll-behavior:contain;
+  touch-action:none;
+  -webkit-overflow-scrolling:touch;
 }
 .popup-overlay.show{
   display:flex !important;
@@ -672,7 +674,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
   background:linear-gradient(145deg,#2a1a4e,#3d2470);
   border:2px solid rgba(167,139,250,0.6);
   border-radius:20px;
-  padding:36px;
+  padding:32px;
   text-align:center;
   max-width:460px;width:100%;
   position:relative;
@@ -681,7 +683,8 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
   animation:popIn 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
   opacity:1;
   transform:scale(1);
-  max-height:90vh;
+  max-height:85vh;
+  max-height:85dvh;
   overflow-y:auto;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
@@ -694,15 +697,23 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
     border-radius:20px 20px 0 0;
     max-width:100%;width:100%;
     animation:slideUpMobile 0.4s ease forwards;
-    padding:28px 16px;
-    max-height:90vh;
+    padding:20px 16px;
+    padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px));
+    max-height:78vh;
+    max-height:78dvh;
     overflow-y:auto;
     -webkit-overflow-scrolling:touch;
     overscroll-behavior:contain;
     margin:0;
   }
-  .popup-card h3{font-size:1.2rem}
-  .popup-card .pf-row{grid-template-columns:1fr}
+  .popup-card h3{font-size:1.1rem;margin-bottom:4px}
+  .popup-card .popup-icon{width:44px;height:44px;font-size:1.1rem;margin-bottom:8px}
+  .popup-card .popup-sub{font-size:0.78rem;margin-bottom:12px;line-height:1.35}
+  .popup-card .pf-group{margin-bottom:8px}
+  .popup-card .pf-label{font-size:0.72rem;margin-bottom:3px}
+  .popup-card .pf-input{padding:9px 11px;font-size:0.88rem}
+  .popup-card .pf-row{grid-template-columns:1fr 1fr;gap:10px}
+  .popup-card .btn-lg{padding:12px 20px;font-size:0.9rem;margin-top:8px !important}
   .slot-counter-bar .container > div{flex-direction:column;gap:12px;text-align:center}
   .slot-counter-bar #slotProgress{width:100%;max-width:280px}
 }
@@ -1924,7 +1935,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
           <label class="pf-label" data-ru="Ваш Telegram или телефон" data-am="Ձեր Telegram-ը կամ հեռախոսը">Ваш Telegram или телефон</label>
           <input class="pf-input" type="text" id="popupContact" required placeholder="@username или +374..." data-placeholder-ru="@username или +374..." data-placeholder-am="@username կամ +374...">
         </div>
-        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:12px">
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">
           <i class="fas fa-paper-plane"></i>
           <span data-ru="Получить мою стратегию" data-am="Ստանալ իմ ռազմավարությունը">Получить мою стратегию</span>
         </button>
@@ -2447,6 +2458,21 @@ function rvGoTo(carId, idx) {
 
 /* ===== TIMED POPUP (5 sec) — ALWAYS SHOWS ON EVERY PAGE LOAD ===== */
 var _popupShown = false;
+var _popupResizeHandler = null;
+var _popupTouchHandler = null;
+
+function _setPopupHeight() {
+  var ov = document.getElementById('popupOverlay');
+  if (!ov || ov.style.display === 'none') return;
+  // window.innerHeight gives the VISIBLE viewport (excludes browser chrome on Android/iOS)
+  var vh = window.innerHeight;
+  ov.style.setProperty('height', vh + 'px', 'important');
+  var card = ov.querySelector('.popup-card');
+  if (card && window.innerWidth <= 640) {
+    var maxH = Math.floor(vh * 0.78);
+    card.style.setProperty('max-height', maxH + 'px', 'important');
+  }
+}
 
 function showPopup() {
   if (_popupShown) return;
@@ -2456,32 +2482,44 @@ function showPopup() {
   var card = ov.querySelector('.popup-card');
   if (!card) { console.log('[Popup] No card element found'); return; }
   var isMobile = window.innerWidth <= 640;
+  var vh = window.innerHeight;
   
-  // Reset any previous state completely
+  // 1) Lock body scroll FIRST — critical for iOS Safari
+  //    position:fixed prevents background scroll; top:-scrollY preserves position
+  document.body.dataset.popupScrollY = String(window.scrollY);
+  document.body.style.overflow = 'hidden';
+  document.body.style.position = 'fixed';
+  document.body.style.top = '-' + window.scrollY + 'px';
+  document.body.style.left = '0';
+  document.body.style.right = '0';
+  document.body.style.width = '100%';
+  
+  // 2) Reset any previous state completely
   card.removeAttribute('style');
   ov.removeAttribute('style');
   
-  // FORCE show overlay with inline styles to override ANY CSS/cache/extension
+  // 3) FORCE show overlay with inline styles to override ANY CSS/cache/extension
   ov.className = 'popup-overlay show';
   ov.style.setProperty('display', 'flex', 'important');
   ov.style.setProperty('position', 'fixed', 'important');
   ov.style.setProperty('top', '0', 'important');
   ov.style.setProperty('left', '0', 'important');
-  ov.style.setProperty('width', '100vw', 'important');
-  ov.style.setProperty('height', '100vh', 'important');
+  ov.style.setProperty('width', '100%', 'important');
+  ov.style.setProperty('height', vh + 'px', 'important');
   ov.style.setProperty('background', 'rgba(0,0,0,0.85)', 'important');
   ov.style.setProperty('z-index', '100000', 'important');
-  ov.style.setProperty('overflow-y', 'auto', 'important');
+  ov.style.setProperty('overflow', 'hidden', 'important');
   ov.style.setProperty('overscroll-behavior', 'contain', 'important');
-  ov.style.setProperty('-webkit-overflow-scrolling', 'touch', 'important');
+  ov.style.setProperty('touch-action', 'none', 'important');
   ov.style.setProperty('visibility', 'visible', 'important');
   ov.style.setProperty('opacity', '1', 'important');
   
   if (isMobile) {
-    ov.style.setProperty('justify-content', 'center', 'important');
+    ov.style.setProperty('justify-content', 'flex-end', 'important');
     ov.style.setProperty('align-items', 'flex-end', 'important');
     ov.style.setProperty('padding', '0', 'important');
-    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:90vh !important;overflow-y:auto !important;padding:28px 16px !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;-webkit-overflow-scrolling:touch !important;overscroll-behavior:contain !important;';
+    var maxH = Math.floor(vh * 0.78);
+    card.style.cssText = 'max-width:100% !important;width:100% !important;margin:0 !important;border-radius:20px 20px 0 0 !important;max-height:' + maxH + 'px !important;overflow-y:auto !important;padding:20px 16px !important;padding-bottom:calc(16px + env(safe-area-inset-bottom, 0px)) !important;opacity:1 !important;visibility:visible !important;display:block !important;animation:slideUpMobile 0.4s ease forwards !important;-webkit-overflow-scrolling:touch !important;overscroll-behavior:contain !important;';
   } else {
     ov.style.setProperty('justify-content', 'center', 'important');
     ov.style.setProperty('align-items', 'center', 'important');
@@ -2489,24 +2527,55 @@ function showPopup() {
     card.style.cssText = 'opacity:1 !important;visibility:visible !important;display:block !important;';
   }
   
-  // Ensure form is visible (reset from previous success state)
+  // 4) Ensure form is visible (reset from previous success state)
   var formWrap = document.getElementById('popupFormWrap');
   var successWrap = document.getElementById('popupSuccess');
   if (formWrap) formWrap.style.display = 'block';
   if (successWrap) successWrap.style.display = 'none';
   
-  document.body.style.overflow = 'hidden';
-  document.body.dataset.popupScrollY = String(window.scrollY);
-  console.log('[Popup] Shown on ' + (isMobile ? 'mobile' : 'desktop') + ', w=' + window.innerWidth);
+  // 5) Update height on resize/orientation change (handles keyboard open/close too)
+  _popupResizeHandler = function() { _setPopupHeight(); };
+  window.addEventListener('resize', _popupResizeHandler);
+  
+  // 6) Prevent touch-scroll on overlay (but allow scrolling inside the card)
+  _popupTouchHandler = function(e) {
+    // Allow scrolling inside the popup card
+    var target = e.target;
+    while (target && target !== ov) {
+      if (target === card) return; // allow card scroll
+      target = target.parentElement;
+    }
+    e.preventDefault();
+  };
+  ov.addEventListener('touchmove', _popupTouchHandler, { passive: false });
+  
+  console.log('[Popup] Shown on ' + (isMobile ? 'mobile' : 'desktop') + ', vh=' + vh + ', w=' + window.innerWidth);
 }
 
 function hidePopup() {
   var ov = document.getElementById('popupOverlay');
   if (ov) {
     ov.classList.remove('show');
-    ov.style.cssText = 'display:none;visibility:hidden;opacity:0;';
+    ov.style.cssText = 'display:none !important;visibility:hidden !important;opacity:0 !important;';
+    if (_popupTouchHandler) {
+      ov.removeEventListener('touchmove', _popupTouchHandler);
+      _popupTouchHandler = null;
+    }
   }
+  // Remove resize listener
+  if (_popupResizeHandler) {
+    window.removeEventListener('resize', _popupResizeHandler);
+    _popupResizeHandler = null;
+  }
+  // Restore body scroll — reverse the iOS Safari scroll-lock
+  var scrollY = parseInt(document.body.dataset.popupScrollY || '0', 10);
   document.body.style.overflow = '';
+  document.body.style.position = '';
+  document.body.style.top = '';
+  document.body.style.left = '';
+  document.body.style.right = '';
+  document.body.style.width = '';
+  window.scrollTo(0, scrollY);
   console.log('[Popup] Hidden');
 }
 
