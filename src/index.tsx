@@ -94,7 +94,7 @@ const CACHE_TTL = 86400; // seconds — edge cache lifetime (24 hours; admin sav
 const CACHEABLE_PATHS = new Set(['/', '/am', '/ru']);
 // Cache version — bump on every deploy to bust stale edge caches
 // The version is embedded in the cache key so old cached HTML is never returned.
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 
 // ===== DOMAIN CONSOLIDATION =====
 // Primary domain: gototopwb.ru — all traffic should end up here.
