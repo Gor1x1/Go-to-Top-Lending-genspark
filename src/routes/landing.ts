@@ -147,12 +147,39 @@ app.get('/', async (c) => {
     }
     
     // ===== Process photo blocks =====
+    // Collect upload IDs to verify they exist (uploads may have been lost during DB migration)
+    const uploadUrlsToCheck: Array<{key: string, url: string, uploadId: string}> = [];
     for (const blk of (photoBlocksRes.results || [])) {
       let url = blk.photo_url as string || '';
       if (!url) {
         try { const opts = JSON.parse(blk.custom_html as string || '{}'); url = opts.photo_url || ''; } catch {}
       }
-      if (url) photoMap[blk.block_key as string] = url;
+      if (url) {
+        const uploadMatch = url.match(/\/api\/admin\/uploads\/(\d+)/);
+        if (uploadMatch) {
+          uploadUrlsToCheck.push({ key: blk.block_key as string, url, uploadId: uploadMatch[1] });
+        } else {
+          photoMap[blk.block_key as string] = url;
+        }
+      }
+    }
+    // Verify upload URLs exist in DB before using them (skip broken refs)
+    if (uploadUrlsToCheck.length > 0) {
+      const ids = uploadUrlsToCheck.map(u => u.uploadId);
+      try {
+        const existing = await db.prepare(
+          `SELECT id FROM uploads WHERE id IN (${ids.map(() => '?').join(',')})`
+        ).bind(...ids).all();
+        const existingIds = new Set((existing.results || []).map((r: any) => String(r.id)));
+        for (const item of uploadUrlsToCheck) {
+          if (existingIds.has(item.uploadId)) {
+            photoMap[item.key] = item.url;
+          }
+          // If upload doesn't exist, skip — default static image will be used
+        }
+      } catch {
+        // If uploads table doesn't exist or query fails, skip all upload URLs
+      }
     }
     
     // ===== Process button blocks =====
@@ -272,7 +299,8 @@ app.get('/', async (c) => {
 <meta property="og:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta property="og:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta property="og:type" content="website">
-<meta property="og:url" content="${siteOrigin}">
+<link rel="canonical" href="https://gototopwb.ru${isArmenian ? '/am' : ''}">
+<meta property="og:url" content="https://gototopwb.ru${isArmenian ? '/am' : ''}">
 <meta property="og:image" content="${siteOrigin}/static/img/og-image-dark.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
@@ -472,9 +500,9 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none;transition:var(--t)}
 .calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
 .calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
-.calc-total{display:flex;justify-content:space-between;align-items:center;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple)}
-.calc-total-label{font-size:1.1rem;font-weight:600}
-.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:nowrap}
+.calc-total{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple);gap:12px;flex-wrap:wrap}
+.calc-total-label{font-size:1.1rem;font-weight:600;flex-shrink:0;white-space:nowrap}
+.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:normal;text-align:right;min-width:0;overflow-wrap:break-word}
 .calc-old-price{font-size:1rem;font-weight:600;color:var(--text-sec);text-decoration:line-through;opacity:0.7;margin-right:6px}
 .calc-discount-line{font-size:0.82rem;color:var(--success);font-weight:600;margin-top:2px}
 .calc-total-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:flex-end}
@@ -887,7 +915,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .process-grid{grid-template-columns:1fr 1fr}
   .cmp-table{font-size:0.78rem;min-width:420px}
   .cmp-table td,.cmp-table th{padding:10px 8px}
-  .calc-row{grid-template-columns:1fr;gap:8px}
+  .calc-row{grid-template-columns:1fr auto;gap:4px 8px}.calc-row .calc-input{grid-column:1/-1;justify-content:flex-start}
   .calc-wrap{padding:24px}
   .calc-tabs{gap:6px}
   .contact-grid{grid-template-columns:1fr}
@@ -2830,7 +2858,7 @@ function recalcDynamic() {
   
   var totalHtml = '';
   if (selectedPkg && packageAmount > 0) {
-    totalHtml += '<div style="font-size:0.78rem;color:#f59e0b;margin-bottom:2px"><i class="fas fa-box-open" style="margin-right:4px"></i>' + (lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru) + ': ' + formatNum(packageAmount) + ' \u058f</div>';
+    totalHtml += '<div style="font-size:0.78rem;color:#f59e0b;margin-bottom:2px;overflow-wrap:break-word;word-break:break-word;white-space:normal"><i class="fas fa-box-open" style="margin-right:4px"></i>' + (lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru) + ': ' + formatNum(packageAmount) + ' \u058f</div>';
   }
   if (totalDiscountAmount > 0 && subtotalBeforeDiscount > 0) {
     calcTotalEl.innerHTML = totalHtml + '<div class="calc-total-prices">' +
@@ -4970,6 +4998,8 @@ switchLang = function(l) {
       }
     }
     
+    // Final safety: re-apply language to any newly-created/modified elements
+    switchLang(lang);
     console.log('[DB] All dynamic data applied v7 – loading overlay removed');
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
@@ -6571,10 +6601,14 @@ async function checkRefCode() {
         /<meta property="og:locale" content="[^"]*">/,
         `<meta property="og:locale" content="hy_AM">`
       );
-      // Update og:url to include /am path
+      // Update og:url and canonical to include /am path (always use primary domain)
       pageHtml = pageHtml.replace(
         /<meta property="og:url" content="[^"]*">/,
-        `<meta property="og:url" content="${siteOrigin}/am">`
+        `<meta property="og:url" content="https://gototopwb.ru/am">`
+      );
+      pageHtml = pageHtml.replace(
+        /<link rel="canonical" href="[^"]*">/,
+        `<link rel="canonical" href="https://gototopwb.ru/am">`
       );
       // Set html lang
       pageHtml = pageHtml.replace('<html lang="ru"', '<html lang="hy"');
