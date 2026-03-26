@@ -43,13 +43,15 @@ app.post('/api/admin/purge-cache', async (c) => {
     const origin = new URL(c.req.url).origin;
     // Purge all cached landing page variants
     const paths = ['/', '/am', '/ru', '/?lang=am', '/?lang=ru'];
+    // Also purge versioned cache keys
+    const vPaths = paths.map(p => p.includes('?') ? p + '&_cv=' + CACHE_VERSION : p + '?_cv=' + CACHE_VERSION);
     // Purge both primary and secondary domain caches
     const origins = [origin];
     if (!origin.includes('gototop.win')) origins.push('https://gototop.win');
     if (!origin.includes('gototopwb.ru')) origins.push('https://gototopwb.ru');
     const purgePromises: Promise<boolean>[] = [];
     for (const o of origins) {
-      for (const p of paths) {
+      for (const p of [...paths, ...vPaths]) {
         purgePromises.push(cache.delete(new Request(o + p)).catch(() => false));
       }
     }
@@ -90,6 +92,9 @@ app.get('/ru', async (c) => {
 // TTL = 600s (10 min). Admin saves auto-purge via /api/admin middleware.
 const CACHE_TTL = 86400; // seconds — edge cache lifetime (24 hours; admin save auto-purges)
 const CACHEABLE_PATHS = new Set(['/', '/am', '/ru']);
+// Cache version — bump on every deploy to bust stale edge caches
+// The version is embedded in the cache key so old cached HTML is never returned.
+const CACHE_VERSION = 'v2';
 
 // ===== DOMAIN CONSOLIDATION =====
 // Primary domain: gototopwb.ru — all traffic should end up here.
@@ -125,6 +130,7 @@ export default {
     const cacheUrl = new URL(url.origin + url.pathname);
     const langParam = url.searchParams.get('lang');
     if (langParam) cacheUrl.searchParams.set('lang', langParam);
+    cacheUrl.searchParams.set('_cv', CACHE_VERSION);
     const cacheKey = new Request(cacheUrl.toString());
 
     // Try cache first
