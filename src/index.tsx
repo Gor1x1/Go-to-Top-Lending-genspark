@@ -43,9 +43,17 @@ app.post('/api/admin/purge-cache', async (c) => {
     const origin = new URL(c.req.url).origin;
     // Purge all cached landing page variants
     const paths = ['/', '/am', '/ru', '/?lang=am', '/?lang=ru'];
-    const results = await Promise.all(
-      paths.map(p => cache.delete(new Request(origin + p)).catch(() => false))
-    );
+    // Purge both primary and secondary domain caches
+    const origins = [origin];
+    if (!origin.includes('gototop.win')) origins.push('https://gototop.win');
+    if (!origin.includes('gototopwb.ru')) origins.push('https://gototopwb.ru');
+    const purgePromises: Promise<boolean>[] = [];
+    for (const o of origins) {
+      for (const p of paths) {
+        purgePromises.push(cache.delete(new Request(o + p)).catch(() => false));
+      }
+    }
+    const results = await Promise.all(purgePromises);
     return c.json({ ok: true, purged: results.filter(Boolean).length });
   } catch (e: any) {
     return c.json({ ok: false, error: e.message });
@@ -83,9 +91,28 @@ app.get('/ru', async (c) => {
 const CACHE_TTL = 86400; // seconds — edge cache lifetime (24 hours; admin save auto-purges)
 const CACHEABLE_PATHS = new Set(['/', '/am', '/ru']);
 
+// ===== DOMAIN CONSOLIDATION =====
+// Primary domain: gototopwb.ru — all traffic should end up here.
+// Secondary domain: gototop.win — 301 permanent redirect to primary.
+// This avoids SEO duplicate-content penalties and gives users one canonical URL.
+const PRIMARY_HOST = 'gototopwb.ru';
+const REDIRECT_HOSTS = new Set(['gototop.win', 'www.gototop.win', 'www.gototopwb.ru']);
+
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+
+    // 301 redirect non-primary domains to the canonical primary domain
+    // Skip admin/API paths so Cloudflare dashboard proxying still works
+    if (REDIRECT_HOSTS.has(url.hostname) && !url.pathname.startsWith('/api/') && !url.pathname.startsWith('/admin')) {
+      const dest = new URL(url.toString());
+      dest.hostname = PRIMARY_HOST;
+      return new Response(null, {
+        status: 301,
+        headers: { 'Location': dest.toString(), 'Cache-Control': 'public, max-age=86400' },
+      });
+    }
+
     const isCacheable = CACHEABLE_PATHS.has(url.pathname) && request.method === 'GET';
 
     // Only cache GET requests for landing pages (not admin, API, etc.)
