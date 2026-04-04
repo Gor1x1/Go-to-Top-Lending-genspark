@@ -7,6 +7,7 @@
 import { Hono } from 'hono'
 import { verifyToken, hashPassword, verifyPassword, createToken, initDefaultAdmin } from '../lib/auth'
 import { initDatabase, ALL_ROLES, ALL_SECTIONS, ROLE_LABELS, SECTION_LABELS, DEFAULT_PERMISSIONS } from '../lib/db'
+import { CACHE_VERSION, CACHEABLE_PATHS, KNOWN_ORIGINS } from '../lib/cache-config'
 
 // Route modules
 import { register as registerContent } from './routes/admin-content'
@@ -45,10 +46,18 @@ api.use('*', async (c, next) => {
     try {
       const cache = caches.default;
       const origin = new URL(c.req.url).origin;
-      const paths = ['/', '/am', '/ru', '/?lang=am', '/?lang=ru'];
-      c.executionCtx.waitUntil(
-        Promise.all(paths.map(p => cache.delete(new Request(origin + p)).catch(() => false)))
-      );
+      // Build versioned + unversioned paths
+      const vPaths = CACHEABLE_PATHS.map(p => p.includes('?') ? p + '&_cv=' + CACHE_VERSION : p + '?_cv=' + CACHE_VERSION);
+      const allPaths = [...CACHEABLE_PATHS, ...vPaths];
+      // Purge from ALL known origins (not just the requesting origin)
+      const origins = new Set([origin, ...KNOWN_ORIGINS]);
+      const purgePromises: Promise<boolean>[] = [];
+      for (const o of origins) {
+        for (const p of allPaths) {
+          purgePromises.push(cache.delete(new Request(o + p)).catch(() => false));
+        }
+      }
+      c.executionCtx.waitUntil(Promise.all(purgePromises));
     } catch { /* cache purge is best-effort */ }
   }
 })

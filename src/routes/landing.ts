@@ -12,9 +12,9 @@ type Bindings = { DB: D1Database }
 export function register(app: Hono<{ Bindings: Bindings }>) {
 app.get('/', async (c) => {
   // Browser: 30s fresh, Edge: 600s via Cache API wrapper (index.tsx).
-  // stale-while-revalidate=86400 means the browser can show a stale page
-  // for up to 24h while revalidating in the background — eliminates white-screen waits.
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=86400, stale-while-revalidate=86400');
+  // stale-while-revalidate=600 means the browser can show a stale page
+  // for up to 10 min while revalidating in the background — eliminates white-screen waits.
+  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
   
   // Start site-data fetch in parallel with SSR (will be awaited at the end)
   const siteDataPromise = (async () => {

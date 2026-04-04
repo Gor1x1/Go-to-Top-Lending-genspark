@@ -11,6 +11,7 @@
 import { Hono } from 'hono'
 import adminApi from './api/admin'
 import { getAdminHTML } from './admin/panel'
+import { CACHE_VERSION, CACHEABLE_PATHS as CACHE_PATHS, KNOWN_ORIGINS } from './lib/cache-config'
 
 // Route modules
 import { register as registerPublicApi } from './routes/public-api'
@@ -42,13 +43,11 @@ app.post('/api/admin/purge-cache', async (c) => {
     const cache = caches.default;
     const origin = new URL(c.req.url).origin;
     // Purge all cached landing page variants
-    const paths = ['/', '/am', '/ru', '/?lang=am', '/?lang=ru'];
+    const paths = CACHE_PATHS;
     // Also purge versioned cache keys
     const vPaths = paths.map(p => p.includes('?') ? p + '&_cv=' + CACHE_VERSION : p + '?_cv=' + CACHE_VERSION);
-    // Purge both primary and secondary domain caches
-    const origins = [origin];
-    if (!origin.includes('gototop.win')) origins.push('https://gototop.win');
-    if (!origin.includes('gototopwb.ru')) origins.push('https://gototopwb.ru');
+    // Purge ALL known origins (not just the requesting one)
+    const origins = new Set([origin, ...KNOWN_ORIGINS]);
     const purgePromises: Promise<boolean>[] = [];
     for (const o of origins) {
       for (const p of [...paths, ...vPaths]) {
@@ -90,11 +89,8 @@ app.get('/ru', async (c) => {
 // Cache key = full URL (normalized). On cache HIT the Worker returns
 // immediately without touching D1, giving ~50ms TTFB.
 // TTL = 600s (10 min). Admin saves auto-purge via /api/admin middleware.
-const CACHE_TTL = 86400; // seconds — edge cache lifetime (24 hours; admin save auto-purges)
+const CACHE_TTL = 600; // seconds — edge cache lifetime (10 min; short TTL ensures stale content expires fast even if purge misses some PoPs)
 const CACHEABLE_PATHS = new Set(['/', '/am', '/ru']);
-// Cache version — bump on every deploy to bust stale edge caches
-// The version is embedded in the cache key so old cached HTML is never returned.
-const CACHE_VERSION = 'v4';
 
 // ===== DOMAIN CONSOLIDATION =====
 // Primary domain: gototopwb.ru — all traffic should end up here.
@@ -154,7 +150,7 @@ export default {
         status: 200,
         headers: {
           ...Object.fromEntries(response.headers.entries()),
-          'Cache-Control': `public, max-age=30, s-maxage=${CACHE_TTL}, stale-while-revalidate=86400`,
+          'Cache-Control': `public, max-age=30, s-maxage=${CACHE_TTL}, stale-while-revalidate=${CACHE_TTL}`,
           'CDN-Cache-Control': `max-age=${CACHE_TTL}`,
           'X-Cache-Status': 'MISS',
           'Vary': 'Accept-Encoding',
