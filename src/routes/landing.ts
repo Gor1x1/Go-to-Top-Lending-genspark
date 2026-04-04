@@ -315,7 +315,9 @@ app.get('/', async (c) => {
 <meta name="twitter:title" content="Go to Top — Առաջխաղացում Wildberries-ում">
 <meta name="twitter:description" content="Выкупы живыми людьми, отзывы с реальными фото, собственный склад в Ереване. Более 1000 аккаунтов.">
 <meta name="twitter:image" content="${siteOrigin}/static/img/og-image-dark.png">
-<link rel="icon" type="image/png" href="/static/img/logo-gototop.png">
+<link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
+<link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css"></noscript>
 <style>
@@ -3081,12 +3083,18 @@ function updateTelegramLinks() {
     if (!buttonText) return;
     buttonText = buttonText.trim();
     var tgMsg = tgByLabel[buttonText];
-    if (!tgMsg) return;
-    var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
-    // PRIORITY: blockFeatures URL > telegram_messages URL
+    // PRIORITY: blockFeatures data > telegram_messages data
     var bfEntry = window._bfUrlByLabel ? window._bfUrlByLabel[buttonText] : null;
-    var mUrl = (bfEntry && bfEntry.url) ? bfEntry.url : (tgMsg.telegram_url || '');
+    var mUrl = (bfEntry && bfEntry.url) ? bfEntry.url : (tgMsg ? tgMsg.telegram_url || '' : '');
     if (!mUrl) return;
+    // Message: blockFeatures message_ru/am is the SINGLE source of truth
+    // telegram_messages.message_template is only used as fallback if blockFeatures has no entry
+    var msgTemplate = '';
+    if (bfEntry) {
+      msgTemplate = (lang === 'am' && bfEntry.message_am) ? bfEntry.message_am : (bfEntry.message_ru || '');
+    } else if (tgMsg) {
+      msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : (tgMsg.message_template_ru || '');
+    }
     var isWa = mUrl.includes('wa.me') || mUrl.includes('whatsapp');
     if (msgTemplate) {
       if (isWa) {
@@ -3471,10 +3479,10 @@ switchLang = function(l) {
         if (!bf.buttons || bf.buttons.length === 0) return;
         bf.buttons.forEach(function(btn) {
           if (btn.text_ru && btn.url) {
-            window._bfUrlByLabel[btn.text_ru.trim()] = { url: btn.url, key: bf.key };
+            window._bfUrlByLabel[btn.text_ru.trim()] = { url: btn.url, key: bf.key, message_ru: btn.message_ru || '', message_am: btn.message_am || '' };
           }
           if (btn.text_am && btn.url) {
-            window._bfUrlByLabel[btn.text_am.trim()] = { url: btn.url, key: bf.key };
+            window._bfUrlByLabel[btn.text_am.trim()] = { url: btn.url, key: bf.key, message_ru: btn.message_ru || '', message_am: btn.message_am || '' };
           }
         });
       });
@@ -3522,7 +3530,7 @@ switchLang = function(l) {
       }
       
       // Find all <a> tags pointing to t.me/ or wa.me/ and update their href
-      // CRITICAL: Use blockFeatures URL (admin panel) as primary, telegram_messages only for message template
+      // SINGLE SOURCE: blockFeatures message_ru/am controls auto-messages
       document.querySelectorAll('a[href*="t.me/"], a[href*="wa.me/"], a[href*="whatsapp"]').forEach(function(a) {
         if (a.id === 'calcTgBtn') return;
         var spanWithDataRu = a.querySelector('span[data-ru]');
@@ -3532,12 +3540,17 @@ switchLang = function(l) {
         if (!buttonText) return;
         buttonText = buttonText.trim();
         var tgMsg = tgByLabel[buttonText];
-        if (!tgMsg) return;
-        var msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : tgMsg.message_template_ru;
-        // PRIORITY: blockFeatures URL > telegram_messages URL
+        // PRIORITY: blockFeatures data > telegram_messages data
         var bfEntry = window._bfUrlByLabel[buttonText];
-        var mUrl = (bfEntry && bfEntry.url) ? bfEntry.url : (tgMsg.telegram_url || '');
+        var mUrl = (bfEntry && bfEntry.url) ? bfEntry.url : (tgMsg ? tgMsg.telegram_url || '' : '');
         if (!mUrl) return;
+        // Message: blockFeatures message_ru/am is the SINGLE source of truth
+        var msgTemplate = '';
+        if (bfEntry) {
+          msgTemplate = (lang === 'am' && bfEntry.message_am) ? bfEntry.message_am : (bfEntry.message_ru || '');
+        } else if (tgMsg) {
+          msgTemplate = (lang === 'am' && tgMsg.message_template_am) ? tgMsg.message_template_am : (tgMsg.message_template_ru || '');
+        }
         var isWa = mUrl.includes('wa.me') || mUrl.includes('whatsapp');
         if (msgTemplate) {
           a.href = isWa ? (mUrl + (mUrl.includes('?') ? '&text=' : '?text=') + encodeURIComponent(msgTemplate)) : (mUrl + '?text=' + encodeURIComponent(msgTemplate));
