@@ -3731,8 +3731,9 @@ function renderLeads() {
       if (l.articles_count > 0) h += '<span class="badge" style="background:rgba(249,115,22,0.15);color:#fb923c"><i class="fas fa-box" style="margin-right:3px"></i>' + l.articles_count + ' \u0430\u0440\u0442.</span>';
       if (freeSvcs.length > 0) h += '<span class="badge" style="background:rgba(16,185,129,0.15);color:#34D399"><i class="fas fa-gift" style="margin-right:3px"></i>' + freeSvcs.length + ' bonus</span>';
       var _invPrefix = (data.pdfTemplate && data.pdfTemplate.invoice_prefix) || 'INV';
-      var _invNum = _invPrefix + '-' + String(l.id).padStart(4, '0');
-      h += '<a href="/pdf/' + l.id + '" target="_blank" onclick="event.stopPropagation()" class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;text-decoration:none;cursor:pointer" title="\u041E\u0442\u043A\u0440\u044B\u0442\u044C PDF"><i class="fas fa-file-invoice" style="margin-right:3px"></i>' + _invNum + ' <i class="fas fa-external-link-alt" style="font-size:0.6rem;margin-left:3px;opacity:0.7"></i></a>';
+      var _invNumDefault = _invPrefix + '-' + String(l.id).padStart(4, '0');
+      var _invNum = (l.service && l.service.trim()) ? l.service.trim() : _invNumDefault;
+      h += '<a id="lead-inv-link-' + l.id + '" href="/pdf/' + l.id + '" target="_blank" onclick="event.stopPropagation()" class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;text-decoration:none;cursor:pointer" title="\u041E\u0442\u043A\u0440\u044B\u0442\u044C PDF"><i class="fas fa-file-invoice" style="margin-right:3px"></i><span id="lead-inv-text-' + l.id + '">' + escHtml(_invNum) + '</span> <i class="fas fa-external-link-alt" style="font-size:0.6rem;margin-left:3px;opacity:0.7"></i></a>';
       h += '</div>';
       // Right: age + actions
       h += '<div style="display:flex;align-items:center;gap:10px">';
@@ -3851,14 +3852,16 @@ function renderLeads() {
       h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fab fa-telegram" style="margin-right:4px;color:#0EA5E9"></i>Группа</label><input class="input" id="lead-tg-' + l.id + '" value="' + escHtml(l.telegram_group||'') + '" style="font-size:0.85rem;padding:8px" placeholder="https://t.me/..." oninput="autoSaveLeadField(' + l.id + ',&apos;telegram_group&apos;,&apos;lead-tg-' + l.id + '&apos;)"></div>';
       h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-file-alt" style="margin-right:4px;color:#F59E0B"></i>ТЗ клиента</label><input class="input" id="lead-tz-' + l.id + '" value="' + escHtml(l.tz_link||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Ссылка на ТЗ..." oninput="autoSaveLeadField(' + l.id + ',&apos;tz_link&apos;,&apos;lead-tz-' + l.id + '&apos;)"></div>';
       h += '</div>';
-      // Row 3: Product + Service (for non-calc leads)
+      // Row 3: Product + Invoice number
       if (l.product || l.service || !isCalc) {
         h += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px">';
         h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-box" style="margin-right:4px;color:#fb923c"></i>Товар (WB)</label><input class="input" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>';
-        h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-concierge-bell" style="margin-right:4px;color:#60a5fa"></i>Интересует</label><input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="Не указано"></div>';
+        h += '<div><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-file-invoice" style="margin-right:4px;color:#60a5fa"></i>Номер инвойса</label><input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="' + escHtml(_invNumDefault) + '" oninput="autoSaveLeadField(' + l.id + ',&apos;service&apos;,&apos;lead-service-' + l.id + '&apos;);updateInvBadge(' + l.id + ')"></div>';
         h += '</div>';
       } else {
-        h += '<input type="hidden" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '"><input type="hidden" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '">';
+        // Calculator lead — still show invoice number field, hide product
+        h += '<input type="hidden" id="lead-product-' + l.id + '" value="' + escHtml(l.product||'') + '">';
+        h += '<div style="margin-top:10px"><label style="font-size:0.72rem;font-weight:600;color:#94a3b8;display:block;margin-bottom:4px"><i class="fas fa-file-invoice" style="margin-right:4px;color:#60a5fa"></i>Номер инвойса</label><input class="input" id="lead-service-' + l.id + '" value="' + escHtml(l.service||'') + '" style="font-size:0.85rem;padding:8px" placeholder="' + escHtml(_invNumDefault) + '" oninput="autoSaveLeadField(' + l.id + ',&apos;service&apos;,&apos;lead-service-' + l.id + '&apos;);updateInvBadge(' + l.id + ')"></div>';
       }
       // Client comment
       if (l.message) {
@@ -4170,6 +4173,15 @@ function autoSaveLeadField(leadId, fieldName, fieldId) {
       setTimeout(function() { el.style.borderColor = ''; }, 1000);
     });
   }, 800);
+}
+
+function updateInvBadge(leadId) {
+  var el = document.getElementById('lead-service-' + leadId);
+  var badge = document.getElementById('lead-inv-text-' + leadId);
+  if (!el || !badge) return;
+  var val = el.value.trim();
+  var _invPrefix = (data.pdfTemplate && data.pdfTemplate.invoice_prefix) || 'INV';
+  badge.textContent = val || (_invPrefix + '-' + String(leadId).padStart(4, '0'));
 }
 
 async function applyLeadRefCode(leadId) {
