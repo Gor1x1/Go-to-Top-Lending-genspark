@@ -189,7 +189,9 @@ function renderLeads() {
         var refMatch = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
         if (refMatch) discPct = Number(refMatch.discount_percent || 0);
       }
-      var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
+      // Use saved discountAmount from recalc (respects linked_services), fallback to full calc
+      var discAmt = Number(calcData && calcData.discountAmount || 0);
+      if (discAmt === 0 && discPct > 0 && l.referral_code) discAmt = Math.round(svcAmt * discPct / 100);
       // Payment method info for card summary — use saved commission_amount for accuracy
       var cardPmMatch = ensureArray(data.paymentMethods).find(function(m) { return m.id == l.payment_method_id; });
       var cardPmComm = Number(l.commission_amount || 0);
@@ -334,8 +336,9 @@ function renderLeads() {
           if (refMatch2) refDiscPct = Number(refMatch2.discount_percent || 0);
         }
         var refSvcBase = svcAmt || Number(calcData && calcData.servicesSubtotal || 0);
-        // Recalculate discount from services base (never trust stored discountAmount — may be stale)
-        var refDiscAmt = refDiscPct > 0 ? Math.round(refSvcBase * refDiscPct / 100) : 0;
+        // Use saved discountAmount from recalc (respects linked_services), fallback to full calc
+        var refDiscAmt = Number(calcData && calcData.discountAmount || 0);
+        if (refDiscAmt === 0 && refDiscPct > 0) refDiscAmt = Math.round(refSvcBase * refDiscPct / 100);
         var svcAfterDisc = refSvcBase - refDiscAmt;
         h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:6px;padding:10px 12px;background:#0f2d1f;border:1px solid rgba(16,185,129,0.2);border-radius:8px;font-size:0.78rem;color:#6ee7b7">' +
           '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span><i class="fas fa-check-circle" style="margin-right:4px"></i>Код «' + escHtml(leadRefCode) + '» применён</span>' +
@@ -363,7 +366,9 @@ function renderLeads() {
         if (refMatch3) leadDiscPct2 = Number(refMatch3.discount_percent || 0);
       }
       // Recalculate discount from actual services total
-      var leadDiscAmt2 = leadDiscPct2 > 0 && l.referral_code ? Math.round(svcTotal * leadDiscPct2 / 100) : 0;
+      // Use saved discountAmount from recalc (respects linked_services), fallback to full calc
+      var leadDiscAmt2 = Number(calcData && calcData.discountAmount || 0);
+      if (leadDiscAmt2 === 0 && leadDiscPct2 > 0 && l.referral_code) leadDiscAmt2 = Math.round(svcTotal * leadDiscPct2 / 100);
       var svcAfterDisc2 = leadDiscAmt2 > 0 ? (svcTotal - leadDiscAmt2) : svcTotal;
       h += '<div style="margin-top:10px;border-top:1px solid #334155;padding-top:10px">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">' +

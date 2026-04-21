@@ -312,6 +312,9 @@ app.get('/pdf/:id', async (c) => {
     const bankDetails = tpl['bank_details' + lSuffix] || '';
     const accentColor = tpl.accent_color || '#8B5CF6';
     const invoicePrefix = tpl.invoice_prefix || 'INV';
+    // Use custom invoice number from lead.service if set by admin, otherwise auto-generate
+    const customInvoice = ((lead.service as string) || '').trim();
+    const invoiceNum = customInvoice || (invoicePrefix + '-' + String(id).padStart(4, '0'));
     const companyLogo = tpl.company_logo_url || '';
     const companyWebsite = tpl.company_website || '';
     const companyInn = tpl.company_inn || '';
@@ -380,9 +383,17 @@ app.get('/pdf/:id', async (c) => {
         pkgDiscountAmount = Math.round(pkgPrice * calcDiscountPercent / 100);
       }
     }
-    // afterDiscount = services subtotal (minus discount if any) + articles subtotal + package price (minus pkg discount if any)
+    // afterDiscount = services subtotal (minus discount if any) + articles subtotal + package price (minus pkg discount if any) + partial-discount bonus services
     // BUG FIX: articles subtotal was NOT included in total — client pays for BOTH services AND articles
-    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + artSubtotal + pkgPrice - pkgDiscountAmount;
+    // BUG FIX: refServiceDiscounts (e.g. -50% on buyouts) were shown in PDF but NOT added to total
+    let refServiceDiscountsTotal = 0;
+    for (const sd of refServiceDiscounts) {
+      const sdQty = Number(sd.quantity) || 1;
+      const sdPrice = Number(sd.price) || 0;
+      const sdDisc = Number(sd.discount_percent) || 0;
+      refServiceDiscountsTotal += Math.round(sdPrice * sdQty * (100 - sdDisc) / 100);
+    }
+    const afterDiscount = (calcDiscountAmount > 0 ? Number(subtotal) - calcDiscountAmount : Number(subtotal)) + artSubtotal + pkgPrice - pkgDiscountAmount + refServiceDiscountsTotal;
     const beforeCommission = refundAmount > 0 ? (afterDiscount - refundAmount) : afterDiscount;
     
     // Load payment method + service names in parallel for speed
@@ -548,7 +559,7 @@ app.get('/pdf/:id', async (c) => {
     const messengerIcon = isWhatsApp ? 'fab fa-whatsapp' : 'fab fa-telegram';
     
     const orderMsg = String(tpl['order_message' + lSuffix] || (isEn ? 'Hello! I would like to place an order:' : isAm ? '\u0548\u0572\u057b\u0578\u0582\u0575\u0576! \u053f\u0581\u0561\u0576\u056f\u0561\u0576\u0561\u0575\u056b \u057a\u0561\u057f\u057e\u056b\u0580\u0565\u056c:' : '\u0417\u0434\u0440\u0430\u0432\u0441\u0442\u0432\u0443\u0439\u0442\u0435! \u0425\u043e\u0447\u0443 \u043e\u0444\u043e\u0440\u043c\u0438\u0442\u044c \u0437\u0430\u043a\u0430\u0437:'))
-      + '\n' + invoicePrefix + '-' + id
+      + '\n' + invoiceNum
       + '\n' + L.total + ' ' + Number(finalTotal).toLocaleString('ru-RU') + ' \u058f';
     const orderMsgFull = orderMsg
       + (clientName ? '\n' + (isEn ? 'Name' : isAm ? '\u0531\u0576\u0578\u0582\u0576' : '\u0418\u043c\u044f') + ': ' + clientName : '')
@@ -568,7 +579,6 @@ app.get('/pdf/:id', async (c) => {
     const companyAddress = String(tpl.company_address || '');
     const localeCode = isEn ? 'en-US' : isAm ? 'hy-AM' : 'ru-RU';
     const dateStr = new Date().toLocaleDateString(localeCode);
-    const invoiceNum = invoicePrefix + '-' + String(id).padStart(4, '0');
 
     const pdfHtml = '<!DOCTYPE html><html lang="' + lang + '"><head><meta charset="UTF-8">'
       + '<meta name="viewport" content="width=device-width,initial-scale=1.0">'
