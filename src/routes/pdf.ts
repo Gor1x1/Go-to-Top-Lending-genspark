@@ -64,6 +64,28 @@ app.post('/api/generate-pdf', async (c) => {
           discountPercent = Number(refRow.discount_percent) || 0;
           try { initLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { initLinkedPackages = []; }
           try { initLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { initLinkedServices = []; }
+          // Enrich items with service_id if missing (fallback matching by name)
+          if (initLinkedServices.length > 0) {
+            const hasServiceIds = items.some((i: any) => !!i.service_id);
+            if (!hasServiceIds) {
+              try {
+                const svcRows = await db.prepare('SELECT id, name_ru, name_am FROM calculator_services').all();
+                const nameToId: Record<string, number> = {};
+                for (const s of (svcRows.results || [])) {
+                  if (s.name_ru) nameToId[String(s.name_ru).trim()] = Number(s.id);
+                  if (s.name_am) nameToId[String(s.name_am).trim()] = Number(s.id);
+                }
+                for (const item of items) {
+                  if (!item.service_id) {
+                    const nameKey = String(item.name_ru || item.name || '').trim();
+                    if (nameKey && nameToId[nameKey]) item.service_id = nameToId[nameKey];
+                  }
+                }
+              } catch {}
+            }
+          }
+          try { initLinkedPackages = JSON.parse((refRow.linked_packages as string) || '[]'); } catch { initLinkedPackages = []; }
+          try { initLinkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { initLinkedServices = []; }
           // Load free/bonus services first — they affect discount logic
           const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
           freeServices = (fsRes.results || []).map((fs: any) => ({
@@ -273,13 +295,29 @@ app.get('/pdf/:id', async (c) => {
     let refLinkedPackages: number[] = [];
     let refLinkedServices: number[] = [];
     
-    // Run template + referral queries in parallel for speed
-    const [tplRow, refRow] = await Promise.all([
+    // Run template + referral + services queries in parallel for speed
+    const [tplRow, refRow, allSvcsRes] = await Promise.all([
       db.prepare("SELECT * FROM pdf_templates WHERE template_key = 'default'").first(),
       referralCode
         ? db.prepare('SELECT * FROM referral_codes WHERE code = ? AND is_active = 1').bind(referralCode.trim().toUpperCase()).first().catch(() => null)
-        : Promise.resolve(null)
+        : Promise.resolve(null),
+      db.prepare('SELECT id, name_ru, name_am FROM calculator_services').all().catch(() => ({ results: [] }))
     ]);
+    // Build name→id map for enriching items that lack service_id (legacy leads)
+    const svcNameToId: Record<string, number> = {};
+    for (const s of (allSvcsRes.results || [])) {
+      if (s.name_ru) svcNameToId[String(s.name_ru).trim()] = Number(s.id);
+      if (s.name_am) svcNameToId[String(s.name_am).trim()] = Number(s.id);
+    }
+    // Enrich items: add service_id when missing by matching item name against DB services
+    for (const item of items) {
+      if (!item.service_id && !item.wb_article) {
+        const nameKey = String(item.name_ru || item.name || '').trim();
+        if (nameKey && svcNameToId[nameKey]) {
+          item.service_id = svcNameToId[nameKey];
+        }
+      }
+    }
     let tpl: any = tplRow || {};
     
     if (refRow) {
@@ -361,10 +399,16 @@ app.get('/pdf/:id', async (c) => {
             discountBase += Number(si.subtotal || 0);
           }
         }
-        // Only fall back to full svcSubtotal when items have no service_ids (legacy leads)
-        // AND the lead was actually generated with a discount (calcData.discountAmount > 0)
-        if (discountBase === 0 && svcSubtotal > 0 && calcData.discountAmount > 0) {
-          discountBase = svcSubtotal;
+        // Fall back to full svcSubtotal when items still have no service_ids after enrichment
+        // This handles truly legacy leads where even name matching couldn't resolve IDs
+        if (discountBase === 0 && svcSubtotal > 0) {
+          // If discount was previously calculated (recalc saved it) use that, otherwise apply to all services
+          if (calcData.discountAmount > 0) {
+            discountBase = svcSubtotal;
+          } else if (!serviceItems.some((si: any) => si.service_id)) {
+            // No items have service_id at all — apply discount to all services as fallback
+            discountBase = svcSubtotal;
+          }
         }
       }
       if (discountBase === 0 && refLinkedServices.length === 0) {
@@ -403,12 +447,12 @@ app.get('/pdf/:id', async (c) => {
     let pmCommissionPct = 0;
     let pmCommissionAmt = 0;
     let svcNameMap: Record<string, { name_ru: string; name_am: string }> = {};
-    const [pmRow, allSvcs] = await Promise.all([
+    const [pmRow] = await Promise.all([
       lead.payment_method_id
         ? db.prepare('SELECT * FROM payment_methods WHERE id = ? AND is_active = 1').bind(lead.payment_method_id).first().catch(() => null)
-        : Promise.resolve(null),
-      db.prepare('SELECT name_ru, name_am FROM calculator_services').all().catch(() => ({ results: [] }))
+        : Promise.resolve(null)
     ]);
+    const allSvcs = allSvcsRes;
     if (pmRow) {
       pmName = (pmRow.name_ru as string) || '';
       pmNameAm = (pmRow.name_am as string) || pmName;
