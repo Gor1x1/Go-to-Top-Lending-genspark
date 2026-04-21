@@ -648,6 +648,25 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
     }
   } catch {}
   
+  // Enrich service items: add service_id when missing by matching name against DB
+  // This is needed because older leads may not have service_id saved in calcData items
+  try {
+    const svcRows = await db.prepare('SELECT id, name_ru, name_am FROM calculator_services').all();
+    const nameToId: Record<string, number> = {};
+    for (const s of (svcRows.results || [])) {
+      if (s.name_ru) nameToId[String(s.name_ru).trim()] = Number(s.id);
+      if (s.name_am) nameToId[String(s.name_am).trim()] = Number(s.id);
+    }
+    for (const si of serviceItems) {
+      if (!si.service_id) {
+        const nameKey = String(si.name_ru || si.name || '').trim();
+        if (nameKey && nameToId[nameKey]) {
+          si.service_id = nameToId[nameKey];
+        }
+      }
+    }
+  } catch {}
+  
   // Sum all articles total_price
   const articlesRes = await db.prepare('SELECT * FROM lead_articles WHERE lead_id = ? ORDER BY sort_order, id').bind(leadId).all();
   const articles = articlesRes.results || [];
@@ -695,6 +714,11 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
               if (si.service_id && linkedServices.map(Number).indexOf(Number(si.service_id)) !== -1) {
                 linkedSubtotal += Number(si.subtotal) || 0;
               }
+            }
+            // Fallback: if no items matched linked services (e.g. name enrichment failed),
+            // apply to all services to avoid silent discount loss
+            if (linkedSubtotal === 0 && servicesTotalAmount > 0 && !serviceItems.some((si: any) => si.service_id)) {
+              linkedSubtotal = servicesTotalAmount;
             }
             discountAmount = Math.round(linkedSubtotal * discountPercent / 100);
           } else {
