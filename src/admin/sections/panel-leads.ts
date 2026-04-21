@@ -512,8 +512,9 @@ async function applyLeadRefCode(leadId) {
       }
       toast('Сумма пересчитана: ' + Number(recalcRes.total_amount).toLocaleString('ru-RU') + ' ֏');
     }
-    // Reload data to update card display
+    // Reload data to update card display (including referral bonus services)
     await loadData();
+    if (typeof loadRefServices === 'function') await loadRefServices();
     render();
   } catch(e) { console.log('Recalc error:', e); }
 }
@@ -537,10 +538,12 @@ async function removeLeadRefCode(leadId) {
     }
     toast('Промокод отменён, скидка убрана');
     await loadData();
+    if (typeof loadRefServices === 'function') await loadRefServices();
     render();
   } catch(e) {
     toast('Промокод убран, обновите страницу');
     await loadData();
+    if (typeof loadRefServices === 'function') await loadRefServices();
     render();
   }
 }

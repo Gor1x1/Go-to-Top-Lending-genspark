@@ -460,7 +460,9 @@ async function saveReferral(id) {
 }
 async function toggleReferral(id, active) {
   var ref=data.referrals.find(function(r){return r.id===id;}); if(!ref) return;
-  await api('/referrals/'+id,{method:'PUT',body:JSON.stringify({...ref,is_active:active})});
+  var lp=[]; try{lp=typeof ref.linked_packages==='string'?JSON.parse(ref.linked_packages||'[]'):ref.linked_packages||[];}catch(e){lp=[];}
+  var ls=[]; try{ls=typeof ref.linked_services==='string'?JSON.parse(ref.linked_services||'[]'):ref.linked_services||[];}catch(e){ls=[];}
+  await api('/referrals/'+id,{method:'PUT',body:JSON.stringify({code:ref.code,description:ref.description,discount_percent:ref.discount_percent,is_active:active,max_uses:ref.max_uses,apply_to_packages:ref.apply_to_packages,linked_packages:lp,linked_services:ls})});
   toast(active?'Активирован':'Деактивирован'); await loadData(); await loadRefServices(); render();
 }
 async function deleteReferral(id) {
