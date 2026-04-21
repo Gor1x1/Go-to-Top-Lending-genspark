@@ -283,7 +283,9 @@ app.get('/pdf/:id', async (c) => {
     const clientName = (lead.name as string) || '';
     const clientContact = (lead.contact as string) || '';
     const refundAmount = Number(lead.refund_amount) || 0;
-    const referralCode = (lead.referral_code as string) || calcData.referralCode || '';
+    // Use lead DB field as primary source; only fall back to calcData when DB field is null/undefined (not empty string)
+    const leadRefCode = lead.referral_code as string;
+    const referralCode = (leadRefCode !== null && leadRefCode !== undefined) ? leadRefCode : (calcData.referralCode || '');
     const pkgData = calcData.package || null;
     const pkgPrice = pkgData ? (Number(pkgData.package_price) || 0) : 0;
     const pkgOriginalPrice = pkgData ? (Number(pkgData.original_price) || 0) : 0;

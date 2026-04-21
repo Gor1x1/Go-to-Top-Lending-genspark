@@ -690,10 +690,11 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   const allItems = [...serviceItems, ...articleItems];
   
   // Apply referral code discount
-  // IMPORTANT: Use lead DB field as primary source; only fall back to calcData if DB field is null (not empty string)
+  // IMPORTANT: Use lead DB field as primary source; only fall back to calcData if DB field is null/undefined
   // When admin clears the code, leadRow.referral_code = '' — must NOT fall back to old calcData value
   const leadRefCode = leadRow.referral_code as string;
-  const referralCode = (leadRefCode !== null && leadRefCode !== undefined && leadRefCode !== '') ? leadRefCode : (existingCalcData?.referralCode || '');
+  // Only fall back to calcData when DB field is truly null/undefined (field missing), NOT when it's empty string (explicitly cleared)
+  const referralCode = (leadRefCode !== null && leadRefCode !== undefined) ? leadRefCode : (existingCalcData?.referralCode || '');
   let discountPercent = 0;
   let discountAmount = 0;
   let refFreeServices: any[] = [];
