@@ -671,20 +671,38 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   const allItems = [...serviceItems, ...articleItems];
   
   // Apply referral code discount
-  const referralCode = (leadRow.referral_code as string) || existingCalcData?.referralCode || '';
+  // IMPORTANT: Use lead DB field as primary source; only fall back to calcData if DB field is null (not empty string)
+  // When admin clears the code, leadRow.referral_code = '' — must NOT fall back to old calcData value
+  const leadRefCode = leadRow.referral_code as string;
+  const referralCode = (leadRefCode !== null && leadRefCode !== undefined && leadRefCode !== '') ? leadRefCode : (existingCalcData?.referralCode || '');
   let discountPercent = 0;
   let discountAmount = 0;
   let refFreeServices: any[] = [];
+  let refServiceDiscountsTotal = 0;
   if (referralCode) {
     try {
       const refRow = await db.prepare('SELECT * FROM referral_codes WHERE UPPER(code) = UPPER(?) AND is_active = 1').bind(referralCode.trim()).first();
       if (refRow) {
         discountPercent = Number(refRow.discount_percent) || 0;
+        // Parse linked_services to apply discount only to specific services
+        let linkedServices: number[] = [];
+        try { linkedServices = JSON.parse((refRow.linked_services as string) || '[]'); } catch { linkedServices = []; }
         if (discountPercent > 0) {
-          // Discount applies ONLY to services, NOT to WB articles (buyouts)
-          discountAmount = Math.round(servicesTotalAmount * discountPercent / 100);
+          if (linkedServices.length > 0) {
+            // Discount applies ONLY to linked services
+            let linkedSubtotal = 0;
+            for (const si of serviceItems) {
+              if (si.service_id && linkedServices.map(Number).indexOf(Number(si.service_id)) !== -1) {
+                linkedSubtotal += Number(si.subtotal) || 0;
+              }
+            }
+            discountAmount = Math.round(linkedSubtotal * discountPercent / 100);
+          } else {
+            // No linked_services filter → discount applies to ALL services
+            discountAmount = Math.round(servicesTotalAmount * discountPercent / 100);
+          }
         }
-        // Load free services
+        // Load free/bonus services
         const fsRes = await db.prepare('SELECT rfs.*, cs.name_ru, cs.name_am, cs.price FROM referral_free_services rfs LEFT JOIN calculator_services cs ON rfs.service_id = cs.id WHERE rfs.referral_code_id = ?').bind(refRow.id).all();
         refFreeServices = (fsRes.results || []).map((fs: any) => {
           const dp = Number(fs.discount_percent) || 0;
@@ -693,12 +711,17 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
           // discount_percent=0 or >=100 means fully free; otherwise partial discount
           const isFree = dp === 0 || dp >= 100;
           const actualSubtotal = isFree ? 0 : Math.round(price * qty * (100 - dp) / 100);
+          // Accumulate partial-discount service totals (e.g. -50% on buyouts → client pays half)
+          if (!isFree) {
+            refServiceDiscountsTotal += actualSubtotal;
+          }
           return {
             name: fs.name_ru || '',
             name_am: fs.name_am || '',
             qty: qty,
             price: price,
             discount_percent: dp,
+            service_id: fs.service_id,
             subtotal: actualSubtotal
           };
         });
@@ -710,7 +733,8 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   // BUG-006 fix: discount applies ONLY to services, not articles — separate the subtraction
   const packagePrice = existingCalcData?.package ? (Number(existingCalcData.package.package_price) || 0) : 0;
   const servicesAfterDiscount = Math.max(0, servicesTotalAmount - discountAmount);
-  const totalAmount = servicesAfterDiscount + articlesTotalAmount + packagePrice;
+  // Include partial-discount bonus services (e.g. -50% buyouts) in total
+  const totalAmount = servicesAfterDiscount + articlesTotalAmount + packagePrice + refServiceDiscountsTotal;
   
   // Compute commission from payment method
   let commissionAmount = 0;

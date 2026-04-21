@@ -2763,9 +2763,10 @@ function renderRefCard(ref, allCalcPackages, allCalcServices) {
     h += '<div style="height:3px;background:#0f172a"><div style="height:100%;background:' + pctColor + ';width:' + pct + '%;transition:width 0.3s"></div></div>';
   }
 
-  // ── Services summary ──
+  // ── Bonus services summary ──
   if (uniSvcs.length > 0) {
     h += '<div style="padding:10px 16px;border-bottom:1px solid #1e293b">' +
+      '<div style="font-size:0.62rem;color:#10B981;font-weight:600;margin-bottom:5px"><i class="fas fa-gift" style="margin-right:3px"></i>Бонусные услуги:</div>' +
       '<div style="display:flex;flex-wrap:wrap;gap:5px">';
     uniSvcs.forEach(function(s) {
       var isFree = s.discount_percent >= 100 || s.discount_percent === 0;
@@ -2783,7 +2784,7 @@ function renderRefCard(ref, allCalcPackages, allCalcServices) {
   if (refLinkedPkgs.length > 0 || refLinkedSvcs.length > 0) {
     h += '<div style="padding:8px 16px;border-bottom:1px solid #1e293b;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
     if (refLinkedSvcs.length > 0) {
-      h += '<span style="font-size:0.62rem;color:#a78bfa;font-weight:600;margin-right:4px"><i class="fas fa-filter" style="margin-right:3px"></i>Скидка на:</span>';
+      h += '<span style="font-size:0.62rem;color:#a78bfa;font-weight:600;margin-right:4px"><i class="fas fa-bullseye" style="margin-right:3px"></i>Скидка % на:</span>';
       refLinkedSvcs.forEach(function(id) {
         var nm = ''; allCalcServices.forEach(function(s) { if (s.id === id) nm = s.name_ru; });
         h += '<span style="font-size:0.68rem;padding:2px 7px;background:rgba(139,92,246,0.06);border-radius:4px;color:#a78bfa;border:1px solid rgba(139,92,246,0.12)">' + escHtml(nm || '#' + id) + '</span>';
@@ -2823,7 +2824,7 @@ function renderRefCard(ref, allCalcPackages, allCalcServices) {
 
   // Linked services edit
   h += '<div style="margin-bottom:10px;padding:10px;background:rgba(139,92,246,0.03);border-radius:8px;border:1px solid rgba(139,92,246,0.1)">' +
-    '<div style="font-size:0.68rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-filter" style="margin-right:4px"></i>Скидка только на (пусто = все)</div>' +
+    '<div style="font-size:0.68rem;color:#a78bfa;font-weight:600;margin-bottom:6px"><i class="fas fa-bullseye" style="margin-right:4px"></i>Скидка % применяется к этим услугам <span style="color:#64748b;font-weight:400">(пусто = ко всем)</span></div>' +
     '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">' +
       '<select class="input" id="ref_linked_svc_' + ref.id + '" style="font-size:0.78rem;flex:1;min-width:160px"><option value="">— Услуга —</option>';
   allCalcServices.forEach(function(s) {
@@ -2839,7 +2840,7 @@ function renderRefCard(ref, allCalcPackages, allCalcServices) {
 
   // Attached services edit
   h += '<div style="margin-bottom:14px;padding:10px;background:rgba(16,185,129,0.03);border-radius:8px;border:1px solid rgba(16,185,129,0.1)">' +
-    '<div style="font-size:0.68rem;font-weight:600;color:#10B981;margin-bottom:8px"><i class="fas fa-gift" style="margin-right:4px"></i>Привязанные услуги (бесплатные / со скидкой)</div>';
+    '<div style="font-size:0.68rem;font-weight:600;color:#10B981;margin-bottom:8px"><i class="fas fa-gift" style="margin-right:4px"></i>Бонусные услуги <span style="color:#64748b;font-weight:400">(бесплатные или со своей скидкой)</span></div>';
   if (uniSvcs.length > 0) {
     h += '<div style="display:flex;flex-direction:column;gap:4px;margin-bottom:10px">';
     uniSvcs.forEach(function(s) {
@@ -3705,7 +3706,9 @@ function renderLeads() {
         var refMatch = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
         if (refMatch) discPct = Number(refMatch.discount_percent || 0);
       }
-      var discAmt = (discPct > 0 && l.referral_code) ? Math.round(svcAmt * discPct / 100) : 0;
+      // Use saved discountAmount from recalc (respects linked_services), fallback to full calc
+      var discAmt = Number(calcData && calcData.discountAmount || 0);
+      if (discAmt === 0 && discPct > 0 && l.referral_code) discAmt = Math.round(svcAmt * discPct / 100);
       var cardPmMatch = ensureArray(data.paymentMethods).find(function(m) { return m.id == l.payment_method_id; });
       var cardPmComm = Number(l.commission_amount || 0);
       var leadCommission = Number(l.commission_amount || 0);
@@ -3965,7 +3968,9 @@ function renderLeads() {
             if (refMatch2) refDiscPct = Number(refMatch2.discount_percent || 0);
           }
           var refSvcBase = svcAmt || Number(calcData && calcData.servicesSubtotal || 0);
-          var refDiscAmt = refDiscPct > 0 ? Math.round(refSvcBase * refDiscPct / 100) : 0;
+          // Use saved discountAmount from recalc (respects linked_services), fallback to full calc
+          var refDiscAmt = Number(calcData && calcData.discountAmount || 0);
+          if (refDiscAmt === 0 && refDiscPct > 0) refDiscAmt = Math.round(refSvcBase * refDiscPct / 100);
           var svcAfterDisc = refSvcBase - refDiscAmt;
           h += '<div id="lead-refcode-info-' + l.id + '" style="margin-top:8px;padding:10px 12px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.15);border-radius:8px;font-size:0.78rem;color:#6ee7b7">';
           h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px"><span><i class="fas fa-check-circle" style="margin-right:4px"></i>Код \u00AB' + escHtml(leadRefCode) + '\u00BB применён</span>';
@@ -4041,7 +4046,9 @@ function renderLeads() {
         var refMatch3 = data.referrals.find(function(r) { return r.code && r.code.toUpperCase() === l.referral_code.toUpperCase(); });
         if (refMatch3) leadDiscPct2 = Number(refMatch3.discount_percent || 0);
       }
-      var leadDiscAmt2 = leadDiscPct2 > 0 && l.referral_code ? Math.round(svcTotal * leadDiscPct2 / 100) : 0;
+      // Use saved discountAmount from recalc (respects linked_services), fallback to full calc
+      var leadDiscAmt2 = Number(calcData && calcData.discountAmount || 0);
+      if (leadDiscAmt2 === 0 && leadDiscPct2 > 0 && l.referral_code) leadDiscAmt2 = Math.round(svcTotal * leadDiscPct2 / 100);
       var svcAfterDisc2 = leadDiscAmt2 > 0 ? (svcTotal - leadDiscAmt2) : svcTotal;
       h += '<div style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,rgba(167,139,250,0.06),rgba(139,92,246,0.03));border:1px solid rgba(167,139,250,0.2);border-radius:12px">';
       h += '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleSection(&apos;svc-body-' + l.id + '&apos;,&apos;svc-arrow-' + l.id + '&apos;)">';
