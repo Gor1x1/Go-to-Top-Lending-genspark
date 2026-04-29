@@ -320,6 +320,8 @@ app.get('/', async (c) => {
 <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <link rel="preload" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.0/css/all.min.css"></noscript>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25/build/css/intlTelInput.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/intl-tel-input@25/build/js/intlTelInput.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -591,6 +593,23 @@ html.server-injected .fade-up{opacity:1!important;transform:translateY(0)!import
 .form-group label{display:block;font-size:0.82rem;font-weight:600;margin-bottom:8px;color:var(--text-sec)}
 .form-group input,.form-group textarea,.form-group select{width:100%;padding:12px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:1rem;font-family:inherit;transition:var(--t)}
 .form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+/* ===== INTL-TEL-INPUT (phone country selector) — dark-theme overrides ===== */
+.iti{width:100%;display:block}
+.iti__tel-input{width:100%}
+.iti--separate-dial-code .iti__selected-flag{background:rgba(139,92,246,0.12);border-radius:var(--r-sm) 0 0 var(--r-sm)}
+.iti--separate-dial-code .iti__selected-dial-code{color:var(--text);font-weight:600}
+.iti__country-list{background:var(--bg-card);border:1px solid var(--border);color:var(--text);max-height:260px;box-shadow:0 8px 24px rgba(0,0,0,0.4)}
+.iti__country.iti__highlight,.iti__country:hover{background:var(--bg-hover)}
+.iti__country .iti__country-name{color:var(--text)}
+.iti__country .iti__dial-code{color:var(--text-sec)}
+.iti__divider{border-bottom-color:var(--border)}
+.iti__search-input{background:var(--bg-surface);color:var(--text);border-color:var(--border)}
+.iti__arrow{border-top-color:var(--text-sec)}
+.iti__arrow--up{border-bottom-color:var(--text-sec)}
+.popup-card .pf-group .iti{width:100%}
+.popup-card .pf-group .iti .pf-input{width:100%}
+#pdfFormWrap .iti{width:100%}
+#pdfFormWrap .iti input[type="tel"]{width:100%}
 .form-group textarea{resize:vertical;min-height:100px}
 .form-group select option{background:var(--bg-card)}
 .contact-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px;max-width:600px;margin:0 auto 32px}
@@ -1837,7 +1856,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   <div class="form-card fade-up">
     <form id="leadForm" onsubmit="submitForm(event)">
       <div class="form-group"><label data-ru="Ваше имя" data-am="Ձեր անունը">Ваше имя</label><input type="text" id="formName" required placeholder="Имя" data-placeholder-ru="Имя" data-placeholder-am="Անուն"></div>
-      <div class="form-group"><label data-ru="Telegram / Телефон" data-am="Telegram / Հեռախոս">Telegram / Телефон</label><input type="text" id="formContact" required placeholder="@username / +374..." data-placeholder-ru="@username / +374..." data-placeholder-am="@username կամ +374..."></div>
+      <div class="form-group"><label data-ru="Телефон" data-am="Հեռախոս">Телефон</label><input type="tel" id="formPhone" required></div>
       <div class="form-group"><label data-ru="Что продаёте на WB?" data-am="Ինչ եք վաճառում WB-ում։">Что продаёте на WB?</label><input type="text" id="formProduct" placeholder="Одежда, электроника..." data-placeholder-ru="Одежда, электроника..." data-placeholder-am="Հագուստ, էլեկտրոնիկա..."></div>
       <div class="form-group"><label data-ru="Какие услуги интересуют?" data-am="Ինչ ծառայություններ են հետաքրքրում։">Какие услуги интересуют?</label>
         <select id="formService">
@@ -1934,8 +1953,8 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
           </div>
         </div>
         <div class="pf-group">
-          <label class="pf-label" data-ru="Ваш Telegram или телефон" data-am="Ձեր Telegram-ը կամ հեռախոսը">Ваш Telegram или телефон</label>
-          <input class="pf-input" type="text" id="popupContact" required placeholder="@username или +374..." data-placeholder-ru="@username или +374..." data-placeholder-am="@username կամ +374...">
+          <label class="pf-label" data-ru="Ваш номер телефона" data-am="Ձեր հեռախոսահամարը">Ваш номер телефона</label>
+          <input class="pf-input" type="tel" id="popupPhone" required>
         </div>
         <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">
           <i class="fas fa-paper-plane"></i>
@@ -2605,13 +2624,73 @@ setTimeout(function() { if (!_popupShown) showPopup(); }, 6000);
 setTimeout(function() { if (!_popupShown) showPopup(); }, 8000);
 console.log('[Popup] Timer set, will fire in 5s (with retry at 6s, 8s)');
 
+/* ===== INTL-TEL-INPUT INIT =====
+   The library is loaded via <script defer>, so it's available only after
+   DOMContentLoaded. The PDF form input (#pdfClientPhone) is created
+   synchronously by an IIFE later in this script, so by the time
+   DOMContentLoaded fires all three inputs exist in the DOM. */
+var ITI_OPTS = {
+  initialCountry: 'am',
+  preferredCountries: ['am','ru','ge','by','kz','ua','us'],
+  separateDialCode: true,
+  utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@25/build/js/utils.js'
+};
+function _initPhoneIti(inputId, key) {
+  var inp = document.getElementById(inputId);
+  if (!inp || !window.intlTelInput) return null;
+  try {
+    var iti = window.intlTelInput(inp, ITI_OPTS);
+    window['_iti_' + key] = iti;
+    return iti;
+  } catch (e) { console.warn('[ITI] init failed for #' + inputId, e); return null; }
+}
+function _initAllPhoneItis() {
+  _initPhoneIti('formPhone', 'lead');
+  _initPhoneIti('popupPhone', 'popup');
+  _initPhoneIti('pdfClientPhone', 'pdf');
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', _initAllPhoneItis);
+} else {
+  _initAllPhoneItis();
+}
+
 /* Form submit */
 document.getElementById('popupForm').addEventListener('submit', function(e) {
   e.preventDefault();
   var popupName = (document.getElementById('popupName') || {}).value || '';
   var buyouts = document.getElementById('popupBuyouts').value;
   var reviews = document.getElementById('popupReviews').value;
-  var contact = document.getElementById('popupContact').value;
+  /* Phone with country selector — use intl-tel-input to get E.164 number */
+  var popupPhoneInput = document.getElementById('popupPhone');
+  var iti = window._iti_popup;
+  var contact = '';
+  if (iti && typeof iti.isValidNumber === 'function') {
+    if (!iti.isValidNumber()) {
+      var msg = lang === 'am' ? 'Մուտքագրեք ճիշտ հեռախոսահամար' : 'Введите корректный номер телефона';
+      popupPhoneInput.style.borderColor = '#EF4444';
+      popupPhoneInput.focus();
+      var prev = this.querySelector('.pf-phone-error');
+      if (prev) prev.remove();
+      var err = document.createElement('div');
+      err.className = 'pf-phone-error';
+      err.style.cssText = 'color:#EF4444;font-size:0.82rem;margin-top:6px';
+      err.textContent = msg;
+      popupPhoneInput.parentElement.appendChild(err);
+      return;
+    }
+    contact = iti.getNumber();
+  } else {
+    contact = (popupPhoneInput.value || '').trim();
+    if (contact.replace(/\D/g, '').length < 7) {
+      popupPhoneInput.style.borderColor = '#EF4444';
+      popupPhoneInput.focus();
+      return;
+    }
+  }
+  popupPhoneInput.style.borderColor = '';
+  var prevErr = this.querySelector('.pf-phone-error');
+  if (prevErr) prevErr.remove();
   /* Build auto-notes from form data */
   var autoNotes = (lang === 'am'
     ? 'Գնումներ: ' + buyouts + ' | Կարծիքներ: ' + reviews
@@ -2640,7 +2719,36 @@ document.getElementById('popupForm').addEventListener('submit', function(e) {
 function submitForm(e) {
   e.preventDefault();
   var name = document.getElementById('formName').value;
-  var contact = document.getElementById('formContact').value;
+  /* Phone with country selector — validate via intl-tel-input and send as E.164 */
+  var phoneInput = document.getElementById('formPhone');
+  var iti = window._iti_lead;
+  var contact = '';
+  if (iti && typeof iti.isValidNumber === 'function') {
+    if (!iti.isValidNumber()) {
+      var msg = lang === 'am' ? 'Մուտքագրեք ճիշտ հեռախոսահամար' : 'Введите корректный номер телефона';
+      phoneInput.style.borderColor = '#EF4444';
+      phoneInput.focus();
+      var prev = e.target.querySelector('.lead-phone-error');
+      if (prev) prev.remove();
+      var err = document.createElement('div');
+      err.className = 'lead-phone-error';
+      err.style.cssText = 'color:#EF4444;font-size:0.82rem;margin-top:6px';
+      err.textContent = msg;
+      phoneInput.parentElement.appendChild(err);
+      return;
+    }
+    contact = iti.getNumber();
+  } else {
+    contact = (phoneInput.value || '').trim();
+    if (contact.replace(/\D/g, '').length < 7) {
+      phoneInput.style.borderColor = '#EF4444';
+      phoneInput.focus();
+      return;
+    }
+  }
+  phoneInput.style.borderColor = '';
+  var prevErr = e.target.querySelector('.lead-phone-error');
+  if (prevErr) prevErr.remove();
   var product = document.getElementById('formProduct').value;
   var service = document.getElementById('formService');
   var serviceText = service.options[service.selectedIndex].textContent;
@@ -5494,13 +5602,28 @@ async function checkRefCode() {
     var phoneInput = document.getElementById('pdfClientPhone');
     var errDiv = document.getElementById('pdfFormError');
     var clientName = (nameInput.value || '').trim();
-    var clientPhone = (phoneInput.value || '').trim();
+    var iti = window._iti_pdf;
+    var clientPhone = '';
+    var phoneValid = false;
+    if (iti && typeof iti.isValidNumber === 'function') {
+      phoneValid = iti.isValidNumber();
+      clientPhone = phoneValid ? iti.getNumber() : (phoneInput.value || '').trim();
+    } else {
+      clientPhone = (phoneInput.value || '').trim();
+      phoneValid = clientPhone.replace(/\D/g, '').length >= 7;
+    }
 
-    if (!clientName || !clientPhone) {
+    if (!clientName || !phoneValid) {
       errDiv.style.display = 'block';
-      errDiv.textContent = lang === 'am' ? 'Լրացրեք անունը և հեռախոսը' : 'Укажите имя и телефон';
+      if (!clientName && !phoneValid) {
+        errDiv.textContent = lang === 'am' ? 'Լրացրեք անունը և ճիշտ հեռախոսահամար' : 'Укажите имя и корректный номер телефона';
+      } else if (!clientName) {
+        errDiv.textContent = lang === 'am' ? 'Լրացրեք անունը' : 'Укажите имя';
+      } else {
+        errDiv.textContent = lang === 'am' ? 'Մուտքագրեք ճիշտ հեռախոսահամար' : 'Введите корректный номер телефона';
+      }
       if (!clientName) nameInput.style.borderColor = '#EF4444';
-      if (!clientPhone) phoneInput.style.borderColor = '#EF4444';
+      if (!phoneValid) phoneInput.style.borderColor = '#EF4444';
       return;
     }
     errDiv.style.display = 'none';

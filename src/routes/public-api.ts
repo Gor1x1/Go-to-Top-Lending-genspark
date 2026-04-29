@@ -214,6 +214,12 @@ app.post('/api/lead', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     const body = await c.req.json();
+    // Phone is mandatory — without it we cannot reach the client.
+    // Defensive server-side check in case JS validation was bypassed.
+    const contact = String(body.contact || '').trim();
+    if (!contact || contact.replace(/\D/g, '').length < 7) {
+      return c.json({ error: 'Phone is required' }, 400);
+    }
     const ua = c.req.header('User-Agent') || '';
     // Get next lead number
     const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
@@ -225,8 +231,8 @@ app.post('/api/lead', async (c) => {
     if (body.message) notesParts.push(`Комментарий: ${body.message}`);
     const autoNotes = notesParts.join(' | ');
     await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, referral_code, user_agent, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'form', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200), autoNotes).run();
-    notifyTelegram(db, { ...body, source: 'form' });
+      .bind(nextNum, 'form', body.name||'', contact, body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200), autoNotes).run();
+    notifyTelegram(db, { ...body, contact, source: 'form' });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
     console.error('Lead error:', e);
@@ -245,6 +251,11 @@ app.post('/api/popup-lead', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     const body = await c.req.json();
+    // Phone is mandatory — without it we cannot reach the client.
+    const contact = String(body.contact || '').trim();
+    if (!contact || contact.replace(/\D/g, '').length < 7) {
+      return c.json({ error: 'Phone is required' }, 400);
+    }
     const ua = c.req.header('User-Agent') || '';
     // Get next lead number
     const lastLead = await db.prepare('SELECT MAX(lead_number) as max_num FROM leads').first();
@@ -252,8 +263,8 @@ app.post('/api/popup-lead', async (c) => {
     // Build notes from popup form data (buyouts, reviews)
     const autoNotes = body.notes || '';
     await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent, notes) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'popup', body.name||'', body.contact||'', body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200), autoNotes).run();
-    notifyTelegram(db, { ...body, source: 'popup', message: autoNotes });
+      .bind(nextNum, 'popup', body.name||'', contact, body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200), autoNotes).run();
+    notifyTelegram(db, { ...body, contact, source: 'popup', message: autoNotes });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
     console.error('Popup lead error:', e);

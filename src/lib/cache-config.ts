@@ -4,6 +4,6 @@
  * 
  * IMPORTANT: Bump CACHE_VERSION on every deploy to bust stale edge caches.
  */
-export const CACHE_VERSION = 'v6';
+export const CACHE_VERSION = 'v7';
 export const CACHEABLE_PATHS = ['/', '/am', '/ru', '/?lang=am', '/?lang=ru'];
 export const KNOWN_ORIGINS = ['https://gototopwb.ru', 'https://gototop.win', 'https://gototop-lending.pages.dev'];

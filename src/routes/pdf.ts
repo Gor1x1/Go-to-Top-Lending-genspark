@@ -33,7 +33,12 @@ app.post('/api/generate-pdf', async (c) => {
     const items = body.items || [];
     const total = body.total || 0;
     const clientName = body.clientName || '';
-    const clientContact = body.clientContact || '';
+    // Phone is mandatory — without it we cannot reach the client.
+    // Defensive server-side check in case JS validation was bypassed.
+    const clientContact = String(body.clientContact || '').trim();
+    if (!clientContact || clientContact.replace(/\D/g, '').length < 7) {
+      return c.json({ error: 'Phone is required' }, 400);
+    }
     const referralCode = body.referralCode || '';
     const packageData = body.package || null; // { package_id, name, name_ru, name_am, package_price, original_price, items }
 

@@ -333,6 +333,7 @@ api.post('/leads/:id/comments', authMiddleware, async (c) => {
       userId = Number(payload.sub) || 0;
       const user = await db.prepare('SELECT display_name FROM users WHERE id = ?').bind(userId).first();
       userName = (user?.display_name as string) || 'Пользователь';
+    }
   } catch {}
   await db.prepare('INSERT INTO lead_comments (lead_id, user_id, user_name, comment) VALUES (?,?,?,?)').bind(leadId, userId, userName, comment).run();
   return c.json({ success: true });
