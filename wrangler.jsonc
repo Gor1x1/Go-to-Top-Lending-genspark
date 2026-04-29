@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "gototop-lending",
+  "compatibility_date": "2026-02-15",
+  "pages_build_output_dir": "./dist",
+  "compatibility_flags": [
+    "nodejs_compat"
+  ],
+
+  // ===== SMART PLACEMENT =====
+  // Run the Worker near the D1 database (WEUR — Frankfurt/Amsterdam).
+  // D1 round-trips drop from ~150-300ms (cross-ocean) to ~1-5ms (same DC).
+  // Combined with Cache API in index.tsx (TTL=24h), most requests are served
+  // from the edge closest to the user (~50ms), while cache-MISS requests
+  // benefit from fast DB access near Europe (close to Armenia).
+  "placement": {
+    "mode": "smart"
+  },
+
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "gototop-production-eu",
+      "database_id": "f49b080f-516f-4ed0-84e9-0efdea1e8a2a"
+    }
+  ]
+}
