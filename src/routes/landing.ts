@@ -337,7 +337,7 @@ app.get('/', async (c) => {
 html{scroll-behavior:smooth;font-size:16px;overflow-x:hidden;width:100%;max-width:100vw;-webkit-text-size-adjust:100%}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;width:100%;max-width:100vw;min-height:100vh;min-height:100dvh;-webkit-overflow-scrolling:touch}
 *,*::before,*::after{box-sizing:border-box}
-.container{max-width:1200px;margin:0 auto;padding:0 24px;overflow-x:hidden;width:100%;box-sizing:border-box}
+.container{max-width:1440px;margin:0 auto;padding:0 40px;overflow-x:hidden;width:100%;box-sizing:border-box}
 a{text-decoration:none;color:inherit}
 img{max-width:100%;height:auto}
 .header{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 0;transition:var(--t);background:rgba(15,10,26,0.8);backdrop-filter:blur(20px);border-bottom:1px solid transparent;width:100%}
@@ -385,12 +385,12 @@ img{max-width:100%;height:auto}
 .bottom-nav-more-menu a i{width:20px;text-align:center;color:var(--purple);font-size:0.9rem}
 .hero{padding:140px 0 80px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo" "qr photo";gap:0 60px;align-items:start}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start}
 .hero-el-title{grid-area:title}
 .hero-el-texts{grid-area:texts}
 .hero-el-stats{grid-area:stats;margin-bottom:36px}
 .hero-el-buttons{grid-area:buttons}
-.hero-image{grid-area:photo;align-self:center}
+.hero-image{grid-area:photo;align-self:start;display:flex;flex-direction:column;gap:16px;position:relative}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.85rem;font-weight:500;color:var(--accent);margin-bottom:24px}
 .hero h1{font-size:3rem;font-weight:800;line-height:1.15;margin-bottom:20px;letter-spacing:-0.02em}
 .hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -406,7 +406,6 @@ img{max-width:100%;height:auto}
 .btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}
 .btn-outline:hover{border-color:var(--purple);background:rgba(139,92,246,0.05)}
 .btn-lg{padding:16px 32px;font-size:1.05rem}
-.hero-image{position:relative}
 .hero-image img{border-radius:var(--r-lg);width:100%;height:auto;aspect-ratio:3/4;max-height:520px;object-fit:cover;object-position:center;border:1px solid var(--border)}
 .hero-badge-img{position:absolute;bottom:20px;left:20px;background:rgba(15,10,26,0.9);backdrop-filter:blur(10px);padding:12px 18px;border-radius:var(--r-sm);display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
 .hero-badge-img i{color:var(--success);font-size:1.1rem}
@@ -934,6 +933,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .calc-float{display:none!important}
 }
 @media(max-width:768px){
+  .container{padding:0 16px}
   .hero{padding:110px 0 60px}
   .hero h1{font-size:1.9rem}
   .hero-stats{flex-wrap:wrap;gap:20px}
@@ -974,7 +974,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .hero-el-texts{order:1}
   .hero-el-stats{order:2;margin-bottom:0}
   .hero-el-buttons{order:3;width:100%;display:flex;flex-direction:column;align-items:center}
-  .hero-image{order:4;max-width:100%;margin:0 auto;width:100%}
+  .hero-image{order:4;max-width:100%;margin:0 auto;width:100%;display:flex;flex-direction:column;gap:12px}
   .hero-image img{height:auto;max-height:none;width:100%;aspect-ratio:auto;border-radius:12px;border:none}
   /* Guarantee: flex-column with orderable children (overridden by server element_order) */
   .guarantee-card{display:flex!important;flex-direction:column;gap:24px}
@@ -1117,8 +1117,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .lang-btn{padding:4px 8px;font-size:0.68rem}
 }
 /* === QR CODES === */
-.hero-el-qr{grid-area:qr;margin-top:16px}
-.qr-codes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+.qr-codes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 .qr-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.15);border-radius:12px;transition:all 0.2s;text-decoration:none;color:var(--text)}
 .qr-card:hover{border-color:var(--purple);background:rgba(139,92,246,0.1);transform:translateY(-2px)}
 .qr-card img{width:80px;height:80px;object-fit:contain;border-radius:8px}
@@ -1142,19 +1141,19 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 @media(max-width:768px){.svc-quick-grid{grid-template-columns:1fr;gap:16px}.svc-quick-img{height:160px}}
 @media(max-width:480px){.svc-quick-img{height:140px}.svc-quick-body{padding:16px}}
 /* === REVIEWS PROOF === */
-.reviews-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:start;margin-top:32px}
+.reviews-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:32px;align-items:start;margin-top:32px}
 .review-proof-col{display:flex;flex-direction:column;border-radius:var(--r-lg);overflow:hidden;border:2px solid var(--border)}
 .review-proof-col.good{border-color:rgba(16,185,129,0.4)}
 .review-proof-col.bad{border-color:rgba(239,68,68,0.3)}
-.review-proof-label{padding:12px 20px;font-size:0.9rem;font-weight:800;letter-spacing:0.5px;display:flex;align-items:center;gap:8px}
+.review-proof-label{padding:14px 20px;font-size:1rem;font-weight:800;letter-spacing:0.5px;display:flex;align-items:center;gap:8px}
 .review-proof-label.good{background:rgba(16,185,129,0.15);color:#10B981}
 .review-proof-label.bad{background:rgba(239,68,68,0.12);color:#ef4444}
-.review-proof-img{width:100%;max-height:400px;overflow:hidden}
-.review-proof-img img{width:100%;height:auto;object-fit:cover;display:block}
+.review-proof-img{width:100%}
+.review-proof-img img{width:100%;height:auto;display:block}
 .review-proof-text{padding:16px 20px;font-size:0.88rem;color:var(--text-sec);line-height:1.7}
 .review-proof-vs{display:flex;align-items:center;justify-content:center;padding:0 8px}
-.review-proof-vs span{width:48px;height:48px;border-radius:50%;background:rgba(139,92,246,0.1);border:2px solid rgba(139,92,246,0.3);display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;color:var(--purple);flex-shrink:0}
-@media(max-width:768px){.reviews-compare{grid-template-columns:1fr;gap:16px}.review-proof-vs{display:none}}
+.review-proof-vs span{width:52px;height:52px;border-radius:50%;background:rgba(139,92,246,0.1);border:2px solid rgba(139,92,246,0.3);display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;color:var(--purple);flex-shrink:0}
+@media(max-width:768px){.reviews-compare{grid-template-columns:1fr;gap:20px}.review-proof-vs{display:none}}
 /* === FOR WHOM === */
 .for-whom-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:32px}
 .for-whom-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;transition:all 0.3s ease;display:flex;flex-direction:column;gap:12px}
@@ -1164,11 +1163,6 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .for-whom-card p{font-size:0.87rem;color:var(--text-sec);line-height:1.7;margin:0}
 @media(max-width:900px){.for-whom-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:600px){.for-whom-grid{grid-template-columns:1fr;gap:14px}.for-whom-card{padding:20px}}
-/* === FLOAT CALLBACK === */
-.float-callback{position:fixed;bottom:100px;right:24px;z-index:999;width:52px;height:52px;background:linear-gradient(135deg,#10B981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;box-shadow:0 4px 20px rgba(16,185,129,0.4);transition:all 0.3s;text-decoration:none;animation:pulse-green 2s infinite}
-.float-callback:hover{transform:scale(1.1);box-shadow:0 8px 30px rgba(16,185,129,0.6)}
-@keyframes pulse-green{0%,100%{box-shadow:0 4px 20px rgba(16,185,129,0.4)}50%{box-shadow:0 4px 30px rgba(16,185,129,0.7)}}
-@media(max-width:768px){.float-callback{bottom:80px;right:16px;width:46px;height:46px;font-size:1rem}}
 </style>
 </head>
 <body>
@@ -1197,9 +1191,9 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#fff"/><rect y="8" width="36" height="8" fill="#0039A6"/><rect y="16" width="36" height="8" fill="#D52B1E"/></svg></span><span class="lang-text">RU</span></button>
       <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#D90012"/><rect y="8" width="36" height="8" fill="#0033A0"/><rect y="16" width="36" height="8" fill="#F2A800"/></svg></span><span class="lang-text">AM</span></button>
     </div>
-    <a href="#contact" class="nav-cta">
+    <a href="javascript:void(0)" onclick="openCallbackModal()" class="nav-cta">
       <i class="fas fa-phone"></i>
-      <span data-ru="Пեрезвоните мне" data-am="զանգահարեք ինծ">Пեрեзвонитե мнե</span>
+      <span data-ru="Перезвоните мне" data-am="Հետ զangahарек">Перезвоните мне</span>
     </a>
   </div>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()">
@@ -1253,8 +1247,6 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <i class="fas fa-shield-alt"></i>
       <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">Надежный метод продвижения</span>
     </div>
-  </div>
-  <div class="hero-el-qr">
     <div class="qr-codes-grid">
       <a href="https://www.instagram.com/goo_to_top/" target="_blank" rel="noopener" class="qr-card">
         <img src="/static/img/qr/qr-instagram.png" alt="Instagram QR">
@@ -1384,10 +1376,33 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <h2 data-ru="Что такое" data-am="Ի՞նչ է Go to Top-ը">Что такое <span class="gr">Go to Top</span>?</h2>
     </div>
     <div class="about-el-texts">
-      <p data-ru="«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе." data-am="«Go to Top» — ձեր բիզնեսի զարգացման ծառայություն մարկետփլեյսներում՝ ինքնագնումների միջոցով առաջխաղացման մեթոդ է TOP-ում երկարաժամկետ դիրքավորվելու համար:">«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе.</p>
-      <p data-ru="Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную." data-am="Մեր մասնագետների թիմը 2021 թվականից աշխատում է արդյունքի համար: Մենք ունենք սեփական պահեստներ և գրասենյակներ Երևանում: Գնումների համար օգտագործում ենք միայն իրական մարդկանց հաշիվներ և ամեն ինչ անում ենք ձեռքով:">Наша команда профессионалов с 2021 года работает на результат. У нас собственные склады и офисы в Ереване. Используем для выкупов Вашего товара только реальные аккаунты людей и производим всё вручную.</p>
+      <p style="color:var(--text-sec);font-size:1rem;line-height:1.8;margin-bottom:20px" data-ru="«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе." data-am="«Go to Top» — ձեр բիզնեси ząрgацмаn ծarrayutHyun марketplayssnerum՝ inqnaGnumneri мIjocov ааrajxaGhacМаn меThod Е TOP-uм ЕркаrаZhамКет ДirqаvОrveЛu Hамар:">«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе.</p>
+      <div style="background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.18);border-radius:14px;padding:20px 22px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <i class="fas fa-star" style="color:var(--purple);font-size:1rem"></i>
+          <strong style="font-size:0.95rem;color:var(--text)" data-ru="Наши сильные стороны" data-am="Մեր ուժеq կողmerumom">Наши сильные стороны</strong>
+        </div>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px">
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-check-circle" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Собственный склад и офис в Ереване" data-am="Սефакан пахест ев грасенйак Ереванум">Собственный склад и офис в Ереване</span></li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-check-circle" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="1000+ реальных аккаунтов, 0 блокировок" data-am="1000+ иракан хашивнер, 0 арgelaphakum">1000+ реальных аккаунтов, 0 блокировок</span></li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-check-circle" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Работаем с 2021 года — 847 товаров в ТОП" data-am="Аsхатum енq 2021-иц — 847 апранк ТОП-ум">Работаем с 2021 года — 847 товаров в ТОП</span></li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-check-circle" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Всё вручную, только по ключевым словам" data-am="Амен инч дзеrrqov, мiyayn banalи bararer">Всё вручную, только по ключевым словам</span></li>
+        </ul>
+      </div>
+      <div style="background:rgba(16,185,129,0.05);border:1px solid rgba(16,185,129,0.2);border-radius:14px;padding:20px 22px;margin-bottom:16px">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+          <i class="fas fa-gift" style="color:#10B981;font-size:1rem"></i>
+          <strong style="font-size:0.95rem;color:var(--text)" data-ru="Что получает клиент" data-am="Инч е стануm хахордуtyunна">Что получает клиент</strong>
+        </div>
+        <ul style="list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px">
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-chart-line" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Рост рейтинга товара на Wildberries" data-am="Апранки варкаniши бардращum WB-uм">Рост рейтинга товара на Wildberries</span></li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-chart-line" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Органический трафик и долгосрочный ТОП" data-am="Органик тrафик ев еркараzhамкет ТОП">Органический трафик и долгосрочный ТОП</span></li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-chart-line" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Реальные отзывы с фото и видео" data-am="Иракан гнахатаканнер люsанкаров ев тесанyuthov">Реальные отзывы с фото и видео</span></li>
+          <li style="display:flex;align-items:flex-start;gap:10px;font-size:0.9rem;color:var(--text-sec)"><i class="fas fa-chart-line" style="color:#10B981;margin-top:3px;flex-shrink:0"></i><span data-ru="Индивидуальный подход, без блокировок" data-am="Анжнаhатар могечum, аrgelaphakumneri кар">Индивидуальный подход, без блокировок</span></li>
+        </ul>
+      </div>
       <div class="about-highlight">
-        <p data-ru="Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!" data-am="Լավագույն արդյունքը կստանաք օգտվելով մեր ծառայությունների փաթեթը!"><i class="fas fa-bolt" style="margin-right:8px"></i>Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!</p>
+        <p data-ru="Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!" data-am="Лавагуйн ардюнка кstанаq оgтvelов мер tsarrayutyunneri pакете!"><i class="fas fa-bolt" style="margin-right:8px"></i>Наилучший результат Вы получите, воспользовавшись комплексом наших услуг!</p>
       </div>
     </div>
     <div class="about-el-buttons">
@@ -2126,10 +2141,38 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   <span data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1">Հաշվիչ</span>
 </a>
 
-<!-- FLOATING CALLBACK BUTTON -->
-<a href="#contact" class="float-callback" aria-label="Перезвоните мне">
-  <i class="fas fa-phone"></i>
-</a>
+<!-- CALLBACK MODAL -->
+<div id="callbackModal" class="popup-overlay" onclick="if(event.target===this)closeCallbackModal()">
+  <div class="popup-card" id="callbackCard">
+    <button class="popup-close" onclick="closeCallbackModal()" aria-label="Закрыть">&times;</button>
+    <div class="popup-icon"><i class="fas fa-phone-alt"></i></div>
+    <h3 data-ru="Перезвоните мне" data-am="Հetav zankhаrek inj">Перезвоните мне</h3>
+    <p class="popup-sub" data-ru="Оставьте заявку — мы свяжемся в удобное для вас время" data-am="Թողեք հայտ — կزankhараenq ձеzh nakhentрутvadz ժamanak">Оставьте заявку — мы свяжемся в удобное для вас время</p>
+    <form id="callbackForm" onsubmit="submitCallbackForm(event)">
+      <div class="pf-group">
+        <label class="pf-label" data-ru="Ваше имя *" data-am="Ձеz անunа *">Ваше имя *</label>
+        <input type="text" id="cb_name" class="pf-input" placeholder="Иван Иванов" required>
+      </div>
+      <div class="pf-group">
+        <label class="pf-label" data-ru="Номер телефона *" data-am="Телефoni hamar *">Номер телефона *</label>
+        <input type="tel" id="cb_phone" class="pf-input" placeholder="+7 (___) ___-__-__" required>
+      </div>
+      <div class="pf-group">
+        <label class="pf-label" data-ru="Удобное время для звонка" data-am="Harchнaкаlі zam для zvanku">Удобное время для звонка</label>
+        <input type="text" id="cb_time" class="pf-input" placeholder="Например: после 18:00">
+      </div>
+      <div class="pf-group">
+        <label class="pf-label" data-ru="Ваш вопрос (необязательно)" data-am="Ваш хорurdum (ам ober)">Ваш вопрос (необязательно)</label>
+        <textarea id="cb_question" class="pf-input" rows="3" placeholder="Кратко опишите, что хотите обсудить..." style="resize:vertical;min-height:72px"></textarea>
+      </div>
+      <div id="callbackResult" style="display:none;padding:12px;border-radius:8px;margin-bottom:12px;font-size:0.88rem;text-align:center"></div>
+      <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">
+        <i class="fas fa-paper-plane"></i>
+        <span data-ru="Отправить заявку" data-am="Ուղарkел hайт">Отправить заявку</span>
+      </button>
+    </form>
+  </div>
+</div>
 
 <!-- LIGHTBOX -->
 <div class="lightbox" id="lightbox" onclick="lbClickHandler(event)">
@@ -2894,6 +2937,66 @@ setTimeout(showPopup, 5000);
 setTimeout(function() { if (!_popupShown) showPopup(); }, 6000);
 setTimeout(function() { if (!_popupShown) showPopup(); }, 8000);
 console.log('[Popup] Timer set, will fire in 5s (with retry at 6s, 8s)');
+
+/* ===== CALLBACK MODAL ===== */
+function openCallbackModal() {
+  var modal = document.getElementById('callbackModal');
+  if (!modal) return;
+  document.body.style.overflow = 'hidden';
+  modal.className = 'popup-overlay show';
+  var result = document.getElementById('callbackResult');
+  if (result) { result.style.display = 'none'; result.textContent = ''; }
+  var form = document.getElementById('callbackForm');
+  if (form) form.reset();
+}
+function closeCallbackModal() {
+  var modal = document.getElementById('callbackModal');
+  if (!modal) return;
+  modal.className = 'popup-overlay';
+  document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeCallbackModal();
+});
+function submitCallbackForm(e) {
+  e.preventDefault();
+  var name = (document.getElementById('cb_name') || {}).value || '';
+  var phone = (document.getElementById('cb_phone') || {}).value || '';
+  var time = (document.getElementById('cb_time') || {}).value || '';
+  var question = (document.getElementById('cb_question') || {}).value || '';
+  var result = document.getElementById('callbackResult');
+  var btn = e.target.querySelector('button[type="submit"]');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...'; }
+  var msg = 'Запрос на звонок\nИмя: ' + name + '\nТелефон: ' + phone;
+  if (time) msg += '\nУдобное время: ' + time;
+  if (question) msg += '\nВопрос: ' + question;
+  fetch('/api/public/contact', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ name: name, phone: phone, message: msg, source: 'callback_modal' })
+  }).then(function(r) { return r.ok ? r.json() : Promise.reject(r.status); })
+    .then(function() {
+      if (result) {
+        result.style.display = 'block';
+        result.style.background = 'rgba(16,185,129,0.1)';
+        result.style.border = '1px solid rgba(16,185,129,0.3)';
+        result.style.color = '#6ee7b7';
+        result.textContent = '✓ Заявка принята! Мы перезвоним вам в ближайшее время.';
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-check"></i> Отправлено'; }
+      setTimeout(closeCallbackModal, 3000);
+    })
+    .catch(function() {
+      if (result) {
+        result.style.display = 'block';
+        result.style.background = 'rgba(239,68,68,0.1)';
+        result.style.border = '1px solid rgba(239,68,68,0.3)';
+        result.style.color = '#fca5a5';
+        result.textContent = 'Ошибка. Напишите нам в Telegram: @goo_to_top';
+      }
+      if (btn) { btn.disabled = false; btn.innerHTML = '<i class="fas fa-paper-plane"></i> Отправить заявку'; }
+    });
+}
 
 /* ===== INTL-TEL-INPUT INIT =====
    The library is loaded via <script defer>, so it's available only after
