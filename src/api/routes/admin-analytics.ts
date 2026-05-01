@@ -38,7 +38,7 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     }
 
     // Parse calc_data for SERVICES only; articles come exclusively from lead_articles table to avoid double-counting
-    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount, assigned_to, referral_code, name, created_at FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
+    const allLeads = await db.prepare("SELECT id, status, calc_data, refund_amount, total_amount, currency, assigned_to, referral_code, name, created_at FROM leads l WHERE 1=1" + dateFilter).bind(...dateParams).all().catch(() => ({ results: [] }));
     let totalRefunds = 0;
     const leadsById: Record<number, any> = {};
     // Package analytics data
@@ -113,6 +113,29 @@ api.get('/business-analytics', authMiddleware, async (c) => {
     turnover = Math.max(0, Math.round(turnover * 100) / 100);
     servicesTotal = Math.max(0, Math.round(servicesTotal * 100) / 100);
     articlesTotal = Math.max(0, Math.round(articlesTotal * 100) / 100);
+
+    // Currency split — RUB-leads must not be summed into AMD totals as if they were drams.
+    // We expose both raw subtotals and a normalized "turnover in AMD" using site_settings.amd_to_rub_rate.
+    let amdToRubRate = 0.222;
+    try {
+      const rateRow = await db.prepare("SELECT value FROM site_settings WHERE key = 'amd_to_rub_rate'").first();
+      if (rateRow && rateRow.value) {
+        const v = Number(rateRow.value);
+        if (v > 0 && v < 100) amdToRubRate = v;
+      }
+    } catch {}
+    let turnoverAmd = 0, turnoverRub = 0;
+    for (const lead of (allLeads.results || [])) {
+      const st = (lead.status as string) || '';
+      if (!turnoverStatuses.includes(st)) continue;
+      const amt = Number(lead.total_amount) || 0;
+      if (((lead.currency as string) || 'amd').toLowerCase() === 'rub') turnoverRub += amt;
+      else turnoverAmd += amt;
+    }
+    turnoverAmd = Math.max(0, Math.round(turnoverAmd * 100) / 100);
+    turnoverRub = Math.max(0, Math.round(turnoverRub * 100) / 100);
+    // Convert RUB → AMD using rate (rate is AMD→RUB so AMD = RUB / rate).
+    const turnoverInAmdAtRate = Math.round(turnoverAmd + (amdToRubRate > 0 ? turnoverRub / amdToRubRate : 0));
 
     // Completed (done) sums — separate for correct "Completed" card display
     const doneAmount = statusData.done?.amount || 0;
@@ -774,6 +797,9 @@ api.get('/business-analytics', authMiddleware, async (c) => {
         break_even: breakEven, avg_fulfillment_days: avgFulfillmentDays,
         done_amount: doneAmount, done_services: doneServices, done_articles: doneArticles,
         vacation_paid_amount: totalVacPaidAmount, vacation_paid_days: totalVacPaidDays, vacation_unpaid_days: totalVacUnpaidDays,
+        // Multi-currency breakdown — UI can show "Оборот ֏" / "Оборот ₽" cards and a unified AMD-equivalent.
+        turnover_amd: turnoverAmd, turnover_rub: turnoverRub,
+        turnover_in_amd_at_rate: turnoverInAmdAtRate, amd_to_rub_rate: amdToRubRate,
       },
       daily: dailyResults,
       by_assignee: byAssignee,

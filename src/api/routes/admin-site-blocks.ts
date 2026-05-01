@@ -3,7 +3,7 @@
  */
 import { Hono } from 'hono'
 import { SEED_CONTENT_SECTIONS } from '../../seed-data'
-type Bindings = { DB: D1Database }
+type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 type AuthMiddleware = (c: any, next: () => Promise<void>) => Promise<any>
 
 export function register(api: Hono<{ Bindings: Bindings }>, authMiddleware: AuthMiddleware) {
@@ -576,7 +576,7 @@ api.post('/site-blocks/duplicate/:id', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
-// ===== UPLOAD IMAGE (base64 in D1) =====
+// ===== UPLOAD IMAGE (R2 storage, with D1 fallback for local dev) =====
 api.post('/upload-image', authMiddleware, async (c) => {
   const db = c.env.DB;
   try {
@@ -584,20 +584,43 @@ api.post('/upload-image', authMiddleware, async (c) => {
     const file = body['file'] as any;
     if (!file || !file.arrayBuffer) return c.json({ error: 'No file' }, 400);
     const buffer = await file.arrayBuffer();
-    const bytes = new Uint8Array(buffer);
-    // Convert to base64
-    let binary = '';
-    for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-    const base64 = btoa(binary);
     const mimeType = file.type || 'image/jpeg';
-    const dataUrl = `data:${mimeType};base64,${base64}`;
+    const filename = (file.name || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
     const blockId = body['block_id'] ? parseInt(body['block_id'] as string) : null;
-    const filename = file.name || 'image.jpg';
-    await db.prepare('INSERT INTO uploads (filename, mime_type, data_base64, block_id) VALUES (?,?,?,?)')
-      .bind(filename, mimeType, dataUrl, blockId).run();
-    const lastRow = await db.prepare('SELECT id FROM uploads ORDER BY id DESC LIMIT 1').first();
+    
+    // Try R2 first (production), fall back to base64 in D1 (local dev without R2)
+    let url = '';
+    let dataUrl = '';
+    
+    if (c.env.MEDIA) {
+      // R2 path: store file and return /api/media/... URL
+      const key = `uploads/${Date.now()}_${filename}`;
+      await c.env.MEDIA.put(key, buffer, {
+        httpMetadata: { contentType: mimeType },
+        customMetadata: { blockId: blockId ? String(blockId) : '' }
+      });
+      url = `/api/media/${key}`;
+      // Store metadata in uploads table (no base64)
+      await db.prepare('INSERT INTO uploads (filename, mime_type, data_base64, block_id) VALUES (?,?,?,?)')
+        .bind(filename, mimeType, url, blockId).run();
+    } else {
+      // Fallback: base64 in D1 (local dev)
+      const bytes = new Uint8Array(buffer);
+      let binary = '';
+      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+      const base64 = btoa(binary);
+      dataUrl = `data:${mimeType};base64,${base64}`;
+      await db.prepare('INSERT INTO uploads (filename, mime_type, data_base64, block_id) VALUES (?,?,?,?)')
+        .bind(filename, mimeType, dataUrl, blockId).run();
+      url = '';
+    }
+    
+    const lastRow = await db.prepare('SELECT id, data_base64 FROM uploads ORDER BY id DESC LIMIT 1').first();
     const imageId = lastRow ? lastRow.id : 0;
-    return c.json({ success: true, url: `/api/admin/uploads/${imageId}`, id: imageId, data_url: dataUrl });
+    const storedUrl = url || `/api/admin/uploads/${imageId}`;
+    const storedDataUrl = dataUrl || (lastRow?.data_base64 as string) || '';
+    
+    return c.json({ success: true, url: storedUrl, id: imageId, data_url: storedDataUrl });
   } catch(e: any) {
     return c.json({ error: 'Upload failed: ' + (e?.message || 'unknown') }, 500);
   }

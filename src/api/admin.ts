@@ -21,8 +21,9 @@ import { register as registerCrmExtended } from './routes/admin-crm-extended'
 import { register as registerAnalytics } from './routes/admin-analytics'
 import { register as registerActivity } from './routes/admin-activity'
 import { register as registerFinance } from './routes/admin-finance'
+import { register as registerBlog } from './routes/admin-blog'
 
-type Bindings = { DB: D1Database }
+type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 const api = new Hono<{ Bindings: Bindings }>()
 
 // Global error handler - return JSON instead of "Internal Server Error"
@@ -250,5 +251,6 @@ registerCrmExtended(api, authMiddleware);
 registerAnalytics(api, authMiddleware);
 registerActivity(api, authMiddleware);
 registerFinance(api, authMiddleware);
+registerBlog(api, authMiddleware);
 
 export default api

@@ -21,6 +21,25 @@ function renderCalculator() {
     '<button class="btn btn-primary" onclick="addNewSection()"><i class="fas fa-folder-plus" style="margin-right:6px"></i>Создать новый раздел</button>' +
     '<a href="/?_nocache=' + Date.now() + '" target="_blank" class="btn btn-outline" style="text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть сайт</a>' +
   '</div>';
+
+  // ===== AMD <-> RUB CURRENCY RATE CARD =====
+  // Курс используется только для кнопки "авто-заполнить пустые RUB-цены".
+  // Публичный калькулятор показывает price_rub напрямую — без пересчёта на лету.
+  var curRate = (data.settings && data.settings.amd_to_rub_rate) || '0.222';
+  h += '<div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(245,158,11,0.06));border:1px solid rgba(139,92,246,0.25)">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><i class="fas fa-money-bill-wave" style="color:#f59e0b"></i><span style="font-weight:700;font-size:1rem">Валюта рубль (\\u20bd)</span></div>' +
+    '<div style="display:grid;grid-template-columns:160px 1fr auto;gap:10px;align-items:end">' +
+      '<div><div style="font-size:0.72rem;color:#64748b;margin-bottom:4px">1 \\u058f = </div>' +
+        '<input class="input" id="amdRubRate" type="number" step="0.001" min="0.001" value="' + escHtml(String(curRate)) + '" style="padding:8px 10px;font-size:0.9rem;font-weight:700"></div>' +
+      '<div style="font-size:0.78rem;color:#94a3b8;line-height:1.45;align-self:center">' +
+        'Стартовый курс <strong>0.222</strong> \\u20bd за драм (\\u22481 \\u20bd \\u2248 4.5 \\u058f). Курс используется только для кнопки авто-заполнения пустых рублёвых цен ниже. Публичный калькулятор показывает рубли напрямую из БД.' +
+      '</div>' +
+      '<button class="btn btn-success" style="padding:8px 14px;font-size:0.85rem" onclick="saveAmdRubRate()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить курс</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">' +
+      '<button class="btn btn-outline" style="padding:8px 14px;font-size:0.85rem;border-color:rgba(245,158,11,0.4);color:#fbbf24" onclick="bulkFillRub()" title="Заполнит только пустые \\u20bd-цены"><i class="fas fa-bolt" style="margin-right:4px"></i>Авто-заполнить пустые \\u20bd по курсу</button>' +
+    '</div>' +
+  '</div>';
   
   // Group services by tab
   var byTab = {};
@@ -61,11 +80,12 @@ function renderCalculator() {
       if (isTiered) { try { tiers = JSON.parse(svc2.price_tiers_json); } catch(e) { tiers = []; } }
       
       h += '<div class="section-edit-row" style="margin-bottom:8px" data-svc-id="' + svc2.id + '">' +
-        '<div style="display:grid;grid-template-columns:28px 1fr 1fr 100px auto auto;gap:8px;align-items:center">' +
+        '<div style="display:grid;grid-template-columns:28px 1fr 1fr 100px 100px auto auto;gap:8px;align-items:center">' +
           '<i class="fas fa-grip-vertical calc-drag-handle" style="color:#475569;cursor:grab;font-size:0.9rem"></i>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название RU</div><input class="input" value="' + escHtml(svc2.name_ru) + '" id="svc_ru_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название AM</div><input class="input" value="' + escHtml(svc2.name_am || '') + '" id="svc_am_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">\\u0426\\u0435\\u043d\\u0430 \\u058f</div><input class="input" type="number" value="' + svc2.price + '" id="svc_price_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#fbbf24;margin-bottom:2px">\\u0426\\u0435\\u043d\\u0430 \\u20bd</div><input class="input" type="number" value="' + (svc2.price_rub || 0) + '" id="svc_price_rub_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem;border-color:rgba(245,158,11,0.4)"></div>' +
           '<button class="btn btn-success" style="padding:6px 10px;margin-top:14px" onclick="saveCalcService(' + svc2.id + ',' + tab.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
           '<button class="btn btn-danger" style="padding:6px 10px;margin-top:14px" onclick="deleteCalcService(' + svc2.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
         '</div>';
@@ -77,11 +97,16 @@ function renderCalculator() {
         h += '<div style="margin-top:6px"><button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;border-color:rgba(239,68,68,0.3);color:#f87171" onclick="disableTieredPricing(' + svc2.id + ')" title="Убрать тарифную шкалу"><i class="fas fa-times" style="margin-right:4px"></i>Убрать шкалу</button></div>';
       }
       
-      // Tier editor
+      // Tier editor (with parallel AMD + RUB price columns)
       if (isTiered && tiers.length > 0) {
+        // Parse parallel RUB tiers (same min/max, different price). Falls back
+        // to empty array — admin can fill cell-by-cell or via bulk-fill.
+        var rubTiers = [];
+        try { rubTiers = svc2.price_tiers_rub_json ? JSON.parse(svc2.price_tiers_rub_json) : []; } catch(e) { rubTiers = []; }
         h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
           '<div style="font-size:0.78rem;font-weight:600;color:#a78bfa;margin-bottom:6px"><i class="fas fa-layer-group" style="margin-right:4px"></i>\\u0422\\u0430\\u0440\\u0438\\u0444\\u043d\\u0430\\u044f \\u0448\\u043a\\u0430\\u043b\\u0430</div>';
         for (var tii = 0; tii < tiers.length; tii++) {
+          var rubP = (rubTiers[tii] && typeof rubTiers[tii].price !== 'undefined') ? rubTiers[tii].price : 0;
           h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">' +
             '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">\\u043e\\u0442</span>' +
             '<input class="input" type="number" value="' + tiers[tii].min + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_min_' + svc2.id + '_' + tii + '">' +
@@ -89,6 +114,8 @@ function renderCalculator() {
             '<input class="input" type="number" value="' + tiers[tii].max + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_max_' + svc2.id + '_' + tii + '">' +
             '<span style="font-size:0.75rem;color:#94a3b8">=</span>' +
             '<input class="input" type="number" value="' + tiers[tii].price + '" style="width:80px;padding:4px 6px;font-size:0.8rem" id="tier_price_' + svc2.id + '_' + tii + '"><span style="font-size:0.8rem;color:#94a3b8">\\u058f</span>' +
+            '<span style="font-size:0.75rem;color:#94a3b8;margin-left:4px">/</span>' +
+            '<input class="input" type="number" value="' + rubP + '" style="width:80px;padding:4px 6px;font-size:0.8rem;border-color:rgba(245,158,11,0.4)" id="tier_price_rub_' + svc2.id + '_' + tii + '" placeholder="0"><span style="font-size:0.8rem;color:#fbbf24">\\u20bd</span>' +
             '<button class="tier-del-btn" onclick="deleteTier(' + svc2.id + ',' + tii + ',' + tiers.length + ')"><i class="fas fa-times"></i></button>' +
           '</div>';
         }
@@ -323,10 +350,11 @@ async function addServiceToTab(tabId) {
   
   var formHtml = '<div id="' + formId + '" style="margin-top:8px;padding:14px;background:#0f172a;border:2px dashed #8B5CF6;border-radius:8px;animation:slideUp 0.3s ease">' +
     '<div style="font-size:0.85rem;font-weight:700;color:#a78bfa;margin-bottom:10px"><i class="fas fa-plus-circle" style="margin-right:4px"></i>\\u041d\\u043e\\u0432\\u0430\\u044f \\u0443\\u0441\\u043b\\u0443\\u0433\\u0430 \\u0432 \\u00ab' + escHtml(tabName) + '\\u00bb</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 100px 130px;gap:8px;margin-bottom:10px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 100px 100px 130px;gap:8px;margin-bottom:10px">' +
       '<input class="input" id="nsvc_ru_' + tabId + '" placeholder="\\u041d\\u0430\\u0437\\u0432\\u0430\\u043d\\u0438\\u0435 RU" style="padding:6px 10px;font-size:0.85rem">' +
       '<input class="input" id="nsvc_am_' + tabId + '" placeholder="\\u041d\\u0430\\u0437\\u0432\\u0430\\u043d\\u0438\\u0435 AM" style="padding:6px 10px;font-size:0.85rem">' +
       '<input class="input" type="number" id="nsvc_price_' + tabId + '" placeholder="\\u0426\\u0435\\u043d\\u0430 \\u058f" value="0" style="padding:6px 10px;font-size:0.85rem">' +
+      '<input class="input" type="number" id="nsvc_price_rub_' + tabId + '" placeholder="\\u0426\\u0435\\u043d\\u0430 \\u20bd" value="0" style="padding:6px 10px;font-size:0.85rem;border-color:rgba(245,158,11,0.4)">' +
       '<select class="input" id="nsvc_type_' + tabId + '" style="padding:6px 8px;font-size:0.82rem">' +
         '<option value="fixed">\\u0424\\u0438\\u043a\\u0441. \\u0446\\u0435\\u043d\\u0430</option>' +
         '<option value="tiered">\\u0422\\u0430\\u0440\\u0438\\u0444\\u043d\\u0430\\u044f \\u0448\\u043a\\u0430\\u043b\\u0430</option>' +
@@ -349,10 +377,17 @@ async function submitSvcToTab(tabId) {
   if (!ru) { toast('\\u0412\\u0432\\u0435\\u0434\\u0438\\u0442\\u0435 \\u043d\\u0430\\u0437\\u0432\\u0430\\u043d\\u0438\\u0435', 'error'); return; }
   var am = document.getElementById('nsvc_am_' + tabId).value.trim() || ru;
   var price = parseInt(document.getElementById('nsvc_price_' + tabId).value) || 0;
+  var priceRub = parseInt((document.getElementById('nsvc_price_rub_' + tabId) || {}).value || '0') || 0;
   var pType = document.getElementById('nsvc_type_' + tabId).value;
   var tiersJson = null;
-  if (pType === 'tiered') { tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]); }
-  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_type: pType, price_tiers_json: tiersJson, sort_order: data.calcServices.length + 1 }) });
+  var tiersRubJson = null;
+  if (pType === 'tiered') {
+    tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]);
+    if (priceRub > 0) {
+      tiersRubJson = JSON.stringify([{min:1,max:20,price:priceRub},{min:21,max:40,price:Math.round(priceRub*0.85)},{min:41,max:999,price:Math.round(priceRub*0.75)}]);
+    }
+  }
+  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_rub: priceRub, price_type: pType, price_tiers_json: tiersJson, price_tiers_rub_json: tiersRubJson, sort_order: data.calcServices.length + 1 }) });
   toast('\\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u00ab' + ru + '\\u00bb \\u0434\\u043e\\u0431\\u0430\\u0432\\u043b\\u0435\\u043d\\u0430!');
   await reloadCalcData(); render();
 }
@@ -374,25 +409,34 @@ async function saveCalcService(id, tabId) {
   var ru = document.getElementById('svc_ru_' + id).value;
   var am = document.getElementById('svc_am_' + id).value;
   var price = parseInt(document.getElementById('svc_price_' + id).value) || 0;
-  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, tab_id: tabId || svc.tab_id }) });
+  var priceRub = parseInt((document.getElementById('svc_price_rub_' + id) || {}).value || '0') || 0;
+  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, price_rub: priceRub, tab_id: tabId || svc.tab_id }) });
   toast('\\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0435\\u043d\\u0430');
   await reloadCalcData(); render();
 }
 
 async function saveTiers(svcId, count) {
   var tiers = [];
+  var tiersRub = [];
+  var anyRub = false;
   for (var i = 0; i < count; i++) {
     var min = parseInt(document.getElementById('tier_min_' + svcId + '_' + i).value);
     var max = parseInt(document.getElementById('tier_max_' + svcId + '_' + i).value);
     var price = parseInt(document.getElementById('tier_price_' + svcId + '_' + i).value);
+    var priceRub = parseInt((document.getElementById('tier_price_rub_' + svcId + '_' + i) || {}).value || '0');
     if (!isNaN(min) && !isNaN(max) && !isNaN(price)) {
       tiers.push({ min: min, max: max, price: price });
+      var rp = isNaN(priceRub) ? 0 : priceRub;
+      tiersRub.push({ min: min, max: max, price: rp });
+      if (rp > 0) anyRub = true;
     }
   }
   if (!tiers.length) { toast('\\u0417\\u0430\\u043f\\u043e\\u043b\\u043d\\u0438\\u0442\\u0435 \\u0445\\u043e\\u0442\\u044f \\u0431\\u044b \\u043e\\u0434\\u0438\\u043d \\u0442\\u0430\\u0440\\u0438\\u0444', 'error'); return; }
   var svc = data.calcServices.find(s => s.id === svcId);
   if (!svc) return;
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
+  // Persist parallel RUB tiers only if at least one row has a rub price; otherwise null so landing falls back to AMD on RU.
+  var rubJson = anyRub ? JSON.stringify(tiersRub) : null;
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price_tiers_rub_json: rubJson, price: tiers[0].price, price_rub: anyRub ? tiersRub[0].price : (svc.price_rub || 0) }) });
   toast('\\u0422\\u0430\\u0440\\u0438\\u0444\\u044b \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0435\\u043d\\u044b! \\u041e\\u0431\\u043d\\u043e\\u0432\\u0438\\u0442\\u0435 \\u0441\\u0430\\u0439\\u0442 \\u0434\\u043b\\u044f \\u043f\\u0440\\u043e\\u0432\\u0435\\u0440\\u043a\\u0438.');
   await reloadCalcData(); render();
 }
@@ -402,9 +446,17 @@ async function addTier(svcId) {
   if (!svc) return;
   var tiers = [];
   try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; }
+  var rubTiers = [];
+  try { rubTiers = svc.price_tiers_rub_json ? JSON.parse(svc.price_tiers_rub_json) : []; } catch(e) { rubTiers = []; }
   var lastMax = tiers.length ? tiers[tiers.length-1].max : 0;
   tiers.push({ min: lastMax + 1, max: lastMax + 20, price: 1000 });
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers) }) });
+  // Mirror RUB tiers length so the editor can render a paired row.
+  if (rubTiers.length > 0) {
+    rubTiers.push({ min: lastMax + 1, max: lastMax + 20, price: 0 });
+  }
+  var payload = { ...svc, price_tiers_json: JSON.stringify(tiers) };
+  if (rubTiers.length > 0) payload.price_tiers_rub_json = JSON.stringify(rubTiers);
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify(payload) });
   toast('\\u0421\\u0442\\u0440\\u043e\\u043a\\u0430 \\u0434\\u043e\\u0431\\u0430\\u0432\\u043b\\u0435\\u043d\\u0430');
   await reloadCalcData(); render();
 }
@@ -416,9 +468,17 @@ async function deleteTier(svcId, tierIndex, totalTiers) {
   if (!svc) return;
   var tiers = [];
   try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; }
+  var rubTiers = [];
+  try { rubTiers = svc.price_tiers_rub_json ? JSON.parse(svc.price_tiers_rub_json) : []; } catch(e) { rubTiers = []; }
   if (tierIndex < 0 || tierIndex >= tiers.length) return;
   tiers.splice(tierIndex, 1);
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
+  if (rubTiers.length > 0) rubTiers.splice(tierIndex, 1);
+  var payload = { ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price };
+  if (rubTiers.length > 0) {
+    payload.price_tiers_rub_json = JSON.stringify(rubTiers);
+    payload.price_rub = rubTiers[0].price || 0;
+  }
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify(payload) });
   toast('\\u0421\\u0442\\u0440\\u043e\\u043a\\u0430 \\u0442\\u0430\\u0440\\u0438\\u0444\\u0430 \\u0443\\u0434\\u0430\\u043b\\u0435\\u043d\\u0430');
   await reloadCalcData(); render();
 }
@@ -434,12 +494,22 @@ async function enableTieredPricing(svcId) {
   var svc = data.calcServices.find(function(s) { return s.id === svcId; });
   if (!svc) return;
   var price = svc.price || 1000;
+  var priceRub = svc.price_rub || 0;
   var defaultTiers = [
     { min: 1, max: 20, price: price },
     { min: 21, max: 40, price: Math.round(price * 0.85) },
     { min: 41, max: 999, price: Math.round(price * 0.75) }
   ];
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'tiered', price_tiers_json: JSON.stringify(defaultTiers) }) });
+  var payload = { ...svc, price_type: 'tiered', price_tiers_json: JSON.stringify(defaultTiers) };
+  if (priceRub > 0) {
+    var defaultTiersRub = [
+      { min: 1, max: 20, price: priceRub },
+      { min: 21, max: 40, price: Math.round(priceRub * 0.85) },
+      { min: 41, max: 999, price: Math.round(priceRub * 0.75) }
+    ];
+    payload.price_tiers_rub_json = JSON.stringify(defaultTiersRub);
+  }
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify(payload) });
   toast('\\u0422\\u0430\\u0440\\u0438\\u0444\\u043d\\u0430\\u044f \\u0448\\u043a\\u0430\\u043b\\u0430 \\u0434\\u043e\\u0431\\u0430\\u0432\\u043b\\u0435\\u043d\\u0430! \\u041d\\u0430\\u0441\\u0442\\u0440\\u043e\\u0439\\u0442\\u0435 \\u0446\\u0435\\u043d\\u044b.');
   await reloadCalcData(); render();
 }
@@ -448,7 +518,7 @@ async function disableTieredPricing(svcId) {
   var svc = data.calcServices.find(function(s) { return s.id === svcId; });
   if (!svc) return;
   if (!confirm('\\u0423\\u0431\\u0440\\u0430\\u0442\\u044c \\u0442\\u0430\\u0440\\u0438\\u0444\\u043d\\u0443\\u044e \\u0448\\u043a\\u0430\\u043b\\u0443? \\u0423\\u0441\\u043b\\u0443\\u0433\\u0430 \\u0441\\u0442\\u0430\\u043d\\u0435\\u0442 \\u0441 \\u0444\\u0438\\u043a\\u0441. \\u0446\\u0435\\u043d\\u043e\\u0439.')) return;
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'fixed', price_tiers_json: null }) });
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'fixed', price_tiers_json: null, price_tiers_rub_json: null }) });
   toast('\\u0422\\u0430\\u0440\\u0438\\u0444\\u043d\\u0430\\u044f \\u0448\\u043a\\u0430\\u043b\\u0430 \\u0443\\u0434\\u0430\\u043b\\u0435\\u043d\\u0430');
   await reloadCalcData(); render();
 }
@@ -512,22 +582,41 @@ function openPackageModal(pkg) {
     // === AUTO-CALCULATED PRICE BLOCK ===
     '<div id="pkg_price_block" style="background:#1a2236;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><i class="fas fa-calculator" style="color:#8B5CF6"></i><span style="font-weight:700;font-size:0.95rem">Цены и скидка</span></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+      // AMD row (default currency)
+      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:700;margin-bottom:6px;letter-spacing:0.05em">\\u058f \\u0414\\u0420\\u0410\\u041c (Армения)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">' +
         '<div>' +
-          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Сумма услуг (авто) ֏</label>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Сумма услуг (авто) \\u058f</label>' +
           '<div id="pkg_original_display" style="font-size:1.3rem;font-weight:800;color:#94a3b8;padding:8px 0">0</div>' +
           '<input type="hidden" id="pkg_original_price" value="' + (isEdit ? pkg.original_price || 0 : 0) + '">' +
         '</div>' +
         '<div>' +
-          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета ֏ <span style="color:#EF4444">*</span></label>' +
-          '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" min="0" placeholder="15000" style="border-color:#f59e0b;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscount()">' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета \\u058f <span style="color:#EF4444">*</span></label>' +
+          '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" min="0" placeholder="15000" style="border-color:#8B5CF6;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscount()">' +
         '</div>' +
         '<div>' +
-          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка</label>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка \\u058f</label>' +
           '<div id="pkg_discount_display" style="font-size:1.3rem;font-weight:800;color:#10B981;padding:8px 0">0%</div>' +
         '</div>' +
       '</div>' +
-      '<div id="pkg_savings_line" style="font-size:0.8rem;color:#64748b;display:none">Экономия клиента: <span id="pkg_savings_amount" style="color:#10B981;font-weight:700">0 ֏</span></div>' +
+      '<div id="pkg_savings_line" style="font-size:0.8rem;color:#64748b;display:none;margin-bottom:14px">Экономия клиента: <span id="pkg_savings_amount" style="color:#10B981;font-weight:700">0 \\u058f</span></div>' +
+      // RUB row (Russian market)
+      '<div style="font-size:0.72rem;color:#fbbf24;font-weight:700;margin-bottom:6px;margin-top:6px;letter-spacing:0.05em">\\u20bd \\u0420\\u0423\\u0411\\u041b\\u0418 (Россия)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Старая цена \\u20bd</label>' +
+          '<input class="input" type="number" id="pkg_original_price_rub" value="' + (isEdit ? pkg.original_price_rub || 0 : 0) + '" min="0" placeholder="0" style="font-size:1rem;border-color:rgba(245,158,11,0.4)" oninput="recalcPkgDiscountRub()">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета \\u20bd</label>' +
+          '<input class="input" type="number" id="pkg_package_price_rub" value="' + (isEdit ? pkg.package_price_rub || 0 : 0) + '" min="0" placeholder="0" style="border-color:#f59e0b;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscountRub()">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка \\u20bd</label>' +
+          '<div id="pkg_discount_display_rub" style="font-size:1.3rem;font-weight:800;color:#10B981;padding:8px 0">—</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:0.7rem;color:#64748b;margin-top:6px;line-height:1.4">Если оставить рублёвые цены = 0 — пакет не будет показываться на русской версии сайта (либо нажмите кнопку «Авто-заполнить \\u20bd» в карточке курса вверху).</div>' +
     '</div>' +
     
     // === Crown tier, badge text, and options ===
@@ -640,7 +729,7 @@ function recalcPkgDiscount() {
     var savings = orig - price;
     if (discDisplay) { discDisplay.textContent = '-' + discPct + '%'; discDisplay.style.color = '#10B981'; }
     if (savingsLine) savingsLine.style.display = 'block';
-    if (savingsAmt) savingsAmt.textContent = savings.toLocaleString('ru-RU') + ' ֏';
+    if (savingsAmt) savingsAmt.textContent = savings.toLocaleString('ru-RU') + ' \\u058f';
     
   } else if (orig > 0 && price >= orig) {
     if (discDisplay) { discDisplay.textContent = 'нет скидки'; discDisplay.style.color = '#EF4444'; }
@@ -649,6 +738,58 @@ function recalcPkgDiscount() {
     if (discDisplay) { discDisplay.textContent = '—'; discDisplay.style.color = '#64748b'; }
     if (savingsLine) savingsLine.style.display = 'none';
   }
+  // Also refresh the RUB discount panel.
+  recalcPkgDiscountRub();
+}
+
+// Recalculate RUB discount display (parallel to AMD).
+function recalcPkgDiscountRub() {
+  var origEl = document.getElementById('pkg_original_price_rub');
+  var priceEl = document.getElementById('pkg_package_price_rub');
+  var discDisplay = document.getElementById('pkg_discount_display_rub');
+  if (!discDisplay) return;
+  var orig = parseInt(origEl ? origEl.value : '0') || 0;
+  var price = parseInt(priceEl ? priceEl.value : '0') || 0;
+  if (orig > 0 && price > 0 && price < orig) {
+    var discPct = Math.round((1 - price / orig) * 100);
+    discDisplay.textContent = '-' + discPct + '%'; discDisplay.style.color = '#10B981';
+  } else if (orig > 0 && price >= orig) {
+    discDisplay.textContent = 'нет скидки'; discDisplay.style.color = '#EF4444';
+  } else if (price > 0 && orig === 0) {
+    discDisplay.textContent = price.toLocaleString('ru-RU') + ' \\u20bd'; discDisplay.style.color = '#fbbf24';
+  } else {
+    discDisplay.textContent = '—'; discDisplay.style.color = '#64748b';
+  }
+}
+
+// Save the AMD->RUB rate to site_settings.
+async function saveAmdRubRate() {
+  var inp = document.getElementById('amdRubRate');
+  if (!inp) return;
+  var v = String(inp.value || '').trim();
+  var num = parseFloat(v);
+  if (!num || num <= 0) { toast('\\u041d\\u0435\\u043a\\u043e\\u0440\\u0440\\u0435\\u043a\\u0442\\u043d\\u044b\\u0439 \\u043a\\u0443\\u0440\\u0441', 'error'); return; }
+  try {
+    await api('/settings', { method: 'PUT', body: JSON.stringify({ amd_to_rub_rate: String(num) }) });
+    if (!data.settings) data.settings = {};
+    data.settings.amd_to_rub_rate = String(num);
+    toast('\\u041a\\u0443\\u0440\\u0441 \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0451\\u043d');
+  } catch(e) { toast('\\u041e\\u0448\\u0438\\u0431\\u043a\\u0430 \\u0441\\u043e\\u0445\\u0440\\u0430\\u043d\\u0435\\u043d\\u0438\\u044f', 'error'); }
+}
+
+// Bulk-fill empty RUB prices using the saved (or input) rate.
+async function bulkFillRub() {
+  var inp = document.getElementById('amdRubRate');
+  var rate = inp ? parseFloat(inp.value) : NaN;
+  if (!rate || rate <= 0) { toast('\\u0421\\u043d\\u0430\\u0447\\u0430\\u043b\\u0430 \\u0443\\u043a\\u0430\\u0436\\u0438\\u0442\\u0435 \\u043a\\u0443\\u0440\\u0441', 'error'); return; }
+  if (!confirm('\\u0417\\u0430\\u043f\\u043e\\u043b\\u043d\\u0438\\u0442\\u044c \\u0432\\u0441\\u0435 \\u043f\\u0443\\u0441\\u0442\\u044b\\u0435 \\u0440\\u0443\\u0431\\u043b\\u0451\\u0432\\u044b\\u0435 \\u0446\\u0435\\u043d\\u044b \\u043f\\u043e \\u043a\\u0443\\u0440\\u0441\\u0443 ' + rate + '? \\u0421\\u0443\\u0449\\u0435\\u0441\\u0442\\u0432\\u0443\\u044e\\u0449\\u0438\\u0435 \\u0440\\u0443\\u0431\\u043b\\u0435\\u0432\\u044b\\u0435 \\u0446\\u0435\\u043d\\u044b \\u041d\\u0415 \\u0431\\u0443\\u0434\\u0443\\u0442 \\u0438\\u0437\\u043c\\u0435\\u043d\\u0435\\u043d\\u044b.')) return;
+  try {
+    var res = await api('/calc/bulk-fill-rub', { method: 'POST', body: JSON.stringify({ rate: rate }) });
+    var msg = '\\u0417\\u0430\\u043f\\u043e\\u043b\\u043d\\u0435\\u043d\\u043e: \\u0443\\u0441\\u043b\\u0443\\u0433 ' + (res.services_updated || 0) + ', \\u0442\\u0430\\u0440\\u0438\\u0444\\u043d\\u044b\\u0445 \\u0448\\u043a\\u0430\\u043b ' + (res.tiered_updated || 0) + ', \\u043f\\u0430\\u043a\\u0435\\u0442\\u043e\\u0432 ' + (res.packages_updated || 0);
+    toast(msg);
+    await reloadCalcData();
+    render();
+  } catch(e) { toast('\\u041e\\u0448\\u0438\\u0431\\u043a\\u0430', 'error'); }
 }
 
 var _pkgItemCounter = 100;
@@ -750,6 +891,8 @@ async function savePackage(pkgId) {
   
   var pkgPrice = parseInt((document.getElementById('pkg_package_price'))?.value || '0') || 0;
   if (pkgPrice <= 0) { toast('Укажите цену пакета', 'error'); return; }
+  var pkgPriceRub = parseInt((document.getElementById('pkg_package_price_rub'))?.value || '0') || 0;
+  var pkgOrigRub = parseInt((document.getElementById('pkg_original_price_rub'))?.value || '0') || 0;
   
   var payload = {
     name_ru: nameRu,
@@ -758,6 +901,8 @@ async function savePackage(pkgId) {
     description_am: (document.getElementById('pkg_desc_am'))?.value || '',
     original_price: parseInt((document.getElementById('pkg_original_price'))?.value || '0') || 0,
     package_price: pkgPrice,
+    original_price_rub: pkgOrigRub,
+    package_price_rub: pkgPriceRub,
     badge_ru: (document.getElementById('pkg_badge_ru'))?.value || '',
     badge_am: (document.getElementById('pkg_badge_am'))?.value || '',
     crown_tier: (document.getElementById('pkg_crown_tier'))?.value || '',

@@ -37,7 +37,7 @@ app.get('/api/site-data', async (c) => {
       db.prepare('SELECT * FROM calculator_tabs WHERE is_active = 1 ORDER BY sort_order').all(),
       db.prepare('SELECT cs.*, ct.tab_key FROM calculator_services cs JOIN calculator_tabs ct ON cs.tab_id = ct.id WHERE cs.is_active = 1 ORDER BY cs.tab_id, cs.sort_order').all(),
       db.prepare('SELECT * FROM calculator_packages WHERE is_active = 1 ORDER BY sort_order, id').all().catch(() => ({ results: [] })),
-      db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am, cs.price as service_price, cs.price_type, cs.price_tiers_json FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all().catch(() => ({ results: [] })),
+      db.prepare('SELECT pi.*, cs.name_ru as service_name_ru, cs.name_am as service_name_am, cs.price as service_price, cs.price_rub as service_price_rub, cs.price_type, cs.price_tiers_json, cs.price_tiers_rub_json FROM calculator_package_items pi LEFT JOIN calculator_services cs ON pi.service_id = cs.id').all().catch(() => ({ results: [] })),
       db.prepare('SELECT * FROM telegram_messages WHERE is_active = 1 ORDER BY sort_order').all(),
       db.prepare('SELECT * FROM custom_scripts WHERE is_active = 1 ORDER BY sort_order').all(),
       db.prepare('SELECT * FROM section_order ORDER BY sort_order').all(),
@@ -46,7 +46,7 @@ app.get('/api/site-data', async (c) => {
       db.prepare("SELECT texts_ru, texts_am, images FROM site_blocks WHERE block_key = 'ticker' LIMIT 1").first().catch(() => null),
       db.prepare("SELECT social_links FROM site_blocks WHERE block_key = 'footer' LIMIT 1").first().catch(() => null),
       db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all().catch(() => ({ results: [] })),
-      db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%'").all().catch(() => ({ results: [] })),
+      db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%' OR key = 'amd_to_rub_rate'").all().catch(() => ({ results: [] })),
     ]);
     
     // Parse content
@@ -230,8 +230,9 @@ app.post('/api/lead', async (c) => {
     if (body.service) notesParts.push(`Услуга: ${body.service}`);
     if (body.message) notesParts.push(`Комментарий: ${body.message}`);
     const autoNotes = notesParts.join(' | ');
-    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, referral_code, user_agent, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'form', body.name||'', contact, body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200), autoNotes).run();
+    const leadCurrency = (body.currency === 'rub') ? 'rub' : 'amd';
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, referral_code, user_agent, notes, currency) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'form', body.name||'', contact, body.product||'', body.service||'', body.message||'', body.lang||'ru', body.referral_code||'', ua.substring(0,200), autoNotes, leadCurrency).run();
     notifyTelegram(db, { ...body, contact, source: 'form' });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
@@ -262,8 +263,9 @@ app.post('/api/popup-lead', async (c) => {
     const nextNum = ((lastLead?.max_num as number) || 0) + 1;
     // Build notes from popup form data (buyouts, reviews)
     const autoNotes = body.notes || '';
-    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent, notes) VALUES (?,?,?,?,?,?,?,?,?,?)')
-      .bind(nextNum, 'popup', body.name||'', contact, body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200), autoNotes).run();
+    const popupCurrency = (body.currency === 'rub') ? 'rub' : 'amd';
+    await db.prepare('INSERT INTO leads (lead_number, source, name, contact, product, service, message, lang, user_agent, notes, currency) VALUES (?,?,?,?,?,?,?,?,?,?,?)')
+      .bind(nextNum, 'popup', body.name||'', contact, body.product||'', body.service||'', body.message||'', body.lang||'ru', ua.substring(0,200), autoNotes, popupCurrency).run();
     notifyTelegram(db, { ...body, contact, source: 'popup', message: autoNotes });
     return c.json({ success: true, message: 'Lead received' });
   } catch (e) {
