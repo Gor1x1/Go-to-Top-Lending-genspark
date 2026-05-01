@@ -2970,9 +2970,9 @@ function submitCallbackForm(e) {
   var result = document.getElementById('callbackResult');
   var btn = e.target.querySelector('button[type="submit"]');
   if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Отправка...'; }
-  var msg = 'Запрос на звонок\nИмя: ' + name + '\nТелефон: ' + phone;
-  if (time) msg += '\nУдобное время: ' + time;
-  if (question) msg += '\nВопрос: ' + question;
+  var msg = 'Запрос на звонок\\nИмя: ' + name + '\\nТелефон: ' + phone;
+  if (time) msg += '\\nУдобное время: ' + time;
+  if (question) msg += '\\nВопрос: ' + question;
   fetch('/api/public/contact', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
