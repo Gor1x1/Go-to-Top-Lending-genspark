@@ -337,7 +337,7 @@ app.get('/', async (c) => {
 html{scroll-behavior:smooth;font-size:16px;overflow-x:hidden;width:100%;max-width:100vw;-webkit-text-size-adjust:100%}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.7;overflow-x:hidden;width:100%;max-width:100vw;min-height:100vh;min-height:100dvh;-webkit-overflow-scrolling:touch}
 *,*::before,*::after{box-sizing:border-box}
-.container{max-width:1440px;margin:0 auto;padding:0 40px;overflow-x:hidden;width:100%;box-sizing:border-box}
+.container{max-width:1440px;margin:0 auto;padding:0 24px;overflow-x:hidden;width:100%;box-sizing:border-box}
 a{text-decoration:none;color:inherit}
 img{max-width:100%;height:auto}
 .header{position:fixed;top:0;left:0;right:0;z-index:1000;padding:12px 0;transition:var(--t);background:rgba(15,10,26,0.8);backdrop-filter:blur(20px);border-bottom:1px solid transparent;width:100%}
@@ -385,12 +385,13 @@ img{max-width:100%;height:auto}
 .bottom-nav-more-menu a i{width:20px;text-align:center;color:var(--purple);font-size:0.9rem}
 .hero{padding:140px 0 80px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start}
 .hero-el-title{grid-area:title}
 .hero-el-texts{grid-area:texts}
 .hero-el-stats{grid-area:stats;margin-bottom:36px}
 .hero-el-buttons{grid-area:buttons}
-.hero-image{grid-area:photo;align-self:start;display:flex;flex-direction:column;gap:16px;position:relative}
+.hero-image{grid-area:photo;align-self:start;display:flex;flex-direction:column;gap:16px}
+.hero-photo-wrap{position:relative;width:100%}
 .hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.85rem;font-weight:500;color:var(--accent);margin-bottom:24px}
 .hero h1{font-size:3rem;font-weight:800;line-height:1.15;margin-bottom:20px;letter-spacing:-0.02em}
 .hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
@@ -406,7 +407,7 @@ img{max-width:100%;height:auto}
 .btn-outline{background:transparent;color:var(--text);border:1px solid var(--border)}
 .btn-outline:hover{border-color:var(--purple);background:rgba(139,92,246,0.05)}
 .btn-lg{padding:16px 32px;font-size:1.05rem}
-.hero-image img{border-radius:var(--r-lg);width:100%;height:auto;aspect-ratio:3/4;max-height:520px;object-fit:cover;object-position:center;border:1px solid var(--border)}
+.hero-image img,.hero-photo-wrap img{border-radius:var(--r-lg);width:100%;height:auto;aspect-ratio:3/4;max-height:520px;object-fit:cover;object-position:center;border:1px solid var(--border);display:block}
 .hero-badge-img{position:absolute;bottom:20px;left:20px;background:rgba(15,10,26,0.9);backdrop-filter:blur(10px);padding:12px 18px;border-radius:var(--r-sm);display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
 .hero-badge-img i{color:var(--success);font-size:1.1rem}
 .hero-badge-img span{font-size:0.85rem;font-weight:500}
@@ -1242,10 +1243,12 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     </div>
   </div>
   <div class="hero-image">
-    <img src="/static/img/founder.jpg" alt="Go to Top" loading="eager" fetchpriority="high" decoding="async">
-    <div class="hero-badge-img">
-      <i class="fas fa-shield-alt"></i>
-      <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">Надежный метод продвижения</span>
+    <div class="hero-photo-wrap">
+      <img src="/static/img/founder.jpg" alt="Go to Top" loading="eager" fetchpriority="high" decoding="async">
+      <div class="hero-badge-img">
+        <i class="fas fa-shield-alt"></i>
+        <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">Надежный метод продвижения</span>
+      </div>
     </div>
     <div class="qr-codes-grid">
       <a href="https://www.instagram.com/goo_to_top/" target="_blank" rel="noopener" class="qr-card">
@@ -3220,6 +3223,44 @@ if (document.documentElement.classList.contains('server-injected')) {
     document.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
   }, 100);
 }
+
+/* ===== COUNTER FALLBACK =====
+   If IntersectionObserver fails (e.g. server-injected reveal, lazy load issues),
+   force counters to animate after page load to guarantee numbers are never stuck at 0. */
+function forceRunCounters() {
+  document.querySelectorAll('.stat-num[data-count]').forEach(function(el) {
+    if (el.dataset.counterDone === '1') return;
+    var target = parseInt(el.dataset.count) || 0;
+    el.dataset.counterDone = '1';
+    if (target === 0) { el.textContent = '0'; return; }
+    var dur = 1800; var start = performance.now();
+    function anim(now) {
+      var p = Math.min((now - start) / dur, 1);
+      el.textContent = Math.floor(target * (1 - Math.pow(1 - p, 3))).toLocaleString('ru-RU');
+      if (p < 1) requestAnimationFrame(anim);
+      else el.textContent = target.toLocaleString('ru-RU');
+    }
+    requestAnimationFrame(anim);
+  });
+  document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) {
+    if (el.dataset.counterDone === '1') return;
+    var target = parseInt(el.dataset.countS) || 0;
+    el.dataset.counterDone = '1';
+    if (target === 0) return;
+    var hasPlus = el.textContent.includes('+');
+    var dur = 1800; var start = performance.now();
+    function animS(now) {
+      var p = Math.min((now - start) / dur, 1);
+      var val = Math.floor(target * (1 - Math.pow(1 - p, 3)));
+      el.textContent = val.toLocaleString('ru-RU') + (hasPlus ? '+' : '');
+      if (p < 1) requestAnimationFrame(animS);
+      else el.textContent = target.toLocaleString('ru-RU') + (hasPlus ? '+' : '');
+    }
+    requestAnimationFrame(animS);
+  });
+}
+window.addEventListener('load', function() { setTimeout(forceRunCounters, 500); });
+setTimeout(forceRunCounters, 2500);
 
 /* ===== SMOOTH SCROLL ===== */
 document.querySelectorAll('a[href^="#"]').forEach(function(a) {
