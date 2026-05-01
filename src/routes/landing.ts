@@ -3259,8 +3259,14 @@ function forceRunCounters() {
     requestAnimationFrame(animS);
   });
 }
-window.addEventListener('load', function() { setTimeout(forceRunCounters, 500); });
-setTimeout(forceRunCounters, 2500);
+/* Run counters as early as possible: immediately + on multiple events for robustness. */
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(forceRunCounters, 50); });
+} else {
+  setTimeout(forceRunCounters, 50);
+}
+window.addEventListener('load', function() { setTimeout(forceRunCounters, 200); });
+setTimeout(forceRunCounters, 1500);
 
 /* ===== SMOOTH SCROLL ===== */
 document.querySelectorAll('a[href^="#"]').forEach(function(a) {
