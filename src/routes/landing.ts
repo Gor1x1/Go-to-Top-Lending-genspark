@@ -7,7 +7,7 @@ import { html } from 'hono/html'
 import { initDatabase } from '../lib/db'
 import { SEED_CONTENT_SECTIONS, SEED_CALC_TABS, SEED_CALC_SERVICES, SEED_TG_MESSAGES } from '../seed-data'
 
-type Bindings = { DB: D1Database }
+type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 
 export function register(app: Hono<{ Bindings: Bindings }>) {
 app.get('/', async (c) => {
@@ -385,7 +385,7 @@ img{max-width:100%;height:auto}
 .bottom-nav-more-menu a i{width:20px;text-align:center;color:var(--purple);font-size:0.9rem}
 .hero{padding:140px 0 80px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
-.hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start}
+.hero-grid{display:grid;grid-template-columns:1fr 1fr;grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo" "qr photo";gap:0 60px;align-items:start}
 .hero-el-title{grid-area:title}
 .hero-el-texts{grid-area:texts}
 .hero-el-stats{grid-area:stats;margin-bottom:36px}
@@ -1116,6 +1116,59 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   .logo img{height:30px}
   .lang-btn{padding:4px 8px;font-size:0.68rem}
 }
+/* === QR CODES === */
+.hero-el-qr{grid-area:qr;margin-top:16px}
+.qr-codes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:20px}
+.qr-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.15);border-radius:12px;transition:all 0.2s;text-decoration:none;color:var(--text)}
+.qr-card:hover{border-color:var(--purple);background:rgba(139,92,246,0.1);transform:translateY(-2px)}
+.qr-card img{width:80px;height:80px;object-fit:contain;border-radius:8px}
+.qr-card span{font-size:0.7rem;font-weight:600;color:var(--text-sec);text-align:center}
+@media(max-width:768px){.qr-codes-grid{grid-template-columns:repeat(4,1fr);gap:8px}.qr-card img{width:56px;height:56px}.qr-card span{font-size:0.6rem}.qr-card{padding:8px}}
+@media(max-width:480px){.qr-codes-grid{grid-template-columns:repeat(2,1fr)}}
+/* === SERVICE QUICK CARDS === */
+.svc-cards-section{padding-top:60px}
+.svc-quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.svc-quick-card{display:flex;flex-direction:column;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);transition:all 0.3s ease;text-decoration:none;color:var(--text)}
+.svc-quick-card:hover{border-color:rgba(139,92,246,0.4);transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,0.2)}
+.svc-quick-img{width:100%;height:200px;overflow:hidden;position:relative}
+.svc-quick-img img{width:100%;height:100%;object-fit:cover;transition:transform 0.4s ease}
+.svc-quick-card:hover .svc-quick-img img{transform:scale(1.05)}
+.svc-quick-body{padding:24px;flex:1;display:flex;flex-direction:column}
+.svc-quick-icon{width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--purple);margin-bottom:12px}
+.svc-quick-card h3{font-size:1.1rem;font-weight:700;margin-bottom:10px;line-height:1.3}
+.svc-quick-card p{font-size:0.88rem;color:var(--text-sec);line-height:1.7;flex:1;margin-bottom:16px}
+.svc-quick-cta{font-size:0.88rem;font-weight:700;color:var(--purple);display:flex;align-items:center;gap:6px}
+.svc-quick-card:hover .svc-quick-cta{gap:10px}
+@media(max-width:768px){.svc-quick-grid{grid-template-columns:1fr;gap:16px}.svc-quick-img{height:160px}}
+@media(max-width:480px){.svc-quick-img{height:140px}.svc-quick-body{padding:16px}}
+/* === REVIEWS PROOF === */
+.reviews-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:start;margin-top:32px}
+.review-proof-col{display:flex;flex-direction:column;border-radius:var(--r-lg);overflow:hidden;border:2px solid var(--border)}
+.review-proof-col.good{border-color:rgba(16,185,129,0.4)}
+.review-proof-col.bad{border-color:rgba(239,68,68,0.3)}
+.review-proof-label{padding:12px 20px;font-size:0.9rem;font-weight:800;letter-spacing:0.5px;display:flex;align-items:center;gap:8px}
+.review-proof-label.good{background:rgba(16,185,129,0.15);color:#10B981}
+.review-proof-label.bad{background:rgba(239,68,68,0.12);color:#ef4444}
+.review-proof-img{width:100%;max-height:400px;overflow:hidden}
+.review-proof-img img{width:100%;height:auto;object-fit:cover;display:block}
+.review-proof-text{padding:16px 20px;font-size:0.88rem;color:var(--text-sec);line-height:1.7}
+.review-proof-vs{display:flex;align-items:center;justify-content:center;padding:0 8px}
+.review-proof-vs span{width:48px;height:48px;border-radius:50%;background:rgba(139,92,246,0.1);border:2px solid rgba(139,92,246,0.3);display:flex;align-items:center;justify-content:center;font-size:0.85rem;font-weight:800;color:var(--purple);flex-shrink:0}
+@media(max-width:768px){.reviews-compare{grid-template-columns:1fr;gap:16px}.review-proof-vs{display:none}}
+/* === FOR WHOM === */
+.for-whom-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:32px}
+.for-whom-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px;transition:all 0.3s ease;display:flex;flex-direction:column;gap:12px}
+.for-whom-card:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-4px);box-shadow:0 12px 30px rgba(0,0,0,0.15)}
+.for-whom-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.05));display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple);flex-shrink:0}
+.for-whom-card h3{font-size:1rem;font-weight:700;line-height:1.3}
+.for-whom-card p{font-size:0.87rem;color:var(--text-sec);line-height:1.7;margin:0}
+@media(max-width:900px){.for-whom-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:600px){.for-whom-grid{grid-template-columns:1fr;gap:14px}.for-whom-card{padding:20px}}
+/* === FLOAT CALLBACK === */
+.float-callback{position:fixed;bottom:100px;right:24px;z-index:999;width:52px;height:52px;background:linear-gradient(135deg,#10B981,#059669);border-radius:50%;display:flex;align-items:center;justify-content:center;color:white;font-size:1.2rem;box-shadow:0 4px 20px rgba(16,185,129,0.4);transition:all 0.3s;text-decoration:none;animation:pulse-green 2s infinite}
+.float-callback:hover{transform:scale(1.1);box-shadow:0 8px 30px rgba(16,185,129,0.6)}
+@keyframes pulse-green{0%,100%{box-shadow:0 4px 20px rgba(16,185,129,0.4)}50%{box-shadow:0 4px 30px rgba(16,185,129,0.7)}}
+@media(max-width:768px){.float-callback{bottom:80px;right:16px;width:46px;height:46px;font-size:1rem}}
 </style>
 </head>
 <body>
@@ -1136,16 +1189,17 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     <li><a href="#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
     <li><a href="#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
     <li><a href="#contact" data-ru="Контакты" data-am="Կոնտակտներ">Контакты</a></li>
-    <li class="nav-mobile-cta"><a href="https://wa.me/37455226224" target="_blank" class="btn btn-primary"><i class="fab fa-whatsapp"></i> <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">Написать нам</span></a></li>
+    <li><a href="/blog" data-ru="Блог" data-am="Բlog">Блог</a></li>
+    <li class="nav-mobile-cta"><a href="#contact" class="btn btn-primary"><i class="fas fa-phone"></i> <span data-ru="Пեрезвоните мне" data-am="զանգահարեք ինծ" data-no-rewrite="1">Пեрեзвоните мне</span></a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
       <button class="lang-btn" data-lang="ru" onclick="switchLang('ru')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#fff"/><rect y="8" width="36" height="8" fill="#0039A6"/><rect y="16" width="36" height="8" fill="#D52B1E"/></svg></span><span class="lang-text">RU</span></button>
       <button class="lang-btn active" data-lang="am" onclick="switchLang('am')"><span class="lang-flag"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 24" width="20" height="14" style="border-radius:2px;vertical-align:middle"><rect width="36" height="8" fill="#D90012"/><rect y="8" width="36" height="8" fill="#0033A0"/><rect y="16" width="36" height="8" fill="#F2A800"/></svg></span><span class="lang-text">AM</span></button>
     </div>
-    <a href="https://wa.me/37455226224" target="_blank" class="nav-cta">
-      <i class="fab fa-whatsapp"></i>
-      <span data-ru="Написать нам" data-am="Գրել հիմա">Написать нам</span>
+    <a href="#contact" class="nav-cta">
+      <i class="fas fa-phone"></i>
+      <span data-ru="Пեрезвоните мне" data-am="զանգահարեք ինծ">Пեрեзвонитե мнե</span>
     </a>
   </div>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()">
@@ -1200,6 +1254,26 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
       <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">Надежный метод продвижения</span>
     </div>
   </div>
+  <div class="hero-el-qr">
+    <div class="qr-codes-grid">
+      <a href="https://www.instagram.com/goo_to_top/" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-instagram.png" alt="Instagram QR">
+        <span data-ru="Наш Instagram" data-am="Մեր Instagram">Наш Instagram</span>
+      </a>
+      <a href="https://t.me/goo_to_top" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-telegram.png" alt="Telegram QR">
+        <span data-ru="Telegram чат" data-am="Telegram чат">Telegram чат</span>
+      </a>
+      <a href="https://www.facebook.com/gototop.wb" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-facebook.png" alt="Facebook QR">
+        <span data-ru="Наш Facebook" data-am="Մեր Facebook">Наш Facebook</span>
+      </a>
+      <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-whatsapp.png" alt="WhatsApp QR">
+        <span data-ru="WhatsApp" data-am="WhatsApp">WhatsApp</span>
+      </a>
+    </div>
+  </div>
 </div>
 </div>
 </section>
@@ -1251,6 +1325,52 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </div>
 </div>
 
+
+
+<!-- ===== SERVICES CARDS (clickable quick-access) ===== -->
+<section class="section svc-cards-section" id="svc-cards" data-section-id="svc-cards">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-th-large"></i> <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">Наши услуги</span></div>
+    <h2 class="section-title" data-ru="Что мы делаем для вашего роста" data-am="Ինչ ենք անում ձեր աճի համար">Что мы делаем для вашего роста</h2>
+  </div>
+  <div class="svc-quick-grid fade-up">
+    <a href="#services" class="svc-quick-card">
+      <div class="svc-quick-img">
+        <img src="/static/img/svc-buyouts.png" alt="Выкупы по ключам" loading="lazy">
+      </div>
+      <div class="svc-quick-body">
+        <div class="svc-quick-icon"><i class="fas fa-shopping-cart"></i></div>
+        <h3 data-ru="Выкупы по ключам и рекламе" data-am="Գնումներ ըստ բանալիների">Выкупы по ключам и рекламе</h3>
+        <p data-ru="Реальные покупки с живых аккаунтов по нужным ключевым словам — ваш товар поднимается в выдаче WB" data-am="Իրական գнумнер кендани hashivnerits dzer banali barrov">Реальные покупки с живых аккаунтов по нужным ключевым словам — ваш товар поднимается в выдаче WB</p>
+        <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավելին →">Подробнее →</span>
+      </div>
+    </a>
+    <a href="#client-reviews" class="svc-quick-card">
+      <div class="svc-quick-img">
+        <img src="/static/img/svc-reviews.png" alt="Отзывы под ключ" loading="lazy">
+      </div>
+      <div class="svc-quick-body">
+        <div class="svc-quick-icon"><i class="fas fa-star"></i></div>
+        <h3 data-ru="Отзывы под ключ" data-am="Կарніqner shrjantsik">Отзывы под ключ</h3>
+        <p data-ru="Реальные отзывы с фото и видео от живых покупателей — рейтинг карточки растёт, доверие клиентов увеличивается" data-am="Иракан karniknер lusankarneriov — barjracnum e kart varkanishine">Реальные отзывы с фото и видео от живых покупателей — рейтинг карточки растёт, доверие клиентов увеличивается</p>
+        <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավелин →">Подробнее →</span>
+      </div>
+    </a>
+    <a href="#referral" class="svc-quick-card">
+      <div class="svc-quick-img">
+        <img src="/static/img/svc-referral.png" alt="Реферальная программа" loading="lazy">
+      </div>
+      <div class="svc-quick-body">
+        <div class="svc-quick-icon"><i class="fas fa-users"></i></div>
+        <h3 data-ru="Реферальная программа" data-am="Ռeferayin dzragir">Реферальная программа</h3>
+        <p data-ru="Рекомендуйте нас коллегам и зарабатывайте. Партнёрская программа для агентств, менеджеров и владельцев ресурсов" data-am="Khоrgurd tveq mez ev vastaekeq">Рекомендуйте нас коллегам и зарабатывайте. Партнёрская программа для агентств, менеджеров и владельцев ресурсов</p>
+        <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավелин →">Подробнее →</span>
+      </div>
+    </a>
+  </div>
+</div>
+</section>
 
 <!-- ===== ABOUT ===== -->
 <section class="section" id="about" data-section-id="about">
@@ -1403,20 +1523,20 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-balance-scale-right"></i> <span data-ru="Сравнение бюджетов" data-am="Բյուջեների համեմատություն">Сравнение бюджетов</span></div>
-    <h2 class="section-title" data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ">50 000 ֏ на блогера vs 50 000 ֏ на выкупы</h2>
+    <h2 class="section-title" data-ru="11 000 ₽ на блогера vs 11 000 ₽ на выкупы" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ">11 000 ₽ на блогера vs 11 000 ₽ на выкупы</h2>
   </div>
 
 <div class="why-block fade-up">
-    <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ — որն է ավելի արդյունավետ?">50 000 ֏ на блогера vs 50 000 ֏ на выкупы — что эффективнее?</span></h3>
+    <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="11 000 ₽ на блогера vs 11 000 ₽ на выкупы — что эффективнее?" data-am="50 000 ֏ բլոգեր vs 50 000 ֏ ինքնագնումներ — որն է ավելի արդյունավետ?">11 000 ₽ на блогера vs 11 000 ₽ на выкупы — что эффективнее?</span></h3>
     <div class="compare-box">
       <div class="compare-side bad">
         <h4><i class="fas fa-dice"></i> <span data-ru="Reels у блогера" data-am="Reels բլոգերի մոտ">Reels у блогера</span></h4>
-        <div class="price-tag">50 000 ֏</div>
+        <div class="price-tag" data-ru="11 000 ₽" data-am="50 000 ֏">11 000 ₽</div>
         <p data-ru="1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это всегда риск без гарантий результата. Нету просмотров на Reels соответственно нету продаж на товары. Блогер не ключ к продажам. Инвестируйте в рекламу с умом!" data-am="Բլոգերի 1 տեսանյութը ռիսկ է։ Անկախ նրանից՝ այն կհավագի դիտումներ, թե ոչ՝ ոչ ոք չգիտի։ Եթե ոչ, գումարը կորած է։ Դա միշտ ռիսկ է՝ առանց երաշխավորված արդյունքի։ Չկան դիտումներ չկան նաև վաճառքներ։ Բլոգերը դա վաճառքի բանալի չէ։ Ներդրեք գումարը գովազդի մեջ մտածված։">1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это <strong>всегда риск</strong> без гарантий результата. Нету просмотров на Reels — соответственно нету продаж на товары. Блогер не ключ к продажам. <strong>Инвестируйте в рекламу с умом!</strong></p>
       </div>
       <div class="compare-side good">
         <h4><i class="fas fa-chart-line"></i> <span data-ru="25 выкупов по ключевым" data-am="25 ինքնագնում բանալի բառով">25 выкупов по ключевым</span></h4>
-        <div class="price-tag">50 000 ֏</div>
+        <div class="price-tag" data-ru="11 000 ₽" data-am="50 000 ֏">11 000 ₽</div>
         <p data-ru="25 выкупов по целевому запросу — это 100% проверенный способ продвижения. Ваш товар быстро поднимается в ТОП выдачи зависимо от изначальных позиций, закрепляется там и начинает привлекать органический трафик. Больше продаж. Больше гарантированной выручки." data-am="25 ինքնագնում բանալի բառով 100% ապացուցված առաջխաղացման մեթոդ է: Ձեր ապրանքը արագորեն բարձրանում է որոնման արդյունքների առաջատար դիրքեր, հաստատվում է և սկսում է գրացել օրգանիգ դիտումներ: Շատ դիտում ավելի շատ վաճառք: Երաշխավորված ավելի շատ եկամուտ: ">25 выкупов по целевому запросу — это <strong>100% проверенный способ</strong> продвижения. Ваш товар быстро поднимается в ТОП выдачи зависимо от изначальных позиций, закрепляется там и начинает привлекать <strong>органический трафик</strong>. Больше продаж. Больше гарантированной выручки.</p>
       </div>
     </div>
@@ -1790,6 +1910,90 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </div>
 </section>
 
+
+<!-- ===== FOR WHOM ===== -->
+<section class="section" id="for-whom" data-section-id="for-whom">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-users"></i> <span data-ru="Для кого" data-am="Ум hамар">Для кого</span></div>
+    <h2 class="section-title" data-ru="Для кого полезен наш сервис" data-am="Ум hамар е огтакар мер царрайутjуне">Для кого полезен <span class="gr">наш сервис</span></h2>
+    <p class="section-sub" data-ru="Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств" data-am="Менк аботум енк тарбер бизнес форматнери хет">Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств</p>
+  </div>
+  <div class="for-whom-grid fade-up">
+    <div class="for-whom-card">
+      <div class="for-whom-icon"><i class="fas fa-handshake"></i></div>
+      <h3 data-ru="Менеджер по маркетплейсам" data-am="Маркетплейс менеджер">Менеджер по маркетплейсам</h3>
+      <p data-ru="Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе" data-am="Унеck hаchakhordнеri база — дарчеck мер горцунакер">Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе</p>
+    </div>
+    <div class="for-whom-card">
+      <div class="for-whom-icon"><i class="fas fa-building"></i></div>
+      <h3 data-ru="Агентство или компания" data-am="Гоptsаkалутjун кам ынкерутjун">Агентство или компания</h3>
+      <p data-ru="Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход" data-am="Абатум еk матаkarerneri хет — аvelацрек царрайутjуннер">Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход</p>
+    </div>
+    <div class="for-whom-card">
+      <div class="for-whom-icon"><i class="fas fa-globe"></i></div>
+      <h3 data-ru="Владелец ресурса" data-am="Ресурси тером">Владелец ресурса</h3>
+      <p data-ru="Ведёте тематический блог, YouTube-канал или телеграм-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию" data-am="Унеck тематик ресурс — дарчеck partner">Ведёте тематический блог, YouTube-канал или телеграм-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию</p>
+    </div>
+    <div class="for-whom-card">
+      <div class="for-whom-icon"><i class="fas fa-graduation-cap"></i></div>
+      <h3 data-ru="Онлайн-школа" data-am="Онlayn-dpрoc">Онлайн-школа</h3>
+      <p data-ru="Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение" data-am="Дасавандум еk marketplace-нери — хоrhурдеk мез студентнерин">Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение</p>
+    </div>
+    <div class="for-whom-card">
+      <div class="for-whom-icon"><i class="fas fa-rocket"></i></div>
+      <h3 data-ru="Интенсив или курс" data-am="Интенсив кам курс">Интенсив или курс</h3>
+      <p data-ru="Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами" data-am="Анцкацнум еk ументs marketplace-нери — ненгарчек мер царрайутjуне">Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами</p>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:40px" class="fade-up">
+    <a href="#contact" class="btn btn-primary">
+      <i class="fas fa-comments"></i>
+      <span data-ru="Обсудить партнёрство" data-am="Камнаркел gortsunakutyun">Обсудить партнёрство</span>
+    </a>
+  </div>
+</div>
+</section>
+
+
+<!-- ===== REVIEWS PROOF ===== -->
+<section class="section section-dark" id="reviews-proof" data-section-id="reviews-proof">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Социальное доказательство" data-am="Սоциальное доказательство">Социальное доказательство</span></div>
+    <h2 class="section-title" data-ru="Вот такие отзывы — продают" data-am="Ахавс айс карнікнерь — вачаром"><span data-ru="Вот такие отзывы — " data-am="Ах aylс karnіknерь — ">Вот такие отзывы — </span><span class="gr" data-ru="продают" data-am="вачаром">продают</span></h2>
+    <p class="section-sub" data-ru="Реальные фото, подробные описания, живые эмоции — именно это убеждает следующего покупателя" data-am="Иракан лусанкарнер, манрамасн нкарагрутjуннер — hенц да е hamozum">Реальные фото, подробные описания, живые эмоции — именно это убеждает следующего покупателя</p>
+  </div>
+  <div class="reviews-compare fade-up">
+    <div class="review-proof-col good">
+      <div class="review-proof-label good"><i class="fas fa-check-circle"></i> <span data-ru="ПРОДАЁТ" data-am="ВАЧАРОМ Е">ПРОДАЁТ</span></div>
+      <div class="review-proof-img">
+        <img src="/static/img/review-proof-good.png" alt="Продающий отзыв" loading="lazy">
+      </div>
+      <div class="review-proof-text">
+        <p data-ru="Фото в использовании, честный детальный текст, покупатель видит реальный опыт — доверие растёт" data-am="Lусанкар, азнив манрамасн тексте — вастахутjуне ajcum е">Фото в использовании, честный детальный текст, покупатель видит реальный опыт — доверие растёт</p>
+      </div>
+    </div>
+    <div class="review-proof-vs"><span>VS</span></div>
+    <div class="review-proof-col bad">
+      <div class="review-proof-label bad"><i class="fas fa-times-circle"></i> <span data-ru="НЕ ПРОДАЁТ" data-am="ЧИ ВАЧАРОМ">НЕ ПРОДАЁТ</span></div>
+      <div class="review-proof-img">
+        <img src="/static/img/review-proof-good2.png" alt="Непродающий отзыв" loading="lazy">
+      </div>
+      <div class="review-proof-text">
+        <p data-ru="Пустые шаблонные оценки без текста и без фото — покупатель не видит ценности, не доверяет" data-am="Датарк варканіш аранц тексти — гнорде архек чи тесnum">Пустые шаблонные оценки без текста и без фото — покупатель не видит ценности, не доверяет</p>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:40px" class="fade-up">
+    <a href="#contact" class="btn btn-primary btn-lg">
+      <i class="fas fa-star"></i>
+      <span data-ru="Заказать продающие отзывы" data-am="Патвирел карникнер">Заказать продающие отзывы</span>
+    </a>
+  </div>
+</div>
+</section>
+
 <!-- ===== FAQ ===== -->
 <section class="section section-dark" id="faq" data-section-id="faq">
 <div class="container">
@@ -1824,7 +2028,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     </div>
     <div class="faq-item">
       <div class="faq-q" onclick="toggleFaq(this)"><span data-ru="В какой валюте идут цены?" data-am="Ինչ արժույթով են գները։">В какой валюте идут цены?</span><i class="fas fa-chevron-down"></i></div>
-      <div class="faq-a"><p data-ru="Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах." data-am="Բոլոր գները նշված են հայկական դրամով (֏ AMD): Վճարումը դրամով:">Все цены указаны в армянских драмах (֏ AMD). Оплата в драмах.</p></div>
+      <div class="faq-a"><p data-ru="Все цены указаны в российских рублях (₽ RUB). Оплата в рублях." data-am="Բոլոր գները նշված են հայկական դրամով (֏ AMD): Վճարումը դրամով:">Все цены указаны в российских рублях (₽ RUB). Оплата в рублях.</p></div>
     </div>
   </div>
   <div class="section-cta">
@@ -1867,6 +2071,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
         </select>
       </div>
       <div class="form-group"><label data-ru="Комментарий (необязательно)" data-am="Մեկնաբանություն (ոչ պարտադիր)">Комментарий (необязательно)</label><textarea id="formMessage" placeholder="Опишите ваш товар..." data-placeholder-ru="Опишите ваш товар..." data-placeholder-am="Նկարագրեք ձեր ապրանքը..."></textarea></div>
+      <div class="form-group"><label data-ru="Удобное время звонка" data-am="Հ армар зангахарелу заманак"><span data-ru="Удобное время звонка" data-am="Харmar zangahаrelou zamanak">Удобное время звонка</span></label><input type="text" id="formCallTime" placeholder="Например: с 10 до 13 ч." class="form-input" data-placeholder-ru="Например: с 10 до 13 ч." data-placeholder-am="Оринак: 10-ит мincs 13h."></div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
         <i class="fas fa-paper-plane"></i>
         <span data-ru="Отправить заявку" data-am="Ուղարկել հայտը">Отправить заявку</span>
@@ -1919,6 +2124,11 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 <a href="#calculator" class="calc-float" id="calcFloatBtn">
   <i class="fas fa-calculator"></i>
   <span data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1">Հաշվիչ</span>
+</a>
+
+<!-- FLOATING CALLBACK BUTTON -->
+<a href="#contact" class="float-callback" aria-label="Перезвоните мне">
+  <i class="fas fa-phone"></i>
 </a>
 
 <!-- LIGHTBOX -->
@@ -1976,6 +2186,48 @@ if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
 /* ===== LANGUAGE ===== */
 let lang = localStorage.getItem('gtt_lang') || 'ru';
+
+/* ===== CURRENCY HELPERS =====
+   Currency is bound to language: RU language → ₽, AM language → ֏.
+   For each price source we prefer the explicit RUB column when it's > 0,
+   otherwise we fall back to AMD so legacy rows keep working.
+   The /api/site-data endpoint already returns price_rub & price_tiers_rub_json. */
+function curSym() { return lang === 'ru' ? '\u20bd' : '\u058f'; }
+function svcPrice(svc) {
+  if (!svc) return 0;
+  if (lang === 'ru') {
+    var rub = Number(svc.price_rub) || 0;
+    if (rub > 0) return rub;
+  }
+  return Number(svc.price) || 0;
+}
+function svcTiers(svc) {
+  if (!svc) return [];
+  if (lang === 'ru' && svc.price_tiers_rub_json) {
+    try {
+      var rt = JSON.parse(svc.price_tiers_rub_json);
+      if (Array.isArray(rt) && rt.length > 0 && rt.some(function(t){ return Number(t.price) > 0; })) return rt;
+    } catch(e) {}
+  }
+  try { return JSON.parse(svc.price_tiers_json || '[]'); } catch(e) { return []; }
+}
+function pkgPrice(p) {
+  if (!p) return 0;
+  if (lang === 'ru') {
+    var rub = Number(p.package_price_rub) || 0;
+    if (rub > 0) return rub;
+  }
+  return Number(p.package_price) || 0;
+}
+function pkgOrig(p) {
+  if (!p) return 0;
+  if (lang === 'ru') {
+    var rub = Number(p.original_price_rub) || 0;
+    if (rub > 0) return rub;
+  }
+  return Number(p.original_price) || 0;
+}
+
 const AM = {
   "Услуги":"Ծառայություններ",
   "Калькулятор":"Հաշվիչ",
@@ -2210,7 +2462,16 @@ function showCalcTab(id, el) {
   el.classList.add('active');
   document.getElementById('cg-' + id).classList.add('active');
 }
+/* Buyout pricing is hardcoded (not in DB) — duplicated for both currencies.
+   RUB amounts are intentionally rounded to "nice" prices, not strict 0.222 conversions. */
 function getBuyoutPrice(qty) {
+  if (lang === 'ru') {
+    if (qty <= 0) return 0;
+    if (qty <= 20) return 450;
+    if (qty <= 40) return 380;
+    if (qty <= 60) return 330;
+    return 280;
+  }
   if (qty <= 0) return 0;
   if (qty <= 20) return 2000;
   if (qty <= 40) return 1700;
@@ -2219,18 +2480,28 @@ function getBuyoutPrice(qty) {
 }
 function getBuyoutTotal(qty) {
   if (qty <= 0) return 0;
+  if (lang === 'ru') {
+    if (qty <= 20) return qty * 450;
+    if (qty <= 40) return 20 * 450 + (qty - 20) * 380;
+    if (qty <= 60) return 20 * 450 + 20 * 380 + (qty - 40) * 330;
+    return 20 * 450 + 20 * 380 + 20 * 330 + (qty - 60) * 280;
+  }
   if (qty <= 20) return qty * 2000;
   if (qty <= 40) return 20 * 2000 + (qty - 20) * 1700;
   if (qty <= 60) return 20 * 2000 + 20 * 1700 + (qty - 40) * 1500;
   return 20 * 2000 + 20 * 1700 + 20 * 1500 + (qty - 60) * 1250;
 }
+function _buyoutDefaultLabel() {
+  return (lang === 'ru' ? '450 ' : '2 000 ') + curSym();
+}
+function _pcsWord() { return lang === 'am' ? '\u0570\u0561\u057f' : '\u0448\u0442'; }
 function ccBuyout(delta) {
   const inp = document.getElementById('buyoutQty');
   let v = parseInt(inp.value || 0) + delta;
   if (v < 0) v = 0; if (v > 999) v = 999;
   inp.value = v;
   const price = getBuyoutPrice(v);
-  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? formatNum(price) + ' ֏/шт' : '2 000 ֏';
+  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? formatNum(price) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
   recalc();
 }
 function onBuyoutInput() {
@@ -2239,7 +2510,7 @@ function onBuyoutInput() {
   if (isNaN(v) || v < 0) v = 0; if (v > 999) v = 999;
   inp.value = v;
   const price = getBuyoutPrice(v);
-  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? formatNum(price) + ' ֏/шт' : '2 000 ֏';
+  document.getElementById('buyoutPriceLabel').textContent = v > 0 ? formatNum(price) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
   recalc();
 }
 function cc(btn, delta) {
@@ -2253,15 +2524,15 @@ function cc(btn, delta) {
 function recalc() {
   let total = 0; const items = [];
   const buyoutQty = parseInt(document.getElementById('buyoutQty').value || 0);
-  if (buyoutQty > 0) { total += getBuyoutTotal(buyoutQty); items.push('Выкуп + забор: ' + buyoutQty + ' шт (' + getBuyoutPrice(buyoutQty) + ' ֏/шт)'); }
+  if (buyoutQty > 0) { total += getBuyoutTotal(buyoutQty); items.push('Выкуп + забор: ' + buyoutQty + ' шт (' + getBuyoutPrice(buyoutQty) + ' ' + curSym() + '/шт)'); }
   document.querySelectorAll('.calc-row:not(#buyoutRow)').forEach(row => {
     const price = parseInt(row.dataset.price);
     const inp = row.querySelector('.calc-input input');
     const qty = parseInt(inp ? inp.value : 0);
     if (!isNaN(price) && qty > 0) { total += price * qty; items.push(row.querySelector('.calc-label').textContent + ': ' + qty); }
   });
-  document.getElementById('calcTotal').textContent = total.toLocaleString('ru-RU') + ' ֏';
-  const msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ' + total.toLocaleString('ru-RU') + ' ֏';
+  document.getElementById('calcTotal').textContent = total.toLocaleString('ru-RU') + ' ' + curSym();
+  const msg = 'Здравствуйте! Хочу заказать:\\n' + items.join('\\n') + '\\n\\nИтого: ' + total.toLocaleString('ru-RU') + ' ' + curSym();
   var _calcBtn = document.getElementById('calcTgBtn');
   if (_calcBtn) {
     var _curHref = _calcBtn.getAttribute('href') || '';
@@ -2701,7 +2972,7 @@ document.getElementById('popupForm').addEventListener('submit', function(e) {
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Отправка...');
   fetch('/api/popup-lead', {
     method: 'POST', headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({name:popupName, buyouts:buyouts, reviews:reviews, contact:contact, lang:lang, notes:autoNotes, ts: new Date().toISOString()})
+    body: JSON.stringify({name:popupName, buyouts:buyouts, reviews:reviews, contact:contact, lang:lang, currency: (lang === 'ru' ? 'rub' : 'amd'), notes:autoNotes, ts: new Date().toISOString()})
   }).then(function(r){ return r.json(); }).then(function() {
     btn.disabled = false;
     document.getElementById('popupFormWrap').style.display = 'none';
@@ -2759,7 +3030,7 @@ function submitForm(e) {
   btn.disabled = true;
   btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> ' + (lang === 'am' ? 'Սպասեք...' : 'Отправка...');
 
-  fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, ts: new Date().toISOString()}) })
+  fetch('/api/lead', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({name:name, contact:contact, product:product, service: service.value, message:message, lang:lang, currency: (lang === 'ru' ? 'rub' : 'amd'), ts: new Date().toISOString()}) })
   .then(function(r){ return r.json(); })
   .then(function(data) {
     btn.disabled = false;
@@ -2888,7 +3159,7 @@ function ccTiered(svcId, delta) {
   try {
     var tiers = JSON.parse(row.getAttribute('data-tiers'));
     var price = getTierPrice(tiers, v);
-    document.getElementById('price_' + svcId).textContent = v > 0 ? formatNum(price) + ' ֏/шт' : formatNum(tiers[0].price) + ' ֏';
+    document.getElementById('price_' + svcId).textContent = v > 0 ? formatNum(price) + ' ' + curSym() + '/' + _pcsWord() : formatNum(tiers[0].price) + ' ' + curSym();
   } catch(e) {}
   recalcDynamic();
 }
@@ -2981,7 +3252,7 @@ function recalcDynamic() {
         var label = row.querySelector('.calc-label');
         var labelText = label ? label.textContent : '';
         var pcsWord = lang === 'am' ? 'հատ' : 'шт';
-        items.push(labelText + ': ' + qty + ' ' + pcsWord + ' (' + formatNum(getTierPrice(tiers, qty)) + ' ֏/' + pcsWord + ')');
+        items.push(labelText + ': ' + qty + ' ' + pcsWord + ' (' + formatNum(getTierPrice(tiers, qty)) + ' ' + curSym() + '/' + pcsWord + ')');
       } catch(e) {}
     }
   });
@@ -3038,19 +3309,19 @@ function recalcDynamic() {
   
   var totalHtml = '';
   if (selectedPkg && packageAmount > 0) {
-    totalHtml += '<div style="font-size:0.78rem;color:#f59e0b;margin-bottom:2px;overflow-wrap:break-word;word-break:break-word;white-space:normal"><i class="fas fa-box-open" style="margin-right:4px"></i>' + (lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru) + ': ' + formatNum(packageAmount) + ' \u058f</div>';
+    totalHtml += '<div style="font-size:0.78rem;color:#f59e0b;margin-bottom:2px;overflow-wrap:break-word;word-break:break-word;white-space:normal"><i class="fas fa-box-open" style="margin-right:4px"></i>' + (lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru) + ': ' + formatNum(packageAmount) + ' ' + curSym() + '</div>';
   }
   if (totalDiscountAmount > 0 && subtotalBeforeDiscount > 0) {
     calcTotalEl.innerHTML = totalHtml + '<div class="calc-total-prices">' +
-      '<span class="calc-old-price">' + formatNum(subtotalBeforeDiscount) + ' \u058f</span>' +
-      '<span>' + formatNum(total) + ' \u058f</span>' +
+      '<span class="calc-old-price">' + formatNum(subtotalBeforeDiscount) + ' ' + curSym() + '</span>' +
+      '<span>' + formatNum(total) + ' ' + curSym() + '</span>' +
       '</div>' +
       '<div class="calc-discount-line"><i class="fas fa-gift" style="margin-right:4px"></i>' +
-      (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573) + ': -' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(totalDiscountAmount) + ' \u058f (-' + _refDiscount + '%)</div>';
+      (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573) + ': -' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(totalDiscountAmount) + ' ' + curSym() + ' (-' + _refDiscount + '%)</div>';
   } else if (totalHtml) {
-    calcTotalEl.innerHTML = totalHtml + '<span>' + formatNum(total) + ' \u058f</span>';
+    calcTotalEl.innerHTML = totalHtml + '<span>' + formatNum(total) + ' ' + curSym() + '</span>';
   } else {
-    calcTotalEl.textContent = formatNum(total) + ' \u058f';
+    calcTotalEl.textContent = formatNum(total) + ' ' + curSym();
   }
   // Update promo result with live discount amount  
   var refResultEl = document.getElementById('refResult');
@@ -3064,7 +3335,7 @@ function recalcDynamic() {
         : '<i class="fas fa-times-circle" style="margin-right:6px"></i>\u042d\u0442\u043e\u0442 \u043f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u043d\u0435 \u0434\u0435\u0439\u0441\u0442\u0432\u0443\u0435\u0442 \u043d\u0430 \u0434\u0430\u043d\u043d\u044b\u0439 \u043f\u0430\u043a\u0435\u0442';
       if (discountAmount > 0) {
         errMsg += '<br><span style="font-size:0.85rem;font-weight:700;color:var(--success)">' + 
-          (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573,0x20,0x056e,0x0561,0x057c,0x0561,0x0575,0x0578,0x0582,0x0569,0x0575,0x0578,0x0582,0x0576,0x0576,0x0565,0x0580,0x056b,0x3a,0x20,0x2d) : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438: -') + formatNum(discountAmount) + ' \u058f</span>';
+          (lang === 'am' ? String.fromCharCode(0x0536,0x0565,0x0572,0x0573,0x20,0x056e,0x0561,0x057c,0x0561,0x0575,0x0578,0x0582,0x0569,0x0575,0x0578,0x0582,0x0576,0x0576,0x0565,0x0580,0x056b,0x3a,0x20,0x2d) : '\u0421\u043a\u0438\u0434\u043a\u0430 \u043d\u0430 \u0443\u0441\u043b\u0443\u0433\u0438: -') + formatNum(discountAmount) + ' ' + curSym() + '</span>';
       }
       refResultEl.innerHTML = errMsg;
       if (discountAmount > 0) {
@@ -3085,7 +3356,7 @@ function recalcDynamic() {
         : '<i class="fas fa-check-circle" style="margin-right:6px;color:var(--success)"></i>\u041f\u0440\u043e\u043c\u043e\u043a\u043e\u0434 \u0430\u043a\u0442\u0438\u0432\u0438\u0440\u043e\u0432\u0430\u043d!';
       promoMsg += '<br><span style="font-size:0.85rem;font-weight:700;color:var(--success)">';
       if (subtotalBeforeDiscount > 0) {
-        promoMsg += (lang === 'am' ? _amDiscount + '-' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(totalDiscountAmount) + ' \u058f (-' + _refDiscount + '%)';
+        promoMsg += (lang === 'am' ? _amDiscount + '-' : '\u0421\u043a\u0438\u0434\u043a\u0430: -') + formatNum(totalDiscountAmount) + ' ' + curSym() + ' (-' + _refDiscount + '%)';
       } else {
         promoMsg += (lang === 'am' ? _amDiscount : '\u0421\u043a\u0438\u0434\u043a\u0430: ') + _refDiscount + '%';
       }
@@ -3116,9 +3387,9 @@ function recalcDynamic() {
   var msg = greeting + '\\n' + items.join('\\n');
   if (discountAmount > 0) {
     var refCode = document.getElementById('refCodeInput') ? document.getElementById('refCodeInput').value : '';
-    msg += '\\n\\n' + (lang === 'am' ? 'Պրոմոկոդ: ' : 'Промокод: ') + refCode + ' (-' + _refDiscount + '%, -' + formatNum(discountAmount) + ' ֏)';
+    msg += '\\n\\n' + (lang === 'am' ? 'Պրոմոկոդ: ' : 'Промокод: ') + refCode + ' (-' + _refDiscount + '%, -' + formatNum(discountAmount) + ' ' + curSym() + ')';
   }
-  msg += '\\n\\n' + totalLabel + ' ' + formatNum(total) + ' ֏';
+  msg += '\\n\\n' + totalLabel + ' ' + formatNum(total) + ' ' + curSym();
   var isWaCalc = tgUrl.includes('wa.me') || tgUrl.includes('whatsapp');
   var calcBtn = document.getElementById('calcTgBtn');
   if (isWaCalc) {
@@ -3219,8 +3490,21 @@ function updateTelegramLinks() {
   if (typeof recalcDynamic === 'function') recalcDynamic();
 }
 
-// Override switchLang to always use latest data-ru/data-am and update Telegram links
+// Override switchLang to always use latest data-ru/data-am and update Telegram links.
+// Currency is bound to language (RU → ₽, AM → ֏). The calculator/package DOM is
+// rebuilt from db on first load (loadSiteData IIFE) and bakes the chosen currency
+// into data-price / data-tiers / .calc-price text. Cleanly re-rendering all that
+// from JS on the fly would duplicate ~200 lines of render logic, so on a real
+// language change we just navigate to the corresponding /ru or /am URL — the SSR
+// layer already pre-renders the right currency, and the page comes up identical
+// minus the flipped prices.
 switchLang = function(l) {
+  var newPath = l === 'am' ? '/am' : '/ru';
+  if (window.location.pathname !== newPath) {
+    localStorage.setItem('gtt_lang', l);
+    window.location.assign(newPath + window.location.hash);
+    return;
+  }
   lang = l;
   localStorage.setItem('gtt_lang', l);
   document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.lang === l); });
@@ -3233,13 +3517,15 @@ switchLang = function(l) {
     el.placeholder = el.getAttribute('data-placeholder-' + l) || '';
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
-  // Update URL path to /am or /ru (without page reload) so shared links carry language
-  var newPath = l === 'am' ? '/am' : '/ru';
-  if (window.location.pathname !== newPath) {
-    history.replaceState(null, '', newPath + window.location.hash);
-  }
-  // Re-apply Telegram links with correct language message templates
   updateTelegramLinks();
+  try {
+    var bp = document.getElementById('buyoutPriceLabel');
+    if (bp) {
+      var bpQty = parseInt((document.getElementById('buyoutQty') || {}).value || '0') || 0;
+      bp.textContent = bpQty > 0 ? formatNum(getBuyoutPrice(bpQty)) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
+    }
+  } catch(e) {}
+  try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch(e) {}
 };
 
 // ===== IMMEDIATE SECTION REVEAL (before loadSiteData) =====
@@ -3430,27 +3716,29 @@ switchLang = function(l) {
           var gh = '';
           
           svcs.forEach(function(svc) {
-            var hasTiers = svc.price_type === 'tiered' && svc.price_tiers_json;
-            var tiers = null;
-            if (hasTiers) { try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = null; hasTiers = false; } }
+            // Pull tiers and unit price through currency helpers so RU sees ₽-tiers/₽-prices.
+            var tiers = svcTiers(svc);
+            var hasTiers = svc.price_type === 'tiered' && tiers && tiers.length > 0;
+            var unitPrice = svcPrice(svc);
             
-            if (hasTiers && tiers && tiers.length > 0) {
+            if (hasTiers) {
               var svcId = 'tiered_' + svc.id;
-              var tiersAttr = svc.price_tiers_json.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+              // Embed the currency-correct tiers in the data attribute so getTierPrice/Total uses them.
+              var tiersAttr = JSON.stringify(tiers).replace(/'/g, '&#39;').replace(/"/g, '&quot;');
               gh += '<div class="calc-row" data-price="tiered" data-tiers="'+tiersAttr+'" data-svc-id="'+svc.id+'" id="row_'+svcId+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">' + (lang==='am' ? svc.name_am : svc.name_ru) + '</div>';
-              gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ֏</div>';
+              gh += '<div class="calc-price" id="price_'+svcId+'">'+formatNum(tiers[0].price)+' ' + curSym() + '</div>';
               gh += '<div class="calc-input"><button onclick="ccTiered(&apos;'+svcId+'&apos;,-1)">−</button><input type="number" id="qty_'+svcId+'" value="0" min="0" max="999" onchange="onTieredInput(&apos;'+svcId+'&apos;)"><button onclick="ccTiered(&apos;'+svcId+'&apos;,1)">+</button></div>';
               gh += '</div>';
               gh += '<div class="buyout-tier-info"><strong data-ru="Чем больше — тем дешевле:" data-am="Որքան շատ — այնքան էժան:">'+( lang==='am' ? 'Որքան շատ — այնքան էժան:' : 'Чем больше — тем дешевле:')+'</strong><br>';
               gh += '<span>' + tiers.map(function(t) { 
                 var range = t.max >= 999 ? t.min+'+' : t.min+'-'+t.max;
-                return range + ' → ' + formatNum(t.price) + ' ֏'; 
+                return range + ' → ' + formatNum(t.price) + ' ' + curSym(); 
               }).join(' &nbsp;|&nbsp; ') + '</span></div>';
             } else {
-              gh += '<div class="calc-row" data-price="'+svc.price+'" data-svc-id="'+svc.id+'">';
+              gh += '<div class="calc-row" data-price="'+unitPrice+'" data-svc-id="'+svc.id+'">';
               gh += '<div class="calc-label" data-ru="'+escCalc(svc.name_ru)+'" data-am="'+escCalc(svc.name_am)+'">'+(lang==='am' ? svc.name_am : svc.name_ru)+'</div>';
-              gh += '<div class="calc-price">'+formatNum(svc.price)+' ֏</div>';
+              gh += '<div class="calc-price">'+formatNum(unitPrice)+' ' + curSym() + '</div>';
               gh += '<div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalcDynamic()" oninput="recalcDynamic()"><button onclick="cc(this,1)">+</button></div>';
               gh += '</div>';
             }
@@ -3478,8 +3766,13 @@ switchLang = function(l) {
         }
         ph += '</div>';
         ph += '<div class="calc-packages-grid' + (isSingle ? ' single-pkg' : '') + '">';
-        // Sort: cheaper packages left, gold center, expensive right
-        var sortedPkgs = db.packages.slice();
+        // Sort: cheaper packages left, gold center, expensive right.
+        // On RU language we drop packages that have no RUB price set so customers don't see ֏ prices on /ru.
+        var allPkgs = db.packages.slice();
+        if (lang === 'ru') {
+          allPkgs = allPkgs.filter(function(p) { return Number(p.package_price_rub) > 0; });
+        }
+        var sortedPkgs = allPkgs;
         var _goldPkg = null;
         var _otherPkgs = [];
         for (var _gi = 0; _gi < sortedPkgs.length; _gi++) {
@@ -3487,7 +3780,7 @@ switchLang = function(l) {
           if (_gc === 'gold' && !_goldPkg) { _goldPkg = sortedPkgs[_gi]; }
           else { _otherPkgs.push(sortedPkgs[_gi]); }
         }
-        _otherPkgs.sort(function(a, b) { return (a.package_price || 0) - (b.package_price || 0); });
+        _otherPkgs.sort(function(a, b) { return (pkgPrice(a) || 0) - (pkgPrice(b) || 0); });
         if (_goldPkg) {
           // cheaper left, gold center, expensive right
           var _left = _otherPkgs.slice(0, Math.ceil(_otherPkgs.length / 2));
@@ -3496,9 +3789,14 @@ switchLang = function(l) {
         } else {
           sortedPkgs = _otherPkgs;
         }
+        // Nothing to render (e.g. RU lang with no RUB-priced packages yet)
+        // — gracefully hide container instead of showing an empty grid.
+        var _renderPkgsAtAll = sortedPkgs.length > 0;
         for (var pki = 0; pki < sortedPkgs.length; pki++) {
           var pk = sortedPkgs[pki];
-          var pkDisc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
+          var pkPriceCur = pkgPrice(pk);
+          var pkOrigCur = pkgOrig(pk);
+          var pkDisc = pkOrigCur > 0 ? Math.round((1 - pkPriceCur / pkOrigCur) * 100) : 0;
           var pkCrown = pk.crown_tier || (pk.is_popular ? 'gold' : '');
           ph += '<div class="calc-pkg-card' + (pkCrown ? ' pkg-crown-' + pkCrown : '') + '" data-pkg-id="' + pk.id + '">';
           // Badge instead of crown
@@ -3514,10 +3812,10 @@ switchLang = function(l) {
             ph += '<div class="pkg-desc" data-ru="' + escCalc(pk.description_ru || '') + '" data-am="' + escCalc(pk.description_am || '') + '">' + (lang==='am' ? (pk.description_am||pk.description_ru) : pk.description_ru) + '</div>';
           }
           ph += '<div class="pkg-prices">';
-          if (pk.original_price > 0 && pk.original_price > pk.package_price) {
-            ph += '<span class="pkg-old-price">' + formatNum(pk.original_price) + ' \u058f</span>';
+          if (pkOrigCur > 0 && pkOrigCur > pkPriceCur) {
+            ph += '<span class="pkg-old-price">' + formatNum(pkOrigCur) + ' ' + curSym() + '</span>';
           }
-          ph += '<span class="pkg-new-price">' + formatNum(pk.package_price) + ' \u058f</span>';
+          ph += '<span class="pkg-new-price">' + formatNum(pkPriceCur) + ' ' + curSym() + '</span>';
           if (pkDisc > 0) ph += '<span class="pkg-discount">\u2212' + pkDisc + '%</span>';
           ph += '</div>';
           if (pk.items && pk.items.length > 0) {
@@ -3533,10 +3831,11 @@ switchLang = function(l) {
               var piExtraAm = '';
               if (pi2.use_tiered && pi2.price_type === 'tiered' && pi2.price_tiers_json) {
                 try {
-                  var piTiers = JSON.parse(pi2.price_tiers_json);
+                  // Pick RU-tiers when on /ru and they exist; otherwise AMD tiers.
+                  var piTiers = svcTiers({ price_type: 'tiered', price_tiers_json: pi2.price_tiers_json, price_tiers_rub_json: pi2.price_tiers_rub_json });
                   var piUnitP = getTierPrice(piTiers, piQty);
-                  piExtraRu = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' \u058f/\u0448\u0442)</span>';
-                  piExtraAm = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' \u058f/\u0570\u0561\u057f)</span>';
+                  piExtraRu = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' ' + curSym() + '/\u0448\u0442)</span>';
+                  piExtraAm = ' <span style="color:#a78bfa;font-size:0.72rem">(' + formatNum(piUnitP) + ' ' + curSym() + '/\u0570\u0561\u057f)</span>';
                   piExtra = lang==='am' ? piExtraAm : piExtraRu;
                 } catch(e) {}
               }
@@ -3550,9 +3849,15 @@ switchLang = function(l) {
           ph += '</div>';
         }
         ph += '</div>';
-        pkgsContainer.innerHTML = ph;
-        pkgsContainer.style.display = '';
-        console.log('[DB] Packages rendered:', db.packages.length);
+        if (_renderPkgsAtAll) {
+          pkgsContainer.innerHTML = ph;
+          pkgsContainer.style.display = '';
+        } else {
+          // Hide entirely on RU when no packages have RUB pricing yet.
+          pkgsContainer.innerHTML = '';
+          pkgsContainer.style.display = 'none';
+        }
+        console.log('[DB] Packages rendered:', sortedPkgs.length, '/', db.packages.length, 'lang=' + lang);
         // Scroll to gold package card on mobile so it's visible first
         (function centerGold() {
           var grid = pkgsContainer.querySelector('.calc-packages-grid');
@@ -5679,7 +5984,7 @@ async function checkRefCode() {
     fetch('/api/generate-pdf', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
-      body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, clientName: clientName, clientContact: clientPhone, referralCode: refCode, package: pkgData })
+      body: JSON.stringify({ items: items, total: parseInt(totalVal)||0, lang: lang, currency: (lang === 'ru' ? 'rub' : 'amd'), clientName: clientName, clientContact: clientPhone, referralCode: refCode, package: pkgData })
     }).then(function(r){ return r.json(); }).then(function(data) {
       pdfBtn.disabled = false;
       pdfBtn.innerHTML = '<i class="fas fa-file-pdf"></i> ' + _getPdfBtnLabel();
@@ -6175,8 +6480,17 @@ async function checkRefCode() {
   
   // ===== SERVER-SIDE PACKAGE RENDERING (instant display) =====
   try {
-    const ssrPkgs = (globalThis as any).__ssrPackages || [];
+    let ssrPkgs = (globalThis as any).__ssrPackages || [];
+    // Hide packages without RUB pricing on /ru — RU customers should not see ֏-only packages.
+    if (!isArmenian) {
+      ssrPkgs = ssrPkgs.filter((p: any) => Number(p.package_price_rub) > 0);
+    }
     if (ssrPkgs.length > 0) {
+      // Currency symbol for SSR — bound to language, just like the client-side helper.
+      const SSR_CUR = isArmenian ? '\u058f' : '\u20bd';
+      // Pull through helpers: prefer RUB on /ru when set, otherwise AMD.
+      const ssrPkgPrice = (p: any) => !isArmenian && Number(p.package_price_rub) > 0 ? Number(p.package_price_rub) : Number(p.package_price) || 0;
+      const ssrPkgOrig = (p: any) => !isArmenian && Number(p.original_price_rub) > 0 ? Number(p.original_price_rub) : Number(p.original_price) || 0;
       const ssrPkgSets = (globalThis as any).__ssrPkgSettings || {};
       const titleRu = ssrPkgSets.packages_title_ru || '\u0413\u043e\u0442\u043e\u0432\u044b\u0435 \u043f\u0430\u043a\u0435\u0442\u044b';
       const titleAm = ssrPkgSets.packages_title_am || '\u054a\u0561\u057f\u0580\u0561\u057d\u057f \u0583\u0561\u0569\u0565\u0569\u0576\u0565\u0580';
@@ -6200,7 +6514,7 @@ async function checkRefCode() {
         if (tier === 'gold' && !goldSsrPkg) { goldSsrPkg = p; }
         else { otherSsrPkgs.push(p); }
       }
-      otherSsrPkgs.sort((a: any, b: any) => (a.package_price || 0) - (b.package_price || 0));
+        otherSsrPkgs.sort((a: any, b: any) => (ssrPkgPrice(a) || 0) - (ssrPkgPrice(b) || 0));
       let sortedSsrPkgs: any[];
       if (goldSsrPkg) {
         const leftSsr = otherSsrPkgs.slice(0, Math.ceil(otherSsrPkgs.length / 2));
@@ -6210,7 +6524,9 @@ async function checkRefCode() {
         sortedSsrPkgs = otherSsrPkgs;
       }
       for (const pk of sortedSsrPkgs) {
-        const disc = pk.original_price > 0 ? Math.round((1 - pk.package_price / pk.original_price) * 100) : 0;
+        const pkPriceCur = ssrPkgPrice(pk);
+        const pkOrigCur = ssrPkgOrig(pk);
+        const disc = pkOrigCur > 0 ? Math.round((1 - pkPriceCur / pkOrigCur) * 100) : 0;
         const ssrCrown = pk.crown_tier || (pk.is_popular ? 'gold' : '');
         pkgHtml += '<div class="calc-pkg-card' + (ssrCrown ? ' pkg-crown-' + ssrCrown : '') + '" data-pkg-id="' + pk.id + '">';
         // Badge instead of crown
@@ -6223,10 +6539,10 @@ async function checkRefCode() {
         pkgHtml += '<div class="pkg-name" data-ru="' + esc(pk.name_ru) + '" data-am="' + esc(pk.name_am || '') + '">' + esc(isArmenian ? (pk.name_am || pk.name_ru) : pk.name_ru) + '</div>';
         if (pk.description_ru || pk.description_am) pkgHtml += '<div class="pkg-desc" data-ru="' + esc(pk.description_ru || '') + '" data-am="' + esc(pk.description_am || '') + '">' + esc(isArmenian ? (pk.description_am || pk.description_ru || '') : (pk.description_ru || '')) + '</div>';
         pkgHtml += '<div class="pkg-prices">';
-        if (pk.original_price > 0 && pk.original_price > pk.package_price) {
-          pkgHtml += '<span class="pkg-old-price">' + fmtN(pk.original_price) + ' \u058f</span>';
+        if (pkOrigCur > 0 && pkOrigCur > pkPriceCur) {
+          pkgHtml += '<span class="pkg-old-price">' + fmtN(pkOrigCur) + ' ' + SSR_CUR + '</span>';
         }
-        pkgHtml += '<span class="pkg-new-price">' + fmtN(pk.package_price) + ' \u058f</span>';
+        pkgHtml += '<span class="pkg-new-price">' + fmtN(pkPriceCur) + ' ' + SSR_CUR + '</span>';
         if (disc > 0) pkgHtml += '<span class="pkg-discount">\u2212' + disc + '%</span>';
         pkgHtml += '</div>';
         if (pk.items && pk.items.length > 0) {
@@ -6236,11 +6552,18 @@ async function checkRefCode() {
             let piExtra = '';
             if (pi.use_tiered && pi.price_type === 'tiered' && pi.price_tiers_json) {
               try {
-                const piTiers = JSON.parse(pi.price_tiers_json as string);
+                // Pick RU tiers when on /ru and they exist; otherwise AMD tiers.
+                let piTiers: any[] = JSON.parse(pi.price_tiers_json as string);
+                if (!isArmenian && pi.price_tiers_rub_json) {
+                  try {
+                    const rubT: any[] = JSON.parse(pi.price_tiers_rub_json as string);
+                    if (Array.isArray(rubT) && rubT.length > 0 && rubT.some((t: any) => Number(t.price) > 0)) piTiers = rubT;
+                  } catch {}
+                }
                 let piUnitP = 0;
                 for (const t of piTiers) { if (piQty >= t.min && piQty <= t.max) { piUnitP = t.price; break; } }
                 if (!piUnitP && piTiers.length) piUnitP = piTiers[piTiers.length - 1].price;
-                piExtra = ' <span style="color:#a78bfa;font-size:0.72rem">(' + fmtN(piUnitP) + ' \u058f/\u0448\u0442)</span>';
+                piExtra = ' <span style="color:#a78bfa;font-size:0.72rem">(' + fmtN(piUnitP) + ' ' + SSR_CUR + '/\u0448\u0442)</span>';
               } catch {}
             }
             const piNameSsr = isArmenian ? (pi.service_name_am || pi.service_name_ru || '') : (pi.service_name_ru || '');

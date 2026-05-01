@@ -108,18 +108,18 @@ api.get('/calc-services', authMiddleware, async (c) => {
 
 api.post('/calc-services', authMiddleware, async (c) => {
   const db = c.env.DB;
-  const { tab_id, name_ru, name_am, price, price_type, price_tiers_json, tier_desc_ru, tier_desc_am, sort_order } = await c.req.json();
-  await db.prepare(`INSERT INTO calculator_services (tab_id, name_ru, name_am, price, price_type, price_tiers_json, tier_desc_ru, tier_desc_am, sort_order) VALUES (?,?,?,?,?,?,?,?,?)`)
-    .bind(tab_id, name_ru, name_am, price, price_type || 'fixed', price_tiers_json || null, tier_desc_ru || null, tier_desc_am || null, sort_order || 0).run();
+  const { tab_id, name_ru, name_am, price, price_rub, price_type, price_tiers_json, price_tiers_rub_json, tier_desc_ru, tier_desc_am, sort_order } = await c.req.json();
+  await db.prepare(`INSERT INTO calculator_services (tab_id, name_ru, name_am, price, price_rub, price_type, price_tiers_json, price_tiers_rub_json, tier_desc_ru, tier_desc_am, sort_order) VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(tab_id, name_ru, name_am, price || 0, price_rub || 0, price_type || 'fixed', price_tiers_json || null, price_tiers_rub_json || null, tier_desc_ru || null, tier_desc_am || null, sort_order || 0).run();
   return c.json({ success: true });
 });
 
 api.put('/calc-services/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
-  const { tab_id, name_ru, name_am, price, price_type, price_tiers_json, tier_desc_ru, tier_desc_am, sort_order, is_active } = await c.req.json();
-  await db.prepare(`UPDATE calculator_services SET tab_id=?, name_ru=?, name_am=?, price=?, price_type=?, price_tiers_json=?, tier_desc_ru=?, tier_desc_am=?, sort_order=?, is_active=? WHERE id=?`)
-    .bind(tab_id, name_ru, name_am, price, price_type, price_tiers_json || null, tier_desc_ru || null, tier_desc_am || null, sort_order, is_active, id).run();
+  const { tab_id, name_ru, name_am, price, price_rub, price_type, price_tiers_json, price_tiers_rub_json, tier_desc_ru, tier_desc_am, sort_order, is_active } = await c.req.json();
+  await db.prepare(`UPDATE calculator_services SET tab_id=?, name_ru=?, name_am=?, price=?, price_rub=?, price_type=?, price_tiers_json=?, price_tiers_rub_json=?, tier_desc_ru=?, tier_desc_am=?, sort_order=?, is_active=? WHERE id=?`)
+    .bind(tab_id, name_ru, name_am, price || 0, price_rub || 0, price_type, price_tiers_json || null, price_tiers_rub_json || null, tier_desc_ru || null, tier_desc_am || null, sort_order, is_active, id).run();
   return c.json({ success: true });
 });
 
@@ -145,6 +145,76 @@ api.put('/calc-services-reorder', authMiddleware, async (c) => {
   return c.json({ success: true });
 });
 
+// ===== BULK-FILL RUB PRICES FROM AMD =====
+// Fills empty (0) RUB prices on services, tiered services and packages by
+// applying the saved AMD->RUB rate from site_settings. Existing non-zero RUB
+// prices are NOT overwritten. Returns counts so the admin sees what changed.
+api.post('/calc/bulk-fill-rub', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json().catch(() => ({} as any));
+  // Allow caller to pass an explicit rate; otherwise read from site_settings.
+  let rate = Number(body.rate);
+  if (!rate || rate <= 0) {
+    try {
+      const row = await db.prepare("SELECT value FROM site_settings WHERE key = 'amd_to_rub_rate'").first();
+      rate = Number(row?.value);
+    } catch {}
+  }
+  if (!rate || rate <= 0) rate = 0.222;
+
+  let svcUpdated = 0, tierUpdated = 0, pkgUpdated = 0;
+
+  // 1) Plain service prices (price_type='fixed' or empty tiered prices).
+  const svcRes = await db.prepare("SELECT id, price, price_rub, price_type, price_tiers_json, price_tiers_rub_json FROM calculator_services").all();
+  for (const s of (svcRes.results || []) as any[]) {
+    const updates: string[] = [];
+    const binds: any[] = [];
+    if ((Number(s.price_rub) || 0) === 0 && Number(s.price) > 0) {
+      updates.push('price_rub = ?');
+      binds.push(Math.round(Number(s.price) * rate));
+      svcUpdated++;
+    }
+    // Tiered shadow JSON: build mirror from price_tiers_json if RUB version is empty.
+    if (s.price_type === 'tiered' && s.price_tiers_json && !s.price_tiers_rub_json) {
+      try {
+        const tiers = JSON.parse(s.price_tiers_json);
+        if (Array.isArray(tiers) && tiers.length > 0) {
+          const rubTiers = tiers.map((t: any) => ({ min: t.min, max: t.max, price: Math.round(Number(t.price) * rate) }));
+          updates.push('price_tiers_rub_json = ?');
+          binds.push(JSON.stringify(rubTiers));
+          tierUpdated++;
+        }
+      } catch {}
+    }
+    if (updates.length > 0) {
+      binds.push(s.id);
+      await db.prepare(`UPDATE calculator_services SET ${updates.join(', ')} WHERE id = ?`).bind(...binds).run();
+    }
+  }
+
+  // 2) Packages.
+  const pkgRes = await db.prepare("SELECT id, package_price, package_price_rub, original_price, original_price_rub FROM calculator_packages").all();
+  for (const p of (pkgRes.results || []) as any[]) {
+    const updates: string[] = [];
+    const binds: any[] = [];
+    if ((Number(p.package_price_rub) || 0) === 0 && Number(p.package_price) > 0) {
+      updates.push('package_price_rub = ?');
+      binds.push(Math.round(Number(p.package_price) * rate));
+    }
+    if ((Number(p.original_price_rub) || 0) === 0 && Number(p.original_price) > 0) {
+      updates.push('original_price_rub = ?');
+      binds.push(Math.round(Number(p.original_price) * rate));
+    }
+    if (updates.length > 0) {
+      binds.push(p.id);
+      await db.prepare(`UPDATE calculator_packages SET ${updates.join(', ')} WHERE id = ?`).bind(...binds).run();
+      pkgUpdated++;
+    }
+  }
+
+  return c.json({ success: true, rate, services_updated: svcUpdated, tiered_updated: tierUpdated, packages_updated: pkgUpdated });
+});
+
 // ===== CALCULATOR PACKAGES =====
 api.get('/calc-packages', authMiddleware, async (c) => {
   const db = c.env.DB;
@@ -163,8 +233,8 @@ api.get('/calc-packages', authMiddleware, async (c) => {
 api.post('/calc-packages', authMiddleware, async (c) => {
   const db = c.env.DB;
   const d = await c.req.json();
-  const res = await db.prepare(`INSERT INTO calculator_packages (name_ru, name_am, description_ru, description_am, original_price, package_price, badge_ru, badge_am, is_popular, crown_tier, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
-    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.crown_tier?1:0, d.crown_tier||'', d.sort_order||0, d.is_active!==undefined?d.is_active:1).run();
+  const res = await db.prepare(`INSERT INTO calculator_packages (name_ru, name_am, description_ru, description_am, original_price, package_price, original_price_rub, package_price_rub, badge_ru, badge_am, is_popular, crown_tier, sort_order, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.original_price_rub||0, d.package_price_rub||0, d.badge_ru||'', d.badge_am||'', d.crown_tier?1:0, d.crown_tier||'', d.sort_order||0, d.is_active!==undefined?d.is_active:1).run();
   const pkgId = res.meta?.last_row_id;
   if (pkgId && d.items && Array.isArray(d.items)) {
     for (const item of d.items) {
@@ -178,8 +248,8 @@ api.put('/calc-packages/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = parseInt(c.req.param('id'));
   const d = await c.req.json();
-  await db.prepare(`UPDATE calculator_packages SET name_ru=?, name_am=?, description_ru=?, description_am=?, original_price=?, package_price=?, badge_ru=?, badge_am=?, is_popular=?, crown_tier=?, sort_order=?, is_active=? WHERE id=?`)
-    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.badge_ru||'', d.badge_am||'', d.crown_tier?1:0, d.crown_tier||'', d.sort_order||0, d.is_active!==undefined?d.is_active:1, id).run();
+  await db.prepare(`UPDATE calculator_packages SET name_ru=?, name_am=?, description_ru=?, description_am=?, original_price=?, package_price=?, original_price_rub=?, package_price_rub=?, badge_ru=?, badge_am=?, is_popular=?, crown_tier=?, sort_order=?, is_active=? WHERE id=?`)
+    .bind(d.name_ru||'', d.name_am||'', d.description_ru||'', d.description_am||'', d.original_price||0, d.package_price||0, d.original_price_rub||0, d.package_price_rub||0, d.badge_ru||'', d.badge_am||'', d.crown_tier?1:0, d.crown_tier||'', d.sort_order||0, d.is_active!==undefined?d.is_active:1, id).run();
   // Replace items
   await db.prepare('DELETE FROM calculator_package_items WHERE package_id = ?').bind(id).run();
   if (d.items && Array.isArray(d.items)) {

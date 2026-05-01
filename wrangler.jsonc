@@ -23,5 +23,18 @@
       "database_name": "gototop-production-eu",
       "database_id": "f49b080f-516f-4ed0-84e9-0efdea1e8a2a"
     }
+  ],
+
+  // ===== MEDIA STORAGE (R2) =====
+  // Used for photos (site blocks, blog covers) and future video uploads.
+  // Create the bucket in Cloudflare Dashboard before deploying:
+  //   Dashboard → R2 → Create bucket → name: gototop-media
+  // For local dev (wrangler dev), R2 is simulated automatically.
+  "r2_buckets": [
+    {
+      "binding": "MEDIA",
+      "bucket_name": "gototop-media",
+      "preview_bucket_name": "gototop-media-preview"
+    }
   ]
 }

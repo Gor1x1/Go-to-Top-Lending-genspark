@@ -400,6 +400,7 @@ const pages = [
   { id: 'team_access', icon: 'fa-shield-alt', label: 'Роли и доступы' },
   { id: 'blocks', icon: 'fa-cubes', label: 'Управление сайтом' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
+  { id: 'blog', icon: 'fa-book-open', label: 'Блог' },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
   { id: 'settings', icon: 'fa-cog', label: 'Настройки' },
@@ -443,6 +444,16 @@ function navigate(page) {
       if (mainEl2 && currentPage === page) mainEl2.innerHTML = getPageHtml();
     }).catch(function() {});
   }
+  // Load blog data when navigating to blog section
+  if (page === 'blog') {
+    reloadBlogData().then(function() {
+      var mainEl3 = document.getElementById('mainArea');
+      if (mainEl3 && currentPage === 'blog') {
+        mainEl3.innerHTML = getPageHtml();
+        setTimeout(function() { if (typeof initBlogSortable === 'function') initBlogSortable(); }, 50);
+      }
+    }).catch(function() {});
+  }
   // Fast navigate: only update main area + sidebar active states
   var mainEl = document.getElementById('mainArea');
   if (mainEl) {
@@ -460,6 +471,8 @@ function navigate(page) {
       setTimeout(function() { initCalcSortables(); }, 50);
       // Post-render: init SortableJS for site blocks
       setTimeout(function() { if (typeof sbInitSortable === 'function') sbInitSortable(); }, 50);
+      // Post-render: init SortableJS for blog posts
+      setTimeout(function() { if (typeof initBlogSortable === 'function') initBlogSortable(); }, 50);
     }, 10);
   } else {
     render();
@@ -518,7 +531,7 @@ function renderDashboard() {
   var stb = db.status_breakdown || {};
   
   // Helpers
-  function fa(v) { return Number(v || 0).toLocaleString('ru-RU') + ' \u058F'; }
+  function fa(v, cur) { var s = (cur === 'rub' || cur === 'RUB') ? '\u20bd' : '\u058F'; return Number(v || 0).toLocaleString('ru-RU') + ' ' + s; }
   function fn(v) { return Number(v || 0).toLocaleString('ru-RU'); }
   function trend(curr, prev) {
     if (!prev || prev == 0) return '';
@@ -671,7 +684,7 @@ function renderDashboard() {
           '<div style="font-size:0.68rem;color:#64748b">' + rlTime + (rlSrc ? ' \u00B7 ' + escHtml(rlSrc) : '') + '</div>' +
         '</div>' +
         '<div style="text-align:right;flex-shrink:0">' +
-          (rl.total_amount > 0 ? '<div style="font-size:0.82rem;font-weight:700;color:#e2e8f0">' + fa(rl.total_amount) + '</div>' : '') +
+          (rl.total_amount > 0 ? '<div style="font-size:0.82rem;font-weight:700;color:#e2e8f0">' + fa(rl.total_amount, rl.currency) + '</div>' : '') +
           '<div style="font-size:0.65rem;color:' + rlColor + '">' + rlStatus + '</div>' +
         '</div></div>';
     }
@@ -1432,6 +1445,25 @@ function renderCalculator() {
     '<button class="btn btn-primary" onclick="addNewSection()"><i class="fas fa-folder-plus" style="margin-right:6px"></i>Создать новый раздел</button>' +
     '<a href="/?_nocache=' + Date.now() + '" target="_blank" class="btn btn-outline" style="text-decoration:none"><i class="fas fa-external-link-alt" style="margin-right:6px"></i>Открыть сайт</a>' +
   '</div>';
+
+  // ===== AMD <-> RUB CURRENCY RATE CARD =====
+  // Курс используется только для кнопки "авто-заполнить пустые RUB-цены".
+  // Публичный калькулятор показывает price_rub напрямую — без пересчёта на лету.
+  var curRate = (data.settings && data.settings.amd_to_rub_rate) || '0.222';
+  h += '<div class="card" style="margin-bottom:20px;background:linear-gradient(135deg,rgba(139,92,246,0.06),rgba(245,158,11,0.06));border:1px solid rgba(139,92,246,0.25)">' +
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><i class="fas fa-money-bill-wave" style="color:#f59e0b"></i><span style="font-weight:700;font-size:1rem">Валюта рубль (\u20bd)</span></div>' +
+    '<div style="display:grid;grid-template-columns:160px 1fr auto;gap:10px;align-items:end">' +
+      '<div><div style="font-size:0.72rem;color:#64748b;margin-bottom:4px">1 \u058f = </div>' +
+        '<input class="input" id="amdRubRate" type="number" step="0.001" min="0.001" value="' + escHtml(String(curRate)) + '" style="padding:8px 10px;font-size:0.9rem;font-weight:700"></div>' +
+      '<div style="font-size:0.78rem;color:#94a3b8;line-height:1.45;align-self:center">' +
+        'Стартовый курс <strong>0.222</strong> \u20bd за драм (\u22481 \u20bd \u2248 4.5 \u058f). Курс используется только для кнопки авто-заполнения пустых рублёвых цен ниже. Публичный калькулятор показывает рубли напрямую из БД.' +
+      '</div>' +
+      '<button class="btn btn-success" style="padding:8px 14px;font-size:0.85rem" onclick="saveAmdRubRate()"><i class="fas fa-save" style="margin-right:4px"></i>Сохранить курс</button>' +
+    '</div>' +
+    '<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap">' +
+      '<button class="btn btn-outline" style="padding:8px 14px;font-size:0.85rem;border-color:rgba(245,158,11,0.4);color:#fbbf24" onclick="bulkFillRub()" title="Заполнит только пустые \u20bd-цены"><i class="fas fa-bolt" style="margin-right:4px"></i>Авто-заполнить пустые \u20bd по курсу</button>' +
+    '</div>' +
+  '</div>';
   
   // Group services by tab
   var byTab = {};
@@ -1472,11 +1504,12 @@ function renderCalculator() {
       if (isTiered) { try { tiers = JSON.parse(svc2.price_tiers_json); } catch(e) { tiers = []; } }
       
       h += '<div class="section-edit-row" style="margin-bottom:8px" data-svc-id="' + svc2.id + '">' +
-        '<div style="display:grid;grid-template-columns:28px 1fr 1fr 100px auto auto;gap:8px;align-items:center">' +
+        '<div style="display:grid;grid-template-columns:28px 1fr 1fr 100px 100px auto auto;gap:8px;align-items:center">' +
           '<i class="fas fa-grip-vertical calc-drag-handle" style="color:#475569;cursor:grab;font-size:0.9rem"></i>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название RU</div><input class="input" value="' + escHtml(svc2.name_ru) + '" id="svc_ru_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">Название AM</div><input class="input" value="' + escHtml(svc2.name_am || '') + '" id="svc_am_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
           '<div><div style="font-size:0.65rem;color:#64748b;margin-bottom:2px">\u0426\u0435\u043d\u0430 \u058f</div><input class="input" type="number" value="' + svc2.price + '" id="svc_price_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem"></div>' +
+          '<div><div style="font-size:0.65rem;color:#fbbf24;margin-bottom:2px">\u0426\u0435\u043d\u0430 \u20bd</div><input class="input" type="number" value="' + (svc2.price_rub || 0) + '" id="svc_price_rub_' + svc2.id + '" style="padding:6px 10px;font-size:0.85rem;border-color:rgba(245,158,11,0.4)"></div>' +
           '<button class="btn btn-success" style="padding:6px 10px;margin-top:14px" onclick="saveCalcService(' + svc2.id + ',' + tab.id + ')" title="Сохранить"><i class="fas fa-save"></i></button>' +
           '<button class="btn btn-danger" style="padding:6px 10px;margin-top:14px" onclick="deleteCalcService(' + svc2.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>' +
         '</div>';
@@ -1488,11 +1521,16 @@ function renderCalculator() {
         h += '<div style="margin-top:6px"><button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem;border-color:rgba(239,68,68,0.3);color:#f87171" onclick="disableTieredPricing(' + svc2.id + ')" title="Убрать тарифную шкалу"><i class="fas fa-times" style="margin-right:4px"></i>Убрать шкалу</button></div>';
       }
       
-      // Tier editor
+      // Tier editor (with parallel AMD + RUB price columns)
       if (isTiered && tiers.length > 0) {
+        // Parse parallel RUB tiers (same min/max, different price). Falls back
+        // to empty array — admin can fill cell-by-cell or via bulk-fill.
+        var rubTiers = [];
+        try { rubTiers = svc2.price_tiers_rub_json ? JSON.parse(svc2.price_tiers_rub_json) : []; } catch(e) { rubTiers = []; }
         h += '<div style="margin-top:8px;padding:10px;background:#0f172a;border:1px solid rgba(139,92,246,0.3);border-radius:8px">' +
           '<div style="font-size:0.78rem;font-weight:600;color:#a78bfa;margin-bottom:6px"><i class="fas fa-layer-group" style="margin-right:4px"></i>\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430</div>';
         for (var tii = 0; tii < tiers.length; tii++) {
+          var rubP = (rubTiers[tii] && typeof rubTiers[tii].price !== 'undefined') ? rubTiers[tii].price : 0;
           h += '<div style="display:flex;gap:6px;align-items:center;margin-bottom:4px;flex-wrap:wrap">' +
             '<span style="font-size:0.75rem;color:#94a3b8;min-width:16px">\u043e\u0442</span>' +
             '<input class="input" type="number" value="' + tiers[tii].min + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_min_' + svc2.id + '_' + tii + '">' +
@@ -1500,6 +1538,8 @@ function renderCalculator() {
             '<input class="input" type="number" value="' + tiers[tii].max + '" style="width:60px;padding:4px 6px;font-size:0.8rem" id="tier_max_' + svc2.id + '_' + tii + '">' +
             '<span style="font-size:0.75rem;color:#94a3b8">=</span>' +
             '<input class="input" type="number" value="' + tiers[tii].price + '" style="width:80px;padding:4px 6px;font-size:0.8rem" id="tier_price_' + svc2.id + '_' + tii + '"><span style="font-size:0.8rem;color:#94a3b8">\u058f</span>' +
+            '<span style="font-size:0.75rem;color:#94a3b8;margin-left:4px">/</span>' +
+            '<input class="input" type="number" value="' + rubP + '" style="width:80px;padding:4px 6px;font-size:0.8rem;border-color:rgba(245,158,11,0.4)" id="tier_price_rub_' + svc2.id + '_' + tii + '" placeholder="0"><span style="font-size:0.8rem;color:#fbbf24">\u20bd</span>' +
             '<button class="tier-del-btn" onclick="deleteTier(' + svc2.id + ',' + tii + ',' + tiers.length + ')"><i class="fas fa-times"></i></button>' +
           '</div>';
         }
@@ -1571,8 +1611,8 @@ function renderCalculator() {
         '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deletePackage(' + pkg.id + ')"><i class="fas fa-trash"></i></button>' +
       '</div>';
       
-      // Price info
-      h += '<div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.9rem;flex-wrap:wrap">';
+      // Price info (AMD line + parallel RUB line so admin sees what RU clients will pay)
+      h += '<div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.9rem;flex-wrap:wrap;align-items:center">';
       if (pkg.original_price > 0) {
         h += '<div style="color:#94a3b8;text-decoration:line-through">\u0411\u0435\u0437 \u043f\u0430\u043a\u0435\u0442\u0430: ' + Number(pkg.original_price).toLocaleString('ru-RU') + ' \u058f</div>';
       }
@@ -1581,6 +1621,23 @@ function renderCalculator() {
         h += '<span class="badge" style="background:#059669;font-size:0.8rem">-' + discount + '% \u0441\u043a\u0438\u0434\u043a\u0430</span>';
       }
       h += '</div>';
+      // RUB price line (only if at least package_price_rub is set; signals which packages are ready for RU launch)
+      var pkgRub = Number(pkg.package_price_rub) || 0;
+      var pkgRubOrig = Number(pkg.original_price_rub) || 0;
+      if (pkgRub > 0 || pkgRubOrig > 0) {
+        var discRub = pkgRubOrig > 0 && pkgRub > 0 ? Math.round((1 - pkgRub / pkgRubOrig) * 100) : 0;
+        h += '<div style="display:flex;gap:16px;margin-bottom:10px;font-size:0.85rem;flex-wrap:wrap;align-items:center;padding-top:4px;border-top:1px dashed rgba(245,158,11,0.2)">';
+        if (pkgRubOrig > 0) {
+          h += '<div style="color:#94a3b8;text-decoration:line-through">\u0411\u0435\u0437 \u043f\u0430\u043a\u0435\u0442\u0430: ' + pkgRubOrig.toLocaleString('ru-RU') + ' \u20bd</div>';
+        }
+        h += '<div style="font-weight:700;color:#fbbf24">\u0426\u0435\u043d\u0430 \u043f\u0430\u043a\u0435\u0442\u0430: ' + pkgRub.toLocaleString('ru-RU') + ' \u20bd</div>';
+        if (discRub > 0) {
+          h += '<span class="badge" style="background:#d97706;font-size:0.75rem">-' + discRub + '%</span>';
+        }
+        h += '</div>';
+      } else {
+        h += '<div style="font-size:0.78rem;color:#64748b;margin-bottom:8px"><i class="fas fa-exclamation-triangle" style="color:#f59e0b;margin-right:4px"></i>\u0420\u0443\u0431\u043b\u0451\u0432\u044b\u0435 \u0446\u0435\u043d\u044b \u043d\u0435 \u0437\u0430\u0434\u0430\u043d\u044b \u2014 \u043f\u0430\u043a\u0435\u0442 \u043d\u0435 \u043f\u043e\u043a\u0430\u0436\u0435\u0442\u0441\u044f \u043d\u0430 RU \u0432\u0435\u0440\u0441\u0438\u0438.</div>';
+      }
       
       // Items list
       if (pkg.items && pkg.items.length > 0) {
@@ -1734,10 +1791,11 @@ async function addServiceToTab(tabId) {
   
   var formHtml = '<div id="' + formId + '" style="margin-top:8px;padding:14px;background:#0f172a;border:2px dashed #8B5CF6;border-radius:8px;animation:slideUp 0.3s ease">' +
     '<div style="font-size:0.85rem;font-weight:700;color:#a78bfa;margin-bottom:10px"><i class="fas fa-plus-circle" style="margin-right:4px"></i>\u041d\u043e\u0432\u0430\u044f \u0443\u0441\u043b\u0443\u0433\u0430 \u0432 \u00ab' + escHtml(tabName) + '\u00bb</div>' +
-    '<div style="display:grid;grid-template-columns:1fr 1fr 100px 130px;gap:8px;margin-bottom:10px">' +
+    '<div style="display:grid;grid-template-columns:1fr 1fr 100px 100px 130px;gap:8px;margin-bottom:10px">' +
       '<input class="input" id="nsvc_ru_' + tabId + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 RU" style="padding:6px 10px;font-size:0.85rem">' +
       '<input class="input" id="nsvc_am_' + tabId + '" placeholder="\u041d\u0430\u0437\u0432\u0430\u043d\u0438\u0435 AM" style="padding:6px 10px;font-size:0.85rem">' +
       '<input class="input" type="number" id="nsvc_price_' + tabId + '" placeholder="\u0426\u0435\u043d\u0430 \u058f" value="0" style="padding:6px 10px;font-size:0.85rem">' +
+      '<input class="input" type="number" id="nsvc_price_rub_' + tabId + '" placeholder="\u0426\u0435\u043d\u0430 \u20bd" value="0" style="padding:6px 10px;font-size:0.85rem;border-color:rgba(245,158,11,0.4)">' +
       '<select class="input" id="nsvc_type_' + tabId + '" style="padding:6px 8px;font-size:0.82rem">' +
         '<option value="fixed">\u0424\u0438\u043a\u0441. \u0446\u0435\u043d\u0430</option>' +
         '<option value="tiered">\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430</option>' +
@@ -1760,10 +1818,17 @@ async function submitSvcToTab(tabId) {
   if (!ru) { toast('\u0412\u0432\u0435\u0434\u0438\u0442\u0435 \u043d\u0430\u0437\u0432\u0430\u043d\u0438\u0435', 'error'); return; }
   var am = document.getElementById('nsvc_am_' + tabId).value.trim() || ru;
   var price = parseInt(document.getElementById('nsvc_price_' + tabId).value) || 0;
+  var priceRub = parseInt((document.getElementById('nsvc_price_rub_' + tabId) || {}).value || '0') || 0;
   var pType = document.getElementById('nsvc_type_' + tabId).value;
   var tiersJson = null;
-  if (pType === 'tiered') { tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]); }
-  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_type: pType, price_tiers_json: tiersJson, sort_order: data.calcServices.length + 1 }) });
+  var tiersRubJson = null;
+  if (pType === 'tiered') {
+    tiersJson = JSON.stringify([{min:1,max:20,price:price},{min:21,max:40,price:Math.round(price*0.85)},{min:41,max:999,price:Math.round(price*0.75)}]);
+    if (priceRub > 0) {
+      tiersRubJson = JSON.stringify([{min:1,max:20,price:priceRub},{min:21,max:40,price:Math.round(priceRub*0.85)},{min:41,max:999,price:Math.round(priceRub*0.75)}]);
+    }
+  }
+  await api('/calc-services', { method: 'POST', body: JSON.stringify({ tab_id: tabId, name_ru: ru, name_am: am, price: price, price_rub: priceRub, price_type: pType, price_tiers_json: tiersJson, price_tiers_rub_json: tiersRubJson, sort_order: data.calcServices.length + 1 }) });
   toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u00ab' + ru + '\u00bb \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430!');
   await loadData(); render();
 }
@@ -1785,25 +1850,34 @@ async function saveCalcService(id, tabId) {
   var ru = document.getElementById('svc_ru_' + id).value;
   var am = document.getElementById('svc_am_' + id).value;
   var price = parseInt(document.getElementById('svc_price_' + id).value) || 0;
-  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, tab_id: tabId || svc.tab_id }) });
+  var priceRub = parseInt((document.getElementById('svc_price_rub_' + id) || {}).value || '0') || 0;
+  await api('/calc-services/' + id, { method: 'PUT', body: JSON.stringify({ ...svc, name_ru: ru, name_am: am, price: price, price_rub: priceRub, tab_id: tabId || svc.tab_id }) });
   toast('\u0423\u0441\u043b\u0443\u0433\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0430');
   await loadData(); render();
 }
 
 async function saveTiers(svcId, count) {
   var tiers = [];
+  var tiersRub = [];
+  var anyRub = false;
   for (var i = 0; i < count; i++) {
     var min = parseInt(document.getElementById('tier_min_' + svcId + '_' + i).value);
     var max = parseInt(document.getElementById('tier_max_' + svcId + '_' + i).value);
     var price = parseInt(document.getElementById('tier_price_' + svcId + '_' + i).value);
+    var priceRub = parseInt((document.getElementById('tier_price_rub_' + svcId + '_' + i) || {}).value || '0');
     if (!isNaN(min) && !isNaN(max) && !isNaN(price)) {
       tiers.push({ min: min, max: max, price: price });
+      var rp = isNaN(priceRub) ? 0 : priceRub;
+      tiersRub.push({ min: min, max: max, price: rp });
+      if (rp > 0) anyRub = true;
     }
   }
   if (!tiers.length) { toast('\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u0435 \u0445\u043e\u0442\u044f \u0431\u044b \u043e\u0434\u0438\u043d \u0442\u0430\u0440\u0438\u0444', 'error'); return; }
   var svc = data.calcServices.find(s => s.id === svcId);
   if (!svc) return;
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
+  // Persist parallel RUB tiers only if at least one row has a rub price; otherwise null so landing falls back to AMD on RU.
+  var rubJson = anyRub ? JSON.stringify(tiersRub) : null;
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price_tiers_rub_json: rubJson, price: tiers[0].price, price_rub: anyRub ? tiersRub[0].price : (svc.price_rub || 0) }) });
   toast('\u0422\u0430\u0440\u0438\u0444\u044b \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u044b! \u041e\u0431\u043d\u043e\u0432\u0438\u0442\u0435 \u0441\u0430\u0439\u0442 \u0434\u043b\u044f \u043f\u0440\u043e\u0432\u0435\u0440\u043a\u0438.');
   await loadData(); render();
 }
@@ -1813,9 +1887,16 @@ async function addTier(svcId) {
   if (!svc) return;
   var tiers = [];
   try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; }
+  var rubTiers = [];
+  try { rubTiers = svc.price_tiers_rub_json ? JSON.parse(svc.price_tiers_rub_json) : []; } catch(e) { rubTiers = []; }
   var lastMax = tiers.length ? tiers[tiers.length-1].max : 0;
   tiers.push({ min: lastMax + 1, max: lastMax + 20, price: 1000 });
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers) }) });
+  if (rubTiers.length > 0) {
+    rubTiers.push({ min: lastMax + 1, max: lastMax + 20, price: 0 });
+  }
+  var payload = { ...svc, price_tiers_json: JSON.stringify(tiers) };
+  if (rubTiers.length > 0) payload.price_tiers_rub_json = JSON.stringify(rubTiers);
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify(payload) });
   toast('\u0421\u0442\u0440\u043e\u043a\u0430 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430');
   await loadData(); render();
 }
@@ -1827,9 +1908,17 @@ async function deleteTier(svcId, tierIndex, totalTiers) {
   if (!svc) return;
   var tiers = [];
   try { tiers = JSON.parse(svc.price_tiers_json); } catch(e) { tiers = []; }
+  var rubTiers = [];
+  try { rubTiers = svc.price_tiers_rub_json ? JSON.parse(svc.price_tiers_rub_json) : []; } catch(e) { rubTiers = []; }
   if (tierIndex < 0 || tierIndex >= tiers.length) return;
   tiers.splice(tierIndex, 1);
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price }) });
+  if (rubTiers.length > 0) rubTiers.splice(tierIndex, 1);
+  var payload = { ...svc, price_tiers_json: JSON.stringify(tiers), price: tiers[0].price };
+  if (rubTiers.length > 0) {
+    payload.price_tiers_rub_json = JSON.stringify(rubTiers);
+    payload.price_rub = rubTiers[0].price || 0;
+  }
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify(payload) });
   toast('\u0421\u0442\u0440\u043e\u043a\u0430 \u0442\u0430\u0440\u0438\u0444\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
   await loadData(); render();
 }
@@ -1845,12 +1934,22 @@ async function enableTieredPricing(svcId) {
   var svc = data.calcServices.find(function(s) { return s.id === svcId; });
   if (!svc) return;
   var price = svc.price || 1000;
+  var priceRub = svc.price_rub || 0;
   var defaultTiers = [
     { min: 1, max: 20, price: price },
     { min: 21, max: 40, price: Math.round(price * 0.85) },
     { min: 41, max: 999, price: Math.round(price * 0.75) }
   ];
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'tiered', price_tiers_json: JSON.stringify(defaultTiers) }) });
+  var payload = { ...svc, price_type: 'tiered', price_tiers_json: JSON.stringify(defaultTiers) };
+  if (priceRub > 0) {
+    var defaultTiersRub = [
+      { min: 1, max: 20, price: priceRub },
+      { min: 21, max: 40, price: Math.round(priceRub * 0.85) },
+      { min: 41, max: 999, price: Math.round(priceRub * 0.75) }
+    ];
+    payload.price_tiers_rub_json = JSON.stringify(defaultTiersRub);
+  }
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify(payload) });
   toast('\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430 \u0434\u043e\u0431\u0430\u0432\u043b\u0435\u043d\u0430! \u041d\u0430\u0441\u0442\u0440\u043e\u0439\u0442\u0435 \u0446\u0435\u043d\u044b.');
   await loadData(); render();
 }
@@ -1859,9 +1958,39 @@ async function disableTieredPricing(svcId) {
   var svc = data.calcServices.find(function(s) { return s.id === svcId; });
   if (!svc) return;
   if (!confirm('\u0423\u0431\u0440\u0430\u0442\u044c \u0442\u0430\u0440\u0438\u0444\u043d\u0443\u044e \u0448\u043a\u0430\u043b\u0443? \u0423\u0441\u043b\u0443\u0433\u0430 \u0441\u0442\u0430\u043d\u0435\u0442 \u0441 \u0444\u0438\u043a\u0441. \u0446\u0435\u043d\u043e\u0439.')) return;
-  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'fixed', price_tiers_json: null }) });
+  await api('/calc-services/' + svcId, { method: 'PUT', body: JSON.stringify({ ...svc, price_type: 'fixed', price_tiers_json: null, price_tiers_rub_json: null }) });
   toast('\u0422\u0430\u0440\u0438\u0444\u043d\u0430\u044f \u0448\u043a\u0430\u043b\u0430 \u0443\u0434\u0430\u043b\u0435\u043d\u0430');
   await loadData(); render();
+}
+
+// Save the AMD->RUB rate to site_settings (for the bulk-fill helper).
+async function saveAmdRubRate() {
+  var inp = document.getElementById('amdRubRate');
+  if (!inp) return;
+  var v = String(inp.value || '').trim();
+  var num = parseFloat(v);
+  if (!num || num <= 0) { toast('\u041d\u0435\u043a\u043e\u0440\u0440\u0435\u043a\u0442\u043d\u044b\u0439 \u043a\u0443\u0440\u0441', 'error'); return; }
+  try {
+    await api('/settings', { method: 'PUT', body: JSON.stringify({ amd_to_rub_rate: String(num) }) });
+    if (!data.settings) data.settings = {};
+    data.settings.amd_to_rub_rate = String(num);
+    toast('\u041a\u0443\u0440\u0441 \u0441\u043e\u0445\u0440\u0430\u043d\u0451\u043d');
+  } catch(e) { toast('\u041e\u0448\u0438\u0431\u043a\u0430 \u0441\u043e\u0445\u0440\u0430\u043d\u0435\u043d\u0438\u044f', 'error'); }
+}
+
+// Bulk-fill empty RUB prices via the saved (or input) rate. Existing non-zero RUB prices are NOT touched.
+async function bulkFillRub() {
+  var inp = document.getElementById('amdRubRate');
+  var rate = inp ? parseFloat(inp.value) : NaN;
+  if (!rate || rate <= 0) { toast('\u0421\u043d\u0430\u0447\u0430\u043b\u0430 \u0443\u043a\u0430\u0436\u0438\u0442\u0435 \u043a\u0443\u0440\u0441', 'error'); return; }
+  if (!confirm('\u0417\u0430\u043f\u043e\u043b\u043d\u0438\u0442\u044c \u0432\u0441\u0435 \u043f\u0443\u0441\u0442\u044b\u0435 \u0440\u0443\u0431\u043b\u0451\u0432\u044b\u0435 \u0446\u0435\u043d\u044b \u043f\u043e \u043a\u0443\u0440\u0441\u0443 ' + rate + '? \u0421\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u044e\u0449\u0438\u0435 \u0440\u0443\u0431\u043b\u0435\u0432\u044b\u0435 \u0446\u0435\u043d\u044b \u041d\u0415 \u0431\u0443\u0434\u0443\u0442 \u0438\u0437\u043c\u0435\u043d\u0435\u043d\u044b.')) return;
+  try {
+    var res = await api('/calc/bulk-fill-rub', { method: 'POST', body: JSON.stringify({ rate: rate }) });
+    var msg = '\u0417\u0430\u043f\u043e\u043b\u043d\u0435\u043d\u043e: \u0443\u0441\u043b\u0443\u0433 ' + (res.services_updated || 0) + ', \u0442\u0430\u0440\u0438\u0444\u043d\u044b\u0445 \u0448\u043a\u0430\u043b ' + (res.tiered_updated || 0) + ', \u043f\u0430\u043a\u0435\u0442\u043e\u0432 ' + (res.packages_updated || 0);
+    toast(msg);
+    await loadData();
+    render();
+  } catch(e) { toast('\u041e\u0448\u0438\u0431\u043a\u0430', 'error'); }
 }
 
 async function deleteCalcTab(id) {
@@ -1923,22 +2052,41 @@ function openPackageModal(pkg) {
     // === AUTO-CALCULATED PRICE BLOCK ===
     '<div id="pkg_price_block" style="background:#1a2236;border:1px solid #334155;border-radius:10px;padding:16px;margin-bottom:16px">' +
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><i class="fas fa-calculator" style="color:#8B5CF6"></i><span style="font-weight:700;font-size:0.95rem">Цены и скидка</span></div>' +
-      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px">' +
+      // AMD row (default currency)
+      '<div style="font-size:0.72rem;color:#a78bfa;font-weight:700;margin-bottom:6px;letter-spacing:0.05em">\u058f \u0414\u0420\u0410\u041c (Армения)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">' +
         '<div>' +
-          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Сумма услуг (авто) ֏</label>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Сумма услуг (авто) \u058f</label>' +
           '<div id="pkg_original_display" style="font-size:1.3rem;font-weight:800;color:#94a3b8;padding:8px 0">0</div>' +
           '<input type="hidden" id="pkg_original_price" value="' + (isEdit ? pkg.original_price || 0 : 0) + '">' +
         '</div>' +
         '<div>' +
-          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета ֏ <span style="color:#EF4444">*</span></label>' +
-          '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" min="0" placeholder="15000" style="border-color:#f59e0b;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscount()">' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета \u058f <span style="color:#EF4444">*</span></label>' +
+          '<input class="input" type="number" id="pkg_package_price" value="' + (isEdit ? pkg.package_price || 0 : 0) + '" min="0" placeholder="15000" style="border-color:#8B5CF6;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscount()">' +
         '</div>' +
         '<div>' +
-          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка</label>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка \u058f</label>' +
           '<div id="pkg_discount_display" style="font-size:1.3rem;font-weight:800;color:#10B981;padding:8px 0">0%</div>' +
         '</div>' +
       '</div>' +
-      '<div id="pkg_savings_line" style="font-size:0.8rem;color:#64748b;display:none">Экономия клиента: <span id="pkg_savings_amount" style="color:#10B981;font-weight:700">0 ֏</span></div>' +
+      '<div id="pkg_savings_line" style="font-size:0.8rem;color:#64748b;display:none;margin-bottom:14px">Экономия клиента: <span id="pkg_savings_amount" style="color:#10B981;font-weight:700">0 \u058f</span></div>' +
+      // RUB row (Russian market)
+      '<div style="font-size:0.72rem;color:#fbbf24;font-weight:700;margin-bottom:6px;margin-top:6px;letter-spacing:0.05em">\u20bd \u0420\u0423\u0411\u041b\u0418 (Россия)</div>' +
+      '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Старая цена \u20bd</label>' +
+          '<input class="input" type="number" id="pkg_original_price_rub" value="' + (isEdit ? pkg.original_price_rub || 0 : 0) + '" min="0" placeholder="0" style="font-size:1rem;border-color:rgba(245,158,11,0.4)" oninput="recalcPkgDiscountRub()">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Цена пакета \u20bd</label>' +
+          '<input class="input" type="number" id="pkg_package_price_rub" value="' + (isEdit ? pkg.package_price_rub || 0 : 0) + '" min="0" placeholder="0" style="border-color:#f59e0b;font-size:1.05rem;font-weight:700" oninput="recalcPkgDiscountRub()">' +
+        '</div>' +
+        '<div>' +
+          '<label style="font-size:0.72rem;color:#64748b;display:block;margin-bottom:4px">Скидка \u20bd</label>' +
+          '<div id="pkg_discount_display_rub" style="font-size:1.3rem;font-weight:800;color:#10B981;padding:8px 0">—</div>' +
+        '</div>' +
+      '</div>' +
+      '<div style="font-size:0.7rem;color:#64748b;margin-top:6px;line-height:1.4">Если оставить рублёвые цены = 0 — пакет не будет показываться на русской версии сайта (либо нажмите кнопку «Авто-заполнить \u20bd» в карточке курса вверху).</div>' +
     '</div>' +
     
     // === Crown tier, badge text, and options ===
@@ -2051,7 +2199,7 @@ function recalcPkgDiscount() {
     var savings = orig - price;
     if (discDisplay) { discDisplay.textContent = '-' + discPct + '%'; discDisplay.style.color = '#10B981'; }
     if (savingsLine) savingsLine.style.display = 'block';
-    if (savingsAmt) savingsAmt.textContent = savings.toLocaleString('ru-RU') + ' ֏';
+    if (savingsAmt) savingsAmt.textContent = savings.toLocaleString('ru-RU') + ' \u058f';
     
   } else if (orig > 0 && price >= orig) {
     if (discDisplay) { discDisplay.textContent = 'нет скидки'; discDisplay.style.color = '#EF4444'; }
@@ -2059,6 +2207,27 @@ function recalcPkgDiscount() {
   } else {
     if (discDisplay) { discDisplay.textContent = '—'; discDisplay.style.color = '#64748b'; }
     if (savingsLine) savingsLine.style.display = 'none';
+  }
+  recalcPkgDiscountRub();
+}
+
+// Recalculate the parallel RUB discount panel inside the package modal.
+function recalcPkgDiscountRub() {
+  var origEl = document.getElementById('pkg_original_price_rub');
+  var priceEl = document.getElementById('pkg_package_price_rub');
+  var discDisplay = document.getElementById('pkg_discount_display_rub');
+  if (!discDisplay) return;
+  var orig = parseInt(origEl ? origEl.value : '0') || 0;
+  var price = parseInt(priceEl ? priceEl.value : '0') || 0;
+  if (orig > 0 && price > 0 && price < orig) {
+    var discPct = Math.round((1 - price / orig) * 100);
+    discDisplay.textContent = '-' + discPct + '%'; discDisplay.style.color = '#10B981';
+  } else if (orig > 0 && price >= orig) {
+    discDisplay.textContent = 'нет скидки'; discDisplay.style.color = '#EF4444';
+  } else if (price > 0 && orig === 0) {
+    discDisplay.textContent = price.toLocaleString('ru-RU') + ' \u20bd'; discDisplay.style.color = '#fbbf24';
+  } else {
+    discDisplay.textContent = '—'; discDisplay.style.color = '#64748b';
   }
 }
 
@@ -2161,6 +2330,8 @@ async function savePackage(pkgId) {
   
   var pkgPrice = parseInt((document.getElementById('pkg_package_price'))?.value || '0') || 0;
   if (pkgPrice <= 0) { toast('Укажите цену пакета', 'error'); return; }
+  var pkgPriceRub = parseInt((document.getElementById('pkg_package_price_rub'))?.value || '0') || 0;
+  var pkgOrigRub = parseInt((document.getElementById('pkg_original_price_rub'))?.value || '0') || 0;
   
   var payload = {
     name_ru: nameRu,
@@ -2169,6 +2340,8 @@ async function savePackage(pkgId) {
     description_am: (document.getElementById('pkg_desc_am'))?.value || '',
     original_price: parseInt((document.getElementById('pkg_original_price'))?.value || '0') || 0,
     package_price: pkgPrice,
+    original_price_rub: pkgOrigRub,
+    package_price_rub: pkgPriceRub,
     badge_ru: (document.getElementById('pkg_badge_ru'))?.value || '',
     badge_am: (document.getElementById('pkg_badge_am'))?.value || '',
     crown_tier: (document.getElementById('pkg_crown_tier'))?.value || '',
@@ -3820,11 +3993,11 @@ function renderLeads() {
       h += '<div id="lead-total-' + l.id + '" style="text-align:center">';
       if (leadAmt > 0) {
         if (leadCommission > 0) {
-          h += '<div style="font-size:0.78rem;color:#64748b;text-decoration:line-through">' + Number(leadAmt).toLocaleString('ru-RU') + ' \u058F</div>';
-          h += '<div style="font-size:1.6rem;font-weight:900;color:#22C55E;line-height:1.2;white-space:nowrap">' + Number(leadFinalTotal).toLocaleString('ru-RU') + ' \u058F</div>';
-          h += '<div style="font-size:0.72rem;color:#3B82F6;font-weight:600;margin-top:2px">+' + Number(leadCommission).toLocaleString('ru-RU') + ' \u058F \u043A\u043E\u043C.</div>';
+          h += '<div style="font-size:0.78rem;color:#64748b;text-decoration:line-through">' + fmtAmt(leadAmt, l.currency) + '</div>';
+          h += '<div style="font-size:1.6rem;font-weight:900;color:#22C55E;line-height:1.2;white-space:nowrap">' + fmtAmt(leadFinalTotal, l.currency) + '</div>';
+          h += '<div style="font-size:0.72rem;color:#3B82F6;font-weight:600;margin-top:2px">+' + fmtAmt(leadCommission, l.currency) + ' \u043A\u043E\u043C.</div>';
         } else {
-          h += '<div style="font-size:1.6rem;font-weight:900;color:#8B5CF6;line-height:1.2;white-space:nowrap">' + Number(leadAmt).toLocaleString('ru-RU') + ' \u058F</div>';
+          h += '<div style="font-size:1.6rem;font-weight:900;color:#8B5CF6;line-height:1.2;white-space:nowrap">' + fmtAmt(leadAmt, l.currency) + '</div>';
         }
       } else {
         h += '<div style="font-size:1.2rem;color:#475569;font-weight:600">\u2014</div>';
@@ -3903,7 +4076,8 @@ function renderLeads() {
         var ap = availPkgs[pki2];
         var apSelected = pkgId && Number(pkgId) === Number(ap.id) ? ' selected' : '';
         var apInactive = !ap.is_active ? ' (\u041D\u0435\u0430\u043A\u0442\u0438\u0432\u0435\u043D)' : '';
-        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + Number(ap.package_price || ap.price || 0).toLocaleString('ru-RU') + ' \u058F)' + apInactive + '</option>';
+        var apPrice = (l.currency === 'rub' && Number(ap.package_price_rub) > 0) ? Number(ap.package_price_rub) : Number(ap.package_price || ap.price || 0);
+        h += '<option value="' + ap.id + '"' + apSelected + '>' + escHtml(ap.name_ru || ap.name || '') + ' (' + fmtAmt(apPrice, l.currency) + ')' + apInactive + '</option>';
       }
       h += '</select>';
       h += '<button class="btn" style="padding:6px 14px;font-size:0.78rem;white-space:nowrap;background:rgba(245,158,11,0.15);color:#FBBF24;border:1px solid rgba(245,158,11,0.3)" onclick="attachPackageToLead(' + l.id + ')"><i class="fas fa-link" style="margin-right:4px"></i>\u041F\u0440\u0438\u043C\u0435\u043D\u0438\u0442\u044C</button>';
@@ -3930,10 +4104,10 @@ function renderLeads() {
           h += '<div><div style="font-size:0.72rem;color:#94a3b8;text-transform:uppercase;letter-spacing:0.5px;font-weight:600;margin-bottom:2px">Выбранный пакет</div>';
           h += '<div style="font-size:1.05rem;font-weight:800;color:#FBBF24">' + escHtml(pkgName) + '</div></div>';
           h += '<div style="text-align:right">';
-          if (pkgOrigPrice > pkgPrice) h += '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + Number(pkgOrigPrice).toLocaleString('ru-RU') + ' \u058F</div>';
-          h += '<div style="font-size:1.2rem;font-weight:900;color:#FBBF24">' + Number(pkgPrice).toLocaleString('ru-RU') + ' \u058F</div>';
+          if (pkgOrigPrice > pkgPrice) h += '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + fmtAmt(pkgOrigPrice, l.currency) + '</div>';
+          h += '<div style="font-size:1.2rem;font-weight:900;color:#FBBF24">' + fmtAmt(pkgPrice, l.currency) + '</div>';
           if (pkgDiscountPct > 0) h += '<span style="font-size:0.65rem;color:#34D399;font-weight:700;background:rgba(16,185,129,0.15);padding:1px 6px;border-radius:4px">-' + pkgDiscountPct + '%</span> ';
-          if (pkgPromoDisc > 0) h += '<span style="font-size:0.65rem;color:#A78BFA;font-weight:700;background:rgba(139,92,246,0.15);padding:1px 6px;border-radius:4px">-' + Number(pkgPromoDisc).toLocaleString('ru-RU') + ' \u058F</span>';
+          if (pkgPromoDisc > 0) h += '<span style="font-size:0.65rem;color:#A78BFA;font-weight:700;background:rgba(139,92,246,0.15);padding:1px 6px;border-radius:4px">-' + fmtAmt(pkgPromoDisc, l.currency) + '</span>';
           h += '</div></div>';
           if (pkgData.items && pkgData.items.length > 0) {
             h += '<div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px">';
@@ -3980,9 +4154,9 @@ function renderLeads() {
           h += (refDiscPct > 0 ? '<span class="badge badge-green" style="font-size:0.72rem">-' + refDiscPct + '%</span>' : '') + '</div>';
           if (refDiscAmt > 0) {
             h += '<div style="margin-top:4px;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;font-size:0.72rem;line-height:1.6">';
-            h += '<div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Подитог услуг:</span><span>' + Number(refSvcBase).toLocaleString('ru-RU') + ' \u058F</span></div>';
-            h += '<div style="display:flex;justify-content:space-between;color:#a78bfa"><span>Скидка ' + refDiscPct + '%:</span><span style="font-weight:700">-' + Number(refDiscAmt).toLocaleString('ru-RU') + ' \u058F</span></div>';
-            h += '<div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;margin-top:4px"><span>Со скидкой:</span><span style="color:#10B981">' + Number(svcAfterDisc).toLocaleString('ru-RU') + ' \u058F</span></div>';
+            h += '<div style="display:flex;justify-content:space-between"><span style="color:#94a3b8">Подитог услуг:</span><span>' + fmtAmt(refSvcBase, l.currency) + '</span></div>';
+            h += '<div style="display:flex;justify-content:space-between;color:#a78bfa"><span>Скидка ' + refDiscPct + '%:</span><span style="font-weight:700">-' + fmtAmt(refDiscAmt, l.currency) + '</span></div>';
+            h += '<div style="display:flex;justify-content:space-between;font-weight:700;border-top:1px solid rgba(255,255,255,0.1);padding-top:4px;margin-top:4px"><span>Со скидкой:</span><span style="color:#10B981">' + fmtAmt(svcAfterDisc, l.currency) + '</span></div>';
             h += '</div>';
           }
           h += '</div>';
@@ -4030,13 +4204,13 @@ function renderLeads() {
       var pmFinal = pmBase + pmCommission;
       var refundVal = Number(l.refund_amount || 0);
       h += '<div id="lead-pm-preview-' + l.id + '" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-top:10px">';
-      h += '<div style="padding:10px;background:rgba(0,0,0,0.15);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:2px">Сумма заказа</div><div style="font-size:1.05rem;font-weight:800;color:#e2e8f0">' + Number(pmBase).toLocaleString('ru-RU') + ' \u058F</div></div>';
+      h += '<div style="padding:10px;background:rgba(0,0,0,0.15);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#94a3b8;margin-bottom:2px">Сумма заказа</div><div style="font-size:1.05rem;font-weight:800;color:#e2e8f0">' + fmtAmt(pmBase, l.currency) + '</div></div>';
       if (pmMatch) {
-        h += '<div style="padding:10px;background:rgba(59,130,246,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#93c5fd;margin-bottom:2px">Комиссия ' + pmPct + '%</div><div style="font-size:1.05rem;font-weight:800;color:#3B82F6">+' + Number(pmCommission).toLocaleString('ru-RU') + ' \u058F</div></div>';
-        h += '<div style="padding:10px;background:rgba(34,197,94,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#86efac;margin-bottom:2px">К оплате</div><div style="font-size:1.05rem;font-weight:800;color:#22C55E">' + Number(pmFinal).toLocaleString('ru-RU') + ' \u058F</div></div>';
+        h += '<div style="padding:10px;background:rgba(59,130,246,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#93c5fd;margin-bottom:2px">Комиссия ' + pmPct + '%</div><div style="font-size:1.05rem;font-weight:800;color:#3B82F6">+' + fmtAmt(pmCommission, l.currency) + '</div></div>';
+        h += '<div style="padding:10px;background:rgba(34,197,94,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#86efac;margin-bottom:2px">К оплате</div><div style="font-size:1.05rem;font-weight:800;color:#22C55E">' + fmtAmt(pmFinal, l.currency) + '</div></div>';
       }
       if (refundVal > 0) {
-        h += '<div style="padding:10px;background:rgba(239,68,68,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#fca5a5;margin-bottom:2px">Возврат</div><div style="font-size:1.05rem;font-weight:800;color:#EF4444">-' + Number(refundVal).toLocaleString('ru-RU') + ' \u058F</div></div>';
+        h += '<div style="padding:10px;background:rgba(239,68,68,0.08);border-radius:8px;text-align:center"><div style="font-size:0.68rem;color:#fca5a5;margin-bottom:2px">Возврат</div><div style="font-size:1.05rem;font-weight:800;color:#EF4444">-' + fmtAmt(refundVal, l.currency) + '</div></div>';
       }
       h += '</div>';
       h += '</div>'; // END section 3
@@ -4239,7 +4413,7 @@ async function applyLeadRefCode(leadId) {
         lead.total_amount = recalcRes.total_amount;
         try { lead.calc_data = JSON.stringify(recalcRes.calc_data || {}); } catch(e) {}
       }
-      toast('Сумма пересчитана: ' + Number(recalcRes.total_amount).toLocaleString('ru-RU') + ' ֏');
+      toast('Сумма пересчитана: ' + fmtAmt(recalcRes.total_amount, lead && lead.currency));
     }
     // Reload data to update card display (including referral bonus services)
     await loadData();
@@ -4303,12 +4477,13 @@ async function applyPaymentMethod(leadId) {
   var pmBase = Number(lead && lead.total_amount || 0);
   var pmFinal = pmBase + commAmt;
   
+  var _leadCur = lead && lead.currency;
   if (preview) {
     if (pmMatch && commAmt > 0) {
       preview.innerHTML = '<div style="font-size:0.78rem;padding:8px;line-height:1.6">' +
-        '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</span></div>' +
-        '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmMatch.commission_pct + '%: +' + Number(commAmt).toLocaleString('ru-RU') + ' ֏</div>' +
-        '<div style="color:#22C55E;font-weight:700;font-size:0.9rem">К оплате: ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏ ✓</div></div>';
+        '<div style="color:#64748b">Сумма заказа: <span style="color:#e2e8f0;font-weight:600">' + fmtAmt(pmBase, _leadCur) + '</span></div>' +
+        '<div style="color:#3B82F6;font-weight:600">Комиссия ' + pmMatch.commission_pct + '%: +' + fmtAmt(commAmt, _leadCur) + '</div>' +
+        '<div style="color:#22C55E;font-weight:700;font-size:0.9rem">К оплате: ' + fmtAmt(pmFinal, _leadCur) + ' ✓</div></div>';
     } else if (pmMatch) {
       preview.innerHTML = '<div style="font-size:0.78rem;padding:8px;color:#22C55E;font-weight:600"><i class="fas fa-check" style="margin-right:4px"></i>' + escHtml(pmMatch.name_ru) + ' — без комиссии ✓</div>';
     } else {
@@ -4321,15 +4496,15 @@ async function applyPaymentMethod(leadId) {
   if (totalEl && pmBase > 0) {
     if (commAmt > 0) {
       totalEl.innerHTML = '<div style="text-align:right">' +
-        '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + Number(pmBase).toLocaleString('ru-RU') + ' ֏</div>' +
-        '<div style="font-size:1.3rem;font-weight:900;color:#22C55E;white-space:nowrap">' + Number(pmFinal).toLocaleString('ru-RU') + '&nbsp;֏</div>' +
-        '<div style="font-size:0.68rem;color:#3B82F6;font-weight:600">+' + Number(commAmt).toLocaleString('ru-RU') + ' ֏ комиссия</div></div>';
+        '<div style="font-size:0.72rem;color:#64748b;text-decoration:line-through">' + fmtAmt(pmBase, _leadCur) + '</div>' +
+        '<div style="font-size:1.3rem;font-weight:900;color:#22C55E;white-space:nowrap">' + fmtAmt(pmFinal, _leadCur) + '</div>' +
+        '<div style="font-size:0.68rem;color:#3B82F6;font-weight:600">+' + fmtAmt(commAmt, _leadCur) + ' комиссия</div></div>';
     } else {
-      totalEl.innerHTML = '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + Number(pmBase).toLocaleString('ru-RU') + '&nbsp;֏</div>';
+      totalEl.innerHTML = '<div style="font-size:1.3rem;font-weight:900;color:#8B5CF6;white-space:nowrap">' + fmtAmt(pmBase, _leadCur) + '</div>';
     }
   }
   
-  toast(pmMatch ? 'Способ оплаты: ' + pmMatch.name_ru + (commAmt > 0 ? ' (+' + Number(commAmt).toLocaleString('ru-RU') + ' ֏ = ' + Number(pmFinal).toLocaleString('ru-RU') + ' ֏)' : '') : 'Способ оплаты сброшен');
+  toast(pmMatch ? 'Способ оплаты: ' + pmMatch.name_ru + (commAmt > 0 ? ' (+' + fmtAmt(commAmt, _leadCur) + ' = ' + fmtAmt(pmFinal, _leadCur) + ')' : '') : 'Способ оплаты сброшен');
 }
 
 function getAssigneeName(id) {
@@ -4696,7 +4871,8 @@ async function deleteArticle(articleId, leadId) {
 async function recalcLeadTotal(leadId) {
   var res = await api('/leads/' + leadId + '/recalc', { method: 'POST' });
   if (res && res.success) {
-    toast('Сумма лида обновлена: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏');
+    var _recalcLead = ((data.leads && data.leads.leads) || []).find(function(x){ return x.id === leadId; });
+    toast('Сумма лида обновлена: ' + fmtAmt(res.total_amount, _recalcLead && _recalcLead.currency));
     // Refresh leads data to show new total
     var resLeads = await api('/leads?limit=500');
     data.leads = resLeads || { leads: [], total: 0 };
@@ -4953,7 +5129,9 @@ async function saveLeadAll(leadId) {
   if (res && res.success) {
     var commAmt2 = Number(res.commission_amount || 0);
     var finalAmt = Number(res.total_amount) + commAmt2;
-    toast('Сохранено. Итого: ' + Number(res.total_amount).toLocaleString('ru-RU') + ' ֏' + (commAmt2 > 0 ? ' + комиссия ' + Number(commAmt2).toLocaleString('ru-RU') + ' ֏ = ' + Number(finalAmt).toLocaleString('ru-RU') + ' ֏' : ''));
+    var _saveLead = ((data.leads && data.leads.leads) || []).find(function(x){ return x.id === leadId; });
+    var _saveCur = _saveLead && _saveLead.currency;
+    toast('Сохранено. Итого: ' + fmtAmt(res.total_amount, _saveCur) + (commAmt2 > 0 ? ' + комиссия ' + fmtAmt(commAmt2, _saveCur) + ' = ' + fmtAmt(finalAmt, _saveCur) : ''));
   } else {
     toast('Данные сохранены');
   }
@@ -5085,11 +5263,13 @@ async function loadAnalyticsData() {
   render();
 }
 
-function fmtAmt(n) {
-  if (n === null || n === undefined || isNaN(Number(n))) return '0 \u058f';
+function curSymOfLead(l) { return (l && (l.currency === 'rub' || l.currency === 'RUB')) ? '\u20bd' : '\u058f'; }
+function fmtAmt(n, cur) {
+  var sym = (cur === 'rub' || cur === 'RUB') ? '\u20bd' : '\u058f';
+  if (n === null || n === undefined || isNaN(Number(n))) return '0 ' + sym;
   var num = Number(n);
-  if (Math.abs(num) >= 1e12) return '0 \u058f'; // prevent absurd numbers
-  return num.toLocaleString('ru-RU', {maximumFractionDigits: 0}) + '\u00a0\u058f';
+  if (Math.abs(num) >= 1e12) return '0 ' + sym;
+  return num.toLocaleString('ru-RU', {maximumFractionDigits: 0}) + '\u00a0' + sym;
 }
 function fmtPct(n) { return (Number(n) || 0).toFixed(1) + '%'; }
 function fmtNum(n) { if (!n && n !== 0) return '0'; return Number(n).toLocaleString('ru-RU'); }
@@ -5213,7 +5393,7 @@ function renderLeadsAnalytics() {
   // Quick KPI strip at top
   h += '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px">';
   var quickKpis = [
-    {label:'Оборот',val:fmtAmt(fin.turnover),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)',desc:'Усл: '+fmtAmt(fin.services)+' | Вык: '+fmtAmt(fin.articles)+(fin.packages > 0 ? ' | Пак: '+fmtAmt(fin.packages) : '')},
+    {label:'Оборот',val: ((Number(fin.turnover_rub)||0) > 0 ? fmtAmt(fin.turnover_amd||0,'amd') + ' + ' + fmtAmt(fin.turnover_rub||0,'rub') : fmtAmt(fin.turnover)),icon:'fa-coins',color:'#8B5CF6',bg:'rgba(139,92,246,0.12)',desc:'Усл: '+fmtAmt(fin.services)+' | Вык: '+fmtAmt(fin.articles)+(fin.packages > 0 ? ' | Пак: '+fmtAmt(fin.packages) : '') + ((Number(fin.turnover_rub)||0) > 0 ? ' | В ֏ по курсу: '+fmtAmt(fin.turnover_in_amd_at_rate||0,'amd') : '')},
     {label:'Чистая прибыль',val:fmtAmt(fin.net_profit),icon:fin.net_profit>=0?'fa-arrow-up':'fa-arrow-down',color:fin.net_profit>=0?'#22C55E':'#EF4444',bg:fin.net_profit>=0?'rgba(34,197,94,0.08)':'rgba(239,68,68,0.08)',desc:'Усл: '+fmtAmt(fin.services)+' + Пак: '+fmtAmt(fin.packages||0)+' \\u2212 Расх: '+fmtAmt(fin.total_expenses)},
     {label:'Конверсия',val:fmtPct(fin.conversion_rate),icon:'fa-percentage',color:fin.conversion_rate>15?'#22C55E':fin.conversion_rate>5?'#F59E0B':'#EF4444',bg:'rgba(245,158,11,0.08)',desc:fmtNum((sd.done||{}).count||0)+' из '+fmtNum(fin.totalLeads)+' лидов'},
     {label:'Ср. чек (услуги)',val:fmtAmt(fin.avg_check),icon:'fa-shopping-cart',color:'#3B82F6',bg:'rgba(59,130,246,0.08)',desc:'Услуги / кол-во завершённых'},
@@ -8369,7 +8549,7 @@ function renderBizFunnelV2(d, sd, fin) {
       var rl2 = rejLeads[ri];
       h += '<tr style="border-bottom:1px solid #1e293b"><td style="padding:8px 16px;font-weight:600">#' + (rl2.id||'') + ' ' + escHtml(rl2.name||'\u2014') + '</td>';
       h += '<td style="padding:8px;color:#94a3b8">' + escHtml(rl2.contact||'\u2014') + '</td>';
-      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(Number(rl2.total_amount)||0) + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#f87171">' + fmtAmt(Number(rl2.total_amount)||0, rl2.currency) + '</td>';
       h += '<td style="padding:8px;color:#e2e8f0;max-width:300px;overflow:hidden;text-overflow:ellipsis">' + escHtml(rl2.notes||'\u041d\u0435 \u0443\u043a\u0430\u0437\u0430\u043d\u0430') + '</td></tr>';
     }
     h += '</tbody></table></div></div>';
@@ -8689,7 +8869,7 @@ function renderBizFunnelV2(d, sd, fin) {
       h += '<td style="padding:8px;font-weight:600">' + escHtml(ol.name || '\u2014') + '</td>';
       h += '<td style="padding:8px;color:#94a3b8">' + escHtml(ol.contact || '\u2014') + '</td>';
       h += '<td style="padding:8px;color:#94a3b8">' + escHtml(ol.source || '\u2014') + '</td>';
-      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#a78bfa">' + fmtAmt(Number(ol.total_amount) || 0) + '</td>';
+      h += '<td style="padding:8px;text-align:right;font-weight:600;color:#a78bfa">' + fmtAmt(Number(ol.total_amount) || 0, ol.currency) + '</td>';
       h += '<td style="padding:8px;color:#64748b;font-size:0.75rem">' + (createdDate ? createdDate.toLocaleDateString('ru-RU') + ' ' + createdDate.toLocaleTimeString('ru-RU', {hour:'2-digit',minute:'2-digit'}) : '\u2014') + '</td>';
       h += '<td style="padding:8px;text-align:right;font-weight:700;color:' + urgencyColor + '">' + hoursAgo + ' ч</td>';
       h += '</tr>';
@@ -10375,12 +10555,29 @@ function renderPdfTemplate() {
     }
     return false;
   });
-  var totalRevenue = pdfLeads.reduce(function(s, l) { return s + (parseFloat(l.total_amount) || 0); }, 0);
+  // Aggregate revenue split by currency (RUB-leads should not be summed into AMD totals).
+  var revAmd = 0, revRub = 0, cntAmd = 0, cntRub = 0;
+  for (var __ri = 0; __ri < pdfLeads.length; __ri++) {
+    var __l = pdfLeads[__ri];
+    var __amt = parseFloat(__l.total_amount) || 0;
+    if ((__l.currency === 'rub' || __l.currency === 'RUB')) { revRub += __amt; cntRub++; }
+    else { revAmd += __amt; cntAmd++; }
+  }
+  var totalRevenue = revAmd + revRub;
+  var revLabel = '';
+  if (revAmd > 0 && revRub > 0) revLabel = fmtAmt(revAmd, 'amd') + ' + ' + fmtAmt(revRub, 'rub');
+  else if (revRub > 0) revLabel = fmtAmt(revRub, 'rub');
+  else revLabel = fmtAmt(revAmd, 'amd');
   h += '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">';
   h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#8B5CF6">' + pdfLeads.length + '</div><div style="font-size:0.72rem;color:#64748b">\u0417\u0430\u044f\u0432\u043e\u043a \u0447\u0435\u0440\u0435\u0437 PDF</div></div>';
-  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#10B981">' + Math.round(totalRevenue).toLocaleString('ru-RU') + ' \u058f</div><div style="font-size:0.72rem;color:#64748b">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430</div></div>';
-  var avgAmount = pdfLeads.length > 0 ? Math.round(totalRevenue / pdfLeads.length) : 0;
-  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#F59E0B">' + avgAmount.toLocaleString('ru-RU') + ' \u058f</div><div style="font-size:0.72rem;color:#64748b">\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0447\u0435\u043a</div></div>';
+  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.05rem;font-weight:800;color:#10B981">' + revLabel + '</div><div style="font-size:0.72rem;color:#64748b">\u041e\u0431\u0449\u0430\u044f \u0441\u0443\u043c\u043c\u0430</div></div>';
+  var avgAmd = cntAmd > 0 ? Math.round(revAmd / cntAmd) : 0;
+  var avgRub = cntRub > 0 ? Math.round(revRub / cntRub) : 0;
+  var avgLabel = '';
+  if (avgAmd > 0 && avgRub > 0) avgLabel = fmtAmt(avgAmd, 'amd') + ' / ' + fmtAmt(avgRub, 'rub');
+  else if (avgRub > 0) avgLabel = fmtAmt(avgRub, 'rub');
+  else avgLabel = fmtAmt(avgAmd, 'amd');
+  h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.05rem;font-weight:800;color:#F59E0B">' + avgLabel + '</div><div style="font-size:0.72rem;color:#64748b">\u0421\u0440\u0435\u0434\u043d\u0438\u0439 \u0447\u0435\u043a</div></div>';
   var todayLeads = pdfLeads.filter(function(l) { var d = new Date(l.created_at); var n = new Date(); return d.toDateString() === n.toDateString(); }).length;
   h += '<div style="text-align:center;padding:12px;background:#0f172a;border-radius:8px"><div style="font-size:1.5rem;font-weight:800;color:#60a5fa">' + todayLeads + '</div><div style="font-size:0.72rem;color:#64748b">\u0421\u0435\u0433\u043e\u0434\u043d\u044f</div></div>';
   h += '</div>';
@@ -10397,7 +10594,7 @@ function renderPdfTemplate() {
         '<td style="padding:6px 8px;color:#8B5CF6;font-weight:600">#' + (rl.lead_number || rl.id) + '</td>' +
         '<td style="padding:6px 8px">' + escHtml(rl.name || '-') + '</td>' +
         '<td style="padding:6px 8px;color:#60a5fa">' + escHtml(rl.contact || '-') + '</td>' +
-        '<td style="padding:6px 8px;text-align:right;font-weight:600;color:#10B981">' + Math.round(parseFloat(rl.total_amount) || 0).toLocaleString('ru-RU') + ' \u058f</td>' +
+        '<td style="padding:6px 8px;text-align:right;font-weight:600;color:#10B981">' + fmtAmt(Math.round(parseFloat(rl.total_amount) || 0), rl.currency) + '</td>' +
         '<td style="padding:6px 8px;color:#64748b">' + (rl.created_at ? new Date(rl.created_at).toLocaleString('ru') : '-') + '</td>' +
         '<td style="padding:6px 8px;white-space:nowrap"><a href="/pdf/' + rl.id + '" target="_blank" class="btn btn-outline" style="padding:2px 8px;font-size:0.68rem;margin-right:4px"><i class="fas fa-eye"></i></a>' +
         '<button class="btn btn-danger" style="padding:2px 8px;font-size:0.68rem" onclick="deletePdfLead(' + rl.id + ')"><i class="fas fa-trash"></i></button></td>' +
@@ -14657,6 +14854,319 @@ async function importSiteBlocks() {
   render();
 }
 
+// ===== BLOG =====
+var blogData = { posts: [], categories: [], filterCategory: '', filterPublished: '' };
+
+async function reloadBlogData() {
+  var results = await Promise.all([
+    api('/blog-posts'),
+    api('/blog-categories')
+  ]);
+  blogData.posts = results[0] || [];
+  blogData.categories = results[1] || [];
+}
+
+function renderBlog() {
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-book-open" style="color:#8B5CF6;margin-right:10px"></i>Блог</h1>';
+  h += '<p style="color:#94a3b8;margin-bottom:24px">Управление статьями блога. Каждая статья — отдельная страница на сайте.</p>';
+  var blogTab = (window._blogTab || 'posts');
+  h += '<div style="display:flex;gap:8px;margin-bottom:24px">';
+  h += '<button class="tab-btn ' + (blogTab==='posts'?'active':'') + '" onclick="window._blogTab=\\'posts\\';render()">Статьи (' + blogData.posts.length + ')</button>';
+  h += '<button class="tab-btn ' + (blogTab==='categories'?'active':'') + '" onclick="window._blogTab=\\'categories\\';render()">Категории (' + blogData.categories.length + ')</button>';
+  h += '</div>';
+  if (blogTab === 'categories') {
+    h += renderBlogCategories();
+  } else {
+    h += renderBlogPosts();
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderBlogPosts() {
+  var h = '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;align-items:center">';
+  h += '<button class="btn btn-primary" onclick="openBlogPostEditor(null)"><i class="fas fa-plus" style="margin-right:6px"></i>Новая статья</button>';
+  h += '<select class="input" style="width:180px;padding:8px 12px" onchange="blogData.filterCategory=this.value;render()">';
+  h += '<option value="">Все категории</option>';
+  for (var ci=0; ci<blogData.categories.length; ci++) {
+    var cat = blogData.categories[ci];
+    h += '<option value="' + cat.id + '" ' + (blogData.filterCategory==cat.id?'selected':'') + '>' + escHtml(cat.name_ru) + '</option>';
+  }
+  h += '</select>';
+  h += '<select class="input" style="width:150px;padding:8px 12px" onchange="blogData.filterPublished=this.value;render()">';
+  h += '<option value="">Все статусы</option>';
+  h += '<option value="1" ' + (blogData.filterPublished==='1'?'selected':'') + '>Опубликованные</option>';
+  h += '<option value="0" ' + (blogData.filterPublished==='0'?'selected':'') + '>Черновики</option>';
+  h += '</select>';
+  h += '</div>';
+  var posts = blogData.posts.filter(function(p) {
+    if (blogData.filterCategory && String(p.category_id) !== String(blogData.filterCategory)) return false;
+    if (blogData.filterPublished !== '' && String(p.published) !== blogData.filterPublished) return false;
+    return true;
+  });
+  if (!posts.length) {
+    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-book-open" style="font-size:2rem;margin-bottom:12px;display:block"></i>Нет статей. Создайте первую!</div>';
+    return h;
+  }
+  h += '<div id="blogPostsList">';
+  for (var i=0; i<posts.length; i++) {
+    var post = posts[i];
+    var catName = '';
+    for (var ci2=0; ci2<blogData.categories.length; ci2++) {
+      if (blogData.categories[ci2].id == post.category_id) { catName = blogData.categories[ci2].name_ru; break; }
+    }
+    var isPublished = post.published == 1;
+    h += '<div class="card blog-post-item" data-id="' + post.id + '" style="margin-bottom:12px;display:flex;gap:16px;align-items:flex-start;padding:16px">';
+    h += '<div class="sb-drag-handle blog-drag-handle" title="Перетащить"><i class="fas fa-grip-vertical"></i></div>';
+    if (post.cover_url) {
+      h += '<img src="' + escHtml(post.cover_url) + '" style="width:80px;height:60px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.style.display=\\'none\\'">';
+    } else {
+      h += '<div style="width:80px;height:60px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-image" style="color:#475569"></i></div>';
+    }
+    h += '<div style="flex:1;min-width:0">';
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">';
+    h += '<span style="font-weight:700;font-size:1rem">' + escHtml(post.title_ru || 'Без заголовка') + '</span>';
+    h += '<span class="badge ' + (isPublished ? 'badge-green' : 'badge-amber') + '">' + (isPublished ? 'Опубликовано' : 'Черновик') + '</span>';
+    if (catName) h += '<span class="badge badge-purple">' + escHtml(catName) + '</span>';
+    h += '</div>';
+    h += '<div style="font-size:0.8rem;color:#64748b;margin-bottom:6px">/blog/' + escHtml(post.slug) + '</div>';
+    var bodyPreview = (post.body_ru || '').replace(/<[^>]+>/g, '').substring(0, 100);
+    if (bodyPreview) h += '<div style="font-size:0.82rem;color:#94a3b8">' + escHtml(bodyPreview) + (post.body_ru && post.body_ru.length > 100 ? '...' : '') + '</div>';
+    h += '</div>';
+    h += '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
+    h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="openBlogPostEditor(' + post.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="btn ' + (isPublished?'btn-success':'btn-outline') + '" style="padding:6px 12px;font-size:0.8rem" onclick="toggleBlogPublish(' + post.id + ',' + (isPublished?0:1) + ')" title="' + (isPublished?'Снять публикацию':'Опубликовать') + '"><i class="fas fa-' + (isPublished?'eye-slash':'eye') + '"></i></button>';
+    h += '<a href="/blog/' + escHtml(post.slug) + '" target="_blank" class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem;text-decoration:none" title="Открыть на сайте"><i class="fas fa-external-link-alt"></i></a>';
+    h += '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deleteBlogPost(' + post.id + ')"><i class="fas fa-trash"></i></button>';
+    h += '</div>';
+    h += '</div>';
+  }
+  h += '</div>';
+  return h;
+}
+
+function renderBlogCategories() {
+  var h = '<div style="margin-bottom:16px"><button class="btn btn-primary" onclick="openBlogCategoryEditor(null)"><i class="fas fa-plus" style="margin-right:6px"></i>Новая категория</button></div>';
+  if (!blogData.categories.length) {
+    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b">Нет категорий.</div>';
+    return h;
+  }
+  h += '<div class="card" style="overflow:hidden;padding:0"><table style="width:100%;border-collapse:collapse">';
+  h += '<thead><tr style="background:#0f172a"><th style="padding:12px 16px;text-align:left;font-size:0.8rem;color:#64748b">Название RU</th><th style="padding:12px 16px;text-align:left;font-size:0.8rem;color:#64748b">AM</th><th style="padding:12px 16px;text-align:left;font-size:0.8rem;color:#64748b">Slug</th><th style="padding:12px 16px;text-align:left;font-size:0.8rem;color:#64748b">Порядок</th><th style="padding:12px 16px"></th></tr></thead><tbody>';
+  for (var i=0; i<blogData.categories.length; i++) {
+    var cat = blogData.categories[i];
+    h += '<tr style="border-top:1px solid #334155">';
+    h += '<td style="padding:12px 16px;font-weight:600">' + escHtml(cat.name_ru) + '</td>';
+    h += '<td style="padding:12px 16px;color:#94a3b8">' + escHtml(cat.name_am || '') + '</td>';
+    h += '<td style="padding:12px 16px;font-family:monospace;font-size:0.8rem;color:#8B5CF6">' + escHtml(cat.slug) + '</td>';
+    h += '<td style="padding:12px 16px;color:#64748b">' + (cat.sort_order || 0) + '</td>';
+    h += '<td style="padding:12px 16px;text-align:right;white-space:nowrap">';
+    h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem;margin-right:6px" onclick="openBlogCategoryEditor(' + cat.id + ')"><i class="fas fa-edit"></i></button>';
+    h += '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deleteBlogCategory(' + cat.id + ')"><i class="fas fa-trash"></i></button>';
+    h += '</td></tr>';
+  }
+  h += '</tbody></table></div>';
+  return h;
+}
+
+function initBlogSortable() {
+  var el = document.getElementById('blogPostsList');
+  if (!el || typeof Sortable === 'undefined') return;
+  Sortable.create(el, {
+    handle: '.blog-drag-handle',
+    animation: 150,
+    onEnd: async function() {
+      var items = el.querySelectorAll('.blog-post-item');
+      var order = [];
+      for (var i=0; i<items.length; i++) {
+        order.push({ id: parseInt(items[i].dataset.id), sort_order: i });
+      }
+      await api('/blog-posts/reorder', 'POST', { order: order });
+      await reloadBlogData();
+      render();
+    }
+  });
+}
+
+function openBlogPostEditor(postId) {
+  var post = postId ? blogData.posts.find(function(p){return p.id==postId;}) : null;
+  var catsOptions = '<option value="">Без категории</option>';
+  for (var i=0; i<blogData.categories.length; i++) {
+    var c = blogData.categories[i];
+    catsOptions += '<option value="' + c.id + '" ' + (post && post.category_id==c.id?'selected':'') + '>' + escHtml(c.name_ru) + '</option>';
+  }
+  var modal = '<div id="blogPostModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeBlogPostModal()">';
+  modal += '<div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;width:100%;max-width:800px;max-height:90vh;overflow-y:auto">';
+  modal += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">';
+  modal += '<h2 style="font-size:1.4rem;font-weight:800">' + (post ? 'Редактировать статью' : 'Новая статья') + '</h2>';
+  modal += '<button onclick="closeBlogPostModal()" style="background:none;border:none;color:#64748b;font-size:1.5rem;cursor:pointer">&times;</button>';
+  modal += '</div>';
+  modal += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  modal += '<div class="sb-field-group" style="grid-column:1/-1"><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">SLUG (URL) — только латиница, цифры, дефис</label>';
+  modal += '<input class="input" id="bpSlug" type="text" value="' + escHtml((post && post.slug) || '') + '" placeholder="kak-vyjti-v-top-wildberries"></div>';
+  modal += '<div class="sb-field-group"><label class="sb-field-label ru"><i class="fas fa-circle" style="font-size:6px;color:#8B5CF6"></i>Заголовок RU</label>';
+  modal += '<input class="input" id="bpTitleRu" type="text" value="' + escHtml((post && post.title_ru) || '') + '"></div>';
+  modal += '<div class="sb-field-group"><label class="sb-field-label am"><i class="fas fa-circle" style="font-size:6px;color:#F59E0B"></i>Заголовок AM</label>';
+  modal += '<input class="input" id="bpTitleAm" type="text" value="' + escHtml((post && post.title_am) || '') + '"></div>';
+  modal += '</div>';
+  modal += '<div class="sb-field-group" style="margin-top:16px"><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">ОБЛОЖКА СТАТЬИ</label>';
+  modal += '<div style="display:flex;gap:10px;align-items:flex-start">';
+  if (post && post.cover_url) {
+    modal += '<img id="bpCoverPreview" src="' + escHtml(post.cover_url) + '" style="width:120px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #334155" onerror="this.style.display=\\'none\\'">';
+  } else {
+    modal += '<div id="bpCoverPreview" style="width:120px;height:80px;background:#0f172a;border-radius:8px;border:1px solid #334155;display:flex;align-items:center;justify-content:center;color:#475569"><i class="fas fa-image"></i></div>';
+  }
+  modal += '<div>';
+  modal += '<input type="file" id="bpCoverFile" accept="image/*" style="display:none" onchange="uploadBlogCover(this)">';
+  modal += '<button class="btn btn-outline" style="margin-bottom:8px;display:block" onclick="document.getElementById(\\'bpCoverFile\\').click()"><i class="fas fa-upload" style="margin-right:6px"></i>Загрузить фото</button>';
+  modal += '<input class="input" id="bpCoverUrl" type="text" value="' + escHtml((post && post.cover_url) || '') + '" placeholder="Или вставьте URL фото" oninput="updateBlogCoverPreview(this.value)" style="font-size:0.8rem">';
+  modal += '</div></div></div>';
+  modal += '<div class="sb-field-group" style="margin-top:16px"><label class="sb-field-label ru"><i class="fas fa-circle" style="font-size:6px;color:#8B5CF6"></i>Текст статьи RU (HTML поддерживается)</label>';
+  modal += '<textarea class="input" id="bpBodyRu" style="min-height:200px;font-family:monospace;font-size:0.85rem">' + escHtml((post && post.body_ru) || '') + '</textarea></div>';
+  modal += '<div class="sb-field-group"><label class="sb-field-label am"><i class="fas fa-circle" style="font-size:6px;color:#F59E0B"></i>Текст статьи AM</label>';
+  modal += '<textarea class="input" id="bpBodyAm" style="min-height:120px;font-family:monospace;font-size:0.85rem">' + escHtml((post && post.body_am) || '') + '</textarea></div>';
+  modal += '<div style="display:grid;grid-template-columns:1fr 1fr 120px;gap:16px;margin-top:16px">';
+  modal += '<div><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">КАТЕГОРИЯ</label>';
+  modal += '<select class="input" id="bpCategory">' + catsOptions + '</select></div>';
+  modal += '<div><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">СТАТУС</label>';
+  modal += '<select class="input" id="bpPublished">';
+  modal += '<option value="0" ' + (post && !post.published?'selected':'') + '>Черновик</option>';
+  modal += '<option value="1" ' + (post && post.published?'selected':'') + '>Опубликовано</option>';
+  modal += '</select></div>';
+  modal += '<div><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">ПОРЯДОК</label>';
+  modal += '<input class="input" id="bpSortOrder" type="number" value="' + ((post && post.sort_order) || 0) + '"></div>';
+  modal += '</div>';
+  modal += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px">';
+  modal += '<button class="btn btn-outline" onclick="closeBlogPostModal()">Отмена</button>';
+  modal += '<button class="btn btn-primary" onclick="saveBlogPost(' + (post ? post.id : 'null') + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>';
+  modal += '</div>';
+  modal += '</div></div>';
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+function closeBlogPostModal() {
+  var m = document.getElementById('blogPostModal');
+  if (m) m.remove();
+}
+
+async function uploadBlogCover(input) {
+  if (!input.files || !input.files[0]) return;
+  var formData = new FormData();
+  formData.append('file', input.files[0]);
+  try {
+    var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('gtt_token') }, body: formData });
+    var d = await resp.json();
+    if (d.url) {
+      document.getElementById('bpCoverUrl').value = d.url;
+      updateBlogCoverPreview(d.url);
+      toast('Фото загружено', 'success');
+    }
+  } catch(e) { toast('Ошибка загрузки', 'error'); }
+}
+
+function updateBlogCoverPreview(url) {
+  var preview = document.getElementById('bpCoverPreview');
+  if (!preview) return;
+  if (url) {
+    preview.outerHTML = '<img id="bpCoverPreview" src="' + escHtml(url) + '" style="width:120px;height:80px;object-fit:cover;border-radius:8px;border:1px solid #334155" onerror="this.style.display=\\'none\\'">';
+  }
+}
+
+async function saveBlogPost(postId) {
+  var slug = document.getElementById('bpSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  var titleRu = document.getElementById('bpTitleRu').value.trim();
+  if (!slug) { toast('Введите slug', 'error'); return; }
+  if (!titleRu) { toast('Введите заголовок на русском', 'error'); return; }
+  var payload = {
+    slug: slug,
+    title_ru: titleRu,
+    title_am: document.getElementById('bpTitleAm').value.trim(),
+    body_ru: document.getElementById('bpBodyRu').value,
+    body_am: document.getElementById('bpBodyAm').value,
+    cover_url: document.getElementById('bpCoverUrl').value.trim(),
+    category_id: document.getElementById('bpCategory').value || null,
+    published: parseInt(document.getElementById('bpPublished').value),
+    sort_order: parseInt(document.getElementById('bpSortOrder').value) || 0
+  };
+  try {
+    if (postId) {
+      await api('/blog-posts/' + postId, 'PUT', payload);
+    } else {
+      await api('/blog-posts', 'POST', payload);
+    }
+    closeBlogPostModal();
+    await reloadBlogData();
+    render();
+    toast('Статья сохранена', 'success');
+  } catch(e) { toast('Ошибка сохранения', 'error'); }
+}
+
+async function toggleBlogPublish(postId, publishedVal) {
+  await api('/blog-posts/' + postId + '/publish', 'POST', { published: publishedVal });
+  await reloadBlogData();
+  render();
+  toast(publishedVal ? 'Статья опубликована' : 'Статья снята с публикации', 'success');
+}
+
+async function deleteBlogPost(postId) {
+  if (!confirm('Удалить статью? Это действие нельзя отменить.')) return;
+  await api('/blog-posts/' + postId, 'DELETE');
+  await reloadBlogData();
+  render();
+  toast('Статья удалена', 'success');
+}
+
+function openBlogCategoryEditor(catId) {
+  var cat = catId ? blogData.categories.find(function(c){return c.id==catId;}) : null;
+  var modal = '<div id="blogCatModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeBlogCatModal()">';
+  modal += '<div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;width:100%;max-width:500px">';
+  modal += '<h2 style="font-size:1.3rem;font-weight:800;margin-bottom:20px">' + (cat ? 'Редактировать категорию' : 'Новая категория') + '</h2>';
+  modal += '<div class="sb-field-group"><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">SLUG</label>';
+  modal += '<input class="input" id="bcSlug" type="text" value="' + escHtml((cat && cat.slug) || '') + '" placeholder="buyouts"></div>';
+  modal += '<div class="sb-field-group" style="margin-top:12px"><label class="sb-field-label ru"><i class="fas fa-circle" style="font-size:6px;color:#8B5CF6"></i>Название RU</label>';
+  modal += '<input class="input" id="bcNameRu" type="text" value="' + escHtml((cat && cat.name_ru) || '') + '" placeholder="Выкупы"></div>';
+  modal += '<div class="sb-field-group" style="margin-top:12px"><label class="sb-field-label am"><i class="fas fa-circle" style="font-size:6px;color:#F59E0B"></i>Название AM</label>';
+  modal += '<input class="input" id="bcNameAm" type="text" value="' + escHtml((cat && cat.name_am) || '') + '"></div>';
+  modal += '<div class="sb-field-group" style="margin-top:12px"><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">ПОРЯДОК</label>';
+  modal += '<input class="input" id="bcSort" type="number" value="' + ((cat && cat.sort_order) || 0) + '"></div>';
+  modal += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">';
+  modal += '<button class="btn btn-outline" onclick="closeBlogCatModal()">Отмена</button>';
+  modal += '<button class="btn btn-primary" onclick="saveBlogCategory(' + (cat ? cat.id : 'null') + ')">Сохранить</button>';
+  modal += '</div></div></div>';
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+function closeBlogCatModal() { var m = document.getElementById('blogCatModal'); if (m) m.remove(); }
+
+async function saveBlogCategory(catId) {
+  var slug = document.getElementById('bcSlug').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  var nameRu = document.getElementById('bcNameRu').value.trim();
+  if (!slug || !nameRu) { toast('Заполните обязательные поля', 'error'); return; }
+  var payload = {
+    slug: slug,
+    name_ru: nameRu,
+    name_am: document.getElementById('bcNameAm').value.trim(),
+    sort_order: parseInt(document.getElementById('bcSort').value) || 0
+  };
+  if (catId) {
+    await api('/blog-categories/' + catId, 'PUT', payload);
+  } else {
+    await api('/blog-categories', 'POST', payload);
+  }
+  closeBlogCatModal();
+  await reloadBlogData();
+  render();
+  toast('Категория сохранена', 'success');
+}
+
+async function deleteBlogCategory(catId) {
+  if (!confirm('Удалить категорию? Статьи в ней останутся, но потеряют категорию.')) return;
+  await api('/blog-categories/' + catId, 'DELETE');
+  await reloadBlogData();
+  render();
+  toast('Категория удалена', 'success');
+}
+
 function getPageHtml() {
   switch (currentPage) {
     case 'dashboard': return renderDashboard();
@@ -14674,6 +15184,7 @@ function getPageHtml() {
     case 'footer': sbActiveTab = 'footer'; return renderSiteBlocks();
     case 'photos': sbActiveTab = 'photos'; return renderSiteBlocks();
     case 'telegram': sbActiveTab = 'telegram'; return renderSiteBlocks();
+    case 'blog': return renderBlog();
     case 'tgbot': return renderTelegramBot();
     case 'scripts': return renderScripts();
     case 'settings': return renderSettings();

@@ -439,6 +439,30 @@ CREATE TABLE IF NOT EXISTS calculator_package_items (
   FOREIGN KEY (package_id) REFERENCES calculator_packages(id) ON DELETE CASCADE,
   FOREIGN KEY (service_id) REFERENCES calculator_services(id) ON DELETE CASCADE
 );
+
+CREATE TABLE IF NOT EXISTS blog_categories (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE NOT NULL,
+  name_ru TEXT NOT NULL DEFAULT '',
+  name_am TEXT DEFAULT '',
+  sort_order INTEGER DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS blog_posts (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT UNIQUE NOT NULL,
+  category_id INTEGER DEFAULT NULL,
+  title_ru TEXT NOT NULL DEFAULT '',
+  title_am TEXT DEFAULT '',
+  body_ru TEXT NOT NULL DEFAULT '',
+  body_am TEXT DEFAULT '',
+  cover_url TEXT DEFAULT '',
+  published INTEGER DEFAULT 0,
+  sort_order INTEGER DEFAULT 0,
+  created_at TEXT DEFAULT (datetime('now')),
+  updated_at TEXT DEFAULT (datetime('now')),
+  FOREIGN KEY (category_id) REFERENCES blog_categories(id) ON DELETE SET NULL
+);
 `;
 
 let dbInitialized = false;
@@ -554,6 +578,12 @@ export async function initDatabase(db: D1Database): Promise<void> {
   try { await db.prepare("ALTER TABLE employee_bonuses ADD COLUMN bonus_type TEXT DEFAULT 'bonus'").run(); } catch {}
   // v9 Cleanup: remove accounts with display_name containing 'готр' (any role, except primary admin id=1)
   try { await db.prepare("DELETE FROM users WHERE display_name LIKE '%готр%' AND id != 1").run(); } catch {}
+  // v31 fresh-install: multi-currency support (mirrors runLatestMigrations).
+  try { await db.prepare("ALTER TABLE calculator_services ADD COLUMN price_rub INTEGER NOT NULL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE calculator_services ADD COLUMN price_tiers_rub_json TEXT").run(); } catch {}
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN currency TEXT NOT NULL DEFAULT 'amd'").run(); } catch {}
+  try { await db.prepare("INSERT OR IGNORE INTO site_settings(key,value) VALUES('amd_to_rub_rate','0.222')").run(); } catch {}
+  // calculator_packages columns are added inside runSeeds() (v28 block) where the table itself is created.
   // Run seeds
   await runSeeds(db);
   dbInitialized = true;
@@ -788,6 +818,42 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
   try { await db.prepare('CREATE INDEX IF NOT EXISTS idx_leads_status_changed ON leads(status_changed_at)').run(); } catch {}
   // v30: Backfill status_changed_at for existing leads that don't have it
   try { await db.prepare("UPDATE leads SET status_changed_at = created_at WHERE status_changed_at IS NULL").run(); } catch {}
+  // v31: Multi-currency support (RUB alongside AMD).
+  // RUB prices stored independently — admin enters them manually; if a
+  // RUB price stays 0/NULL, the public landing falls back to AMD on RU lang.
+  try { await db.prepare("ALTER TABLE calculator_services ADD COLUMN price_rub INTEGER NOT NULL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE calculator_services ADD COLUMN price_tiers_rub_json TEXT").run(); } catch {}
+  try { await db.prepare("ALTER TABLE calculator_packages ADD COLUMN package_price_rub INTEGER NOT NULL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE calculator_packages ADD COLUMN original_price_rub INTEGER NOT NULL DEFAULT 0").run(); } catch {}
+  // currency on leads = which currency the client SAW when submitting the form.
+  // 'amd' (default) for legacy data and AM-language clients, 'rub' for RU-language clients post-launch.
+  try { await db.prepare("ALTER TABLE leads ADD COLUMN currency TEXT NOT NULL DEFAULT 'amd'").run(); } catch {}
+  // Default starting AMD->RUB rate. Used by the admin "auto-fill RUB" helper
+  // and by CRM analytics aggregation when mixing currencies. Public calculator
+  // does NOT use this rate — it shows price_rub directly.
+  try { await db.prepare("INSERT OR IGNORE INTO site_settings(key,value) VALUES('amd_to_rub_rate','0.222')").run(); } catch {}
+  // vBlog: blog tables
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS blog_categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    name_ru TEXT NOT NULL DEFAULT '',
+    name_am TEXT DEFAULT '',
+    sort_order INTEGER DEFAULT 0
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS blog_posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT UNIQUE NOT NULL,
+    category_id INTEGER DEFAULT NULL,
+    title_ru TEXT NOT NULL DEFAULT '',
+    title_am TEXT DEFAULT '',
+    body_ru TEXT NOT NULL DEFAULT '',
+    body_am TEXT DEFAULT '',
+    cover_url TEXT DEFAULT '',
+    published INTEGER DEFAULT 0,
+    sort_order INTEGER DEFAULT 0,
+    created_at TEXT DEFAULT (datetime('now')),
+    updated_at TEXT DEFAULT (datetime('now'))
+  )`).run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
@@ -916,6 +982,9 @@ async function runSeeds(db: D1Database): Promise<void> {
   try {
     await db.prepare(`ALTER TABLE calculator_package_items ADD COLUMN use_tiered INTEGER DEFAULT 0`).run();
   } catch {} // column already exists
+  // v31: RUB pricing on packages (mirrors runLatestMigrations).
+  try { await db.prepare(`ALTER TABLE calculator_packages ADD COLUMN package_price_rub INTEGER NOT NULL DEFAULT 0`).run(); } catch {}
+  try { await db.prepare(`ALTER TABLE calculator_packages ADD COLUMN original_price_rub INTEGER NOT NULL DEFAULT 0`).run(); } catch {}
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====

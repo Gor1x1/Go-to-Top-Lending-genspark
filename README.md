@@ -455,6 +455,49 @@ npx wrangler d1 execute gototop-production --file=./seed-production.sql
 
 ---
 
+## 🤖 Cursor: субагенты (AI)
+
+Субагенты — это Markdown-промпты в **[`.cursor/agents/`](.cursor/agents/)**. Cursor подхватывает их как кастомных агентов (см. [документацию](https://cursor.com/docs/subagents)). **`documenter`** при изменениях должен обновлять таблицу ниже, чтобы она совпадала с файлами в папке.
+
+### Как начинать сообщение в чате (оптимальный вариант)
+
+1. Включи режим **Agent** (не Ask), если нужны правки файлов.
+2. Используй **явную цепочку** и требование **итераций до PASS**:
+   - *«Задача: … Цепочка: [при необходимости `codebase-explorer`] → `planner` → [реализаторы, напр. `implementer`] → `reviewer` → `test-runner` → `documenter`. Если reviewer или test-runner даст FAIL — верни нумерованный список дефектов тому же агенту, пусть исправит; повторяй до PASS.»*
+3. **Финансы / бизнес-аналитика / KPI:** добавь **`finance-modeler` → `finance-auditor`** до и после кода (аудитор проверяет спеку и согласованность с CRM).
+4. **Сложный план с параллельными агентами:** *«Сначала `workflow-auditor` проверь план.»*
+5. **Обновить README и реестр субагентов:** *«`documenter`: обнови README — обзор, что сделано, таблицу субагентов в этом разделе.»*
+6. **Экономия токенов:** в плане у каждой подзадачи — только **файлы + короткие пункты действий**; исполнители не дублируют длинный контекст (подробности в **[`planner.md`](.cursor/agents/planner.md)** → *Token economy & lean handoffs*).
+
+### Таблица субагентов
+
+| Файл | Когда вызывать | Правит код |
+|------|----------------|------------|
+| [`planner.md`](.cursor/agents/planner.md) | Разбить задачу, назначить исполнителей | Нет |
+| [`codebase-explorer.md`](.cursor/agents/codebase-explorer.md) | «Где в коде…», карта файлов (read-only) | Нет |
+| [`workflow-auditor.md`](.cursor/agents/workflow-auditor.md) | Проверить план: владельцы файлов, цепочка до reviewer/test-runner | Нет |
+| [`finance-modeler.md`](.cursor/agents/finance-modeler.md) | Формулы, KPI, связь таблиц D1 → P&L/аналитика (спека) | Нет |
+| [`finance-auditor.md`](.cursor/agents/finance-auditor.md) | Проверка расчётов и связности CRM/аналитики | Нет |
+| [`implementer.md`](.cursor/agents/implementer.md) | Backend API, D1, `index.tsx`, `public-api`, `pdf` (бэкенд-часть) | Да |
+| [`frontend-implementer.md`](.cursor/agents/frontend-implementer.md) | Админка `panel.ts` | Да |
+| [`landing-implementer.md`](.cursor/agents/landing-implementer.md) | Лендинг `landing.ts` | Да |
+| [`pdf-implementer.md`](.cursor/agents/pdf-implementer.md) | Только `pdf.ts` | Да |
+| [`schema-implementer.md`](.cursor/agents/schema-implementer.md) | `db.ts`, миграции, seed SQL | Да |
+| [`platform-engineer.md`](.cursor/agents/platform-engineer.md) | Vite, Wrangler, `tsconfig`, npm scripts | Да |
+| [`reviewer.md`](.cursor/agents/reviewer.md) | Код-ревью перед сборкой | Нет |
+| [`test-runner.md`](.cursor/agents/test-runner.md) | `npm run build`, регрессии в `dist/_worker.js` | Нет |
+| [`documenter.md`](.cursor/agents/documenter.md) | README, FIX_LOG, комментарии | Да (только доки/комменты) |
+
+### Политика качества
+
+Все субагенты настроены на уровень **principal / staff**: явные краевые случаи, без «магии» в деньгах и безопасности. **Гейт:** `reviewer` **PASS** и `test-runner` **PASS**; при **FAIL** — правки у исходного исполнителя до зелёного статуса.
+
+### Финансы: обязательные сценарии в спеках
+
+Для задач с деньгами/KPI субагенты **`finance-modeler`** и **`finance-auditor`** включают минимум: **MS-1** закрытие месяца / снапшоты, **MS-2** кредит полностью погашен, **MS-3** нулевые расходы в периоде (и общие краевые случаи). Дополнительные сценарии владелец добавляет в ту же матрицу. В CRM заложены данные для **кассового потока и периодных (начислений/snapshot) показателей** там, где модуль это поддерживает. Длинные фин. методологии в README **не обязательны** — по желанию владельца, обычно **`FIX_LOG`** / кратко.
+
+---
+
 ## 📝 Git-flow
 
 ```bash
