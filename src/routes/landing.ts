@@ -1455,7 +1455,7 @@ function renderBuyoutsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): str
   .buyout-card{padding:20px}
 }
 /* Force correct order: content blocks BEFORE CTA buttons in why-buyouts &
-   fifty-vs-fifty (mirror of home-page rules so layout matches `/`). */
+   fifty-vs-fifty (mirror of home-page rules so layout matches the home page). */
 section#why-buyouts .container{display:flex;flex-direction:column}
 section#why-buyouts .section-header{order:0!important}
 section#why-buyouts .why-block{order:1!important}
@@ -6368,7 +6368,7 @@ for (const page of PLACEHOLDER_PAGES) {
         } catch { return null; }
       })();
       let pageHtml = renderBuyoutsPage({ lang, siteOrigin });
-      // 3s timeout + `</` escape — same defensive pattern as the `/` route.
+      // 3s timeout + escape closing tags — same defensive pattern as the `/` route.
       const siteDataJson = await Promise.race<string | null>([
         siteDataPromise,
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
