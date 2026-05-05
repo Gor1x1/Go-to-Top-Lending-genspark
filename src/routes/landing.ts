@@ -4188,6 +4188,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 @media(max-width:480px){.qr-codes-grid{grid-template-columns:repeat(2,1fr)}}
 /* === SERVICE QUICK CARDS === */
 .svc-cards-section{padding-top:60px}
+.svc-cards-section .section-header .section-sub{font-size:0.95rem;color:var(--text-sec);max-width:620px;margin:8px auto 0;line-height:1.7}
 .svc-quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
 .svc-quick-card{display:flex;flex-direction:column;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);transition:all 0.3s ease;text-decoration:none;color:var(--text)}
 .svc-quick-card:hover{border-color:rgba(139,92,246,0.4);transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,0.2)}
@@ -4200,7 +4201,11 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 .svc-quick-card p{font-size:0.88rem;color:var(--text-sec);line-height:1.7;flex:1;margin-bottom:16px}
 .svc-quick-cta{font-size:0.88rem;font-weight:700;color:var(--purple);display:flex;align-items:center;gap:6px}
 .svc-quick-card:hover .svc-quick-cta{gap:10px}
-@media(max-width:768px){.svc-quick-grid{grid-template-columns:1fr;gap:16px}.svc-quick-img{height:160px}}
+/* Phase 3B icon-only variant: no hero image, large gradient circle. */
+.svc-card-icon{padding-top:8px}
+.svc-card-icon-wrap{width:64px;height:64px;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:white;background:linear-gradient(135deg,var(--purple),var(--purple-deep));margin:24px 24px 0;box-shadow:0 12px 28px rgba(139,92,246,0.35)}
+.svc-card-icon .svc-quick-body{padding-top:18px}
+@media(max-width:768px){.svc-quick-grid{grid-template-columns:1fr;gap:16px}.svc-quick-img{height:160px}.svc-card-icon-wrap{width:56px;height:56px;font-size:1.4rem;border-radius:14px}}
 @media(max-width:480px){.svc-quick-img{height:140px}.svc-quick-body{padding:16px}}
 /* === REVIEWS PROOF === */
 .reviews-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:32px;align-items:start;margin-top:32px}
@@ -4383,45 +4388,63 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 
 
-<!-- ===== SERVICES CARDS (clickable quick-access) ===== -->
+<!-- ===== SECTIONS PREVIEW (Phase 3B) ===== -->
+<!-- 6 cards = entry points to every subpage. Replaces the legacy 3-card grid
+     so every subpage gets a prominent visible link from the home page. -->
 <section class="section svc-cards-section" id="svc-cards" data-section-id="svc-cards">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-th-large"></i> <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">Наши услуги</span></div>
+    <div class="section-badge"><i class="fas fa-th-large"></i> <span data-ru="Разделы сайта" data-am="Կայքի բաժիններ">Разделы сайта</span></div>
     <h2 class="section-title" data-ru="Что мы делаем для вашего роста" data-am="Ինչ ենք անում ձեր աճի համար">Что мы делаем для вашего роста</h2>
+    <p class="section-sub" data-ru="6 разделов с подробной информацией — выберите тему, которая вам важна" data-am="6 բաժին մանրամասն տեղեկություններով — ընտրեք ձեզ համար կարևոր թեման">6 разделов с подробной информацией — выберите тему, которая вам важна</p>
   </div>
   <div class="svc-quick-grid fade-up">
-    <a href="#services" class="svc-quick-card">
-      <div class="svc-quick-img">
-        <img src="/static/img/svc-buyouts.png" alt="Выкупы по ключам" loading="lazy">
-      </div>
+    <a href="/services" class="svc-quick-card svc-card-icon">
+      <div class="svc-card-icon-wrap"><i class="fas fa-hand-holding-usd"></i></div>
       <div class="svc-quick-body">
-        <div class="svc-quick-icon"><i class="fas fa-shopping-cart"></i></div>
-        <h3 data-ru="Выкупы по ключам и рекламе" data-am="Գնումներ ըստ բանալիների">Выкупы по ключам и рекламе</h3>
-        <p data-ru="Реальные покупки с живых аккаунтов по нужным ключевым словам — ваш товар поднимается в выдаче WB" data-am="Իրական գнумнер кендани hashivnerits dzer banali barrov">Реальные покупки с живых аккаунтов по нужным ключевым словам — ваш товар поднимается в выдаче WB</p>
-        <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավելին →">Подробнее →</span>
+        <h3 data-ru="Услуги и цены" data-am="Ծառայություններ և գներ">Услуги и цены</h3>
+        <p data-ru="Выкупы, отзывы с фото, фотосессии, фулфилмент. Калькулятор стоимости и пакеты под ваш товар." data-am="Հետագնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ, ֆուլֆիլմենթ։ Կալկուլյատոր և փաթեթներ ձեր ապրանքի համար։">Выкупы, отзывы с фото, фотосессии, фулфилмент. Калькулятор стоимости и пакеты под ваш товар.</p>
+        <span class="svc-quick-cta" data-ru="Перейти →" data-am="Անցնել →">Перейти →</span>
       </div>
     </a>
-    <a href="#client-reviews" class="svc-quick-card">
-      <div class="svc-quick-img">
-        <img src="/static/img/svc-reviews.png" alt="Отзывы под ключ" loading="lazy">
-      </div>
+    <a href="/buyouts" class="svc-quick-card svc-card-icon">
+      <div class="svc-card-icon-wrap"><i class="fas fa-shopping-cart"></i></div>
       <div class="svc-quick-body">
-        <div class="svc-quick-icon"><i class="fas fa-star"></i></div>
-        <h3 data-ru="Отзывы под ключ" data-am="Կарніqner shrjantsik">Отзывы под ключ</h3>
-        <p data-ru="Реальные отзывы с фото и видео от живых покупателей — рейтинг карточки растёт, доверие клиентов увеличивается" data-am="Иракан karniknер lusankarneriov — barjracnum e kart varkanishine">Реальные отзывы с фото и видео от живых покупателей — рейтинг карточки растёт, доверие клиентов увеличивается</p>
-        <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավелин →">Подробнее →</span>
+        <h3 data-ru="Выкупы на Wildberries" data-am="Հետգնում Wildberries-ում">Выкупы на Wildberries</h3>
+        <p data-ru="Как реальные выкупы по ключам поднимают карточки в ТОП. Бюджет, гарантии, честное сравнение методов." data-am="Ինչպես իրական հետագնումները բարձրացնում են քարտերը TOP-ում։ Բյուջե, երաշխիքներ, մեթոդների ազնիվ համեմատություն։">Как реальные выкупы по ключам поднимают карточки в ТОП. Бюджет, гарантии, честное сравнение методов.</p>
+        <span class="svc-quick-cta" data-ru="Перейти →" data-am="Անցնել →">Перейти →</span>
       </div>
     </a>
-    <a href="/referral" class="svc-quick-card">
-      <div class="svc-quick-img">
-        <img src="/static/img/svc-referral.png" alt="Реферальная программа" loading="lazy">
-      </div>
+    <a href="/about" class="svc-quick-card svc-card-icon">
+      <div class="svc-card-icon-wrap"><i class="fas fa-info-circle"></i></div>
       <div class="svc-quick-body">
-        <div class="svc-quick-icon"><i class="fas fa-users"></i></div>
-        <h3 data-ru="Реферальная программа" data-am="Ռeferayin dzragir">Реферальная программа</h3>
-        <p data-ru="Рекомендуйте нас коллегам и зарабатывайте. Партнёрская программа для агентств, менеджеров и владельцев ресурсов" data-am="Khоrgurd tveq mez ev vastaekeq">Рекомендуйте нас коллегам и зарабатывайте. Партнёрская программа для агентств, менеджеров и владельцев ресурсов</p>
-        <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավелин →">Подробнее →</span>
+        <h3 data-ru="О нас" data-am="Մեր մասին">О нас</h3>
+        <p data-ru="Команда Go to Top, собственный склад в Ереване, 1000+ аккаунтов, опыт Wildberries с 2021 года." data-am="Go to Top թիմը, սեփական պահեստ Երևանում, 1000+ հաշիվ, Wildberries-ի փորձ 2021 թվականից։">Команда Go to Top, собственный склад в Ереване, 1000+ аккаунтов, опыт Wildberries с 2021 года.</p>
+        <span class="svc-quick-cta" data-ru="Перейти →" data-am="Անցնել →">Перейти →</span>
+      </div>
+    </a>
+    <a href="/faq" class="svc-quick-card svc-card-icon">
+      <div class="svc-card-icon-wrap"><i class="fas fa-question-circle"></i></div>
+      <div class="svc-quick-body">
+        <h3 data-ru="Частые вопросы" data-am="Հաճախ տրվող հարցեր">Частые вопросы</h3>
+        <p data-ru="12 ответов про оплату, гарантии, сроки, риски блокировки и работу с маркетплейсом изнутри." data-am="12 պատասխան վճարման, երաշխիքների, ժամկետների և մարքեթփլեյսի հետ աշխատանքի մասին։">12 ответов про оплату, гарантии, сроки, риски блокировки и работу с маркетплейсом изнутри.</p>
+        <span class="svc-quick-cta" data-ru="Перейти →" data-am="Անցնել →">Перейти →</span>
+      </div>
+    </a>
+    <a href="/contacts" class="svc-quick-card svc-card-icon">
+      <div class="svc-card-icon-wrap"><i class="fas fa-envelope"></i></div>
+      <div class="svc-quick-body">
+        <h3 data-ru="Контакты" data-am="Կոնտակտներ">Контакты</h3>
+        <p data-ru="Telegram, WhatsApp, форма обратной связи. Адрес офиса в Ереване и часы работы — на связи 7 дней." data-am="Telegram, WhatsApp, հետադարձ կապի ձև։ Երևանի գրասենյակի հասցեն — հասանելի ենք 7 օր։">Telegram, WhatsApp, форма обратной связи. Адрес офиса в Ереване и часы работы — на связи 7 дней.</p>
+        <span class="svc-quick-cta" data-ru="Перейти →" data-am="Անցնել →">Перейти →</span>
+      </div>
+    </a>
+    <a href="/referral" class="svc-quick-card svc-card-icon">
+      <div class="svc-card-icon-wrap"><i class="fas fa-gift"></i></div>
+      <div class="svc-quick-body">
+        <h3 data-ru="Партнёрская программа" data-am="Գործընկերային ծրագիր">Партнёрская программа</h3>
+        <p data-ru="Бонусы 5/8/15% за приведённых клиентов. Промокоды, выплаты, условия — всё прозрачно." data-am="Բոնուսներ 5/8/15% հրավիրված հաճախորդների համար։ Պրոմոկոդեր, վճարումներ, պայմաններ։">Бонусы 5/8/15% за приведённых клиентов. Промокоды, выплаты, условия — всё прозрачно.</p>
+        <span class="svc-quick-cta" data-ru="Перейти →" data-am="Անցնել →">Перейти →</span>
       </div>
     </a>
   </div>
