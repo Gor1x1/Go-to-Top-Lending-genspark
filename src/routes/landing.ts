@@ -82,27 +82,40 @@ const PLACEHOLDER_PAGE_DATA: Record<PlaceholderPage, {
 // Using the same channel that the rest of the site already advertises (header CTA, hero buttons, footer).
 const PLACEHOLDER_TG_URL = 'https://t.me/goo_to_top'
 
-function renderPlaceholderPage(opts: {
-  page: PlaceholderPage,
+// =====================================================================
+// renderPageShell
+// ---------------------------------------------------------------------
+// Shared SSR skeleton for all secondary pages: builds full <html> doc
+// with head (meta/SEO/OG/hreflang/CSS), header, footer, popups, bottom-
+// nav and the /static/landing.js bundle. Page-specific markup is passed
+// as `mainHtml` and rendered inside <main class="${bodyClass}" data-page="${page}">.
+//
+// Currently consumed by renderPlaceholderPage; phase 2 will route /about,
+// /buyouts, /services, /faq, /contacts, /referral content here too. The
+// `'home'` literal is reserved for a future migration of `app.get('/')`.
+// =====================================================================
+function renderPageShell(opts: {
+  page: PlaceholderPage | 'home',
   lang: 'ru' | 'am',
   siteOrigin: string,
+  seo: { title: string, description: string, ogImage?: string },
+  bodyClass?: string,
+  mainHtml: string,
+  extraHead?: string,
 }): string {
-  const { page, lang, siteOrigin } = opts
-  const data = PLACEHOLDER_PAGE_DATA[page]
-  const path = data.path
+  const { page, lang, siteOrigin, seo, mainHtml } = opts
+  const bodyClass = opts.bodyClass || ''
+  const extraHead = opts.extraHead || ''
+  const path = page === 'home' ? '/' : `/${page}`
   const isAM = lang === 'am'
   const htmlLang = isAM ? 'hy' : 'ru'
   const ogLocale = isAM ? 'hy_AM' : 'ru_RU'
   const ogLocaleAlt = isAM ? 'ru_RU' : 'hy_AM'
-  const title = isAM ? data.title.am : data.title.ru
-  const titleSiteSuffix = isAM ? 'Go to Top' : 'Go to Top'
-  const fullTitle = `${title} — ${titleSiteSuffix}`
-  const desc = isAM ? data.desc.am : data.desc.ru
-  const body = isAM ? data.body.am : data.body.ru
+  const ogImage = seo.ogImage || `${siteOrigin}/static/img/og-image-dark.png`
   const canonical = `${siteOrigin}${path}`
   const hrefRu = `${siteOrigin}${path}`
-  // /am prefix only exists for the home page; for placeholder/sub-pages use ?lang=am
-  // until Phase 2 introduces /am/{page} routes
+  // /am prefix only exists for the home page; secondary pages use ?lang=am
+  // until phase 2 introduces /am/{page} routes.
   const hrefAm = path === '/' ? `${siteOrigin}/am` : `${siteOrigin}${path}?lang=am`
 
   return `<!DOCTYPE html>
@@ -110,14 +123,14 @@ function renderPlaceholderPage(opts: {
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-<title>${fullTitle}</title>
-<meta name="description" content="${desc}">
-<meta property="og:title" content="${fullTitle}">
-<meta property="og:description" content="${desc}">
+<title>${seo.title}</title>
+<meta name="description" content="${seo.description}">
+<meta property="og:title" content="${seo.title}">
+<meta property="og:description" content="${seo.description}">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Go to Top">
 <meta property="og:url" content="${canonical}">
-<meta property="og:image" content="${siteOrigin}/static/img/og-image-dark.png">
+<meta property="og:image" content="${ogImage}">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:locale" content="${ogLocale}">
@@ -127,9 +140,9 @@ function renderPlaceholderPage(opts: {
 <link rel="alternate" hreflang="hy" href="${hrefAm}">
 <link rel="alternate" hreflang="x-default" href="${hrefRu}">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="${fullTitle}">
-<meta name="twitter:description" content="${desc}">
-<meta name="twitter:image" content="${siteOrigin}/static/img/og-image-dark.png">
+<meta name="twitter:title" content="${seo.title}">
+<meta name="twitter:description" content="${seo.description}">
+<meta name="twitter:image" content="${ogImage}">
 <link rel="icon" type="image/x-icon" href="/static/img/favicon.ico">
 <link rel="icon" type="image/png" sizes="32x32" href="/static/img/favicon-32x32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/static/img/apple-touch-icon.png">
@@ -248,6 +261,7 @@ img{max-width:100%;height:auto}
 .bottom-nav-more-menu a:hover{background:rgba(139,92,246,0.15);color:var(--purple)}
 @media(max-width:900px){.bottom-nav{display:block}body{padding-bottom:72px}}
 </style>
+${extraHead}
 </head>
 <body>
 
@@ -286,33 +300,9 @@ img{max-width:100%;height:auto}
 </div>
 </header>
 
-<!-- ===== PLACEHOLDER MAIN ===== -->
-<main class="placeholder-page" data-page="${page}">
-  <div class="container">
-    <div class="placeholder-card">
-      <span class="placeholder-eyebrow" data-ru="Страница" data-am="Էջ">${isAM ? 'Էջ' : 'Страница'}</span>
-      <h1 data-ru="${data.title.ru}" data-am="${data.title.am}"><span class="gr">${title}</span></h1>
-      <p data-ru="${data.body.ru}" data-am="${data.body.am}">${body}</p>
-      <div class="placeholder-cta">
-        <a href="/#calculator" class="btn btn-primary">
-          <i class="fas fa-calculator"></i>
-          <span data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</span>
-        </a>
-        <a href="javascript:void(0)" onclick="openCallbackModal()" class="btn btn-outline">
-          <i class="fas fa-phone"></i>
-          <span data-ru="Перезвоните мне" data-am="Կզանգահարեն">Перезвоните мне</span>
-        </a>
-        <a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener" class="btn btn-tg">
-          <i class="fab fa-telegram"></i>
-          <span data-ru="Telegram чат" data-am="Telegram զրույց">Telegram чат</span>
-        </a>
-      </div>
-      <a href="/" class="placeholder-back">
-        <i class="fas fa-arrow-left"></i>
-        <span data-ru="На главную" data-am="Գլխավոր էջ">На главную</span>
-      </a>
-    </div>
-  </div>
+<!-- ===== PAGE MAIN ===== -->
+<main class="${bodyClass}" data-page="${page}">
+${mainHtml}
 </main>
 
 <!-- ===== FOOTER (shared with /) ===== -->
@@ -414,6 +404,2511 @@ img{max-width:100%;height:auto}
 
 </body>
 </html>`
+}
+
+// =====================================================================
+// renderPlaceholderPage — phase 1 fallback for /about /buyouts /services
+// /faq /contacts /referral. Builds the placeholder-card markup and hands
+// it to renderPageShell which owns the surrounding skeleton.
+// =====================================================================
+function renderPlaceholderPage(opts: {
+  page: PlaceholderPage,
+  lang: 'ru' | 'am',
+  siteOrigin: string,
+}): string {
+  const { page, lang, siteOrigin } = opts
+  const data = PLACEHOLDER_PAGE_DATA[page]
+  const isAM = lang === 'am'
+  const title = isAM ? data.title.am : data.title.ru
+  const desc = isAM ? data.desc.am : data.desc.ru
+  const body = isAM ? data.body.am : data.body.ru
+  const fullTitle = `${title} — Go to Top`
+
+  const mainHtml = `  <div class="container">
+    <div class="placeholder-card">
+      <span class="placeholder-eyebrow" data-ru="Страница" data-am="Էջ">${isAM ? 'Էջ' : 'Страница'}</span>
+      <h1 data-ru="${data.title.ru}" data-am="${data.title.am}"><span class="gr">${title}</span></h1>
+      <p data-ru="${data.body.ru}" data-am="${data.body.am}">${body}</p>
+      <div class="placeholder-cta">
+        <a href="/#calculator" class="btn btn-primary">
+          <i class="fas fa-calculator"></i>
+          <span data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</span>
+        </a>
+        <a href="javascript:void(0)" onclick="openCallbackModal()" class="btn btn-outline">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Կզանգահարեն">Перезвоните мне</span>
+        </a>
+        <a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Telegram чат" data-am="Telegram զրույց">Telegram чат</span>
+        </a>
+      </div>
+      <a href="/" class="placeholder-back">
+        <i class="fas fa-arrow-left"></i>
+        <span data-ru="На главную" data-am="Գլխավոր էջ">На главную</span>
+      </a>
+    </div>
+  </div>`
+
+  return renderPageShell({
+    page,
+    lang,
+    siteOrigin,
+    seo: { title: fullTitle, description: desc },
+    bodyClass: 'placeholder-page',
+    mainHtml,
+  })
+}
+
+// =====================================================================
+// renderAboutPage — phase 2A "light" page for /about.
+// Reuses three sections from `/`: hero (founder), #about (who we are),
+// #guarantee (team & office). No full calculator — only a compact CTA
+// strip at the bottom (calculator anchor / Telegram / callback modal).
+// All copy is bilingual via data-ru / data-am; the visible text is
+// rendered server-side in the requested language so SEO sees real content
+// without relying on the client switchLang() pass.
+// =====================================================================
+function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  const seo = {
+    title: t(
+      'О компании — Go to Top | Маркетплейс-агентство',
+      'Մեր մասին — Go to Top | Մարքեթփլեյս գործակալություն'
+    ),
+    description: t(
+      'Go to Top — маркетплейс-агентство в Ереване: 1000+ аккаунтов, собственный склад, команда с опытом Wildberries',
+      'Go to Top — մարքեթփլեյս գործակալություն Երևանում: հազարից ավելի հաշիվ, սեփական պահեստ, թիմ Wildberries-ի փորձով'
+    ),
+    ogImage: `${siteOrigin}/static/img/og-image.png`,
+  }
+
+  // Page-only styles. Reuses --purple/--bg-card/--text/etc tokens that
+  // renderPageShell already declared in :root.
+  const extraHead = `<style>
+.about-page{padding-top:88px}
+.about-hero{padding:24px 0 56px}
+.about-hero .ah-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:48px;align-items:center}
+.about-hero .ah-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.about-hero h1{font-size:clamp(1.9rem,3.6vw,2.9rem);font-weight:800;line-height:1.15;margin-bottom:18px;letter-spacing:-0.02em}
+.about-hero h1 .gr,.about-section h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.about-hero .ah-desc{font-size:1.02rem;color:var(--text-sec);margin-bottom:24px;line-height:1.7;max-width:560px}
+.about-hero .ah-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:28px;max-width:520px}
+.about-hero .ah-stat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:16px 14px;text-align:center}
+.about-hero .ah-stat-num{font-size:1.5rem;font-weight:800;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.about-hero .ah-stat-label{font-size:0.72rem;color:var(--text-muted);margin-top:6px;line-height:1.3}
+.about-hero .ah-cta{display:flex;gap:12px;flex-wrap:wrap}
+.about-hero .ah-image{display:flex;justify-content:center}
+.about-hero .ah-image img{width:100%;max-width:520px;border-radius:var(--r-lg);box-shadow:0 20px 60px rgba(0,0,0,0.45),0 0 60px rgba(139,92,246,0.18);object-fit:cover}
+.about-section{padding:56px 0}
+.about-section .as-grid{display:grid;grid-template-columns:1fr 1.05fr;gap:48px;align-items:center}
+.about-section.flip .as-image{order:2}
+.about-section .as-image img{width:100%;border-radius:var(--r-lg);box-shadow:0 16px 40px rgba(0,0,0,0.35);object-fit:cover}
+.about-section .as-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.74rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.about-section h2{font-size:clamp(1.6rem,2.8vw,2.1rem);font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
+.about-section .as-text p{color:var(--text-sec);font-size:0.98rem;line-height:1.75;margin-bottom:16px}
+.about-section .as-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:10px}
+.about-section .as-list li{display:flex;gap:10px;align-items:flex-start;font-size:0.92rem;color:var(--text-sec)}
+.about-section .as-list li i{color:#10B981;margin-top:4px;flex-shrink:0}
+.about-section .as-card{background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.18);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+.about-section .as-card.green{background:rgba(16,185,129,0.05);border-color:rgba(16,185,129,0.2)}
+.about-section .as-card .as-card-title{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:0.95rem;font-weight:700;color:var(--text)}
+.about-section .as-card.green .as-card-title i{color:#10B981}
+.about-section .as-card-title i{color:var(--purple)}
+.about-section .as-badge-flag{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:50px;color:#10B981;font-size:0.85rem;font-weight:600;margin-top:14px}
+.about-cta-strip{padding:24px 0 64px}
+.about-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.about-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.about-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.about-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.about-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:900px){
+  .about-page{padding-top:80px}
+  .about-hero{padding:16px 0 40px}
+  .about-hero .ah-grid,.about-section .as-grid{grid-template-columns:1fr;gap:28px}
+  .about-section.flip .as-image{order:0}
+  .about-section{padding:40px 0}
+  .about-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .about-cta-strip .acs-actions{width:100%}
+  .about-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:600px){
+  .about-hero .ah-stat-num{font-size:1.2rem}
+  .about-hero .ah-stat-label{font-size:0.66rem}
+  .about-cta-strip .acs-actions{flex-direction:column}
+  .about-cta-strip .acs-actions .btn{width:100%}
+}
+</style>`
+
+  const mainHtml = `
+<!-- ===== ABOUT HERO ===== -->
+<section class="about-hero">
+  <div class="container">
+    <div class="ah-grid">
+      <div class="ah-text">
+        <div class="ah-eyebrow">
+          <i class="fas fa-info-circle"></i>
+          <span data-ru="О компании" data-am="Ընկերության մասին">${t('О компании', 'Ընկերության մասին')}</span>
+        </div>
+        <h1>
+          <span data-ru="О компании" data-am="Go to Top-ի մասին">${t('О компании', 'Go to Top-ի մասին')}</span>
+          <span class="gr" data-ru="Go to Top" data-am="Go to Top">Go to Top</span>
+        </h1>
+        <p class="ah-desc" data-ru="Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года." data-am="Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։">${t('Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года.', 'Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։')}</p>
+        <div class="ah-stats">
+          <div class="ah-stat">
+            <div class="ah-stat-num">847</div>
+            <div class="ah-stat-label" data-ru="товаров в ТОП" data-am="ապրանք TOP-ում">${t('товаров в ТОП', 'ապրանք TOP-ում')}</div>
+          </div>
+          <div class="ah-stat">
+            <div class="ah-stat-num">1000+</div>
+            <div class="ah-stat-label" data-ru="реальных аккаунтов" data-am="իրական հաշիվ">${t('реальных аккаунтов', 'իրական հաշիվ')}</div>
+          </div>
+          <div class="ah-stat">
+            <div class="ah-stat-num">0</div>
+            <div class="ah-stat-label" data-ru="блокировок с 2021" data-am="արգելափակում 2021-ից">${t('блокировок с 2021', 'արգելափակում 2021-ից')}</div>
+          </div>
+        </div>
+        <div class="ah-cta">
+          <a href="/services" class="btn btn-primary btn-lg">
+            <i class="fas fa-box-open"></i>
+            <span data-ru="Открыть пакеты услуг" data-am="Բացել ծառայությունների փաթեթները">${t('Открыть пакеты услуг', 'Բացել ծառայությունների փաթեթները')}</span>
+          </a>
+          <a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener" class="btn btn-tg btn-lg">
+            <i class="fab fa-telegram"></i>
+            <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
+          </a>
+        </div>
+      </div>
+      <div class="ah-image">
+        <img src="/static/img/founder.jpg" alt="${t('Основатель Go to Top', 'Go to Top-ի հիմնադիրը')}" loading="eager" fetchpriority="high" decoding="async">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHO WE ARE ===== -->
+<section class="about-section">
+  <div class="container">
+    <div class="as-grid">
+      <div class="as-image">
+        <img src="/static/img/about-hero2.jpg" alt="${t('Go to Top — о компании', 'Go to Top — ընկերության մասին')}" loading="lazy">
+      </div>
+      <div class="as-text">
+        <div class="as-eyebrow">
+          <i class="fas fa-rocket"></i>
+          <span data-ru="Кто мы" data-am="Ով ենք մենք">${t('Кто мы', 'Ով ենք մենք')}</span>
+        </div>
+        <h2 data-ru="Что такое" data-am="Ի՞նչ է Go to Top-ը">${t('Что такое', 'Ի՞նչ է')} <span class="gr">Go to Top</span>?</h2>
+        <p data-ru="«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе." data-am="«Go to Top» — ձեր բիզնեսի զարգացման ծառայություն մարքեթփլեյսներում՝ համալիր առաջխաղացման և բանալի բառերով գնումների միջոցով։ Ապրանքի երկարատև ամրապնդման համար TOP-ում։">${t('«Go to Top» — сервис развития Вашего бизнеса на маркетплейсах с помощью комплексного продвижения и услуги выкупов по ключевым словам. Для долгосрочного закрепления товара в TOPе.', '«Go to Top» — ձեր բիզնեսի զարգացման ծառայություն մարքեթփլեյսներում՝ համալիր առաջխաղացման և բանալի բառերով գնումների միջոցով։ Ապրանքի երկարատև ամրապնդման համար TOP-ում։')}</p>
+        <div class="as-card">
+          <div class="as-card-title">
+            <i class="fas fa-star"></i>
+            <strong data-ru="Наши сильные стороны" data-am="Մեր ուժեղ կողմերը">${t('Наши сильные стороны', 'Մեր ուժեղ կողմերը')}</strong>
+          </div>
+          <ul class="as-list">
+            <li><i class="fas fa-check-circle"></i><span data-ru="Собственный склад и офис в Ереване" data-am="Սեփական պահեստ և գրասենյակ Երևանում">${t('Собственный склад и офис в Ереване', 'Սեփական պահեստ և գրասենյակ Երևանում')}</span></li>
+            <li><i class="fas fa-check-circle"></i><span data-ru="1000+ реальных аккаунтов, 0 блокировок" data-am="1000+ իրական հաշիվ, 0 արգելափակում">${t('1000+ реальных аккаунтов, 0 блокировок', '1000+ իրական հաշիվ, 0 արգելափակում')}</span></li>
+            <li><i class="fas fa-check-circle"></i><span data-ru="Работаем с 2021 года — 847 товаров в ТОП" data-am="Աշխատում ենք 2021-ից — 847 ապրանք TOP-ում">${t('Работаем с 2021 года — 847 товаров в ТОП', 'Աշխատում ենք 2021-ից — 847 ապրանք TOP-ում')}</span></li>
+            <li><i class="fas fa-check-circle"></i><span data-ru="Всё вручную, только по ключевым словам" data-am="Ամեն ինչ ձեռքով, միայն բանալի բառերով">${t('Всё вручную, только по ключевым словам', 'Ամեն ինչ ձեռքով, միայն բանալի բառերով')}</span></li>
+          </ul>
+        </div>
+        <div class="as-card green">
+          <div class="as-card-title">
+            <i class="fas fa-gift"></i>
+            <strong data-ru="Что получает клиент" data-am="Ինչ է ստանում հաճախորդը">${t('Что получает клиент', 'Ինչ է ստանում հաճախորդը')}</strong>
+          </div>
+          <ul class="as-list">
+            <li><i class="fas fa-chart-line"></i><span data-ru="Рост рейтинга товара на Wildberries" data-am="Ապրանքի վարկանիշի աճ Wildberries-ում">${t('Рост рейтинга товара на Wildberries', 'Ապրանքի վարկանիշի աճ Wildberries-ում')}</span></li>
+            <li><i class="fas fa-chart-line"></i><span data-ru="Органический трафик и долгосрочный ТОП" data-am="Օրգանական տրաֆիկ և երկարատև TOP">${t('Органический трафик и долгосрочный ТОП', 'Օրգանական տրաֆիկ և երկարատև TOP')}</span></li>
+            <li><i class="fas fa-chart-line"></i><span data-ru="Реальные отзывы с фото и видео" data-am="Իրական կարծիքներ լուսանկարներով և տեսանյութերով">${t('Реальные отзывы с фото и видео', 'Իրական կարծիքներ լուսանկարներով և տեսանյութերով')}</span></li>
+            <li><i class="fas fa-chart-line"></i><span data-ru="Индивидуальный подход, без блокировок" data-am="Անհատական մոտեցում, առանց արգելափակումների">${t('Индивидуальный подход, без блокировок', 'Անհատական մոտեցում, առանց արգելափակումների')}</span></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TEAM & OFFICE ===== -->
+<section class="about-section flip">
+  <div class="container">
+    <div class="as-grid">
+      <div class="as-text">
+        <div class="as-eyebrow">
+          <i class="fas fa-shield-alt"></i>
+          <span data-ru="Команда и офис" data-am="Թիմ և գրասենյակ">${t('Команда и офис', 'Թիմ և գրասենյակ')}</span>
+        </div>
+        <h2 data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը">${t('Всё организовано и по полочкам. Наша команда', 'Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը')}</h2>
+        <p data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе." data-am="Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Յուրաքանչյուր նախագիծ վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:">${t('За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе.', 'Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Յուրաքանչյուր նախագիծ վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:')}</p>
+        <ul class="as-list">
+          <li><i class="fas fa-check-circle"></i><span data-ru="Реальное поведение человека во время выкупа" data-am="Իրական մարդկային վարքագիծ գնում կատարելիս">${t('Реальное поведение человека во время выкупа', 'Իրական մարդկային վարքագիծ գնում կատարելիս')}</span></li>
+          <li><i class="fas fa-check-circle"></i><span data-ru="Реальные аккаунты с историей покупок" data-am="Իրական հաշիվներ գնումների պատմությամբ">${t('Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ')}</span></li>
+          <li><i class="fas fa-check-circle"></i><span data-ru="Естественное распределение по географии" data-am="Բնական աշխարհագրական բաշխում">${t('Естественное распределение по географии', 'Բնական աշխարհագրական բաշխում')}</span></li>
+        </ul>
+        <div class="as-badge-flag">
+          <i class="fas fa-award"></i>
+          <span data-ru="0 блокировок за всё время работы" data-am="0 արգելափակում աշխատանքի ողջ ընթացքում">${t('0 блокировок за всё время работы', '0 արգելափակում աշխատանքի ողջ ընթացքում')}</span>
+        </div>
+      </div>
+      <div class="as-image">
+        <img src="/static/img/team-office.jpg" alt="${t('Команда Go to Top', 'Go to Top թիմը')}" loading="lazy">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== LIGHT CTA STRIP ===== -->
+<section class="about-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Готовы начать?" data-am="Պատրա՞ստ եք սկսել">${t('Готовы начать?', 'Պատրա՞ստ եք սկսել')}</h3>
+        <p data-ru="Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу." data-am="Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։">${t('Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу.', 'Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։')}</p>
+      </div>
+      <div class="acs-actions">
+        <a href="/#calculator" class="btn btn-primary">
+          <i class="fas fa-calculator"></i>
+          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը">${t('Открыть калькулятор', 'Բացել հաշվիչը')}</span>
+        </a>
+        <a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Telegram" data-am="Telegram">Telegram</span>
+        </a>
+        <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  return renderPageShell({
+    page: 'about',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'about-page',
+    mainHtml,
+    extraHead,
+  })
+}
+
+// =====================================================================
+// renderServicesPage — phase 2B "heavy" page for /services.
+// Reuses sections from `/`: quick service cards, detailed services, the
+// FULL calculator (tabs / prices / packages / promo code) and the 5-step
+// process. The calculator works against `window.__SITE_DATA` injected
+// post-SSR by the /services route handler (mirrors the `/` route).
+// All copy is bilingual via data-ru / data-am with the requested
+// language rendered server-side so SEO sees real content.
+// =====================================================================
+function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  const seo = {
+    title: t(
+      'Услуги — Go to Top | для продавцов Wildberries',
+      'Ծառայություններ — Go to Top | Wildberries-ի համար'
+    ),
+    description: t(
+      'Услуги для продавцов Wildberries: выкупы, отзывы, ключевые слова. Рассчитайте стоимость в калькуляторе',
+      'Wildberries-ի վաճառողների համար ծառայություններ. Հետագնումներ, կարծիքներ, հիմնաբառեր. Հաշվարկեք արժեքը կալկուլյատորում'
+    ),
+    ogImage: `${siteOrigin}/static/img/og-image.png`,
+  }
+
+  // Page-only styles. Reuses --purple/--bg-card/--text/etc tokens that
+  // renderPageShell already declared in :root. Includes the full calc-* /
+  // svc-* / process-grid CSS subset copied from the `/` SSR styles so
+  // the calculator + service cards render correctly without depending on
+  // the home page stylesheet.
+  const extraHead = `<style>
+.services-page{padding-top:88px}
+.svc-hero{padding:24px 0 48px}
+.svc-hero .sh-inner{max-width:880px;margin:0 auto;text-align:center}
+.svc-hero .sh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.svc-hero h1{font-size:clamp(1.9rem,3.6vw,2.9rem);font-weight:800;line-height:1.15;margin-bottom:16px;letter-spacing:-0.02em}
+.svc-hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.svc-hero .sh-desc{font-size:1.02rem;color:var(--text-sec);margin:0 auto 24px;line-height:1.7;max-width:680px}
+.svc-hero .sh-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+/* Section primitives (subset from home) */
+.section{padding:48px 0;overflow:visible}
+.section-dark{background:var(--bg-surface)}
+.section-header{text-align:center;margin-bottom:36px}
+.section-header h2 .gr,.section-title .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
+.section-title{font-size:clamp(1.5rem,2.6vw,2rem);font-weight:800;line-height:1.2;margin-bottom:12px;letter-spacing:-0.02em}
+.section-sub{font-size:1rem;color:var(--text-sec);max-width:680px;margin:0 auto;line-height:1.7}
+.section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px}
+.section-cta .btn{font-size:0.9rem;padding:12px 24px}
+.btn-success{background:linear-gradient(135deg,#10B981,#059669);color:white;box-shadow:0 4px 15px rgba(16,185,129,0.3)}
+.btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(16,185,129,0.5)}
+.btn-warning{background:linear-gradient(135deg,#F59E0B,#D97706);color:white;box-shadow:0 4px 15px rgba(245,158,11,0.3)}
+.btn-warning:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(245,158,11,0.5)}
+/* Quick service cards */
+.svc-quick-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.svc-quick-card{display:flex;flex-direction:column;border-radius:var(--r-lg);overflow:hidden;border:1px solid var(--border);background:var(--bg-card);transition:all 0.3s ease;text-decoration:none;color:var(--text)}
+.svc-quick-card:hover{border-color:rgba(139,92,246,0.4);transform:translateY(-6px);box-shadow:0 20px 40px rgba(0,0,0,0.2)}
+.svc-quick-img{width:100%;height:200px;overflow:hidden;position:relative}
+.svc-quick-img img{width:100%;height:100%;object-fit:cover;transition:transform 0.4s ease}
+.svc-quick-card:hover .svc-quick-img img{transform:scale(1.05)}
+.svc-quick-body{padding:24px;flex:1;display:flex;flex-direction:column}
+.svc-quick-icon{width:44px;height:44px;border-radius:12px;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:var(--purple);margin-bottom:12px}
+.svc-quick-card h3{font-size:1.1rem;font-weight:700;margin-bottom:10px;line-height:1.3}
+.svc-quick-card p{font-size:0.88rem;color:var(--text-sec);line-height:1.7;flex:1;margin-bottom:16px}
+.svc-quick-cta{font-size:0.88rem;font-weight:700;color:var(--purple);display:flex;align-items:center;gap:6px}
+.svc-quick-card:hover .svc-quick-cta{gap:10px}
+/* Detail services grid */
+.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:28px}
+.svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:32px;transition:var(--t);position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);display:flex;flex-direction:column}
+.svc-card:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-4px);box-shadow:var(--glow)}
+.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--purple),var(--accent));opacity:1}
+.svc-icon{width:56px;height:56px;border-radius:14px;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple);margin-bottom:20px}
+.svc-card h3{font-size:1.2rem;font-weight:700;margin-bottom:10px}
+.svc-card > p{color:var(--text-sec);font-size:0.92rem;line-height:1.7;margin-bottom:16px}
+.svc-features{list-style:none;flex:1;padding:0}
+.svc-features li{display:flex;align-items:flex-start;gap:10px;padding:5px 0;font-size:0.88rem;color:var(--text-sec)}
+.svc-features li i{color:var(--success);margin-top:4px;font-size:0.78rem}
+/* Calculator */
+.calc-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px;max-width:860px;margin:0 auto}
+.calc-tabs{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
+.calc-tab{padding:8px 20px;border-radius:50px;font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--t);background:var(--bg-surface);border:1px solid var(--border);color:var(--text-muted)}
+.calc-tab.active{background:var(--purple);color:white;border-color:var(--purple)}
+.calc-tab:hover:not(.active){border-color:var(--purple);color:var(--text)}
+.calc-group{display:none}
+.calc-group.active{display:block}
+.calc-packages{margin-bottom:28px;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(249,115,22,0.02));border:1px solid rgba(245,158,11,0.15);border-radius:16px;overflow:visible}
+.calc-packages-header{text-align:center;margin-bottom:20px}
+.calc-packages-title{font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--text)}
+.calc-packages-subtitle{font-size:0.85rem;color:var(--text-muted);margin-top:6px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5}
+.calc-packages-grid{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:nowrap;padding:20px 10px;overflow:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.calc-packages-grid::-webkit-scrollbar{display:none}
+.calc-packages-grid.single-pkg{max-width:400px;margin:0 auto}
+.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;flex:1 1 0;min-width:180px;max-width:280px;display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent}
+.calc-pkg-card:hover{border-color:#f59e0b;transform:translateY(-3px);box-shadow:0 12px 30px rgba(245,158,11,0.12)}
+.calc-pkg-card.selected{border-color:#f59e0b !important;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(249,115,22,0.04)) !important;box-shadow:0 0 0 3px rgba(245,158,11,0.25),0 8px 20px rgba(245,158,11,0.12) !important}
+.calc-pkg-card.selected::after{content:'\\2713';position:absolute;top:14px;left:14px;width:22px;height:22px;background:#f59e0b;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;z-index:10}
+.calc-pkg-card .pkg-tier-badge{position:absolute;top:0;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:0.72rem;padding:4px 14px;border-radius:0 0 12px 12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(245,158,11,0.3)}
+.calc-pkg-card.pkg-crown-gold{border:2px solid rgba(255,215,0,0.3);border-top:4px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.08),0 4px 12px rgba(255,215,0,0.04);z-index:3;padding:24px 22px;background:linear-gradient(145deg,var(--bg-surface),rgba(255,215,0,0.03));transform:scale(1.03)}
+.calc-pkg-card.pkg-crown-silver{border:2px solid rgba(192,192,192,0.3);border-top:3px solid #C0C0C0;z-index:2}
+.calc-pkg-card.pkg-crown-bronze{border:2px solid rgba(205,127,50,0.25);border-top:3px solid #CD7F32;z-index:1}
+.calc-pkg-card .pkg-name{font-weight:700;font-size:1rem;margin-bottom:6px;margin-top:18px;line-height:1.3}
+.calc-pkg-card .pkg-desc{font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;flex-grow:1}
+.calc-pkg-card .pkg-prices{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.85rem}
+.calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.25rem;color:#f59e0b}
+.calc-pkg-card .pkg-discount{background:linear-gradient(135deg,#059669,#10B981);color:white;font-size:0.7rem;padding:3px 8px;border-radius:10px;font-weight:700}
+.calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
+.calc-pkg-card .pkg-items div{margin-bottom:2px;line-height:1.7}
+.calc-pkg-card .pkg-items div i{color:#22c55e;font-size:0.65rem;margin-right:5px;vertical-align:middle}
+.calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.calc-row:last-of-type{border-bottom:none}
+.calc-label{font-size:0.92rem;font-weight:500}
+.calc-price{font-size:0.82rem;color:var(--text-muted);white-space:nowrap}
+.calc-input{display:flex;align-items:center;gap:8px}
+.calc-input button{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.95rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
+.calc-input button:hover{border-color:var(--purple);background:rgba(139,92,246,0.1)}
+.calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none}
+.calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+.calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.calc-total{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple);gap:12px;flex-wrap:wrap}
+.calc-total-label{font-size:1.1rem;font-weight:600;flex-shrink:0;white-space:nowrap}
+.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:normal;text-align:right;min-width:0;overflow-wrap:break-word}
+.calc-old-price{font-size:1rem;font-weight:600;color:var(--text-sec);text-decoration:line-through;opacity:0.7;margin-right:6px}
+.calc-discount-line{font-size:0.82rem;color:var(--success);font-weight:600;margin-top:2px}
+.calc-total-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.calc-cta{margin-top:24px;text-align:center}
+.buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
+.buyout-tier-info strong{color:var(--accent)}
+/* Process steps */
+.process-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:16px;position:relative}
+.step{text-align:center;position:relative}
+.step-num{width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;margin:0 auto 16px;position:relative;z-index:2}
+.step-line{position:absolute;top:24px;left:50%;right:-50%;height:2px;background:var(--border);z-index:1}
+.step:last-child .step-line{display:none}
+.step h4{font-size:0.92rem;font-weight:600;margin-bottom:8px}
+.step p{font-size:0.78rem;color:var(--text-muted);line-height:1.5}
+/* CTA strip (re-used styling pattern from /about) */
+.svc-cta-strip{padding:24px 0 64px}
+.svc-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.svc-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.svc-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.svc-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.svc-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:900px){
+  .services-page{padding-top:80px}
+  .svc-quick-grid{grid-template-columns:1fr;gap:16px}
+  .svc-quick-img{height:160px}
+  .process-grid{grid-template-columns:repeat(3,1fr)}
+  .calc-wrap{padding:24px}
+  .svc-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .svc-cta-strip .acs-actions{width:100%}
+  .svc-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:768px){
+  .calc-packages{padding:16px 0;overflow:visible;position:relative}
+  .calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:12px;padding:12px 16px;justify-content:flex-start}
+  .calc-packages-grid::-webkit-scrollbar{display:none}
+  .calc-pkg-card{flex:0 0 72vw;max-width:72vw;min-width:0;padding:18px 16px;border-radius:14px;scroll-snap-align:center}
+  .calc-pkg-card.pkg-crown-gold{transform:none;flex:0 0 72vw;max-width:72vw}
+  .services-grid{grid-template-columns:1fr;gap:20px}
+}
+@media(max-width:600px){
+  .process-grid{grid-template-columns:1fr 1fr}
+  .svc-cta-strip .acs-actions{flex-direction:column}
+  .svc-cta-strip .acs-actions .btn{width:100%}
+}
+@media(max-width:480px){
+  .svc-quick-img{height:140px}
+  .svc-quick-body{padding:16px}
+  .svc-card{padding:20px}
+  .calc-wrap{padding:14px}
+  .calc-tab{padding:5px 10px;font-size:0.72rem}
+}
+</style>`
+
+  const tgUrl = PLACEHOLDER_TG_URL
+  const managerTgUrl = 'https://t.me/suport_admin_2'
+
+  const mainHtml = `
+<!-- ===== SERVICES HERO ===== -->
+<section class="svc-hero">
+  <div class="container">
+    <div class="sh-inner">
+      <div class="sh-eyebrow">
+        <i class="fas fa-th-large"></i>
+        <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${t('Наши услуги', 'Մեր ծառայությունները')}</span>
+      </div>
+      <h1>
+        <span data-ru="Услуги" data-am="Ծառայություններ">${t('Услуги', 'Ծառայություններ')}</span>
+        <span class="gr" data-ru="для Wildberries" data-am="Wildberries-ի համար">${t('для Wildberries', 'Wildberries-ի համար')}</span>
+      </h1>
+      <p class="sh-desc" data-ru="Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет." data-am="Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։">${t('Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет.', 'Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։')}</p>
+      <div class="sh-cta">
+        <a href="#calculator" class="btn btn-primary btn-lg">
+          <i class="fas fa-calculator"></i>
+          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը">${t('Открыть калькулятор', 'Բացել հաշվիչը')}</span>
+        </a>
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg btn-lg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== QUICK SERVICE CARDS ===== -->
+<section class="section" id="svc-cards" data-section-id="svc-cards">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-th-large"></i> <span data-ru="Что мы делаем" data-am="Ինչ ենք անում">${t('Что мы делаем', 'Ինչ ենք անում')}</span></div>
+      <h2 class="section-title" data-ru="Три направления роста" data-am="Աճի երեք ուղղություն">${t('Три направления роста', 'Աճի երեք ուղղություն')}</h2>
+      <p class="section-sub" data-ru="Кликните карточку, чтобы перейти к деталям и пакетам" data-am="Սեղմեք քարտի վրա մանրամասներին և փաթեթներին անցնելու համար">${t('Кликните карточку, чтобы перейти к деталям и пакетам', 'Սեղմեք քարտի վրա մանրամասներին և փաթեթներին անցնելու համար')}</p>
+    </div>
+    <div class="svc-quick-grid">
+      <a href="#services-detail" class="svc-quick-card">
+        <div class="svc-quick-img">
+          <img src="/static/img/svc-buyouts.png" alt="${t('Выкупы по ключам', 'Գնումներ բանալի բառերով')}" loading="lazy">
+        </div>
+        <div class="svc-quick-body">
+          <div class="svc-quick-icon"><i class="fas fa-shopping-cart"></i></div>
+          <h3 data-ru="Выкупы по ключам и рекламе" data-am="Գնումներ բանալի բառերով և գովազդով">${t('Выкупы по ключам и рекламе', 'Գնումներ բանալի բառերով և գովազդով')}</h3>
+          <p data-ru="Реальные покупки с живых аккаунтов по нужным ключевым словам — ваш товар поднимается в выдаче WB" data-am="Իրական գնումներ կենդանի հաշիվներից ձեր անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB որոնման մեջ">${t('Реальные покупки с живых аккаунтов по нужным ключевым словам — ваш товар поднимается в выдаче WB', 'Իրական գնումներ կենդանի հաշիվներից ձեր անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB որոնման մեջ')}</p>
+          <span class="svc-quick-cta"><span data-ru="Подробнее" data-am="Մանրամասն">${t('Подробнее', 'Մանրամասն')}</span> →</span>
+        </div>
+      </a>
+      <a href="#services-detail" class="svc-quick-card">
+        <div class="svc-quick-img">
+          <img src="/static/img/svc-reviews.png" alt="${t('Отзывы под ключ', 'Կարծիքներ բանալիով')}" loading="lazy">
+        </div>
+        <div class="svc-quick-body">
+          <div class="svc-quick-icon"><i class="fas fa-star"></i></div>
+          <h3 data-ru="Отзывы под ключ" data-am="Կարծիքներ բանալիով">${t('Отзывы под ключ', 'Կարծիքներ բանալիով')}</h3>
+          <p data-ru="Реальные отзывы с фото и видео от живых покупателей — рейтинг карточки растёт, доверие клиентов увеличивается" data-am="Իրական կարծիքներ լուսանկարներով և տեսանյութերով կենդանի հաճախորդներից — քարտի վարկանիշը աճում է, հաճախորդների վստահությունը մեծանում">${t('Реальные отзывы с фото и видео от живых покупателей — рейтинг карточки растёт, доверие клиентов увеличивается', 'Իրական կարծիքներ լուսանկարներով և տեսանյութերով կենդանի հաճախորդներից — քարտի վարկանիշը աճում է, հաճախորդների վստահությունը մեծանում')}</p>
+          <span class="svc-quick-cta"><span data-ru="Подробнее" data-am="Մանրամասն">${t('Подробнее', 'Մանրամասն')}</span> →</span>
+        </div>
+      </a>
+      <a href="/referral" class="svc-quick-card">
+        <div class="svc-quick-img">
+          <img src="/static/img/svc-referral.png" alt="${t('Реферальная программа', 'Ուղեկից ծրագիր')}" loading="lazy">
+        </div>
+        <div class="svc-quick-body">
+          <div class="svc-quick-icon"><i class="fas fa-users"></i></div>
+          <h3 data-ru="Реферальная программа" data-am="Ուղեկից ծրագիր">${t('Реферальная программа', 'Ուղեկից ծրագիր')}</h3>
+          <p data-ru="Рекомендуйте нас коллегам и зарабатывайте. Партнёрская программа для агентств, менеджеров и владельцев ресурсов" data-am="Խորհուրդ տվեք մեզ գործընկերներին և վաստակեք։ Գործընկերային ծրագիր գործակալությունների, մենեջերների և ռեսուրսների սեփականատերերի համար">${t('Рекомендуйте нас коллегам и зарабатывайте. Партнёрская программа для агентств, менеджеров и владельцев ресурсов', 'Խորհուրդ տվեք մեզ գործընկերներին և վաստակեք։ Գործընկերային ծրագիր գործակալությունների, մենեջերների և ռեսուրսների սեփականատերերի համար')}</p>
+          <span class="svc-quick-cta"><span data-ru="Перейти" data-am="Անցնել">${t('Перейти', 'Անցնել')}</span> →</span>
+        </div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== DETAIL SERVICES ===== -->
+<section class="section" id="services-detail" data-section-id="services-detail">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Полный спектр" data-am="Լիարժեք սպեկտր">${t('Полный спектр', 'Լիարժեք սպեկտր')}</span></div>
+      <h2 class="section-title" data-ru="Полный спектр продвижения на WB" data-am="WB-ում առաջխաղացման լիարժեք սպեկտր">${t('Полный спектр продвижения на WB', 'WB-ում առաջխաղացման լիարժեք սպեկտր')}</h2>
+      <p class="section-sub" data-ru="Выкупы живыми людьми, отзывы с реальными фото, активация ключевых слов — всё для роста вашего товара." data-am="Իրական մարդկանցով գնումներ, իրական լուսանկարներով կարծիքներ, բանալի բառերի ակտիվացում — ամենը ձեր ապրանքի աճի համար։">${t('Выкупы живыми людьми, отзывы с реальными фото, активация ключевых слов — всё для роста вашего товара.', 'Իրական մարդկանցով գնումներ, իրական լուսանկարներով կարծիքներ, բանալի բառերի ակտիվացում — ամենը ձեր ապրանքի աճի համար։')}</p>
+    </div>
+    <div class="services-grid">
+      <div class="svc-card">
+        <div class="svc-icon"><i class="fas fa-shopping-cart"></i></div>
+        <h3 data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի հարցումներով">${t('Выкупы по ключевым запросам', 'Գնումներ բանալի հարցումներով')}</h3>
+        <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану." data-am="Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:">${t('Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.', 'Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:')}</p>
+        <ul class="svc-features">
+          <li><i class="fas fa-check"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Իրական հաշիվներ գնումների պատմությամբ">${t('Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Географическое распределение" data-am="Աշխարհագրական բաշխում">${t('Географическое распределение', 'Աշխարհագրական բաշխում')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Естественное поведение покупателей" data-am="Գնորդների բնական վարքագիծ">${t('Естественное поведение покупателей', 'Գնորդների բնական վարքագիծ')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Забор товара из ПВЗ" data-am="Ապրանքի ստացում ՊՎԶ-ից">${t('Забор товара из ПВЗ', 'Ապրանքի ստացում ՊՎԶ-ից')}</span></li>
+        </ul>
+        <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Повысить рейтинг" data-am="Բարձրացնել վարկանիշը">${t('Повысить рейтинг', 'Բարձրացնել վարկանիշը')}</span></a></div>
+      </div>
+      <div class="svc-card">
+        <div class="svc-icon"><i class="fas fa-star"></i></div>
+        <h3 data-ru="Отзывы и оценки" data-am="Կարծիքներ և գնահատականներ">${t('Отзывы и оценки', 'Կարծիքներ և գնահատականներ')}</h3>
+        <p data-ru="Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга." data-am="Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:">${t('Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.', 'Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:')}</p>
+        <ul class="svc-features">
+          <li><i class="fas fa-check"></i> <span data-ru="Текст отзыва + фото/видео" data-am="Կարծիքի տեքստ + լուսանկար/տեսանյութ">${t('Текст отзыва + фото/видео', 'Կարծիքի տեքստ + լուսանկար/տեսանյութ')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Профессиональная фотосессия" data-am="Մասնագիտական լուսանկարահանում">${t('Профессиональная фотосессия', 'Մասնագիտական լուսանկարահանում')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Տարբեր վայրեր և մոդելներ">${t('Разные локации и модели', 'Տարբեր վայրեր և մոդելներ')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Մինչև 50% կարծիքներ գնումներից">${t('До 50% отзывов от выкупов', 'Մինչև 50% կարծիքներ գնումներից')}</span></li>
+        </ul>
+        <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-success" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">${t('Начать продвижение', 'Սկսել առաջխաղացումը')}</span></a></div>
+      </div>
+      <div class="svc-card">
+        <div class="svc-icon"><i class="fas fa-key"></i></div>
+        <h3 data-ru="Активация ключевых слов" data-am="Բանալի բառերի ակտիվացում">${t('Активация ключевых слов', 'Բանալի բառերի ակտիվացում')}</h3>
+        <p data-ru="Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Делаем целевые выкупы, которые активируют товар в нужном кластере." data-am="Ունե՞ք բանալի բառ, որով ցանկանում եք ցուցադրվել, բայց ալգորիթմները չեն կապում այն ձեր քարտի հետ։ Կատարում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։">${t('Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Делаем целевые выкупы, которые активируют товар в нужном кластере.', 'Ունե՞ք բանալի բառ, որով ցանկանում եք ցուցադրվել, բայց ալգորիթմները չեն կապում այն ձեր քարտի հետ։ Կատարում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։')}</p>
+        <ul class="svc-features">
+          <li><i class="fas fa-check"></i> <span data-ru="Органический трафик — резкий рост" data-am="Օրգանիկ տրաֆիկի կտրուկ աճ">${t('Органический трафик — резкий рост', 'Օրգանիկ տրաֆիկի կտրուկ աճ')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Укрепление позиций новыми ключевыми словами" data-am="Դիրքերի ամրապնդում նոր բանալի բառերով">${t('Укрепление позиций новыми ключевыми словами', 'Դիրքերի ամրապնդում նոր բանալի բառերով')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Подключение к целевым и прибыльным запросам" data-am="Միացում թիրախային և եկամտաբեր հարցումներին">${t('Подключение к целевым и прибыльным запросам', 'Միացում թիրախային և եկամտաբեր հարցումներին')}</span></li>
+          <li><i class="fas fa-check"></i> <span data-ru="Стабильные позиции без рекламы" data-am="Կայուն դիրքեր առանց գովազդի">${t('Стабильные позиции без рекламы', 'Կայուն դիրքեր առանց գովազդի')}</span></li>
+        </ul>
+        <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-key"></i> <span data-ru="Активировать ключевые" data-am="Ակտիվացնել բանալիները">${t('Активировать ключевые', 'Ակտիվացնել բանալիները')}</span></a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CALCULATOR (full) ===== -->
+<section class="section section-dark" id="calculator" data-section-id="calculator">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հաշվիչ">${t('Калькулятор', 'Հաշվիչ')}</span></div>
+      <h2 class="section-title" data-ru="Рассчитайте стоимость услуг" data-am="Հաշվեք ծառայությունների արժեքը">${t('Рассчитайте стоимость услуг', 'Հաշվեք ծառայությունների արժեքը')}</h2>
+      <p class="section-sub" data-ru="Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram." data-am="Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:">${t('Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.', 'Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:')}</p>
+    </div>
+    <div class="calc-wrap">
+      <div class="calc-packages" id="calcPackages" style="display:none"></div>
+      <div class="calc-tabs">
+        <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Գնումներ">${t('Выкупы', 'Գնումներ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Կարծիքներ">${t('Отзывы', 'Կարծիքներ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Լուսանկարահանում">${t('Фотосъёмка', 'Լուսանկարահանում')}</div>
+        <div class="calc-tab" onclick="showCalcTab('ff',this)" data-ru="ФФ" data-am="Ֆուլֆիլմենթ">${t('ФФ', 'Ֆուլֆիլմենթ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Լոգիստիկա">${t('Логистика', 'Լոգիստիկա')}</div>
+        <div class="calc-tab" onclick="showCalcTab('other',this)" data-ru="Прочие услуги" data-am="Այլ ծառայություններ">${t('Прочие услуги', 'Այլ ծառայություններ')}</div>
+      </div>
+
+      <!-- ===== ВЫКУПЫ ===== -->
+      <div class="calc-group active" id="cg-buyouts">
+        <div class="calc-row" data-price="buyout" id="buyoutRow">
+          <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Գնում + ստացում ՊՎԶ-ից">${t('Выкуп + забор из ПВЗ', 'Գնում + ստացում ՊՎԶ-ից')}</div>
+          <div class="calc-price" id="buyoutPriceLabel">2 000 ֏</div>
+          <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><input type="number" id="buyoutQty" value="0" min="0" max="999" onchange="onBuyoutInput()" oninput="onBuyoutInput()"><button onclick="ccBuyout(1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Выкуп КГТ + забор из ПВЗ" data-am="Ծանրաքաշ ապրանքի գնում + ստացում ՊՎԶ-ից">${t('Выкуп КГТ + забор из ПВЗ', 'Ծանրաքաշ ապրանքի գնում + ստացում ՊՎԶ-ից')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ОТЗЫВЫ ===== -->
+      <div class="calc-group" id="cg-reviews">
+        <div class="calc-row" data-price="300">
+          <div class="calc-label" data-ru="Оценка" data-am="Գնահատական">${t('Оценка', 'Գնահատական')}</div>
+          <div class="calc-price">300 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="500">
+          <div class="calc-label" data-ru="Оценка + отзыв" data-am="Գնահատական + կարծիք">${t('Оценка + отзыв', 'Գնահատական + կարծիք')}</div>
+          <div class="calc-price">500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="500">
+          <div class="calc-label" data-ru="Вопрос к товару" data-am="Հարց ապրանքի վերաբերյալ">${t('Вопрос к товару', 'Հարց ապրանքի վերաբերյալ')}</div>
+          <div class="calc-price">500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="250">
+          <div class="calc-label" data-ru="Написание текста отзыва" data-am="Կարծիքի տեքստի գրում">${t('Написание текста отзыва', 'Կարծիքի տեքստի գրում')}</div>
+          <div class="calc-price">250 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="100">
+          <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Բրենդի / էջի բաժանորդագրություն">${t('Подписка на бренд / страницу', 'Բրենդի / էջի բաժանորդագրություն')}</div>
+          <div class="calc-price">100 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ФОТОСЪЁМКА ===== -->
+      <div class="calc-group" id="cg-photo">
+        <div class="calc-row" data-price="3500">
+          <div class="calc-label" data-ru="Фотосессия в гардеробной WB (жен. модель)" data-am="Լուսանկարահանում WB հագուստապահարանում (կին մոդել)">${t('Фотосессия в гардеробной WB (жен. модель)', 'Լուսանկարահանում WB հագուստապահարանում (կին մոդել)')}</div>
+          <div class="calc-price">3 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="4500">
+          <div class="calc-label" data-ru="Фотосессия в гардеробной WB (муж. модель)" data-am="Լուսանկարահանում WB հագուստապահարանում (տղամարդ մոդել)">${t('Фотосессия в гардеробной WB (муж. модель)', 'Լուսանկարահանում WB հագուստապահարանում (տղամարդ մոդել)')}</div>
+          <div class="calc-price">4 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Предметная фотосъёмка (3 фото)" data-am="Առարկայական լուսանկարահանում (3 լուսանկար)">${t('Предметная фотосъёмка (3 фото)', 'Առարկայական լուսանկարահանում (3 լուսանկար)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="5000">
+          <div class="calc-label" data-ru="Предметная съёмка (крупное / техника, 3 фото)" data-am="Առարկայական լուսանկարահանում (խոշոր / տեխնիկա, 3 լուս.)">${t('Предметная съёмка (крупное / техника, 3 фото)', 'Առարկայական լուսանկարահանում (խոշոր / տեխնիկա, 3 լուս.)')}</div>
+          <div class="calc-price">5 000 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">${t('Ребёнок модель (до 14 лет)', 'Երեխա մոդել (մինչև 14 տարեկան)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="7000">
+          <div class="calc-label" data-ru="Видеообзор товара" data-am="Ապրանքի վիդեոհոլովակ">${t('Видеообзор товара', 'Ապրանքի վիդեոհոլովակ')}</div>
+          <div class="calc-price">7 000 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ФФ (Фулфилмент) ===== -->
+      <div class="calc-group" id="cg-ff">
+        <div class="calc-row" data-price="100">
+          <div class="calc-label" data-ru="Замена штрихкода" data-am="Շտրիխկոդի փոխարինում">${t('Замена штрихкода', 'Շտրիխկոդի փոխարինում')}</div>
+          <div class="calc-price">100 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="200">
+          <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Վերափաթեթավորում (մեր փաթեթ)">${t('Переупаковка (наша)', 'Վերափաթեթավորում (մեր փաթեթ)')}</div>
+          <div class="calc-price">200 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="150">
+          <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Վերափաթեթավորում (հաճախորդի փաթեթ)">${t('Переупаковка (клиента)', 'Վերափաթեթավորում (հաճախորդի փաթեթ)')}</div>
+          <div class="calc-price">150 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ЛОГИСТИКА ===== -->
+      <div class="calc-group" id="cg-logistics">
+        <div class="calc-row" data-price="2000">
+          <div class="calc-label" data-ru="Доставка на склад WB (1 коробка 60х40х40)" data-am="Առաքում WB պահեստ (1 տուփ 60x40x40)">${t('Доставка на склад WB (1 коробка 60х40х40)', 'Առաքում WB պահեստ (1 տուփ 60x40x40)')}</div>
+          <div class="calc-price">2 000 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Доставка до вашего склада (1 коробка 60х40х40)" data-am="Առաքում ձեր պահեստ (1 տուփ 60x40x40)">${t('Доставка до вашего склада (1 коробка 60х40х40)', 'Առաքում ձեր պահեստ (1 տուփ 60x40x40)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ПРОЧИЕ УСЛУГИ ===== -->
+      <div class="calc-group" id="cg-other">
+        <div class="calc-row" data-price="1500">
+          <div class="calc-label" data-ru="Глажка одежды (одиночная вещь)" data-am="Հագուստի արդուկում (մեկ իր)">${t('Глажка одежды (одиночная вещь)', 'Հագուստի արդուկում (մեկ իր)')}</div>
+          <div class="calc-price">1 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Глажка одежды (верхняя одежда)" data-am="Հագուստի արդուկում (վերնահագուստ)">${t('Глажка одежды (верхняя одежда)', 'Հագուստի արդուկում (վերնահագուստ)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="1500">
+          <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Վերցնում ՊՎԶ-ից">${t('Забор из ПВЗ для съёмки', 'Վերցնում ՊՎԶ-ից')}</div>
+          <div class="calc-price">1 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="1500">
+          <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Վերադարձ ՊՎԶ լուսանկարահանումից հետո">${t('Возврат в ПВЗ после съёмки', 'Վերադարձ ՊՎԶ լուսանկարահանումից հետո')}</div>
+          <div class="calc-price">1 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <div class="calc-total">
+        <div class="calc-total-label" data-ru="Итого:" data-am="Ընդամենը:">${t('Итого:', 'Ընդամենը:')}</div>
+        <div class="calc-total-value" id="calcTotal" data-total="0">0 ֏</div>
+      </div>
+
+      <!-- Referral code field -->
+      <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:6px"><i class="fas fa-gift" style="margin-right:6px"></i><span data-ru="Есть промокод?" data-am="Պրոմոկոդ ունեք?">${t('Есть промокод?', 'Պրոմոկոդ ունեք?')}</span></label>
+            <input type="text" id="refCodeInput" placeholder="PROMO2026" style="width:100%;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;font-family:inherit;text-transform:uppercase;outline:none;transition:var(--t)" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <button onclick="checkRefCode()" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;white-space:nowrap"><i class="fas fa-check-circle" style="margin-right:6px"></i><span data-ru="Применить" data-am="Կիրառել">${t('Применить', 'Կիրառել')}</span></button>
+        </div>
+        <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
+      </div>
+
+      <div class="calc-cta" style="display:none">
+        <a href="https://wa.me/37455226224" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
+          <i class="fab fa-whatsapp"></i>
+          <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">${t('Заказать сейчас', 'Պատվիրել հիմա')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PROCESS (5 steps) ===== -->
+<section class="section" id="process" data-section-id="process">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как мы работаем" data-am="Ինչպես ենք աշխատում">${t('Как мы работаем', 'Ինչպես ենք աշխատում')}</span></div>
+      <h2 class="section-title" data-ru="5 шагов от заявки до ТОПа" data-am="5 քայլ մինչև TOP">${t('5 шагов от заявки до ТОПа', '5 քայլ մինչև TOP')}</h2>
+    </div>
+    <div class="process-grid">
+      <div class="step"><div class="step-line"></div><div class="step-num">1</div><h4 data-ru="Заявка" data-am="Հայտ">${t('Заявка', 'Հայտ')}</h4><p data-ru="Пишете в Telegram и описываете товар" data-am="Գրում եք Telegram-ով և նկարագրում ապրանքը">${t('Пишете в Telegram и описываете товар', 'Գրում եք Telegram-ով և նկարագրում ապրանքը')}</p></div>
+      <div class="step"><div class="step-line"></div><div class="step-num">2</div><h4 data-ru="Анализ" data-am="Վերլուծություն">${t('Анализ', 'Վերլուծություն')}</h4><p data-ru="Анализируем нишу и создаём стратегию" data-am="Վերլուծում ենք ապրանքը և ստեղծում ստրատեգիա">${t('Анализируем нишу и создаём стратегию', 'Վերլուծում ենք ապրանքը և ստեղծում ստրատեգիա')}</p></div>
+      <div class="step"><div class="step-line"></div><div class="step-num">3</div><h4 data-ru="Запуск" data-am="Մեկնարկ">${t('Запуск', 'Մեկնարկ')}</h4><p data-ru="Начинаем выкупы в течение 24 часов" data-am="Սկսում ենք գնումները 24 ժամվա ընթացքում">${t('Начинаем выкупы в течение 24 часов', 'Սկսում ենք գնումները 24 ժամվա ընթացքում')}</p></div>
+      <div class="step"><div class="step-line"></div><div class="step-num">4</div><h4 data-ru="Контроль" data-am="Վերահսկողություն">${t('Контроль', 'Վերահսկողություն')}</h4><p data-ru="Ежедневные отчёты о прогрессе" data-am="Ամենօրյա հաշվետվություններ ընթացքի մասին">${t('Ежедневные отчёты о прогрессе', 'Ամենօրյա հաշվետվություններ ընթացքի մասին')}</p></div>
+      <div class="step"><div class="step-num">5</div><h4 data-ru="Результат" data-am="Արդյունք">${t('Результат', 'Արդյունք')}</h4><p data-ru="Ваш товар в ТОПе выдачи WB" data-am="Ձեր ապրանքը WB-ի TOP-ում է">${t('Ваш товар в ТОПе выдачи WB', 'Ձեր ապրանքը WB-ի TOP-ում է')}</p></div>
+    </div>
+    <div class="section-cta">
+      <a href="${managerTgUrl}" target="_blank" rel="noopener" class="btn btn-tg"><i class="fab fa-telegram"></i> <span data-ru="Написать менеджеру" data-am="Գրել մենեջերին">${t('Написать менеджеру', 'Գրել մենեջերին')}</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FINAL CTA STRIP ===== -->
+<section class="svc-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Готовы заказать?" data-am="Պատրա՞ստ եք պատվիրել">${t('Готовы заказать?', 'Պատրա՞ստ եք պատվիրել')}</h3>
+        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${t('Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+      </div>
+      <div class="acs-actions">
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Telegram" data-am="Telegram">Telegram</span>
+        </a>
+        <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+        <a href="/contacts" class="btn btn-primary">
+          <i class="fas fa-envelope"></i>
+          <span data-ru="Контакты" data-am="Կոնտակտներ">${t('Контакты', 'Կոնտակտներ')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  return renderPageShell({
+    page: 'services',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'services-page',
+    mainHtml,
+    extraHead,
+  })
+}
+
+// =====================================================================
+// renderBuyoutsPage — phase 2C "heavy" page for /buyouts.
+// Topical content about Wildberries buyouts: hero, WB warning banner,
+// stats, what buyouts are, why they work (6-step funnel), 11 000 ₽
+// budget comparison, official-WB legal block, the FULL calculator and
+// a final CTA strip. The calculator works against `window.__SITE_DATA`
+// injected post-SSR by the /buyouts route handler (mirrors `/services`).
+// All copy is bilingual via data-ru / data-am with the requested
+// language rendered server-side so SEO sees real content.
+// =====================================================================
+function renderBuyoutsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  const seo = {
+    title: t(
+      'Выкупы Wildberries — Go to Top | Быстрый рост позиций',
+      'Հետագնումներ Wildberries — Go to Top | Արագ TOP դիրքեր'
+    ),
+    description: t(
+      'Выкупы на Wildberries для роста позиций товара в TOP. 200+ выкупов в день, собственный склад в Ереване, 0 блокировок',
+      'Wildberries-ում հետագնումներ՝ ապրանքների TOP դիրքերի համար. 200+ հետագնում օրական, սեփական պահեստ Երևանում, ոչ մի արգելափակում'
+    ),
+    ogImage: `${siteOrigin}/static/img/og-image.png`,
+  }
+
+  // Page-only styles — copy of the subsets needed for buyouts: hero,
+  // section primitives, calculator, why-block + compare-box, buyout-detail,
+  // stats-bar, wb-banner, wb-official-badge, highlight-result, CTA strip.
+  // Reuses --purple/--bg-card/--text/etc tokens declared in renderPageShell.
+  const extraHead = `<style>
+.buyouts-page{padding-top:88px}
+/* Hero */
+.bp-hero{padding:24px 0 48px}
+.bp-hero .bh-inner{max-width:880px;margin:0 auto;text-align:center}
+.bp-hero .bh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.bp-hero h1{font-size:clamp(1.9rem,3.6vw,2.9rem);font-weight:800;line-height:1.15;margin-bottom:16px;letter-spacing:-0.02em}
+.bp-hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.bp-hero .bh-desc{font-size:1.02rem;color:var(--text-sec);margin:0 auto 24px;line-height:1.7;max-width:680px}
+.bp-hero .bh-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+/* Section primitives (subset from home) */
+.section{padding:48px 0;overflow:visible}
+.section-dark{background:var(--bg-surface)}
+.section-header{text-align:center;margin-bottom:36px}
+.section-header h2 .gr,.section-title .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
+.section-title{font-size:clamp(1.5rem,2.6vw,2rem);font-weight:800;line-height:1.2;margin-bottom:12px;letter-spacing:-0.02em}
+.section-sub{font-size:1rem;color:var(--text-sec);max-width:680px;margin:0 auto;line-height:1.7}
+.section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px}
+.section-cta .btn{font-size:0.9rem;padding:12px 24px}
+.btn-success{background:linear-gradient(135deg,#10B981,#059669);color:white;box-shadow:0 4px 15px rgba(16,185,129,0.3)}
+.btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(16,185,129,0.5)}
+.btn-warning{background:linear-gradient(135deg,#F59E0B,#D97706);color:white;box-shadow:0 4px 15px rgba(245,158,11,0.3)}
+.btn-warning:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(245,158,11,0.5)}
+/* WB warning banner (top of page) */
+.wb-banner{padding:0 0 24px}
+.wb-banner-inner{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
+.wb-banner-card{display:flex;align-items:center;gap:16px;padding:16px 28px;background:linear-gradient(135deg,#ff3366,var(--purple));border-radius:var(--r);flex:1;min-width:280px;position:relative;overflow:hidden}
+.wb-banner-card::after{content:"!";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:3.5rem;font-weight:900;color:rgba(255,255,255,0.15)}
+.wb-banner-card .wb-icon{font-size:1.6rem;color:#fff}
+.wb-banner-card .wb-text{font-weight:800;font-size:1rem;color:#fff;line-height:1.3;text-transform:uppercase}
+.wb-banner-right{display:flex;align-items:center;gap:16px;padding:16px 28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);flex:1;min-width:280px}
+.wb-banner-right .wb-r-icon{font-size:1.4rem}
+.wb-banner-right .wb-r-text{font-weight:700;font-size:0.92rem;line-height:1.4}
+.wb-banner-right .btn{margin-left:auto;white-space:nowrap;font-size:0.82rem;padding:10px 20px}
+/* Stats bar */
+.stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
+.stat-card .stat-big{font-size:2.8rem;font-weight:900;color:var(--purple);line-height:1}
+.stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
+/* Buyout detail */
+.buyout-detail{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:48px}
+.buyout-detail-header{margin-bottom:32px}
+.buyout-detail-header h2{font-size:2rem;font-weight:800;margin-bottom:12px}
+.buyout-detail-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.buyout-detail-header .subtitle{font-weight:700;font-size:1.1rem;margin-bottom:8px}
+.buyout-detail-header p{color:var(--text-sec);font-size:0.92rem;line-height:1.7}
+.buyout-grid{display:grid;grid-template-columns:1.2fr 1fr 1fr;gap:20px}
+.buyout-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;transition:var(--t)}
+.buyout-card:hover{border-color:rgba(139,92,246,0.3)}
+.buyout-card h4{font-size:1rem;font-weight:700;margin-bottom:12px;text-transform:uppercase;color:var(--accent)}
+.buyout-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7}
+.buyout-card ul{list-style:none;margin-top:12px;counter-reset:buyout-step}
+.buyout-card ul li{padding:4px 0;font-size:0.88rem;color:var(--text-sec);counter-increment:buyout-step}
+.buyout-card ul li::before{content:counter(buyout-step);color:var(--purple);margin-right:8px;font-weight:700}
+/* Why-block + compare-box */
+.why-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px;margin-bottom:24px}
+.why-block h3{font-size:1.3rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.why-block h3 i{color:var(--purple);font-size:1.1rem}
+.why-block p{color:var(--text-sec);font-size:0.92rem;line-height:1.8;margin-bottom:16px}
+.why-block p:last-child{margin-bottom:0}
+.why-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px 0}
+.why-step{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;display:flex;gap:14px;align-items:flex-start;transition:var(--t)}
+.why-step:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-2px)}
+.why-step-num{width:36px;height:36px;min-width:36px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--accent));color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem}
+.why-step h4{font-size:0.95rem;font-weight:600;margin-bottom:4px}
+.why-step p{font-size:0.85rem;color:var(--text-sec);line-height:1.6;margin:0}
+.compare-box{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin:24px 0}
+.compare-side{padding:24px;border-radius:var(--r);border:1px solid var(--border)}
+.compare-side.bad{background:rgba(239,68,68,0.05);border-color:rgba(239,68,68,0.2)}
+.compare-side.good{background:rgba(139,92,246,0.05);border-color:rgba(139,92,246,0.3)}
+.compare-side h4{font-size:1rem;font-weight:700;margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.compare-side.bad h4{color:#ef4444}
+.compare-side.good h4{color:var(--purple)}
+.compare-side p{font-size:0.88rem;color:var(--text-sec);line-height:1.7;margin:0}
+.compare-side .price-tag{font-size:1.3rem;font-weight:800;margin:8px 0}
+.compare-side.bad .price-tag{color:#ef4444}
+.compare-side.good .price-tag{color:var(--purple)}
+.wb-official-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 16px;border-radius:20px;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);color:#10B981;font-weight:600;font-size:0.88rem;margin-bottom:16px}
+.highlight-result{background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(168,85,247,0.08));border:1px solid rgba(139,92,246,0.2);border-radius:var(--r);padding:20px 24px;margin:20px 0;font-size:0.95rem;line-height:1.7}
+.highlight-result i{color:var(--purple);margin-right:8px}
+.highlight-result strong{color:var(--text)}
+/* Calculator (subset from home / services) */
+.calc-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px;max-width:860px;margin:0 auto}
+.calc-tabs{display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap}
+.calc-tab{padding:8px 20px;border-radius:50px;font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--t);background:var(--bg-surface);border:1px solid var(--border);color:var(--text-muted)}
+.calc-tab.active{background:var(--purple);color:white;border-color:var(--purple)}
+.calc-tab:hover:not(.active){border-color:var(--purple);color:var(--text)}
+.calc-group{display:none}
+.calc-group.active{display:block}
+.calc-packages{margin-bottom:28px;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(249,115,22,0.02));border:1px solid rgba(245,158,11,0.15);border-radius:16px;overflow:visible}
+.calc-packages-header{text-align:center;margin-bottom:20px}
+.calc-packages-title{font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--text)}
+.calc-packages-subtitle{font-size:0.85rem;color:var(--text-muted);margin-top:6px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5}
+.calc-packages-grid{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:nowrap;padding:20px 10px;overflow:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.calc-packages-grid::-webkit-scrollbar{display:none}
+.calc-packages-grid.single-pkg{max-width:400px;margin:0 auto}
+.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;flex:1 1 0;min-width:180px;max-width:280px;display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent}
+.calc-pkg-card:hover{border-color:#f59e0b;transform:translateY(-3px);box-shadow:0 12px 30px rgba(245,158,11,0.12)}
+.calc-pkg-card.selected{border-color:#f59e0b !important;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(249,115,22,0.04)) !important;box-shadow:0 0 0 3px rgba(245,158,11,0.25),0 8px 20px rgba(245,158,11,0.12) !important}
+.calc-pkg-card.selected::after{content:'\\2713';position:absolute;top:14px;left:14px;width:22px;height:22px;background:#f59e0b;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;z-index:10}
+.calc-pkg-card .pkg-tier-badge{position:absolute;top:0;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:0.72rem;padding:4px 14px;border-radius:0 0 12px 12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(245,158,11,0.3)}
+.calc-pkg-card.pkg-crown-gold{border:2px solid rgba(255,215,0,0.3);border-top:4px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.08),0 4px 12px rgba(255,215,0,0.04);z-index:3;padding:24px 22px;background:linear-gradient(145deg,var(--bg-surface),rgba(255,215,0,0.03));transform:scale(1.03)}
+.calc-pkg-card.pkg-crown-silver{border:2px solid rgba(192,192,192,0.3);border-top:3px solid #C0C0C0;z-index:2}
+.calc-pkg-card.pkg-crown-bronze{border:2px solid rgba(205,127,50,0.25);border-top:3px solid #CD7F32;z-index:1}
+.calc-pkg-card .pkg-name{font-weight:700;font-size:1rem;margin-bottom:6px;margin-top:18px;line-height:1.3}
+.calc-pkg-card .pkg-desc{font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;flex-grow:1}
+.calc-pkg-card .pkg-prices{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.85rem}
+.calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.25rem;color:#f59e0b}
+.calc-pkg-card .pkg-discount{background:linear-gradient(135deg,#059669,#10B981);color:white;font-size:0.7rem;padding:3px 8px;border-radius:10px;font-weight:700}
+.calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
+.calc-pkg-card .pkg-items div{margin-bottom:2px;line-height:1.7}
+.calc-pkg-card .pkg-items div i{color:#22c55e;font-size:0.65rem;margin-right:5px;vertical-align:middle}
+.calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.calc-row:last-of-type{border-bottom:none}
+.calc-label{font-size:0.92rem;font-weight:500}
+.calc-price{font-size:0.82rem;color:var(--text-muted);white-space:nowrap}
+.calc-input{display:flex;align-items:center;gap:8px}
+.calc-input button{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.95rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
+.calc-input button:hover{border-color:var(--purple);background:rgba(139,92,246,0.1)}
+.calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none}
+.calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+.calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.calc-total{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple);gap:12px;flex-wrap:wrap}
+.calc-total-label{font-size:1.1rem;font-weight:600;flex-shrink:0;white-space:nowrap}
+.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:normal;text-align:right;min-width:0;overflow-wrap:break-word}
+.calc-old-price{font-size:1rem;font-weight:600;color:var(--text-sec);text-decoration:line-through;opacity:0.7;margin-right:6px}
+.calc-discount-line{font-size:0.82rem;color:var(--success);font-weight:600;margin-top:2px}
+.calc-total-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.calc-cta{margin-top:24px;text-align:center}
+.buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
+.buyout-tier-info strong{color:var(--accent)}
+/* Final CTA strip (re-uses /services pattern) */
+.bp-cta-strip{padding:24px 0 64px}
+.bp-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.bp-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.bp-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.bp-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.bp-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:1024px){
+  .buyout-grid{grid-template-columns:1fr 1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr)}
+  .wb-banner-inner{flex-direction:column}
+}
+@media(max-width:900px){
+  .buyouts-page{padding-top:80px}
+  .calc-wrap{padding:24px}
+  .bp-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .bp-cta-strip .acs-actions{width:100%}
+  .bp-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:768px){
+  .compare-box{grid-template-columns:1fr}
+  .why-steps{grid-template-columns:1fr}
+  .buyout-grid{grid-template-columns:1fr}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:20px}
+  .wb-banner-inner{flex-direction:column;gap:16px;text-align:center}
+  .wb-banner-right{flex-direction:column;gap:8px;min-width:0}
+  .wb-banner-right .btn{width:100%;margin-left:0}
+  .buyout-detail{padding:24px}
+  .why-block{padding:24px}
+  .calc-row{grid-template-columns:1fr auto;gap:4px 8px}
+  .calc-row .calc-input{grid-column:1/-1;justify-content:flex-start}
+  .calc-packages{padding:16px 0;overflow:visible;position:relative}
+  .calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:12px;padding:12px 16px;justify-content:flex-start}
+  .calc-packages-grid::-webkit-scrollbar{display:none}
+  .calc-pkg-card{flex:0 0 72vw;max-width:72vw;min-width:0;padding:18px 16px;border-radius:14px;scroll-snap-align:center}
+  .calc-pkg-card.pkg-crown-gold{transform:none;flex:0 0 72vw;max-width:72vw}
+}
+@media(max-width:600px){
+  .bp-cta-strip .acs-actions{flex-direction:column}
+  .bp-cta-strip .acs-actions .btn{width:100%}
+  .stat-card .stat-big{font-size:2.2rem}
+  .wb-banner-card,.wb-banner-right{min-width:0;padding:12px 16px}
+  .buyout-detail-header h2{font-size:1.5rem}
+}
+@media(max-width:480px){
+  .calc-wrap{padding:14px}
+  .calc-tab{padding:5px 10px;font-size:0.72rem}
+  .why-block{padding:20px}
+  .buyout-detail{padding:20px}
+  .buyout-card{padding:20px}
+}
+/* Force correct order: content blocks BEFORE CTA buttons in why-buyouts &
+   fifty-vs-fifty (mirror of home-page rules so layout matches `/`). */
+section#why-buyouts .container{display:flex;flex-direction:column}
+section#why-buyouts .section-header{order:0!important}
+section#why-buyouts .why-block{order:1!important}
+section#why-buyouts .section-cta{order:2!important}
+section#why-buyouts .why-block > *{order:0!important}
+section#why-buyouts .why-block .highlight-result{order:99!important}
+section#fifty-vs-fifty .container{display:flex;flex-direction:column}
+section#fifty-vs-fifty .section-header{order:0!important}
+section#fifty-vs-fifty .why-block{order:1!important}
+section#fifty-vs-fifty .section-cta{order:2!important}
+section#fifty-vs-fifty .why-block > *{order:0!important}
+section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
+</style>`
+
+  const tgUrl = PLACEHOLDER_TG_URL
+  const managerTgUrl = 'https://t.me/suport_admin_2'
+
+  const mainHtml = `
+<!-- ===== BUYOUTS HERO ===== -->
+<section class="bp-hero">
+  <div class="container">
+    <div class="bh-inner">
+      <div class="bh-eyebrow">
+        <i class="fas fa-shopping-bag"></i>
+        <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն">${t('Услуга выкупа', 'Գնումի ծառայություն')}</span>
+      </div>
+      <h1>
+        <span data-ru="Выкупы на" data-am="Հետագնումներ">${t('Выкупы на', 'Հետագնումներ')}</span>
+        <span class="gr">Wildberries</span>
+      </h1>
+      <p class="bh-desc" data-ru="Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване." data-am="Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։">${t('Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване.', 'Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։')}</p>
+      <div class="bh-cta">
+        <a href="#calculator" class="btn btn-primary btn-lg">
+          <i class="fas fa-calculator"></i>
+          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը">${t('Открыть калькулятор', 'Բացել հաշվիչը')}</span>
+        </a>
+        <a href="javascript:void(0)" onclick="openCallbackModal()" class="btn btn-outline btn-lg">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Связаться" data-am="Կապ հաստատել">${t('Связаться', 'Կապ հաստատել')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WB WARNING BANNER ===== -->
+<div class="wb-banner" data-section-id="wb-banner">
+  <div class="container">
+    <div class="wb-banner-inner">
+      <div class="wb-banner-card">
+        <i class="fas fa-gavel wb-icon"></i>
+        <div class="wb-text" data-ru="WB официально отменил штрафы за выкупы!" data-am="WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!">${t('WB официально отменил штрафы за выкупы!', 'WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!')}</div>
+      </div>
+      <div class="wb-banner-right">
+        <span class="wb-r-icon">🚀</span>
+        <div class="wb-r-text" data-ru="Повысь рейтинг магазина прямо сейчас" data-am="Բարձրացրեք խանութի վարկանիշը հիմա">${t('Повысь рейтинг магазина прямо сейчас', 'Բարձրացրեք խանութի վարկանիշը հիմա')}</div>
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary"><span data-ru="Узнать" data-am="Իմանալ">${t('Узнать', 'Իմանալ')}</span></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== STATS BAR ===== -->
+<div class="stats-bar" data-section-id="stats-bar">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="500">0</div>
+        <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ">${t('поставщиков сотрудничают с нами', 'մատակարար համագործակցում է մեզ հետ')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="1000">0+</div>
+        <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով">${t('аккаунтов с индивидуальной картой', 'հաշիվներ անհատական քարտով')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="21">0</div>
+        <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="օր մինչև TOP-ում հայտնվելը">${t('день до выхода в ТОП', 'օր մինչև TOP-ում հայտնվելը')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="200">0+</div>
+        <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">${t('выкупов каждый день', 'գնում ամեն օր')}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ЧТО ТАКОЕ ВЫКУПЫ (buyout-detail) ===== -->
+<section class="section" data-section-id="buyout-detail">
+  <div class="container">
+    <div class="buyout-detail">
+      <div class="buyout-detail-header">
+        <div class="section-badge"><i class="fas fa-shopping-bag"></i> <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն">${t('Услуга выкупа', 'Գնումի ծառայություն')}</span></div>
+        <h2 data-ru="Что включает в себя услуга выкупа" data-am="Ինչ է ներառում գնումի ծառայությունը">${t('Что включает в себя ', 'Ինչ է ներառում ')}<span class="gr">${t('услуга выкупа', 'գնումի ծառայությունը')}</span></h2>
+        <p data-ru="Индивидуальный подход к каждому клиенту. Выкупы только по ключевым запросам, каждый заказ оформляет реальный человек вручную." data-am="Անհատական մոտեցում յուրաքանչյուր հաճախորդի համար: Գնումներ միայն բանալի հարցումներով, յուրաքանչյուր պատվերը կատարում է իրական մարդ ձեռքով:">${t('Индивидуальный подход к каждому клиенту. Выкупы только по ключевым запросам, каждый заказ оформляет реальный человек вручную.', 'Անհատական մոտեցում յուրաքանչյուր հաճախորդի համար: Գնումներ միայն բանալի հարցումներով, յուրաքանչյուր պատվերը կատարում է իրական մարդ ձեռքով:')}</p>
+      </div>
+      <div class="buyout-grid">
+        <div class="buyout-card">
+          <h4 data-ru="Полное сопровождение" data-am="Լիարժեք ուղեկցում">${t('Полное сопровождение', 'Լիարժեք ուղեկցում')}</h4>
+          <ul>
+            <li data-ru="Консультация" data-am="Խորհրդատվություն">${t('Консультация', 'Խորհրդատվություն')}</li>
+            <li data-ru="Создание чата с менеджером" data-am="Մենեջերի հետ չատի ստեղծում">${t('Создание чата с менеджером', 'Մենեջերի հետ չատի ստեղծում')}</li>
+            <li data-ru="Согласование плана выкупов" data-am="Գնումների պլանի համաձայնեցում">${t('Согласование плана выкупов', 'Գնումների պլանի համաձայնեցում')}</li>
+            <li data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի հարցումներով">${t('Выкупы по ключевым запросам', 'Գնումներ բանալի հարցումներով')}</li>
+            <li data-ru="Забор товара из ПВЗ курьерами" data-am="Ապրանքի ստացում ՊՎԶ-ից մեր առաքիչների օգնությամբ">${t('Забор товара из ПВЗ курьерами', 'Ապրանքի ստացում ՊՎԶ-ից մեր առաքիչների օգնությամբ')}</li>
+            <li data-ru="Возврат на склады маркетплейсов" data-am="Վերադարձ մարկետփլեյսների պահեստներ">${t('Возврат на склады маркетплейсов', 'Վերադարձ մարկետփլեյսների պահեստներ')}</li>
+            <li data-ru="Публикация отзывов" data-am="Կարծիքների հրապարակում">${t('Публикация отзывов', 'Կարծիքների հրապարակում')}</li>
+          </ul>
+        </div>
+        <div class="buyout-card">
+          <h4 data-ru="Отчётность" data-am="Հաշվետվություն">${t('Отчётность', 'Հաշվետվություն')}</h4>
+          <p data-ru="Формирование итоговой отчётности по каждому выкупу. Полная прозрачность на каждом этапе." data-am="Վերջնական հաշվետվության ձևավորում յուրաքանչյուր գնումի համար: Լիարժեք թափանցիկություն յուրաքանչյուր փուլում:">${t('Формирование итоговой отчётности по каждому выкупу. Полная прозрачность на каждом этапе.', 'Վերջնական հաշվետվության ձևավորում յուրաքանչյուր գնումի համար: Լիարժեք թափանցիկություն յուրաքանչյուր փուլում:')}</p>
+          <div style="margin-top:16px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning" style="font-size:0.82rem;padding:9px 18px"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы сейчас" data-am="Սկսել գնումները">${t('Начать выкупы сейчас', 'Սկսել գնումները')}</span></a></div>
+        </div>
+        <div class="buyout-card">
+          <h4 data-ru="Контроль" data-am="Վերահսկողություն">${t('Контроль', 'Վերահսկողություն')}</h4>
+          <p data-ru="Сопровождение и контроль на всех этапах. Точное следование алгоритму для безопасности вашего кабинета." data-am="Ուղեկցում և վերահսկողություն բոլոր փուլերում: Ալգորիթմի ճիշտ հետևողականություն ձեր հաշվի անվտանգության համար:">${t('Сопровождение и контроль на всех этапах. Точное следование алгоритму для безопасности вашего кабинета.', 'Ուղեկցում և վերահսկողություն բոլոր փուլերում: Ալգորիթմի ճիշտ հետևողականություն ձեր հաշվի անվտանգության համար:')}</p>
+          <div style="margin-top:16px;text-align:center"><a href="${managerTgUrl}" target="_blank" rel="noopener" class="btn btn-tg" style="font-size:0.82rem;padding:9px 18px"><i class="fab fa-telegram"></i> <span data-ru="Получить индивидуальный расчёт" data-am="Ստանալ ինդիվիդուալ հաշվարկ">${t('Получить индивидуальный расчёт', 'Ստանալ ինդիվիդուալ հաշվարկ')}</span></a></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== WHY BUYOUTS WORK (6-step funnel) ===== -->
+<section class="section" id="why-buyouts" data-section-id="why-buyouts">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աշխատում">${t('Почему это работает', 'Ինչու է սա աշխատում')}</span></div>
+      <h2 class="section-title" data-ru="Почему выкупы по ключевым запросам — самый эффективный способ продвижения" data-am="Ինչու են բանալի բառերով գնումները ամենաարդյունավետը">${t('Почему выкупы по ключевым запросам — ', 'Ինչու են բանալի բառերով գնումները ')}<span class="gr">${t('самый эффективный способ', 'ամենաարդյունավետը')}</span>${t(' продвижения', '')}</h2>
+    </div>
+
+    <div class="why-block">
+      <h3><i class="fas fa-funnel-dollar"></i> <span data-ru="Мы не просто покупаем ваш товар — мы прокачиваем всю воронку" data-am="Մենք ոչ միայն գնում ենք ձեր ապրանքը — մենք բարձրացնում ենք ողջ ձագարի կոնվերսիաները">${t('Мы не просто покупаем ваш товар — мы прокачиваем всю воронку', 'Մենք ոչ միայն գնում ենք ձեր ապրանքը — մենք բարձրացնում ենք ողջ ձագարի կոնվերսիաները')}</span></h3>
+      <p data-ru="Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:" data-am="Յուրաքանչյուր գնում բանալի բառով — դա ձեր քարտի լիարժեք առաջխաղացում է: Մեր մարդիկ ամեն ինչ անում են այնպես, ինչպես իրական գնորդը: Ահա թե ինչ է տեղի ունենում յուրաքանչյուր գնման ժամանակ:">${t('Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:', 'Յուրաքանչյուր գնում բանալի բառով — դա ձեր քարտի լիարժեք առաջխաղացում է: Մեր մարդիկ ամեն ինչ անում են այնպես, ինչպես իրական գնորդը: Ահա թե ինչ է տեղի ունենում յուրաքանչյուր գնման ժամանակ:')}</p>
+
+      <div class="why-steps">
+        <div class="why-step"><div class="why-step-num">1</div><div><h4 data-ru="Поиск по ключевому запросу" data-am="Որոնում բանալի բառով">${t('Поиск по ключевому запросу', 'Որոնում բանալի բառով')}</h4><p data-ru="Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB" data-am="Գտնում ենք ձեր ապրանքը այնպես, ինչպես իրական գնորդը — WB-ի որոնման տողով">${t('Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB', 'Գտնում ենք ձեր ապրանքը այնպես, ինչպես իրական գնորդը — WB-ի որոնման տողով')}</p></div></div>
+        <div class="why-step"><div class="why-step-num">2</div><div><h4 data-ru="Просмотр карточки" data-am="Քարտի դիտում">${t('Просмотр карточки', 'Քարտի դիտում')}</h4><p data-ru="Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход" data-am="Լիարժեք դիտում ենք բոլոր լուսանկարներն ու տեսանյութերը, թերթում ենք նկարագրությունը — բարձրացնում ենք դիտումից անցման փոխարկումը">${t('Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход', 'Լիարժեք դիտում ենք բոլոր լուսանկարներն ու տեսանյութերը, թերթում ենք նկարագրությունը — բարձրացնում ենք դիտումից անցման փոխարկումը')}</p></div></div>
+        <div class="why-step"><div class="why-step-num">3</div><div><h4 data-ru="Работа с отзывами" data-am="Աշխատանք կարծիքների հետ">${t('Работа с отзывами', 'Աշխատանք կարծիքների հետ')}</h4><p data-ru="Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов" data-am="Թերթում ենք կարծիքները, լայքում դրականները — սա բարելավում է լավագույն կարծիքների վարկանիշը">${t('Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов', 'Թերթում ենք կարծիքները, լայքում դրականները — սա բարելավում է լավագույն կարծիքների վարկանիշը')}</p></div></div>
+        <div class="why-step"><div class="why-step-num">4</div><div><h4 data-ru="Добавление конкурентов" data-am="Մրցակիցների ավելացում">${t('Добавление конкурентов', 'Մրցակիցների ավելացում')}</h4><p data-ru="Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя" data-am="Զամբյուղում ավելացնում ենք մրցակիցների ապրանքները ձեր ապրանքի հետ — իմիտացիա ենք անում իրական գնորդի վարքագիծը">${t('Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя', 'Զամբյուղում ավելացնում ենք մրցակիցների ապրանքները ձեր ապրանքի հետ — իմիտացիա ենք անում իրական գնորդի վարքագիծը')}</p></div></div>
+        <div class="why-step"><div class="why-step-num">5</div><div><h4 data-ru="Удаление конкурентов из корзины" data-am="Մրցակիցների հեռացում զամբյուղից">${t('Удаление конкурентов из корзины', 'Մրցակիցների հեռացում զամբյուղից')}</h4><p data-ru="В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас" data-am="Պատվիրելու պահին հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը — WB-ն տեսնում է, որ ընտրում են հենց ձեզ">${t('В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас', 'Պատվիրելու պահին հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը — WB-ն տեսնում է, որ ընտրում են հենց ձեզ')}</p></div></div>
+        <div class="why-step"><div class="why-step-num">6</div><div><h4 data-ru="Заказ и получение" data-am="Պատվեր և ստացում">${t('Заказ и получение', 'Պատվեր և ստացում')}</h4><p data-ru="Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя" data-am="Ձևակերպում ենք պատվերը, վերցնում ՊՎԶ-ից, թողնում կարծիք — իրական գնորդի ամբողջական ցիկլ">${t('Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя', 'Ձևակերպում ենք պատվերը, վերցնում ՊՎԶ-ից, թողնում կարծիք — իրական գնորդի ամբողջական ցիկլ')}</p></div></div>
+      </div>
+
+      <div class="highlight-result" data-ru="В результате повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Արդյունքում բարձրանում են ձեր քարտի ԲՈԼՈՐ կոնվերսիաները՝ CTR, անցումներ, զամբյուղում ավելացումներ, պատվերներ: Քարտը ամրապնդվում է TOP-ում և սկսում ստանալ օրգանական տրաֆիկ: Որքան բարձր է դիրքը՝ այնքան ավելի շատ օրգանական վաճառքներ առանց լրացուցիչ ներդրումների:"><i class="fas fa-bolt"></i> <strong>${t('Результат:', 'Արդյունք:')}</strong> ${t('повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.', 'բարձրանում են ձեր քարտի <strong>ԲՈԼՈՐ կոնվերսիաները</strong>՝ CTR, անցումներ, զամբյուղում ավելացումներ, պատվերներ: Քարտը ամրապնդվում է TOP-ում և սկսում ստանալ <strong>օրգանական տրաֆիկ</strong>: Որքան բարձր է դիրքը՝ այնքան ավելի շատ օրգանական վաճառքներ առանց լրացուցիչ ներդրումների:')}</div>
+    </div>
+
+    <div class="section-cta">
+      <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы" data-am="Սկսել գնումները">${t('Начать выкупы', 'Սկսել գնումները')}</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== БЮДЖЕТ: 11 000 ₽ блогер vs выкупы ===== -->
+<section class="section section-dark" id="fifty-vs-fifty" data-section-id="fifty-vs-fifty">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-balance-scale-right"></i> <span data-ru="Сравнение бюджетов" data-am="Բյուջեների համեմատություն">${t('Сравнение бюджетов', 'Բյուջեների համեմատություն')}</span></div>
+      <h2 class="section-title" data-ru="11 000 ₽ на блогера vs 11 000 ₽ на выкупы" data-am="11 000 ₽ բլոգերին vs 11 000 ₽ գնումներին">${t('11 000 ₽ на блогера vs 11 000 ₽ на выкупы', '11 000 ₽ բլոգերին vs 11 000 ₽ գնումներին')}</h2>
+    </div>
+
+    <div class="why-block">
+      <h3><i class="fas fa-balance-scale-right"></i> <span data-ru="11 000 ₽ на блогера vs 11 000 ₽ на выкупы — что эффективнее?" data-am="11 000 ₽ բլոգերին vs 11 000 ₽ գնումներին — որն է ավելի արդյունավետ?">${t('11 000 ₽ на блогера vs 11 000 ₽ на выкупы — что эффективнее?', '11 000 ₽ բլոգերին vs 11 000 ₽ գնումներին — որն է ավելի արդյունավետ?')}</span></h3>
+      <div class="compare-box">
+        <div class="compare-side bad">
+          <h4><i class="fas fa-dice"></i> <span data-ru="Reels у блогера" data-am="Reels բլոգերի մոտ">${t('Reels у блогера', 'Reels բլոգերի մոտ')}</span></h4>
+          <div class="price-tag">11 000 ₽</div>
+          <p data-ru="1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это всегда риск без гарантий результата." data-am="1 տեսանյութ բլոգերի մոտ — դա վիճակախաղ է: Կհայտնվի՞ առաջարկություններում, թե ոչ — ոչ ոք չգիտի: Եթե չթռչի — գումարը կորած է: Դա միշտ ռիսկ է առանց արդյունքի երաշխիքների:">${t('1 видеоролик у блогера — это лотерея. Попадёт в рекомендации или нет — никто не знает. Если не залетит — деньги потеряны. Это <strong>всегда риск</strong> без гарантий результата.', '1 տեսանյութ բլոգերի մոտ — դա վիճակախաղ է: Կհայտնվի՞ առաջարկություններում, թե ոչ — ոչ ոք չգիտի: Եթե չթռչի — գումարը կորած է: Դա <strong>միշտ ռիսկ է</strong> առանց արդյունքի երաշխիքների:')}</p>
+        </div>
+        <div class="compare-side good">
+          <h4><i class="fas fa-chart-line"></i> <span data-ru="25 выкупов по ключевым" data-am="25 գնում բանալի բառերով">${t('25 выкупов по ключевым', '25 գնում բանալի բառերով')}</span></h4>
+          <div class="price-tag">11 000 ₽</div>
+          <p data-ru="25 выкупов по целевому запросу — это 100% проверенный способ продвижения. Ваш товар быстро поднимается в ТОП выдачи, закрепляется там и начинает привлекать органический трафик. Больше продаж. Больше гарантированной выручки." data-am="25 գնում թիրախային բանալիով — դա 100% ապացուցված առաջխաղացման մեթոդ է: Ձեր ապրանքը արագ բարձրանում է TOP-ում, ամրապնդվում և սկսում ներգրավել օրգանական տրաֆիկ: Ավելի շատ վաճառք, ավելի շատ երաշխավորված եկամուտ:">${t('25 выкупов по целевому запросу — это <strong>100% проверенный способ</strong> продвижения. Ваш товар быстро поднимается в ТОП выдачи, закрепляется там и начинает привлекать <strong>органический трафик</strong>. Больше продаж. Больше гарантированной выручки.', '25 գնում թիրախային բանալիով — դա <strong>100% ապացուցված մեթոդ</strong> է: Ձեր ապրանքը արագ բարձրանում է TOP-ում, ամրապնդվում և սկսում ներգրավել <strong>օրգանական տրաֆիկ</strong>: Ավելի շատ վաճառք, ավելի շատ երաշխավորված եկամուտ:')}</p>
+        </div>
+      </div>
+      <div class="highlight-result" data-ru="Факт: при выкупах по 1 ключевому запросу уже от 25 штук товар быстро продвигается в ТОП и закрепляется там надолго — за счёт улучшения всех поведенческих метрик. А органический трафик WB становится вашим основным источником продаж." data-am="Փաստ. 1 բանալի բառով արդեն 25 գնման դեպքում ապրանքը արագ առաջ է գնում TOP և ամրապնդվում երկար ժամանակով — բոլոր վարքային ցուցանիշների բարելավման հաշվին: Իսկ WB-ի օրգանական տրաֆիկը դառնում է ձեր վաճառքի հիմնական աղբյուրը:"><i class="fas fa-lightbulb"></i> <strong>${t('Факт:', 'Փաստ:')}</strong> ${t('при выкупах по 1 ключевому запросу уже от <strong>25 штук</strong> товар быстро продвигается в ТОП и закрепляется там надолго — за счёт улучшения всех поведенческих метрик. А органический трафик WB становится вашим основным источником продаж.', '1 բանալի բառով արդեն <strong>25 գնման</strong> դեպքում ապրանքը արագ առաջ է գնում TOP և ամրապնդվում երկար ժամանակով — բոլոր վարքային ցուցանիշների բարելավման հաշվին: Իսկ WB-ի օրգանական տրաֆիկը դառնում է ձեր վաճառքի հիմնական աղբյուրը:')}</div>
+    </div>
+
+    <div class="section-cta">
+      <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы по ключевикам" data-am="Սկսել գնումները բանալիներով">${t('Начать выкупы по ключевикам', 'Սկսել գնումները բանալիներով')}</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ЛЕГАЛЬНО — WB OFFICIAL ===== -->
+<section class="section" id="wb-official" data-section-id="wb-official">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-gavel"></i> <span data-ru="Официально" data-am="Պաշտոնապես">${t('Официально', 'Պաշտոնապես')}</span></div>
+      <h2 class="section-title" data-ru="Wildberries официально разрешил самовыкупы" data-am="Wildberries-ը պաշտոնապես թույլատրել է ինքնագնումները">Wildberries <span class="gr">${t('официально разрешил', 'պաշտոնապես թույլատրել է')}</span> ${t('самовыкупы', 'ինքնագնումները')}</h2>
+    </div>
+
+    <div class="why-block">
+      <div class="wb-official-badge"><i class="fas fa-check-circle"></i> <span data-ru="Подтверждено в оферте WB" data-am="Հաստատված է WB-ի օֆերտայում">${t('Подтверждено в оферте WB', 'Հաստատված է WB-ի օֆերտայում')}</span></div>
+
+      <h3><i class="fas fa-shield-alt"></i> <span data-ru="Никаких штрафов. Никаких рисков." data-am="Ոչ մի տուգանք: Ոչ մի ռիսկ:">${t('Никаких штрафов. Никаких рисков.', 'Ոչ մի տուգանք: Ոչ մի ռիսկ:')}</span></h3>
+      <p data-ru="Wildberries официально подтвердил в своей оферте, что самовыкупы не являются нарушением. За это не предусмотрены штрафы или блокировки кабинета. Тысячи успешных продавцов используют этот инструмент каждый день." data-am="Wildberries-ը պաշտոնապես հաստատել է իր օֆերտայում, որ ինքնագնումները խախտում չեն: Դրանց համար տուգանքներ կամ արգելափակումներ չեն նախատեսված: Հազարավոր հաջողակ վաճառողներ օգտագործում են այս գործիքը ամեն օր:">${t('Wildberries официально подтвердил в своей оферте, что самовыкупы <strong>не являются нарушением</strong>. За это не предусмотрены штрафы или блокировки кабинета. Тысячи успешных продавцов используют этот инструмент каждый день.', 'Wildberries-ը պաշտոնապես հաստատել է իր օֆերտայում, որ ինքնագնումները <strong>խախտում չեն</strong>: Դրանց համար տուգանքներ կամ արգելափակումներ չեն նախատեսված: Հազարավոր հաջողակ վաճառողներ օգտագործում են այս գործիքը ամեն օր:')}</p>
+
+      <h3><i class="fas fa-arrow-up"></i> <span data-ru="WB вернул приоритет органической выдачи" data-am="WB-ն վերադարձրել է օրգանական արդյունքների առաջնահերթությունը">${t('WB вернул приоритет органической выдачи', 'WB-ն վերադարձրել է օրգանական արդյունքների առաջնահերթությունը')}</span></h3>
+      <p data-ru="Wildberries подтвердил в обновлённой оферте: приоритет в поисковой выдаче получают товары с лучшими поведенческими метриками — конверсия, время на карточке, добавления в корзину, заказы. Именно это мы и прокачиваем при каждом выкупе." data-am="Wildberries-ը հաստատել է թարմացված օֆերտայում. որոնման արդյունքներում առաջնահերթություն են ստանում լավագույն վարքային ցուցանիշներով ապրանքները — կոնվերսիա, քարտի վրա անցկացրած ժամանակ, զամբյուղում ավելացումներ, պատվերներ: Հենց դա է, ինչ մենք բարձրացնում ենք յուրաքանչյուր գնման ժամանակ:">${t('Wildberries подтвердил в обновлённой оферте: приоритет в поисковой выдаче получают товары с лучшими <strong>поведенческими метриками</strong> — конверсия, время на карточке, добавления в корзину, заказы. <strong>Именно это мы и прокачиваем при каждом выкупе.</strong>', 'Wildberries-ը հաստատել է թարմացված օֆերտայում. որոնման արդյունքներում առաջնահերթություն են ստանում լավագույն <strong>վարքային ցուցանիշներով</strong> ապրանքները — կոնվերսիա, քարտի վրա անցկացրած ժամանակ, զամբյուղում ավելացումներ, պատվերներ: <strong>Հենց դա է, ինչ մենք բարձրացնում ենք յուրաքանչյուր գնման ժամանակ:</strong>')}</p>
+
+      <div class="highlight-result" data-ru="Сейчас — лучшее время для продвижения вашего товара. Пока конкуренты сомневаются — вы уже можете занять ТОП выдачи, привлечь органический трафик и зарабатывать больше. Не ждите, пока конкуренты сделают это первыми." data-am="Հիմա ձեր ապրանքի առաջխաղացման լավագույն ժամանակն է: Մինչ մրցակիցները կասկածում են — դուք արդեն կարող եք զբաղեցնել TOP-ը, ներգրավել օրգանական տրաֆիկ և ավելի շատ վաստակել: Մի սպասեք, որ մրցակիցները դա անեն ձեզանից առաջ:"><i class="fas fa-rocket"></i> <strong>${t('Сейчас — лучшее время', 'Հիմա — լավագույն ժամանակն է')}</strong> ${t('для продвижения вашего товара. Пока конкуренты сомневаются — вы уже можете занять ТОП выдачи, привлечь органический трафик и <strong>зарабатывать больше</strong>. Не ждите, пока конкуренты сделают это первыми.', 'ձեր ապրանքի առաջխաղացման համար: Մինչ մրցակիցները կասկածում են — դուք արդեն կարող եք զբաղեցնել TOP-ը, ներգրավել օրգանական տրաֆիկ և <strong>ավելի շատ վաստակել</strong>: Մի սպասեք, որ մրցակիցները դա անեն ձեզանից առաջ:')}</div>
+    </div>
+
+    <div class="section-cta">
+      <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-success"><i class="fas fa-rocket"></i> <span data-ru="Занять ТОП прямо сейчас" data-am="Զբաղեցնել TOP-ը հիմա">${t('Занять ТОП прямо сейчас', 'Զբաղեցնել TOP-ը հիմա')}</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CALCULATOR (full, mirrors /services) ===== -->
+<section class="section section-dark" id="calculator" data-section-id="calculator">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հաշվիչ">${t('Калькулятор', 'Հաշվիչ')}</span></div>
+      <h2 class="section-title" data-ru="Рассчитайте стоимость выкупов" data-am="Հաշվեք գնումների արժեքը">${t('Рассчитайте стоимость выкупов', 'Հաշվեք գնումների արժեքը')}</h2>
+      <p class="section-sub" data-ru="Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram." data-am="Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:">${t('Выберите нужные услуги, укажите количество и узнайте сумму. Заказ оформляется в Telegram.', 'Ընտրեք անհրաժեշտ ծառայությունները, նշեք քանակը և իմացեք գումարը: Պատվերը ձևակերպվում է Telegram-ով:')}</p>
+    </div>
+    <div class="calc-wrap">
+      <div class="calc-packages" id="calcPackages" style="display:none"></div>
+      <div class="calc-tabs">
+        <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Գնումներ">${t('Выкупы', 'Գնումներ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Կարծիքներ">${t('Отзывы', 'Կարծիքներ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Լուսանկարահանում">${t('Фотосъёмка', 'Լուսանկարահանում')}</div>
+        <div class="calc-tab" onclick="showCalcTab('ff',this)" data-ru="ФФ" data-am="Ֆուլֆիլմենթ">${t('ФФ', 'Ֆուլֆիլմենթ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Լոգիստիկա">${t('Логистика', 'Լոգիստիկա')}</div>
+        <div class="calc-tab" onclick="showCalcTab('other',this)" data-ru="Прочие услуги" data-am="Այլ ծառայություններ">${t('Прочие услуги', 'Այլ ծառայություններ')}</div>
+      </div>
+
+      <!-- ===== ВЫКУПЫ ===== -->
+      <div class="calc-group active" id="cg-buyouts">
+        <div class="calc-row" data-price="buyout" id="buyoutRow">
+          <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Գնում + ստացում ՊՎԶ-ից">${t('Выкуп + забор из ПВЗ', 'Գնում + ստացում ՊՎԶ-ից')}</div>
+          <div class="calc-price" id="buyoutPriceLabel">2 000 ֏</div>
+          <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><input type="number" id="buyoutQty" value="0" min="0" max="999" onchange="onBuyoutInput()" oninput="onBuyoutInput()"><button onclick="ccBuyout(1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Выкуп КГТ + забор из ПВЗ" data-am="Ծանրաքաշ ապրանքի գնում + ստացում ՊՎԶ-ից">${t('Выкуп КГТ + забор из ПВЗ', 'Ծանրաքաշ ապրանքի գնում + ստացում ՊՎԶ-ից')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ОТЗЫВЫ ===== -->
+      <div class="calc-group" id="cg-reviews">
+        <div class="calc-row" data-price="300">
+          <div class="calc-label" data-ru="Оценка" data-am="Գնահատական">${t('Оценка', 'Գնահատական')}</div>
+          <div class="calc-price">300 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="500">
+          <div class="calc-label" data-ru="Оценка + отзыв" data-am="Գնահատական + կարծիք">${t('Оценка + отзыв', 'Գնահատական + կարծիք')}</div>
+          <div class="calc-price">500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="500">
+          <div class="calc-label" data-ru="Вопрос к товару" data-am="Հարց ապրանքի վերաբերյալ">${t('Вопрос к товару', 'Հարց ապրանքի վերաբերյալ')}</div>
+          <div class="calc-price">500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="250">
+          <div class="calc-label" data-ru="Написание текста отзыва" data-am="Կարծիքի տեքստի գրում">${t('Написание текста отзыва', 'Կարծիքի տեքստի գրում')}</div>
+          <div class="calc-price">250 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="100">
+          <div class="calc-label" data-ru="Подписка на бренд / страницу" data-am="Բրենդի / էջի բաժանորդագրություն">${t('Подписка на бренд / страницу', 'Բրենդի / էջի բաժանորդագրություն')}</div>
+          <div class="calc-price">100 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ФОТОСЪЁМКА ===== -->
+      <div class="calc-group" id="cg-photo">
+        <div class="calc-row" data-price="3500">
+          <div class="calc-label" data-ru="Фотосессия в гардеробной WB (жен. модель)" data-am="Լուսանկարահանում WB հագուստապահարանում (կին մոդել)">${t('Фотосессия в гардеробной WB (жен. модель)', 'Լուսանկարահանում WB հագուստապահարանում (կին մոդել)')}</div>
+          <div class="calc-price">3 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="4500">
+          <div class="calc-label" data-ru="Фотосессия в гардеробной WB (муж. модель)" data-am="Լուսանկարահանում WB հագուստապահարանում (տղամարդ մոդել)">${t('Фотосессия в гардеробной WB (муж. модель)', 'Լուսանկարահանում WB հագուստապահարանում (տղամարդ մոդել)')}</div>
+          <div class="calc-price">4 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Предметная фотосъёмка (3 фото)" data-am="Առարկայական լուսանկարահանում (3 լուսանկար)">${t('Предметная фотосъёмка (3 фото)', 'Առարկայական լուսանկարահանում (3 լուսանկար)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="5000">
+          <div class="calc-label" data-ru="Предметная съёмка (крупное / техника, 3 фото)" data-am="Առարկայական լուսանկարահանում (խոշոր / տեխնիկա, 3 լուս.)">${t('Предметная съёмка (крупное / техника, 3 фото)', 'Առարկայական լուսանկարահանում (խոշոր / տեխնիկա, 3 լուս.)')}</div>
+          <div class="calc-price">5 000 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Ребёнок модель (до 14 лет)" data-am="Երեխա մոդել (մինչև 14 տարեկան)">${t('Ребёнок модель (до 14 лет)', 'Երեխա մոդել (մինչև 14 տարեկան)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="7000">
+          <div class="calc-label" data-ru="Видеообзор товара" data-am="Ապրանքի վիդեոհոլովակ">${t('Видеообзор товара', 'Ապրանքի վիդեոհոլովակ')}</div>
+          <div class="calc-price">7 000 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ФФ (Фулфилмент) ===== -->
+      <div class="calc-group" id="cg-ff">
+        <div class="calc-row" data-price="100">
+          <div class="calc-label" data-ru="Замена штрихкода" data-am="Շտրիխկոդի փոխարինում">${t('Замена штрихкода', 'Շտրիխկոդի փոխարինում')}</div>
+          <div class="calc-price">100 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="200">
+          <div class="calc-label" data-ru="Переупаковка (наша)" data-am="Վերափաթեթավորում (մեր փաթեթ)">${t('Переупаковка (наша)', 'Վերափաթեթավորում (մեր փաթեթ)')}</div>
+          <div class="calc-price">200 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="150">
+          <div class="calc-label" data-ru="Переупаковка (клиента)" data-am="Վերափաթեթավորում (հաճախորդի փաթեթ)">${t('Переупаковка (клиента)', 'Վերափաթեթավորում (հաճախորդի փաթեթ)')}</div>
+          <div class="calc-price">150 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ЛОГИСТИКА ===== -->
+      <div class="calc-group" id="cg-logistics">
+        <div class="calc-row" data-price="2000">
+          <div class="calc-label" data-ru="Доставка на склад WB (1 коробка 60х40х40)" data-am="Առաքում WB պահեստ (1 տուփ 60x40x40)">${t('Доставка на склад WB (1 коробка 60х40х40)', 'Առաքում WB պահեստ (1 տուփ 60x40x40)')}</div>
+          <div class="calc-price">2 000 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Доставка до вашего склада (1 коробка 60х40х40)" data-am="Առաքում ձեր պահեստ (1 տուփ 60x40x40)">${t('Доставка до вашего склада (1 коробка 60х40х40)', 'Առաքում ձեր պահեստ (1 տուփ 60x40x40)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <!-- ===== ПРОЧИЕ УСЛУГИ ===== -->
+      <div class="calc-group" id="cg-other">
+        <div class="calc-row" data-price="1500">
+          <div class="calc-label" data-ru="Глажка одежды (одиночная вещь)" data-am="Հագուստի արդուկում (մեկ իր)">${t('Глажка одежды (одиночная вещь)', 'Հագուստի արդուկում (մեկ իր)')}</div>
+          <div class="calc-price">1 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="2500">
+          <div class="calc-label" data-ru="Глажка одежды (верхняя одежда)" data-am="Հագուստի արդուկում (վերնահագուստ)">${t('Глажка одежды (верхняя одежда)', 'Հագուստի արդուկում (վերնահագուստ)')}</div>
+          <div class="calc-price">2 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="1500">
+          <div class="calc-label" data-ru="Забор из ПВЗ для съёмки" data-am="Վերցնում ՊՎԶ-ից">${t('Забор из ПВЗ для съёмки', 'Վերցնում ՊՎԶ-ից')}</div>
+          <div class="calc-price">1 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+        <div class="calc-row" data-price="1500">
+          <div class="calc-label" data-ru="Возврат в ПВЗ после съёмки" data-am="Վերադարձ ՊՎԶ լուսանկարահանումից հետո">${t('Возврат в ПВЗ после съёмки', 'Վերադարձ ՊՎԶ լուսանկարահանումից հետո')}</div>
+          <div class="calc-price">1 500 ֏</div>
+          <div class="calc-input"><button onclick="cc(this,-1)">−</button><input type="number" value="0" min="0" max="999" onchange="recalc()" oninput="recalc()"><button onclick="cc(this,1)">+</button></div>
+        </div>
+      </div>
+
+      <div class="calc-total">
+        <div class="calc-total-label" data-ru="Итого:" data-am="Ընդամենը:">${t('Итого:', 'Ընդամենը:')}</div>
+        <div class="calc-total-value" id="calcTotal" data-total="0">0 ֏</div>
+      </div>
+
+      <!-- Referral code field -->
+      <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--accent);margin-bottom:6px"><i class="fas fa-gift" style="margin-right:6px"></i><span data-ru="Есть промокод?" data-am="Պրոմոկոդ ունեք?">${t('Есть промокод?', 'Պրոմոկոդ ունեք?')}</span></label>
+            <input type="text" id="refCodeInput" placeholder="PROMO2026" style="width:100%;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;font-family:inherit;text-transform:uppercase;outline:none;transition:var(--t)" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <button onclick="checkRefCode()" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;white-space:nowrap"><i class="fas fa-check-circle" style="margin-right:6px"></i><span data-ru="Применить" data-am="Կիրառել">${t('Применить', 'Կիրառել')}</span></button>
+        </div>
+        <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
+      </div>
+
+      <div class="calc-cta" style="display:none">
+        <a href="https://wa.me/37455226224" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
+          <i class="fab fa-whatsapp"></i>
+          <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">${t('Заказать сейчас', 'Պատվիրել հիմա')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FINAL CTA STRIP ===== -->
+<section class="bp-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Готовы начать выкупы?" data-am="Պատրա՞ստ եք սկսել գնումները">${t('Готовы начать выкупы?', 'Պատրա՞ստ եք սկսել գնումները')}</h3>
+        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${t('Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+      </div>
+      <div class="acs-actions">
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span>Telegram</span>
+        </a>
+        <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+        <a href="/contacts" class="btn btn-primary">
+          <i class="fas fa-envelope"></i>
+          <span data-ru="Контакты" data-am="Կոնտակտներ">${t('Контакты', 'Կոնտակտներ')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  return renderPageShell({
+    page: 'buyouts',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'buyouts-page',
+    mainHtml,
+    extraHead,
+  })
+}
+
+// =====================================================================
+// renderFaqPage — phase 2D "light" page for /faq.
+// Compact hero, 12-item bilingual accordion (uses the same `.faq-item /
+// .faq-q / .faq-a` markup the home page consumes via toggleFaq() in
+// landing.js) and a small CTA strip — no full calculator.
+// SEO is amplified with a JSON-LD `FAQPage` block injected via
+// `extraHead` so Google can pick up rich-result entries; the schema
+// uses the current-language strings for `name` / `text`.
+// =====================================================================
+function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  // 12 FAQ items: 7 carried over from the home #faq section + 5 new
+  // entries covering payment, guarantees, lead times, paperwork and the
+  // legal status of self-buyouts on Wildberries.
+  const faqItems: Array<{ qRu: string, qAm: string, aRu: string, aAm: string }> = [
+    {
+      qRu: 'Могут ли заблокировать мой кабинет?',
+      qAm: 'Կարող են արգելափակել իմ կաբինետը?',
+      aRu: 'За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии — алгоритмы WB не отличают такие выкупы от обычных заказов.',
+      aAm: 'Մեր աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի կաբինետ չի արգելափակվել: Մենք օգտագործում ենք իրական հաշիվներ գնումների պատմությամբ, սեփական պահեստ և բնական աշխարհագրական բաշխում — WB-ի ալգորիթմները նման հետագնումները չեն տարբերում սովորական պատվերներից:',
+    },
+    {
+      qRu: 'Как быстро начнётся продвижение?',
+      qAm: 'Ինչքան արագ կսկսվի առաջխաղացումը?',
+      aRu: 'В течение 24 часов после согласования стратегии и оплаты. Менеджер составляет план выкупов по ключевым запросам и запускает первые заказы в тот же день.',
+      aAm: '24 ժամվա ընթացքում ստրատեգիայի համաձայնեցումից և վճարումից հետո: Մենեջերը կազմում է հետագնումների պլանը բանալի հարցումներով և գործարկում առաջին պատվերները նույն օրը:',
+    },
+    {
+      qRu: 'Выкупы делают реальные люди или боты?',
+      qAm: 'Հետագնումները կատարում են իրական մարդիկ թե բոտեր?',
+      aRu: 'Только реальные люди. У нас собственный склад в Ереване с устройствами и реальными аккаунтами. Каждый выкуп оформляется вручную живым покупателем — никаких ботов и эмуляторов.',
+      aAm: 'Միայն իրական մարդիկ: Մենք ունենք սեփական պահեստ Երևանում սարքերով և իրական հաշիվներով: Յուրաքանչյուր հետագնում ձևակերպվում է ձեռքով կենդանի գնորդի կողմից — ոչ մի բոտ ու էմուլյատոր:',
+    },
+    {
+      qRu: 'Почему не все выкупы получают отзывы?',
+      qAm: 'Ինչու ոչ բոլոր հետագնումներն են ստանում կարծիքներ?',
+      aRu: 'Для безопасности вашего кабинета мы публикуем отзывы не более чем на 50% выкупленных товаров. Это имитирует естественное поведение покупателей: реальные клиенты тоже не все оставляют отзывы.',
+      aAm: 'Ձեր կաբինետի անվտանգության համար կարծիքները հրապարակում ենք գնված ապրանքների ոչ ավելի քան 50%-ի համար: Սա նմանակում է գնորդների բնական վարքագիծը՝ իրական հաճախորդներն էլ բոլորը կարծիք չեն թողնում:',
+    },
+    {
+      qRu: 'Можно ли заказать только отзывы без выкупов?',
+      qAm: 'Հնարավոր է պատվիրել միայն կարծիքներ առանց հետագնումների?',
+      aRu: 'Да, мы можем выкупить товар для фото- или видеоотзыва и затем сделать возврат на ПВЗ. Стоимость отдельной услуги уточняйте у менеджера в Telegram.',
+      aAm: 'Այո, մենք կարող ենք գնել ապրանքը լուսանկար- կամ տեսանյութ կարծիքի համար և հետո վերադարձնել ՊՎԶ: Առանձին ծառայության արժեքը ճշտեք մենեջերի մոտ Telegram-ով:',
+    },
+    {
+      qRu: 'Какие отчёты мы получаем?',
+      qAm: 'Ինչ հաշվետվություններ ենք ստանում?',
+      aRu: 'Ежедневные отчёты: статус каждого выкупа, даты забора из ПВЗ, статус и тексты отзывов. Полная прозрачность на каждом этапе — вы всегда видите, на каком шаге находится заказ.',
+      aAm: 'Ամենօրյա հաշվետվություններ՝ յուրաքանչյուր հետագնման կարգավիճակ, ՊՎԶ-ից վերցնման ամսաթվեր, կարծիքների կարգավիճակ ու տեքստեր: Լիարժեք թափանցիկություն յուրաքանչյուր փուլում — դուք միշտ տեսնում եք, թե որ քայլում է պատվերը:',
+    },
+    {
+      qRu: 'В какой валюте идут цены?',
+      qAm: 'Ինչ արժույթով են գները?',
+      aRu: 'Все цены на сайте указаны в армянских драмах (֏ AMD). Принимаем оплату в драмах или рублях по согласованному курсу — детали обсудим перед стартом.',
+      aAm: 'Կայքի բոլոր գները նշված են հայկական դրամով (֏ AMD): Ընդունում ենք վճարում դրամով կամ ռուբլիով համաձայնեցված կուրսով — մանրամասները կքննարկենք մինչ սկիզբը:',
+    },
+    {
+      qRu: 'Какие способы оплаты вы принимаете?',
+      qAm: 'Ինչ վճարման եղանակներ եք ընդունում?',
+      aRu: 'Перевод на банковскую карту в RUB или AMD, безналичный расчёт по реквизитам компании, наличными в офисе в Ереване. Конкретный вариант согласуем в Telegram перед запуском.',
+      aAm: 'Բանկային քարտին փոխանցում RUB-ով կամ AMD-ով, անկանխիկ վճարում ընկերության վավերապահանջներով, կանխիկ Երևանի գրասենյակում: Կոնկրետ տարբերակը կհամաձայնեցնենք Telegram-ով մինչ գործարկումը:',
+    },
+    {
+      qRu: 'Что если выкупы не дадут результата?',
+      qAm: 'Իսկ եթե հետագնումները արդյունք չտան?',
+      aRu: 'Мы не обещаем конкретные позиции в выдаче — на ранжирование влияют карточка, ниша, сезон, конкуренция. Но гарантируем выполнение оговорённого объёма выкупов с реальными отзывами и прозрачной отчётностью. На практике 9 из 10 клиентов возвращаются за повторными пакетами.',
+      aAm: 'Մենք չենք խոստանում կոնկրետ դիրքեր որոնման մեջ — դասակարգման վրա ազդում են քարտը, նիշան, սեզոնը, մրցակցությունը: Բայց երաշխավորում ենք համաձայնեցված ծավալի հետագնումների կատարումը իրական կարծիքներով և թափանցիկ հաշվետվությամբ: Գործնականում 10-ից 9 հաճախորդը վերադառնում է կրկնակի փաթեթների համար:',
+    },
+    {
+      qRu: 'Сколько по времени занимает один пакет?',
+      qAm: 'Որքա՞ն ժամանակ է պահանջում մեկ փաթեթը?',
+      aRu: 'Стандартный пакет из 25–50 выкупов выполняем за 5–7 дней — этот темп выглядит для алгоритмов WB естественно и не вызывает подозрений. Большие объёмы разбиваем на несколько недель по согласованному графику.',
+      aAm: '25–50 հետագնումից բաղկացած ստանդարտ փաթեթը կատարում ենք 5–7 օրվա ընթացքում — այս տեմպը WB-ի ալգորիթմների համար բնական է երևում և կասկածներ չի առաջացնում: Մեծ ծավալները բաժանում ենք մի քանի շաբաթների՝ համաձայնեցված գրաֆիկով:',
+    },
+    {
+      qRu: 'Подписываете ли вы договор и выдаёте ли документы?',
+      qAm: 'Կնքու՞մ եք պայմանագիր և տրամադրու՞մ եք փաստաթղթեր:',
+      aRu: 'Да. Мы официальная компания, зарегистрированная в Армении: работаем по договору с актами выполненных работ. По запросу выставляем счёт в RUB или AMD. Все документы предоставляем до старта работ.',
+      aAm: 'Այո: Մենք պաշտոնապես գրանցված ընկերություն ենք Հայաստանում, աշխատում ենք պայմանագրով՝ կատարված աշխատանքների ակտերով: Ըստ պահանջի դուրս ենք գրում հաշիվ RUB-ով կամ AMD-ով: Բոլոր փաստաթղթերը տրամադրում ենք մինչ աշխատանքների սկիզբը:',
+    },
+    {
+      qRu: 'Это законно? Не нарушаю ли я правила Wildberries?',
+      qAm: 'Արդյո՞ք սա օրինական է: Wildberries-ի կանոնները չե՞մ խախտում:',
+      aRu: 'Wildberries официально подтвердил в обновлённой оферте, что самовыкупы не являются нарушением и штрафы за них не предусмотрены. Алгоритм WB ранжирует товары по поведенческим метрикам — именно их мы и улучшаем при каждом выкупе по ключевому запросу.',
+      aAm: 'Wildberries-ը պաշտոնապես հաստատել է թարմացված օֆերտայում, որ ինքնագնումները խախտում չեն, և դրանց համար տուգանքներ նախատեսված չեն: WB-ի ալգորիթմը դասակարգում է ապրանքները վարքագծային ցուցանիշներով — հենց դրանք մենք բարելավում ենք յուրաքանչյուր հետագնման ժամանակ բանալի բառով:',
+    },
+  ]
+
+  const seo = {
+    title: t(
+      'Часто задаваемые вопросы — Go to Top | FAQ Wildberries',
+      'Հաճախ տրվող հարցեր — Go to Top | FAQ Wildberries'
+    ),
+    description: t(
+      'Ответы на самые частые вопросы продавцов Wildberries: выкупы, легальность, документы, безопасность, оплата',
+      'Պատասխաններ Wildberries-ի վաճառողների ամենահաճախ տրվող հարցերին՝ հետագնումներ, օրինականություն, փաստաթղթեր, անվտանգություն'
+    ),
+    ogImage: `${siteOrigin}/static/img/og-image.png`,
+  }
+
+  // JSON-LD FAQPage — current-language `name` / `text`. Strict JSON via
+  // JSON.stringify; we also escape `</` to `<\/` so the payload can never
+  // accidentally close the surrounding <script> tag.
+  const faqJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqItems.map((item) => ({
+      '@type': 'Question',
+      name: isAM ? item.qAm : item.qRu,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: isAM ? item.aAm : item.aRu,
+      },
+    })),
+  }
+  const faqJsonLdSafe = JSON.stringify(faqJsonLd).replace(/<\//g, '<\\/')
+
+  // Page-only styles. Reuses --purple/--bg-card/--text/etc tokens declared
+  // in renderPageShell. The .faq-item / .faq-q / .faq-a rules mirror the
+  // home #faq subset so toggleFaq() in landing.js works without changes.
+  const extraHead = `<style>
+.faq-page{padding-top:88px}
+/* Hero */
+.fp-hero{padding:24px 0 40px}
+.fp-hero .fh-inner{max-width:780px;margin:0 auto;text-align:center}
+.fp-hero .fh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.fp-hero h1{font-size:clamp(1.8rem,3.4vw,2.6rem);font-weight:800;line-height:1.18;margin-bottom:14px;letter-spacing:-0.02em}
+.fp-hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.fp-hero .fh-desc{font-size:1rem;color:var(--text-sec);margin:0 auto;line-height:1.7;max-width:640px}
+/* FAQ list */
+.fp-faq{padding:24px 0 56px}
+.faq-list{max-width:820px;margin:0 auto}
+.faq-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:var(--t)}
+.faq-item.active{border-color:rgba(139,92,246,0.3)}
+.faq-q{padding:20px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;font-weight:600;font-size:0.95rem;line-height:1.4}
+.faq-q span{flex:1}
+.faq-q i{color:var(--purple);transition:var(--t);font-size:0.78rem;flex-shrink:0}
+.faq-item.active .faq-q i{transform:rotate(180deg)}
+.faq-a{padding:0 24px;max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.4s ease}
+.faq-item.active .faq-a{max-height:600px;padding:0 24px 20px}
+.faq-a p{color:var(--text-sec);font-size:0.92rem;line-height:1.75}
+/* Final CTA strip — light variant, mirrors /buyouts pattern */
+.fp-cta-strip{padding:8px 0 64px}
+.fp-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.fp-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.fp-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.fp-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.fp-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:900px){
+  .faq-page{padding-top:80px}
+  .fp-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .fp-cta-strip .acs-actions{width:100%}
+  .fp-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:600px){
+  .fp-cta-strip .acs-actions{flex-direction:column}
+  .fp-cta-strip .acs-actions .btn{width:100%}
+  .faq-q{padding:16px 18px;font-size:0.9rem}
+  .faq-item.active .faq-a{padding:0 18px 18px}
+}
+</style>
+<script type="application/ld+json">${faqJsonLdSafe}</script>`
+
+  const tgUrl = PLACEHOLDER_TG_URL
+
+  // Render accordion. First item gets `.active` so the answer is open by
+  // default — toggleFaq() in landing.js handles the rest.
+  const faqItemsHtml = faqItems.map((item, idx) => {
+    const activeCls = idx === 0 ? ' active' : ''
+    const qText = t(item.qRu, item.qAm)
+    const aText = t(item.aRu, item.aAm)
+    return `      <div class="faq-item${activeCls}">
+        <div class="faq-q" onclick="toggleFaq(this)"><span data-ru="${item.qRu}" data-am="${item.qAm}">${qText}</span><i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a"><p data-ru="${item.aRu}" data-am="${item.aAm}">${aText}</p></div>
+      </div>`
+  }).join('\n')
+
+  const mainHtml = `
+<!-- ===== FAQ HERO ===== -->
+<section class="fp-hero">
+  <div class="container">
+    <div class="fh-inner">
+      <div class="fh-eyebrow">
+        <i class="fas fa-question-circle"></i>
+        <span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span>
+      </div>
+      <h1>
+        <span data-ru="Часто задаваемые" data-am="Հաճախ տրվող">${t('Часто задаваемые', 'Հաճախ տրվող')}</span>
+        <span class="gr" data-ru="вопросы" data-am="հարցեր">${t('вопросы', 'հարցեր')}</span>
+      </h1>
+      <p class="fh-desc" data-ru="Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram." data-am="Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:">${t('Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram.', 'Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:')}</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ LIST ===== -->
+<section class="fp-faq">
+  <div class="container">
+    <div class="faq-list">
+${faqItemsHtml}
+    </div>
+  </div>
+</section>
+
+<!-- ===== FINAL CTA STRIP ===== -->
+<section class="fp-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Не нашли ответ?" data-am="Չգտա՞ք պատասխանը:">${t('Не нашли ответ?', 'Չգտա՞ք պատասխանը:')}</h3>
+        <p data-ru="Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${t('Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+      </div>
+      <div class="acs-actions">
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span>Telegram</span>
+        </a>
+        <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+        <a href="/contacts" class="btn btn-primary">
+          <i class="fas fa-envelope"></i>
+          <span data-ru="Контакты" data-am="Կոնտակտներ">${t('Контакты', 'Կոնտակտներ')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  return renderPageShell({
+    page: 'faq',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'faq-page',
+    mainHtml,
+    extraHead,
+  })
+}
+
+// =====================================================================
+// renderContactsPage — phase 2E "heavy" page for /contacts.
+// Compact hero → channels grid (Telegram x2 + WhatsApp) → QR codes →
+// lead form (#leadForm consumed by submitForm() in landing.js, posts to
+// /api/lead) → address & hours → final CTA strip with callback button.
+// No calculator and no __SITE_DATA injection: the form is fully self-
+// contained so we keep the page maximally cacheable. intl-tel-input is
+// loaded via extraHead so the phone field gets the country selector;
+// submitForm() gracefully degrades if the library hasn't booted yet.
+// =====================================================================
+function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  const seo = {
+    title: t(
+      'Контакты — Go to Top | Telegram, WhatsApp, обратный звонок',
+      'Կապ — Go to Top | Telegram, WhatsApp, հետադարձ զանգ'
+    ),
+    description: t(
+      'Свяжитесь с Go to Top: Telegram, WhatsApp, обратный звонок, форма заявки. Менеджер ответит в течение 5 минут',
+      'Կապվեք Go to Top-ի հետ. Telegram, WhatsApp, հետադարձ զանգ, հայտի ձև: Մենեջերը կպատասխանի 5 րոպեի ընթացքում'
+    ),
+    ogImage: `${siteOrigin}/static/img/og-image.png`,
+  }
+
+  const tgUrl = PLACEHOLDER_TG_URL
+  const tgSupportUrl = 'https://t.me/suport_admin_2'
+  const waUrl = 'https://wa.me/37455226224'
+  const waLabel = '+374 55 22 62 24'
+
+  // Page-only styles. Reuses --purple/--bg-card/--text/etc tokens declared
+  // in renderPageShell. .form-card / .form-group are scoped here so they
+  // don't conflict with the home-page form (which lives in a different
+  // CSS context). intl-tel-input CSS+JS are loaded so #formPhone gets a
+  // country selector; submitForm() in landing.js falls back to plain
+  // validation when the lib isn't ready.
+  const extraHead = `<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/intl-tel-input@25/build/css/intlTelInput.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/intl-tel-input@25/build/js/intlTelInput.min.js"></script>
+<style>
+.contacts-page{padding-top:88px}
+/* Hero */
+.cp-hero{padding:24px 0 36px}
+.cp-hero .ch-inner{max-width:780px;margin:0 auto;text-align:center}
+.cp-hero .ch-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.cp-hero h1{font-size:clamp(1.8rem,3.4vw,2.6rem);font-weight:800;line-height:1.18;margin-bottom:14px;letter-spacing:-0.02em}
+.cp-hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.cp-hero .ch-desc{font-size:1rem;color:var(--text-sec);margin:0 auto;line-height:1.7;max-width:640px}
+/* Channels grid */
+.cp-channels{padding:24px 0 32px}
+.cp-channels-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1080px;margin:0 auto}
+.cp-channel{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;display:flex;flex-direction:column;align-items:flex-start;gap:14px;transition:var(--t)}
+.cp-channel:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-3px);box-shadow:0 14px 40px rgba(0,0,0,0.3)}
+.cp-channel-icon{width:54px;height:54px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:1.6rem;color:#fff}
+.cp-ch-tg .cp-channel-icon{background:linear-gradient(135deg,#0088cc,#0077b5)}
+.cp-ch-wa .cp-channel-icon{background:linear-gradient(135deg,#25D366,#128C7E)}
+.cp-channel h3{font-size:1.12rem;font-weight:700;margin:0;line-height:1.3}
+.cp-channel-handle{font-family:'Inter',monospace;font-size:0.92rem;font-weight:600;color:var(--accent);background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.18);padding:6px 12px;border-radius:8px;letter-spacing:0.2px}
+.cp-channel-desc{color:var(--text-sec);font-size:0.9rem;line-height:1.6;margin:0}
+.cp-channel-cta{margin-top:auto;display:inline-flex;align-items:center;gap:8px;padding:12px 18px;border-radius:var(--r-sm);font-weight:600;font-size:0.9rem;width:100%;justify-content:center;color:#fff;transition:var(--t)}
+.cp-ch-tg .cp-channel-cta{background:linear-gradient(135deg,#0088cc,#0077b5);box-shadow:0 4px 15px rgba(0,136,204,0.3)}
+.cp-ch-wa .cp-channel-cta{background:linear-gradient(135deg,#25D366,#128C7E);box-shadow:0 4px 15px rgba(37,211,102,0.3)}
+.cp-channel-cta:hover{transform:translateY(-1px);filter:brightness(1.05)}
+/* QR section */
+.cp-qr{padding:24px 0 40px}
+.cp-qr-wrap{max-width:1000px;margin:0 auto;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px 28px;text-align:center}
+.cp-qr-eyebrow{display:inline-flex;align-items:center;gap:8px;font-size:0.78rem;font-weight:600;color:var(--accent);text-transform:uppercase;letter-spacing:0.5px;margin-bottom:8px}
+.cp-qr-wrap h2{font-size:clamp(1.2rem,2vw,1.6rem);font-weight:800;margin-bottom:6px}
+.cp-qr-wrap p.cp-qr-sub{color:var(--text-sec);font-size:0.92rem;line-height:1.6;margin:0 auto 24px;max-width:520px}
+.cp-qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.cp-qr-card{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.15);border-radius:14px;transition:var(--t);text-decoration:none;color:var(--text)}
+.cp-qr-card:hover{border-color:var(--purple);background:rgba(139,92,246,0.1);transform:translateY(-2px)}
+.cp-qr-card img{width:120px;height:120px;object-fit:contain;border-radius:10px;background:#fff;padding:6px}
+.cp-qr-card span{font-size:0.78rem;font-weight:600;color:var(--text-sec);text-align:center}
+/* Lead form */
+.cp-form{padding:24px 0 40px}
+.cp-form-header{text-align:center;max-width:640px;margin:0 auto 24px}
+.cp-form-header h2{font-size:clamp(1.4rem,2.4vw,1.9rem);font-weight:800;margin-bottom:8px}
+.cp-form-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.6;margin:0}
+.form-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:36px;max-width:600px;margin:0 auto}
+.form-group{margin-bottom:18px}
+.form-group label{display:block;font-size:0.82rem;font-weight:600;margin-bottom:8px;color:var(--text-sec)}
+.form-group input,.form-group textarea,.form-group select{width:100%;padding:12px 16px;background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r-sm);color:var(--text);font-size:1rem;font-family:inherit;transition:var(--t)}
+.form-group input:focus,.form-group textarea:focus,.form-group select:focus{outline:none;border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+.form-group textarea{resize:vertical;min-height:96px}
+.form-group select option{background:var(--bg-card)}
+/* intl-tel-input wrapper width */
+.form-group .iti{width:100%}
+.form-group .iti input.iti__tel-input{width:100%}
+/* Address & hours */
+.cp-info{padding:8px 0 40px}
+.cp-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px;max-width:1000px;margin:0 auto}
+.cp-info-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;display:flex;gap:18px;align-items:flex-start}
+.cp-info-icon{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.18),rgba(139,92,246,0.06));border:1px solid rgba(139,92,246,0.25);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple);flex-shrink:0}
+.cp-info-text h3{font-size:1.05rem;font-weight:700;margin-bottom:6px}
+.cp-info-text p{color:var(--text-sec);font-size:0.92rem;line-height:1.65;margin:0}
+.cp-info-text strong{color:var(--text);display:block;margin-bottom:4px}
+/* Final CTA strip — same shape as buyouts/faq */
+.cp-cta-strip{padding:8px 0 64px}
+.cp-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.cp-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.cp-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.cp-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.cp-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:900px){
+  .contacts-page{padding-top:80px}
+  .cp-channels-grid{grid-template-columns:1fr;gap:16px}
+  .cp-info-grid{grid-template-columns:1fr}
+  .cp-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .cp-cta-strip .acs-actions{width:100%}
+  .cp-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:600px){
+  .cp-qr-grid{grid-template-columns:repeat(2,1fr);gap:12px}
+  .cp-qr-card img{width:96px;height:96px}
+  .cp-qr-wrap{padding:24px 18px}
+  .form-card{padding:24px 20px}
+  .cp-info-card{padding:22px 18px;gap:14px}
+  .cp-cta-strip .acs-actions{flex-direction:column}
+  .cp-cta-strip .acs-actions .btn{width:100%}
+}
+</style>`
+
+  const mainHtml = `
+<!-- ===== CONTACTS HERO ===== -->
+<section class="cp-hero">
+  <div class="container">
+    <div class="ch-inner">
+      <div class="ch-eyebrow">
+        <i class="fas fa-headset"></i>
+        <span data-ru="Контакты" data-am="Կապ">${t('Контакты', 'Կապ')}</span>
+      </div>
+      <h1>
+        <span data-ru="Свяжитесь" data-am="Կապվեք">${t('Свяжитесь', 'Կապվեք')}</span>
+        <span class="gr" data-ru="с нами" data-am="մեզ հետ">${t('с нами', 'մեզ հետ')}</span>
+      </h1>
+      <p class="ch-desc" data-ru="Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время." data-am="Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:">${t('Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время.', 'Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CHANNELS GRID ===== -->
+<section class="cp-channels">
+  <div class="container">
+    <div class="cp-channels-grid">
+      <div class="cp-channel cp-ch-tg">
+        <div class="cp-channel-icon"><i class="fab fa-telegram"></i></div>
+        <h3 data-ru="Telegram — администратор" data-am="Telegram — ադմինիստրատոր">${t('Telegram — администратор', 'Telegram — ադմինիստրատոր')}</h3>
+        <span class="cp-channel-handle" data-no-rewrite="1">@goo_to_top</span>
+        <p class="cp-channel-desc" data-ru="Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время." data-am="Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:">${t('Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время.', 'Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
+        </a>
+      </div>
+      <div class="cp-channel cp-ch-tg">
+        <div class="cp-channel-icon"><i class="fab fa-telegram"></i></div>
+        <h3 data-ru="Telegram — поддержка" data-am="Telegram — աջակցություն">${t('Telegram — поддержка', 'Telegram — աջակցություն')}</h3>
+        <span class="cp-channel-handle" data-no-rewrite="1">@suport_admin_2</span>
+        <p class="cp-channel-desc" data-ru="Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер." data-am="Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:">${t('Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер.', 'Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:')}</p>
+        <a href="${tgSupportUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Написать в поддержку" data-am="Գրել աջակցությանը">${t('Написать в поддержку', 'Գրել աջակցությանը')}</span>
+        </a>
+      </div>
+      <div class="cp-channel cp-ch-wa">
+        <div class="cp-channel-icon"><i class="fab fa-whatsapp"></i></div>
+        <h3 data-ru="WhatsApp" data-am="WhatsApp">WhatsApp</h3>
+        <span class="cp-channel-handle" data-no-rewrite="1">${waLabel}</span>
+        <p class="cp-channel-desc" data-ru="Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram." data-am="Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:">${t('Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram.', 'Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:')}</p>
+        <a href="${waUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
+          <i class="fab fa-whatsapp"></i>
+          <span data-ru="Написать в WhatsApp" data-am="Գրել WhatsApp-ով">${t('Написать в WhatsApp', 'Գրել WhatsApp-ով')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== QR CODES ===== -->
+<section class="cp-qr">
+  <div class="container">
+    <div class="cp-qr-wrap">
+      <div class="cp-qr-eyebrow">
+        <i class="fas fa-qrcode"></i>
+        <span data-ru="Сканируйте на ходу" data-am="Սկանավորեք քայլելիս">${t('Сканируйте на ходу', 'Սկանավորեք քայլելիս')}</span>
+      </div>
+      <h2 data-ru="QR-коды для быстрой связи" data-am="QR-կոդեր արագ կապի համար">${t('QR-коды для быстрой связи', 'QR-կոդեր արագ կապի համար')}</h2>
+      <p class="cp-qr-sub" data-ru="Откройте камеру телефона, наведите на нужный QR — и сразу попадёте в наш чат или соцсеть." data-am="Բացեք հեռախոսի տեսախցիկը, ուղղեք ցանկալի QR-ի վրա — և անմիջապես կհայտնվեք մեր չատում կամ սոցցանցում:">${t('Откройте камеру телефона, наведите на нужный QR — и сразу попадёте в наш чат или соцсеть.', 'Բացեք հեռախոսի տեսախցիկը, ուղղեք ցանկալի QR-ի վրա — և անմիջապես կհայտնվեք մեր չատում կամ սոցցանցում:')}</p>
+      <div class="cp-qr-grid">
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="cp-qr-card">
+          <img src="/static/img/qr/qr-telegram.png" alt="Telegram QR" loading="lazy">
+          <span data-ru="Telegram чат" data-am="Telegram չատ">${t('Telegram чат', 'Telegram չատ')}</span>
+        </a>
+        <a href="${waUrl}" target="_blank" rel="noopener" class="cp-qr-card">
+          <img src="/static/img/qr/qr-whatsapp.png" alt="WhatsApp QR" loading="lazy">
+          <span data-ru="WhatsApp" data-am="WhatsApp">WhatsApp</span>
+        </a>
+        <a href="https://www.instagram.com/goo_to_top/" target="_blank" rel="noopener" class="cp-qr-card">
+          <img src="/static/img/qr/qr-instagram.png" alt="Instagram QR" loading="lazy">
+          <span data-ru="Наш Instagram" data-am="Մեր Instagram">${t('Наш Instagram', 'Մեր Instagram')}</span>
+        </a>
+        <a href="https://www.facebook.com/gototop.wb" target="_blank" rel="noopener" class="cp-qr-card">
+          <img src="/static/img/qr/qr-facebook.png" alt="Facebook QR" loading="lazy">
+          <span data-ru="Наш Facebook" data-am="Մեր Facebook">${t('Наш Facebook', 'Մեր Facebook')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== LEAD FORM (id="leadForm" → submitForm() in landing.js) ===== -->
+<section class="cp-form">
+  <div class="container">
+    <div class="cp-form-header">
+      <h2 data-ru="Оставьте заявку" data-am="Թողեք հայտ">${t('Оставьте заявку', 'Թողեք հայտ')}</h2>
+      <p data-ru="Заполните форму — менеджер свяжется с вами в течение 5 минут в рабочее время и пришлёт расчёт." data-am="Լրացրեք ձևը — մենեջերը կկապվի ձեզ հետ 5 րոպեի ընթացքում աշխատանքային ժամերին և կուղարկի հաշվարկը:">${t('Заполните форму — менеджер свяжется с вами в течение 5 минут в рабочее время и пришлёт расчёт.', 'Լրացրեք ձևը — մենեջերը կկապվի ձեզ հետ 5 րոպեի ընթացքում աշխատանքային ժամերին և կուղարկի հաշվարկը:')}</p>
+    </div>
+    <div class="form-card">
+      <form id="leadForm" onsubmit="submitForm(event)">
+        <div class="form-group">
+          <label data-ru="Ваше имя" data-am="Ձեր անունը">${t('Ваше имя', 'Ձեր անունը')}</label>
+          <input type="text" id="formName" required placeholder="${t('Имя', 'Անուն')}" data-placeholder-ru="Имя" data-placeholder-am="Անուն">
+        </div>
+        <div class="form-group">
+          <label data-ru="Телефон" data-am="Հեռախոս">${t('Телефон', 'Հեռախոս')}</label>
+          <input type="tel" id="formPhone" required>
+        </div>
+        <div class="form-group">
+          <label data-ru="Что продаёте на WB?" data-am="Ինչ եք վաճառում WB-ում?">${t('Что продаёте на WB?', 'Ինչ եք վաճառում WB-ում?')}</label>
+          <input type="text" id="formProduct" placeholder="${t('Одежда, электроника...', 'Հագուստ, էլեկտրոնիկա...')}" data-placeholder-ru="Одежда, электроника..." data-placeholder-am="Հագուստ, էլեկտրոնիկա...">
+        </div>
+        <div class="form-group">
+          <label data-ru="Какие услуги интересуют?" data-am="Ինչ ծառայություններ են հետաքրքրում?">${t('Какие услуги интересуют?', 'Ինչ ծառայություններ են հետաքրքրում?')}</label>
+          <select id="formService">
+            <option value="buyouts" data-ru="Выкупы" data-am="Գնումներ">${t('Выкупы', 'Գնումներ')}</option>
+            <option value="reviews" data-ru="Отзывы" data-am="Կարծիքներ">${t('Отзывы', 'Կարծիքներ')}</option>
+            <option value="photos" data-ru="Фотосессия" data-am="Լուսանկարահանում">${t('Фотосессия', 'Լուսանկարահանում')}</option>
+            <option value="complex" data-ru="Комплекс услуг" data-am="Ծառայությունների փաթեթ" selected>${t('Комплекс услуг', 'Ծառայությունների փաթեթ')}</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-ru="Комментарий (необязательно)" data-am="Մեկնաբանություն (ոչ պարտադիր)">${t('Комментарий (необязательно)', 'Մեկնաբանություն (ոչ պարտադիր)')}</label>
+          <textarea id="formMessage" placeholder="${t('Опишите ваш товар...', 'Նկարագրեք ձեր ապրանքը...')}" data-placeholder-ru="Опишите ваш товар..." data-placeholder-am="Նկարագրեք ձեր ապրանքը..."></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center">
+          <i class="fas fa-paper-plane"></i>
+          <span data-ru="Отправить заявку" data-am="Ուղարկել հայտը">${t('Отправить заявку', 'Ուղարկել հայտը')}</span>
+        </button>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ADDRESS & HOURS ===== -->
+<section class="cp-info">
+  <div class="container">
+    <div class="cp-info-grid">
+      <div class="cp-info-card">
+        <div class="cp-info-icon"><i class="fas fa-map-marker-alt"></i></div>
+        <div class="cp-info-text">
+          <h3 data-ru="Где мы находимся" data-am="Որտեղ ենք գտնվում">${t('Где мы находимся', 'Որտեղ ենք գտնվում')}</h3>
+          <p><strong data-ru="Ереван, Армения" data-am="Երևան, Հայաստան">${t('Ереван, Армения', 'Երևան, Հայաստան')}</strong><span data-ru="Собственный склад и офис в Ереване. Точный адрес отправляем после согласования заказа в Telegram — встреча по предварительной записи." data-am="Սեփական պահեստ և գրասենյակ Երևանում: Ճշգրիտ հասցեն ուղարկում ենք պատվերի համաձայնեցումից հետո Telegram-ով — հանդիպումը նախնական գրանցումով:">${t('Собственный склад и офис в Ереване. Точный адрес отправляем после согласования заказа в Telegram — встреча по предварительной записи.', 'Սեփական պահեստ և գրասենյակ Երևանում: Ճշգրիտ հասցեն ուղարկում ենք պատվերի համաձայնեցումից հետո Telegram-ով — հանդիպումը նախնական գրանցումով:')}</span></p>
+        </div>
+      </div>
+      <div class="cp-info-card">
+        <div class="cp-info-icon"><i class="fas fa-clock"></i></div>
+        <div class="cp-info-text">
+          <h3 data-ru="Часы работы" data-am="Աշխատանքային ժամեր">${t('Часы работы', 'Աշխատանքային ժամեր')}</h3>
+          <p><strong data-ru="Пн–Пт: 10:00–20:00 (UTC+4)" data-am="Երկ–Ուրբ: 10:00–20:00 (UTC+4)">${t('Пн–Пт: 10:00–20:00 (UTC+4)', 'Երկ–Ուրբ: 10:00–20:00 (UTC+4)')}</strong><span data-ru="Менеджеры на связи каждый день в Telegram и WhatsApp. Звонки и оформление заказов — по будням в указанное время." data-am="Մենեջերները կապի մեջ են ամեն օր Telegram-ով և WhatsApp-ով: Զանգերն ու պատվերների ձևակերպումը՝ աշխատանքային օրերին նշված ժամերին:">${t('Менеджеры на связи каждый день в Telegram и WhatsApp. Звонки и оформление заказов — по будням в указанное время.', 'Մենեջերները կապի մեջ են ամեն օր Telegram-ով և WhatsApp-ով: Զանգերն ու պատվերների ձևակերպումը՝ աշխատանքային օրերին նշված ժամերին:')}</span></p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FINAL CTA STRIP ===== -->
+<section class="cp-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Не нашли подходящий канал?" data-am="Չգտա՞ք ձեզ հարմար եղանակ:">${t('Не нашли подходящий канал?', 'Չգտա՞ք ձեզ հարմար եղանակ:')}</h3>
+        <p data-ru="Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом." data-am="Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:">${t('Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом.', 'Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:')}</p>
+      </div>
+      <div class="acs-actions">
+        <button type="button" class="btn btn-primary" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  return renderPageShell({
+    page: 'contacts',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'contacts-page',
+    mainHtml,
+    extraHead,
+  })
+}
+
+// =====================================================================
+// renderReferralPage — phase 2F "light" page for /referral.
+// Standalone partner-program landing: hero → 3-step "how it works" →
+// audience grid (4 cards mirrored from home #for-whom 4361-4393) →
+// bonus tier cards (5% / 8% / up to 15%, all with "verify with manager"
+// disclaimer) → 5-item FAQ accordion (re-uses .faq-item styles from
+// /faq via local copy so toggleFaq() in landing.js works without
+// changes) → CTA strip with Telegram / callback / contacts buttons.
+// No __SITE_DATA injection: calculator and #refCodeInput are not used
+// here, so we keep the page maximally edge-cacheable.
+// =====================================================================
+function renderReferralPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  const seo = {
+    title: t(
+      'Реферальная программа — Go to Top | Бонусы партнёрам',
+      'Հղման ծրագիր — Go to Top | Բոնուսներ գործընկերներին'
+    ),
+    description: t(
+      'Присоединяйтесь к партнёрской программе Go to Top: получайте 5–15% с каждого приведённого клиента. Для менеджеров, агентств, блогеров, школ маркетплейсов',
+      'Միացեք Go to Top-ի գործընկերային ծրագրին. ստացեք 5–15% յուրաքանչյուր բերված հաճախորդից. ապրանքագետներ, գործակալություններ, բլոգերներ, դպրոցներ'
+    ),
+    ogImage: `${siteOrigin}/static/img/og-image.png`,
+  }
+
+  const tgUrl = PLACEHOLDER_TG_URL
+  // Pre-filled "get my promo code" message; openTgWithMessage()
+  // handles encoding when the user follows the CTA.
+  const tgPromoMsg = t(
+    'Здравствуйте! Хочу получить промокод партнёрской программы Go to Top.',
+    'Բարև Ձեզ։ Ցանկանում եմ ստանալ Go to Top գործընկերային ծրագրի պրոմո կոդը։'
+  )
+  const tgPromoUrl = `${tgUrl}?text=${encodeURIComponent(tgPromoMsg)}`
+
+  // Bonus tiers — exact numbers come straight from the spec; every
+  // card carries a "уточняйте у менеджера" footnote because the real
+  // % can shift per partner contract.
+  const bonusTiers: Array<{
+    cls: string
+    icon: string
+    titleRu: string, titleAm: string
+    pct: string
+    descRu: string, descAm: string
+    bulletsRu: string[], bulletsAm: string[]
+  }> = [
+    {
+      cls: 'rp-tier-base',
+      icon: 'fa-handshake',
+      titleRu: 'Стандартный реферал',
+      titleAm: 'Ստանդարտ ուղեկից',
+      pct: '5%',
+      descRu: 'Получайте процент с первой оплаты каждого приведённого клиента — даже если вы привели всего одного.',
+      descAm: 'Ստացեք տոկոս յուրաքանչյուր ձեր կողմից բերված հաճախորդի առաջին վճարումից — նույնիսկ եթե բերել եք միայն մեկը։',
+      bulletsRu: [
+        'Без минимального порога — стартуете сразу',
+        'Промокод действует бессрочно для ваших клиентов',
+        'Выплаты на карту RUB / AMD',
+      ],
+      bulletsAm: [
+        'Առանց նվազագույն շեմի — սկսում եք անմիջապես',
+        'Պրոմո կոդը գործում է ձեր հաճախորդների համար անժամկետ',
+        'Վճարումները քարտին RUB / AMD',
+      ],
+    },
+    {
+      cls: 'rp-tier-pro',
+      icon: 'fa-rocket',
+      titleRu: 'Партнёрский',
+      titleAm: 'Գործընկերային',
+      pct: '8%',
+      descRu: 'Для активных партнёров: от 3 приведённых клиентов в месяц — повышенный процент со всех новых оплат.',
+      descAm: 'Ակտիվ գործընկերների համար՝ ամիսը 3-ից ավելի բերված հաճախորդից բարձր տոկոս՝ բոլոր նոր վճարումներից։',
+      bulletsRu: [
+        'Персональные UTM-ссылки и баннеры',
+        'Приоритетная поддержка в Telegram',
+        'Помесячные отчёты и сверка',
+      ],
+      bulletsAm: [
+        'Անհատական UTM-հղումներ և բաններներ',
+        'Առաջնային աջակցություն Telegram-ով',
+        'Ամսական հաշվետվություններ և սթիքավորում',
+      ],
+    },
+    {
+      cls: 'rp-tier-vip',
+      icon: 'fa-crown',
+      titleRu: 'Эксклюзивный',
+      titleAm: 'Բացառիկ',
+      pct: 'до 15%',
+      descRu: 'Для агентств, школ и крупных авторов: от 10 клиентов в месяц — индивидуальные условия и персональный менеджер.',
+      descAm: 'Գործակալությունների, դպրոցների և մեծ հեղինակների համար՝ ամիսը 10-ից ավելի հաճախորդից՝ անհատական պայմաններ և անձնական մենեջեր։',
+      bulletsRu: [
+        'Персональный менеджер и Slack/Telegram-чат',
+        'White-label материалы и презентации',
+        'Индивидуальная сетка комиссий',
+      ],
+      bulletsAm: [
+        'Անձնական մենեջեր և Slack/Telegram-չատ',
+        'White-label նյութեր և ներկայացումներ',
+        'Հանձնաժողովների անհատական ցանց',
+      ],
+    },
+  ]
+
+  // 5 FAQ items — same structure as /faq so toggleFaq() in
+  // landing.js works without any JS change.
+  const faqItems: Array<{ qRu: string, qAm: string, aRu: string, aAm: string }> = [
+    {
+      qRu: 'Когда выплачиваются бонусы?',
+      qAm: 'Ե՞րբ են վճարվում բոնուսները։',
+      aRu: 'Бонус начисляется после того, как клиент оплатил услугу и работа стартовала. Выплаты партнёрам делаем раз в две недели — вы получаете подтверждение в Telegram и перевод на согласованную карту (RUB или AMD). Точный график согласовывается персональным менеджером после подписания партнёрского соглашения.',
+      aAm: 'Բոնուսը հաշվարկվում է հաճախորդի կողմից ծառայության վճարումից և աշխատանքի մեկնարկից հետո։ Գործընկերներին վճարումները կատարում ենք երկու շաբաթը մեկ — դուք ստանում եք հաստատում Telegram-ով և փոխանցում համաձայնեցված քարտին (RUB կամ AMD)։ Ճշգրիտ ժամանակացույցը համաձայնեցվում է անձնական մենեջերի կողմից գործընկերային համաձայնագրի կնքումից հետո։',
+    },
+    {
+      qRu: 'Можно ли использовать свой промокод для собственных заказов?',
+      qAm: 'Կարո՞ղ եմ օգտագործել իմ սեփական պրոմո կոդն իմ պատվերների համար։',
+      aRu: 'Нет — реферальный процент рассчитывается только на новых клиентов, которые впервые оплачивают наш сервис. Это защищает партнёрскую программу от само-выплат и сохраняет честную экономику для всех участников. Если вы — действующий клиент и хотите скидку на свой заказ, попросите у менеджера обычный промокод.',
+      aAm: 'Ոչ — ուղեկից տոկոսը հաշվարկվում է միայն նոր հաճախորդների վրա, ովքեր առաջին անգամ վճարում են մեր ծառայության համար։ Սա պաշտպանում է գործընկերային ծրագիրը ինքնավճարումներից և պահպանում ազնիվ տնտեսությունը բոլոր մասնակիցների համար։ Եթե դուք գործող հաճախորդ եք և ցանկանում եք զեղչ ձեր պատվերի համար, խնդրեք մենեջերից սովորական պրոմո կոդ։',
+    },
+    {
+      qRu: 'Сколько времени действует промокод?',
+      qAm: 'Որքա՞ն ժամանակ է գործում պրոմո կոդը։',
+      aRu: 'Сам промокод действует бессрочно — пока вы остаётесь партнёром программы. Бонус начисляется как с первой оплаты приведённого клиента, так и со всех его повторных пакетов в течение первых 12 месяцев сотрудничества. После этого условия пересматриваются персональным менеджером, обычно в сторону партнёра.',
+      aAm: 'Ինքը պրոմո կոդն գործում է անժամկետ — քանի դեռ դուք մնում եք ծրագրի գործընկեր։ Բոնուսը հաշվարկվում է ինչպես բերված հաճախորդի առաջին վճարումից, այնպես էլ նրա բոլոր կրկնակի փաթեթներից համագործակցության առաջին 12 ամիսների ընթացքում։ Դրանից հետո պայմանները վերանայվում են անձնական մենեջերի կողմից, սովորաբար գործընկերի օգտին։',
+    },
+    {
+      qRu: 'Каков минимальный порог для выплаты?',
+      qAm: 'Ո՞րն է վճարման նվազագույն շեմը։',
+      aRu: 'Минимальная сумма для выплаты — 10 000 ֏ AMD (или эквивалент в RUB). Если за период сумма меньше — она автоматически переносится на следующий цикл и не сгорает. Партнёры тарифа «Эксклюзивный» получают выплаты без минимального порога, по индивидуальному графику.',
+      aAm: 'Վճարման նվազագույն գումարը՝ 10 000 ֏ AMD (կամ համարժեքը RUB-ով)։ Եթե ժամանակահատվածի համար գումարը ավելի քիչ է, այն ինքնաշխատ տեղափոխվում է հաջորդ ցիկլ և չի ոչնչանում։ «Բացառիկ» սակագնի գործընկերները ստանում են վճարումներ առանց նվազագույն շեմի, անհատական ժամանակացույցով։',
+    },
+    {
+      qRu: 'Какие документы нужны, чтобы стать партнёром?',
+      qAm: 'Ի՞նչ փաստաթղթեր են պետք գործընկեր դառնալու համար։',
+      aRu: 'Достаточно одного сообщения в Telegram — менеджер выдаст промокод и партнёрскую ссылку в течение рабочего дня. Для тарифов «Партнёрский» и «Эксклюзивный» подписываем партнёрское соглашение (как с физлицом, ИП/ИЧП, так и с юр.лицом — RU или AM юрисдикция). Все документы готовим мы.',
+      aAm: 'Բավական է մեկ հաղորդագրություն Telegram-ով — մենեջերը կտրամադրի պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։ «Գործընկերային» և «Բացառիկ» սակագների համար կնքում ենք գործընկերային համաձայնագիր (ինչպես ֆիզիկական անձի, ԱՁ/ԱՁՎ, այնպես էլ իրավաբանական անձի հետ — RU կամ AM իրավակարգում)։ Բոլոր փաստաթղթերը պատրաստում ենք մենք։',
+    },
+  ]
+
+  // Page-only styles. Reuses --purple/--bg-card/--text/etc tokens declared
+  // in renderPageShell. .faq-item / .faq-q / .faq-a mirror the /faq page
+  // so toggleFaq() in landing.js keeps working unchanged.
+  const extraHead = `<style>
+.referral-page{padding-top:88px}
+/* Hero */
+.rp-hero{padding:24px 0 40px}
+.rp-hero .rh-inner{max-width:820px;margin:0 auto;text-align:center}
+.rp-hero .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-hero h1{font-size:clamp(1.9rem,3.6vw,2.8rem);font-weight:800;line-height:1.16;margin-bottom:14px;letter-spacing:-0.02em}
+.rp-hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-hero .rh-desc{font-size:1.02rem;color:var(--text-sec);margin:0 auto 24px;line-height:1.7;max-width:680px}
+.rp-hero .rh-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.rp-hero .rh-cta .btn{padding:13px 22px;font-size:0.95rem}
+/* How it works — 3 numbered steps */
+.rp-steps{padding:32px 0}
+.rp-steps-header{text-align:center;max-width:700px;margin:0 auto 32px}
+.rp-steps-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-steps-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-steps-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-steps-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.rp-steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1080px;margin:0 auto}
+.rp-step{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;display:flex;flex-direction:column;gap:12px;position:relative;transition:var(--t)}
+.rp-step:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-3px);box-shadow:0 12px 30px rgba(0,0,0,0.2)}
+.rp-step-num{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:800;color:#fff;box-shadow:0 6px 18px rgba(139,92,246,0.35)}
+.rp-step h3{font-size:1.08rem;font-weight:700;line-height:1.3;margin:0}
+.rp-step p{color:var(--text-sec);font-size:0.92rem;line-height:1.7;margin:0}
+/* Audience grid (mirrors home #for-whom) */
+.rp-audience{padding:48px 0}
+.rp-audience-header{text-align:center;max-width:700px;margin:0 auto 28px}
+.rp-audience-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-audience-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-audience-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-audience-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.rp-aud-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;max-width:1200px;margin:0 auto}
+.rp-aud-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px 22px;display:flex;flex-direction:column;gap:12px;transition:var(--t)}
+.rp-aud-card:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,0.2)}
+.rp-aud-icon{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,rgba(139,92,246,0.18),rgba(139,92,246,0.06));border:1px solid rgba(139,92,246,0.22);display:flex;align-items:center;justify-content:center;font-size:1.25rem;color:var(--purple)}
+.rp-aud-card h3{font-size:1rem;font-weight:700;line-height:1.3;margin:0}
+.rp-aud-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7;margin:0}
+/* Bonus tiers */
+.rp-tiers{padding:32px 0 48px}
+.rp-tiers-header{text-align:center;max-width:720px;margin:0 auto 32px}
+.rp-tiers-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-tiers-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-tiers-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-tiers-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.rp-tiers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1100px;margin:0 auto}
+.rp-tier{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px 26px;display:flex;flex-direction:column;gap:14px;position:relative;transition:var(--t)}
+.rp-tier:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,0.25)}
+.rp-tier-pro{border-color:rgba(139,92,246,0.45);background:linear-gradient(180deg,rgba(139,92,246,0.08),rgba(139,92,246,0.02))}
+.rp-tier-pro::after{content:attr(data-badge);position:absolute;top:-12px;right:20px;padding:4px 12px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:#fff;font-size:0.68rem;font-weight:700;border-radius:50px;letter-spacing:0.5px;text-transform:uppercase}
+.rp-tier-vip{border-color:rgba(245,158,11,0.4);background:linear-gradient(180deg,rgba(245,158,11,0.07),rgba(245,158,11,0.02))}
+.rp-tier-vip .rp-tier-icon{background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.3);color:#F59E0B}
+.rp-tier-vip .rp-tier-pct{background:linear-gradient(135deg,#F59E0B,#FBBF24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-tier-icon{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.18),rgba(139,92,246,0.06));border:1px solid rgba(139,92,246,0.22);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple)}
+.rp-tier h3{font-size:1.15rem;font-weight:700;margin:0;line-height:1.3}
+.rp-tier-pct{font-size:2.4rem;font-weight:900;line-height:1;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.02em}
+.rp-tier-pct-label{font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-top:-6px;letter-spacing:0.3px}
+.rp-tier-desc{color:var(--text-sec);font-size:0.92rem;line-height:1.7;margin:0}
+.rp-tier-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.rp-tier-list li{display:flex;gap:10px;align-items:flex-start;font-size:0.88rem;color:var(--text-sec);line-height:1.55}
+.rp-tier-list li i{color:#10B981;margin-top:4px;flex-shrink:0;font-size:0.85rem}
+.rp-tier-note{font-size:0.74rem;color:var(--text-muted);text-align:center;margin:18px auto 0;max-width:640px;line-height:1.6}
+.rp-tier-note i{margin-right:6px;color:var(--accent)}
+/* FAQ — copies /faq accordion so toggleFaq() works unchanged */
+.rp-faq{padding:32px 0 48px}
+.rp-faq-header{text-align:center;max-width:700px;margin:0 auto 28px}
+.rp-faq-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-faq-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-faq-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-faq-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.faq-list{max-width:820px;margin:0 auto}
+.faq-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:var(--t)}
+.faq-item.active{border-color:rgba(139,92,246,0.3)}
+.faq-q{padding:20px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;font-weight:600;font-size:0.95rem;line-height:1.4}
+.faq-q span{flex:1}
+.faq-q i{color:var(--purple);transition:var(--t);font-size:0.78rem;flex-shrink:0}
+.faq-item.active .faq-q i{transform:rotate(180deg)}
+.faq-a{padding:0 24px;max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.4s ease}
+.faq-item.active .faq-a{max-height:600px;padding:0 24px 20px}
+.faq-a p{color:var(--text-sec);font-size:0.92rem;line-height:1.75}
+/* Final CTA strip — same shape as faq/contacts */
+.rp-cta-strip{padding:8px 0 64px}
+.rp-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.rp-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.rp-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.rp-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.rp-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:1000px){
+  .rp-aud-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:900px){
+  .referral-page{padding-top:80px}
+  .rp-steps-grid{grid-template-columns:1fr;gap:14px}
+  .rp-tiers-grid{grid-template-columns:1fr;gap:16px}
+  .rp-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .rp-cta-strip .acs-actions{width:100%}
+  .rp-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:600px){
+  .rp-aud-grid{grid-template-columns:1fr;gap:12px}
+  .rp-aud-card{padding:20px 18px}
+  .rp-tier{padding:26px 20px}
+  .rp-tier-pct{font-size:2rem}
+  .rp-cta-strip .acs-actions{flex-direction:column}
+  .rp-cta-strip .acs-actions .btn{width:100%}
+  .faq-q{padding:16px 18px;font-size:0.9rem}
+  .faq-item.active .faq-a{padding:0 18px 18px}
+}
+</style>`
+
+  // Render bonus tier cards. Pro tier gets a "Популярно" pill via
+  // ::after / data-badge so we don't need extra DOM nodes.
+  const tiersHtml = bonusTiers.map((tier) => {
+    const badgeAttr = tier.cls === 'rp-tier-pro'
+      ? ` data-badge="${t('Популярно', 'Հանրաճանաչ')}"`
+      : ''
+    const bullets = (isAM ? tier.bulletsAm : tier.bulletsRu)
+      .map((b, i) => `            <li><i class="fas fa-check-circle"></i><span data-ru="${tier.bulletsRu[i]}" data-am="${tier.bulletsAm[i]}">${b}</span></li>`)
+      .join('\n')
+    const titleNow = t(tier.titleRu, tier.titleAm)
+    const descNow = t(tier.descRu, tier.descAm)
+    return `      <div class="rp-tier ${tier.cls}"${badgeAttr}>
+        <div class="rp-tier-icon"><i class="fas ${tier.icon}"></i></div>
+        <h3 data-ru="${tier.titleRu}" data-am="${tier.titleAm}">${titleNow}</h3>
+        <div>
+          <div class="rp-tier-pct">${tier.pct}</div>
+          <div class="rp-tier-pct-label" data-ru="с первой оплаты клиента" data-am="հաճախորդի առաջին վճարումից">${t('с первой оплаты клиента', 'հաճախորդի առաջին վճարումից')}</div>
+        </div>
+        <p class="rp-tier-desc" data-ru="${tier.descRu}" data-am="${tier.descAm}">${descNow}</p>
+        <ul class="rp-tier-list">
+${bullets}
+        </ul>
+      </div>`
+  }).join('\n')
+
+  // Render FAQ accordion. First item gets `.active` so it opens by
+  // default — toggleFaq() in landing.js handles the rest.
+  const faqItemsHtml = faqItems.map((item, idx) => {
+    const activeCls = idx === 0 ? ' active' : ''
+    const qText = t(item.qRu, item.qAm)
+    const aText = t(item.aRu, item.aAm)
+    return `      <div class="faq-item${activeCls}">
+        <div class="faq-q" onclick="toggleFaq(this)"><span data-ru="${item.qRu}" data-am="${item.qAm}">${qText}</span><i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a"><p data-ru="${item.aRu}" data-am="${item.aAm}">${aText}</p></div>
+      </div>`
+  }).join('\n')
+
+  const mainHtml = `
+<!-- ===== REFERRAL HERO ===== -->
+<section class="rp-hero">
+  <div class="container">
+    <div class="rh-inner">
+      <div class="rh-eyebrow">
+        <i class="fas fa-handshake"></i>
+        <span data-ru="Партнёрская программа" data-am="Գործընկերային ծրագիր">${t('Партнёрская программа', 'Գործընկերային ծրագիր')}</span>
+      </div>
+      <h1>
+        <span data-ru="Реферальная программа" data-am="Հղման ծրագիր">${t('Реферальная программа', 'Հղման ծրագիր')}</span>
+        <span class="gr">Go to Top</span>
+      </h1>
+      <p class="rh-desc" data-ru="Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD." data-am="Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։">${t('Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD.', 'Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։')}</p>
+      <div class="rh-cta">
+        <a href="${tgPromoUrl}" target="_blank" rel="noopener" class="btn btn-tg btn-lg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Стать партнёром — получить промокод" data-am="Դառնալ գործընկեր — ստանալ պրոմո կոդ">${t('Стать партнёром — получить промокод', 'Դառնալ գործընկեր — ստանալ պրոմո կոդ')}</span>
+        </a>
+        <button type="button" class="btn btn-outline btn-lg" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== HOW IT WORKS — 3 steps ===== -->
+<section class="rp-steps">
+  <div class="container">
+    <div class="rp-steps-header">
+      <div class="rh-eyebrow">
+        <i class="fas fa-list-ol"></i>
+        <span data-ru="Как это работает" data-am="Ինչպես է աշխատում">${t('Как это работает', 'Ինչպես է աշխատում')}</span>
+      </div>
+      <h2>
+        <span data-ru="Три шага" data-am="Երեք քայլ">${t('Три шага', 'Երեք քայլ')}</span>
+        <span class="gr" data-ru="до первого бонуса" data-am="մինչ առաջին բոնուսը">${t('до первого бонуса', 'մինչ առաջին բոնուսը')}</span>
+      </h2>
+      <p data-ru="Никаких сложных интеграций — нужен только промокод и желание делиться сервисом, который реально работает." data-am="Ոչ մի բարդ ինտեգրացիա — պետք է միայն պրոմո կոդ և ցանկություն կիսվել իսկապես աշխատող ծառայությամբ։">${t('Никаких сложных интеграций — нужен только промокод и желание делиться сервисом, который реально работает.', 'Ոչ մի բարդ ինտեգրացիա — պետք է միայն պրոմո կոդ և ցանկություն կիսվել իսկապես աշխատող ծառայությամբ։')}</p>
+    </div>
+    <div class="rp-steps-grid">
+      <div class="rp-step">
+        <div class="rp-step-num">1</div>
+        <h3 data-ru="Получите промокод" data-am="Ստացեք պրոմո կոդ">${t('Получите промокод', 'Ստացեք պրոմո կոդ')}</h3>
+        <p data-ru="Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня." data-am="Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։">${t('Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня.', 'Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։')}</p>
+      </div>
+      <div class="rp-step">
+        <div class="rp-step-num">2</div>
+        <h3 data-ru="Делитесь с клиентами" data-am="Կիսվեք հաճախորդների հետ">${t('Делитесь с клиентами', 'Կիսվեք հաճախորդների հետ')}</h3>
+        <p data-ru="Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной." data-am="Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։">${t('Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной.', 'Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։')}</p>
+      </div>
+      <div class="rp-step">
+        <div class="rp-step-num">3</div>
+        <h3 data-ru="Получайте бонус" data-am="Ստացեք բոնուս">${t('Получайте бонус', 'Ստացեք բոնուս')}</h3>
+        <p data-ru="Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию." data-am="Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։">${t('Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию.', 'Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։')}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== AUDIENCE — 4 cards (mirrors home #for-whom 4361-4393) ===== -->
+<section class="rp-audience">
+  <div class="container">
+    <div class="rp-audience-header">
+      <div class="rh-eyebrow">
+        <i class="fas fa-users"></i>
+        <span data-ru="Кому подойдёт" data-am="Ում համար է հարմար">${t('Кому подойдёт', 'Ում համար է հարմար')}</span>
+      </div>
+      <h2>
+        <span data-ru="Программа для тех," data-am="Ծրագիր նրանց համար,">${t('Программа для тех,', 'Ծրագիր նրանց համար,')}</span>
+        <span class="gr" data-ru="у кого есть аудитория" data-am="ովքեր ունեն լսարան">${t('у кого есть аудитория', 'ովքեր ունեն լսարան')}</span>
+      </h2>
+      <p data-ru="Мы работаем с разными форматами партнёров — от отдельных менеджеров до агентств и образовательных проектов." data-am="Մենք աշխատում ենք գործընկերների տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև գործակալություններ և կրթական նախագծեր։">${t('Мы работаем с разными форматами партнёров — от отдельных менеджеров до агентств и образовательных проектов.', 'Մենք աշխատում ենք գործընկերների տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև գործակալություններ և կրթական նախագծեր։')}</p>
+    </div>
+    <div class="rp-aud-grid">
+      <div class="rp-aud-card">
+        <div class="rp-aud-icon"><i class="fas fa-handshake"></i></div>
+        <h3 data-ru="Менеджер по маркетплейсам" data-am="Մարքեթփլեյս մենեջեր">${t('Менеджер по маркетплейсам', 'Մարքեթփլեյս մենեջեր')}</h3>
+        <p data-ru="Имеете базу клиентов-поставщиков на Wildberries и Ozon — рекомендуйте наш сервис и зарабатывайте процент с каждого их заказа." data-am="Ունեք հաճախորդ-մատակարարների բազա Wildberries-ում և Ozon-ում — խորհուրդ տվեք մեր ծառայությունը և վաստակեք տոկոս նրանց յուրաքանչյուր պատվերից։">${t('Имеете базу клиентов-поставщиков на Wildberries и Ozon — рекомендуйте наш сервис и зарабатывайте процент с каждого их заказа.', 'Ունեք հաճախորդ-մատակարարների բազա Wildberries-ում և Ozon-ում — խորհուրդ տվեք մեր ծառայությունը և վաստակեք տոկոս նրանց յուրաքանչյուր պատվերից։')}</p>
+      </div>
+      <div class="rp-aud-card">
+        <div class="rp-aud-icon"><i class="fas fa-building"></i></div>
+        <h3 data-ru="Агентство или компания" data-am="Գործակալություն կամ ընկերություն">${t('Агентство или компания', 'Գործակալություն կամ ընկերություն')}</h3>
+        <p data-ru="Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте средний чек клиента." data-am="Աշխատում եք մարքեթփլեյսների մատակարարների հետ — ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթին և ավելացրեք հաճախորդի միջին չեկը։">${t('Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте средний чек клиента.', 'Աշխատում եք մարքեթփլեյսների մատակարարների հետ — ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթին և ավելացրեք հաճախորդի միջին չեկը։')}</p>
+      </div>
+      <div class="rp-aud-card">
+        <div class="rp-aud-icon"><i class="fas fa-globe"></i></div>
+        <h3 data-ru="Блогер или владелец канала" data-am="Բլոգեր կամ ալիքի սեփականատեր">${t('Блогер или владелец канала', 'Բլոգեր կամ ալիքի սեփականատեր')}</h3>
+        <p data-ru="Ведёте тематический блог, YouTube- или Telegram-канал о Wildberries — монетизируйте аудиторию через партнёрский промокод." data-am="Վարում եք թեմատիկ բլոգ, YouTube- կամ Telegram-ալիք Wildberries-ի մասին — դրամայնացրեք լսարանը գործընկերային պրոմո կոդով։">${t('Ведёте тематический блог, YouTube- или Telegram-канал о Wildberries — монетизируйте аудиторию через партнёрский промокод.', 'Վարում եք թեմատիկ բլոգ, YouTube- կամ Telegram-ալիք Wildberries-ի մասին — դրամայնացրեք լսարանը գործընկերային պրոմո կոդով։')}</p>
+      </div>
+      <div class="rp-aud-card">
+        <div class="rp-aud-icon"><i class="fas fa-graduation-cap"></i></div>
+        <h3 data-ru="Школа маркетплейсов" data-am="Մարքեթփլեյսների դպրոց">${t('Школа маркетплейсов', 'Մարքեթփլեյսների դպրոց')}</h3>
+        <p data-ru="Обучаете работе с Wildberries — рекомендуйте наш сервис студентам как практический инструмент и получайте реферальное вознаграждение." data-am="Ուսուցանում եք Wildberries-ի հետ աշխատանքը — խորհուրդ տվեք մեր ծառայությունը ուսանողներին որպես գործնական գործիք և ստացեք ուղեկից վարձատրություն։">${t('Обучаете работе с Wildberries — рекомендуйте наш сервис студентам как практический инструмент и получайте реферальное вознаграждение.', 'Ուսուցանում եք Wildberries-ի հետ աշխատանքը — խորհուրդ տվեք մեր ծառայությունը ուսանողներին որպես գործնական գործիք և ստացեք ուղեկից վարձատրություն։')}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== BONUS TIERS ===== -->
+<section class="rp-tiers">
+  <div class="container">
+    <div class="rp-tiers-header">
+      <div class="rh-eyebrow">
+        <i class="fas fa-percent"></i>
+        <span data-ru="Размер бонусов" data-am="Բոնուսների չափը">${t('Размер бонусов', 'Բոնուսների չափը')}</span>
+      </div>
+      <h2>
+        <span data-ru="Три уровня" data-am="Երեք մակարդակ">${t('Три уровня', 'Երեք մակարդակ')}</span>
+        <span class="gr" data-ru="партнёрства" data-am="գործընկերության">${t('партнёрства', 'գործընկերության')}</span>
+      </h2>
+      <p data-ru="Чем больше клиентов вы приводите — тем выше процент и доступ к индивидуальным условиям. Стартуйте с базового и переходите выше." data-am="Որքան շատ հաճախորդ եք բերում, այնքան բարձր է տոկոսը և անհատական պայմանների հասանելիությունը։ Սկսեք բազայինից և անցեք ավելի բարձր։">${t('Чем больше клиентов вы приводите — тем выше процент и доступ к индивидуальным условиям. Стартуйте с базового и переходите выше.', 'Որքան շատ հաճախորդ եք բերում, այնքան բարձր է տոկոսը և անհատական պայմանների հասանելիությունը։ Սկսեք բազայինից և անցեք ավելի բարձր։')}</p>
+    </div>
+    <div class="rp-tiers-grid">
+${tiersHtml}
+    </div>
+    <div class="rp-tier-note">
+      <i class="fas fa-info-circle"></i>
+      <span data-ru="Точные проценты, периоды выплат и условия по тарифам «Партнёрский» и «Эксклюзивный» уточняйте у персонального менеджера — они фиксируются в партнёрском соглашении." data-am="Ճշգրիտ տոկոսները, վճարման ժամանակահատվածները և «Գործընկերային» ու «Բացառիկ» սակագների պայմանները ճշտեք անձնական մենեջերի մոտ — դրանք ամրագրվում են գործընկերային համաձայնագրում։">${t('Точные проценты, периоды выплат и условия по тарифам «Партнёрский» и «Эксклюзивный» уточняйте у персонального менеджера — они фиксируются в партнёрском соглашении.', 'Ճշգրիտ տոկոսները, վճարման ժամանակահատվածները և «Գործընկերային» ու «Բացառիկ» սակագների պայմանները ճշտեք անձնական մենեջերի մոտ — դրանք ամրագրվում են գործընկերային համաձայնագրում։')}</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ — 5 referral-specific questions ===== -->
+<section class="rp-faq">
+  <div class="container">
+    <div class="rp-faq-header">
+      <div class="rh-eyebrow">
+        <i class="fas fa-question-circle"></i>
+        <span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span>
+      </div>
+      <h2>
+        <span data-ru="Частые вопросы" data-am="Հաճախ տրվող">${t('Частые вопросы', 'Հաճախ տրվող')}</span>
+        <span class="gr" data-ru="о программе" data-am="հարցեր ծրագրի մասին">${t('о программе', 'հարցեր ծրագրի մասին')}</span>
+      </h2>
+      <p data-ru="Ответы на ключевые вопросы партнёров: выплаты, документы, сроки и пороги. Не нашли свой — напишите менеджеру в Telegram." data-am="Պատասխաններ գործընկերների հիմնական հարցերին՝ վճարումներ, փաստաթղթեր, ժամկետներ և շեմեր։ Չգտա՞ք ձերը — գրեք մենեջերին Telegram-ով։">${t('Ответы на ключевые вопросы партнёров: выплаты, документы, сроки и пороги. Не нашли свой — напишите менеджеру в Telegram.', 'Պատասխաններ գործընկերների հիմնական հարցերին՝ վճարումներ, փաստաթղթեր, ժամկետներ և շեմեր։ Չգտա՞ք ձերը — գրեք մենեջերին Telegram-ով։')}</p>
+    </div>
+    <div class="faq-list">
+${faqItemsHtml}
+    </div>
+  </div>
+</section>
+
+<!-- ===== FINAL CTA STRIP ===== -->
+<section class="rp-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Готовы стать партнёром?" data-am="Պատրա՞ստ եք դառնալ գործընկեր">${t('Готовы стать партнёром?', 'Պատրա՞ստ եք դառնալ գործընկեր')}</h3>
+        <p data-ru="Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов." data-am="Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։">${t('Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов.', 'Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։')}</p>
+      </div>
+      <div class="acs-actions">
+        <a href="${tgPromoUrl}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Получить код" data-am="Ստանալ կոդը">${t('Получить код', 'Ստանալ կոդը')}</span>
+        </a>
+        <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+        <a href="/contacts" class="btn btn-primary">
+          <i class="fas fa-envelope"></i>
+          <span data-ru="Контакты" data-am="Կոնտակտներ">${t('Контакты', 'Կոնտակտներ')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  return renderPageShell({
+    page: 'referral',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'referral-page',
+    mainHtml,
+    extraHead,
+  })
 }
 
 export function register(app: Hono<{ Bindings: Bindings }>) {
@@ -1759,7 +4254,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
         <span class="svc-quick-cta" data-ru="Подробнее →" data-am="Ավелин →">Подробнее →</span>
       </div>
     </a>
-    <a href="#referral" class="svc-quick-card">
+    <a href="/referral" class="svc-quick-card">
       <div class="svc-quick-img">
         <img src="/static/img/svc-referral.png" alt="Реферальная программа" loading="lazy">
       </div>
@@ -3790,9 +6285,17 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   }
 
   // === Inline site-data (started in parallel at the beginning) ===
-  const siteDataJson = await siteDataPromise;
+  // 3s timeout: if /api/site-data is slow, render without inlined data
+  // (calculator falls back to a client-side fetch instead of hanging the page).
+  // Escape `</` in the JSON to prevent any chance of breaking out of the
+  // <script> block (defense-in-depth — JSON.stringify already escapes most things).
+  const siteDataJson = await Promise.race<string | null>([
+    siteDataPromise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+  ]);
   if (siteDataJson) {
-    pageHtml = pageHtml.replace('</head>', '<script>window.__SITE_DATA=' + siteDataJson + '</script>\n</head>');
+    const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
+    pageHtml = pageHtml.replace('</head>', '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>');
   }
 
   return c.html(pageHtml);
@@ -3800,8 +6303,10 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 // ===== PLACEHOLDER PAGES (Phase 1) =====
 // Pure-SSR placeholder routes for /about /buyouts /services /faq /contacts /referral.
-// Phase 2 will replace these with real per-page content + DB-backed site_blocks.
-// All 6 share the same layout (header, footer, popup, bottom-nav, /static/landing.js).
+// Phase 2 progressively replaces these with real content. /about (2A) and
+// /services (2B) are already migrated; the rest still use the lightweight
+// placeholder shell. All share the same header/footer/popup/bottom-nav and
+// load /static/landing.js.
 const PLACEHOLDER_PAGES: PlaceholderPage[] = ['about', 'buyouts', 'services', 'faq', 'contacts', 'referral'];
 for (const page of PLACEHOLDER_PAGES) {
   app.get(`/${page}`, async (c) => {
@@ -3818,6 +6323,90 @@ for (const page of PLACEHOLDER_PAGES) {
     const lang: 'ru' | 'am' = (urlLang === 'am' || urlLang === 'hy') ? 'am' : 'ru';
     const siteOrigin = reqUrl.origin;
 
+    // /about now has real content (phase 2A); the rest stay on the
+    // placeholder shell until their respective phase-2 subtasks land.
+    if (page === 'about') {
+      return c.html(renderAboutPage({ lang, siteOrigin }));
+    }
+    // /services (phase 2B): heavy page with the full calculator. Mirrors
+    // the `/` route — kicks off a parallel /api/site-data fetch and inlines
+    // the JSON as `window.__SITE_DATA` before `</head>` so the calculator
+    // renders packages/tabs/prices without an extra client round-trip.
+    if (page === 'services') {
+      const siteDataPromise = (async () => {
+        try {
+          const req = new Request(new URL('/api/site-data', c.req.url).toString());
+          const resp = await app.fetch(req, c.env);
+          return resp.ok ? await resp.text() : null;
+        } catch { return null; }
+      })();
+      let pageHtml = renderServicesPage({ lang, siteOrigin });
+      // 3s timeout + `</` escape — same defensive pattern as the `/` route.
+      const siteDataJson = await Promise.race<string | null>([
+        siteDataPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+      ]);
+      if (siteDataJson) {
+        const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
+        pageHtml = pageHtml.replace(
+          '</head>',
+          '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>'
+        );
+      }
+      return c.html(pageHtml);
+    }
+    // /buyouts (phase 2C): heavy page with topical Wildberries-buyouts
+    // content + the full calculator. Same `__SITE_DATA` injection pattern
+    // as `/services` so the calculator renders packages/tabs/prices
+    // without an extra client round-trip.
+    if (page === 'buyouts') {
+      const siteDataPromise = (async () => {
+        try {
+          const req = new Request(new URL('/api/site-data', c.req.url).toString());
+          const resp = await app.fetch(req, c.env);
+          return resp.ok ? await resp.text() : null;
+        } catch { return null; }
+      })();
+      let pageHtml = renderBuyoutsPage({ lang, siteOrigin });
+      // 3s timeout + `</` escape — same defensive pattern as the `/` route.
+      const siteDataJson = await Promise.race<string | null>([
+        siteDataPromise,
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+      ]);
+      if (siteDataJson) {
+        const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
+        pageHtml = pageHtml.replace(
+          '</head>',
+          '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>'
+        );
+      }
+      return c.html(pageHtml);
+    }
+    // /faq (phase 2D): light page — compact hero, 12-item bilingual
+    // accordion (toggleFaq() lives in landing.js) and a small CTA strip.
+    // No __SITE_DATA injection: the calculator is not used here, so we
+    // skip the extra D1 round-trip and keep the page maximally cacheable.
+    // SEO is amplified with a JSON-LD FAQPage block emitted via extraHead.
+    if (page === 'faq') {
+      return c.html(renderFaqPage({ lang, siteOrigin }));
+    }
+    // /contacts (phase 2E): heavy page with channels grid (Telegram x2 +
+    // WhatsApp), QR codes, lead form (#leadForm → submitForm() in
+    // landing.js → POST /api/lead), address/hours and a final callback
+    // CTA strip. No __SITE_DATA injection: the calculator isn't used
+    // here, so we skip the extra D1 round-trip and stay edge-cacheable.
+    if (page === 'contacts') {
+      return c.html(renderContactsPage({ lang, siteOrigin }));
+    }
+    // /referral (phase 2F): light partner-program page — hero, 3 steps,
+    // audience cards (mirrors home #for-whom), bonus tiers (5/8/15%),
+    // referral-specific FAQ accordion (re-uses .faq-item via local CSS
+    // copy so toggleFaq() in landing.js works) and a CTA strip. No
+    // __SITE_DATA injection: the calculator and #refCodeInput are not
+    // used here, so the page stays maximally edge-cacheable.
+    if (page === 'referral') {
+      return c.html(renderReferralPage({ lang, siteOrigin }));
+    }
     return c.html(renderPlaceholderPage({ page, lang, siteOrigin }));
   });
 }

@@ -1420,10 +1420,42 @@ function updateTelegramLinks() {
 // layer already pre-renders the right currency, and the page comes up identical
 // minus the flipped prices.
 switchLang = function(l) {
-  var newPath = l === 'am' ? '/am' : '/ru';
-  if (window.location.pathname !== newPath) {
+  var path = window.location.pathname;
+  // Phase 1C: secondary pages live at /about, /buyouts, /services, /faq,
+  // /contacts, /referral. They have no /am prefix yet, so language is
+  // carried via ?lang=am while preserving the current path.
+  // Preserve any non-lang query params (UTM, fbclid, ref, etc.) via URLSearchParams.
+  var subPages = ['/about', '/buyouts', '/services', '/faq', '/contacts', '/referral'];
+  if (subPages.indexOf(path) !== -1) {
     localStorage.setItem('gtt_lang', l);
-    window.location.assign(newPath + window.location.hash);
+    try {
+      var subUrl = new URL(window.location.href);
+      subUrl.pathname = path;
+      if (l === 'am') {
+        subUrl.searchParams.set('lang', 'am');
+      } else {
+        subUrl.searchParams.delete('lang');
+      }
+      subUrl.hash = window.location.hash;
+      window.location.assign(subUrl.toString());
+    } catch (e) {
+      var target = l === 'am' ? path + '?lang=am' : path;
+      window.location.assign(target + window.location.hash);
+    }
+    return;
+  }
+  var newPath = l === 'am' ? '/am' : '/ru';
+  if (path !== newPath) {
+    localStorage.setItem('gtt_lang', l);
+    try {
+      var rootUrl = new URL(window.location.href);
+      rootUrl.pathname = newPath;
+      rootUrl.searchParams.delete('lang');
+      rootUrl.hash = window.location.hash;
+      window.location.assign(rootUrl.toString());
+    } catch (e) {
+      window.location.assign(newPath + window.location.hash);
+    }
     return;
   }
   lang = l;
