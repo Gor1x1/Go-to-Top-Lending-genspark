@@ -259,6 +259,7 @@ CREATE TABLE IF NOT EXISTS photo_blocks (
 CREATE TABLE IF NOT EXISTS site_blocks (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   block_key TEXT UNIQUE NOT NULL,
+  page TEXT NOT NULL DEFAULT 'home',
   block_type TEXT DEFAULT 'section',
   title_ru TEXT DEFAULT '',
   title_am TEXT DEFAULT '',

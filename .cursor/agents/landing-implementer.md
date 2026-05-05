@@ -29,6 +29,9 @@ Execute a landing-page subtask assigned by the planner. Includes: SSR HTML chang
   - Page sections: hero, stats-bar, services/calculator, WB banner, buyout detail, packages, ticker, reviews, FAQ, contact cards, footer
   - Full `<script>` block — calculator logic, Telegram buttons, animations, scroll effects, language switching, form submission, slot counter timers, **promo code validation via `POST /api/referral/check`**
 
+- `src/routes/blog.ts` — SSR blog index (`/blog`) and post page (`/blog/:slug`). Same SSR style as `landing.ts` (HTML string composition, bilingual `t()` helper, edge-cached). Owns blog `<head>` SEO (title, OG, hreflang, JSON-LD `Article`), blog grid layout, and "other posts" preview. Does NOT own blog admin CRUD — that's `frontend-implementer` (panel.ts) + `implementer` (admin-blog.ts).
+- `public/static/landing.js` — extracted client-side bundle for ALL public pages (calculator, popups, counter animations, language switcher, form handlers). Loaded via `<script src="/static/landing.js" defer>` from the shared layout. **Edit this file, NEVER inline scripts back into HTML routes.**
+- `src/routes/_layout.ts` (or equivalent shared-layout helper inside `landing.ts`) — `renderPageLayout({page, lang, contentHtml, includeCalculator, includeFullCta, ...})` reused by every public page route.
 - `src/seed-data.ts` (~115 lines) — `SEED_CONTENT_SECTIONS`, `SEED_CALC_TABS`, `SEED_CALC_SERVICES`, `SEED_TG_MESSAGES` (DB fallback)
 - `src/renderer.tsx` (~12 lines) — minimal Hono JSX renderer
 

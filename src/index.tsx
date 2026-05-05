@@ -70,10 +70,8 @@ registerSeedApi(app)
 // appropriate anchor on the main landing page.
 // This allows proper sharing/bookmarking of /services, /calculator etc.
 const PAGE_SECTIONS: Record<string, { anchor: string; title_ru: string; title_am: string }> = {
-  services:   { anchor: 'services',   title_ru: 'Услуги',       title_am: 'Ծараyutyan' },
-  calculator: { anchor: 'calculator', title_ru: 'Калькулятор',  title_am: 'Հашviч' },
-  guarantee:  { anchor: 'guarantee',  title_ru: 'Гарантии',     title_am: 'Eराशखiknern' },
-  contacts:   { anchor: 'contact',    title_ru: 'Контакты',     title_am: 'Контaktner' },
+  calculator: { anchor: 'calculator', title_ru: 'Калькулятор',  title_am: 'Հաշվիչ' },
+  guarantee:  { anchor: 'guarantee',  title_ru: 'Гарантии',     title_am: 'Երաշխիքներ' },
 };
 
 for (const [path, info] of Object.entries(PAGE_SECTIONS)) {
@@ -120,7 +118,13 @@ app.get('/sitemap.xml', async (c) => {
   <url><loc>${origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>${origin}/ru</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>${origin}/am</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
-  <url><loc>${origin}/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>${blogUrls}
+  <url><loc>${origin}/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/buyouts</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/services</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/faq</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/contacts</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/referral</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>${blogUrls}
 </urlset>`;
   return new Response(xml, { headers: { 'Content-Type': 'application/xml', 'Cache-Control': 'public, max-age=3600' } });
 });
@@ -202,7 +206,7 @@ a{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius
 // immediately without touching D1, giving ~50ms TTFB.
 // TTL = 600s (10 min). Admin saves auto-purge via /api/admin middleware.
 const CACHE_TTL = 600; // seconds — edge cache lifetime (10 min; short TTL ensures stale content expires fast even if purge misses some PoPs)
-const CACHEABLE_PATHS = new Set(['/', '/am', '/ru', '/blog']);
+const CACHEABLE_PATHS = new Set(CACHE_PATHS);
 
 // ===== DOMAIN CONSOLIDATION =====
 // Primary domain: gototopwb.ru — all traffic should end up here.
