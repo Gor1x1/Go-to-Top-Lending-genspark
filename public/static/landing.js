@@ -164,11 +164,62 @@ document.addEventListener('click', function(e) {
   }
 });
 
-// Active section highlighting on scroll — re-reads nav items each time
-// so it works even after DB client rebuilds the bottom nav
+// Active nav highlighting — works in two modes:
+//   • Subpage (/about, /services, /buyouts, /faq, /contacts, /referral):
+//     mark the bottom-nav item whose href pathname matches location.pathname.
+//     The "More" dropdown button gets highlighted if the active link lives in
+//     the dropdown (FAQ / Contacts / Bonuses on certain pages).
+//   • Home (/, /am, /ru): legacy scroll-based highlighting against in-page
+//     anchors (#about, #services, etc.). Re-reads nav items each tick so it
+//     keeps working after the DB client rebuilds the bottom nav.
+// Re-uses the same .bottom-nav-item.active CSS class so styling is unified.
 (function() {
   var scrollTimer = null;
-  function updateActiveNav() {
+  var SUBPAGE_PATHS = ['/about','/services','/buyouts','/faq','/contacts','/referral'];
+  function isSubpage() {
+    var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    return SUBPAGE_PATHS.indexOf(p) !== -1;
+  }
+  function highlightByPath() {
+    var current = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    var navItems = document.querySelectorAll('.bottom-nav-item[href]');
+    var moreLinks = document.querySelectorAll('.bottom-nav-more-menu a[href]');
+    var matched = false;
+    navItems.forEach(function(a) {
+      a.classList.remove('active');
+      var href = a.getAttribute('href') || '';
+      try {
+        var u = new URL(href, location.origin);
+        var hp = u.pathname.replace(/\/+$/, '') || '/';
+        // Skip /services#calculator-style items: they have a hash and shouldn't
+        // win over the bare /services item when on /services page.
+        if (hp === current && !u.hash) {
+          a.classList.add('active');
+          matched = true;
+        }
+      } catch (_e) { /* ignore */ }
+    });
+    var moreBtn = document.getElementById('bottomNavMore');
+    if (moreBtn) {
+      var inMore = false;
+      moreLinks.forEach(function(a) {
+        var href = a.getAttribute('href') || '';
+        try {
+          var u = new URL(href, location.origin);
+          var hp = u.pathname.replace(/\/+$/, '') || '/';
+          if (hp === current && !u.hash) inMore = true;
+        } catch (_e) {}
+      });
+      if (!matched && inMore) moreBtn.classList.add('active');
+      else if (!matched) {
+        // Don't fight the open-state class set by toggleBottomMore()
+        if (!moreBtn.querySelector('.bottom-nav-more-menu.active')) {
+          moreBtn.classList.remove('active');
+        }
+      }
+    }
+  }
+  function updateActiveNavScroll() {
     var navItems = document.querySelectorAll('.bottom-nav-item[href]');
     if (!navItems.length) return;
     var moreLinks = document.querySelectorAll('.bottom-nav-more-menu a[href]');
@@ -177,7 +228,6 @@ document.addEventListener('click', function(e) {
       var href = a.getAttribute('href');
       if (href && href.startsWith('#')) moreTargets.push(href.substring(1));
     });
-    // Collect all sections in DOM order (top to bottom)
     var allSections = [];
     navItems.forEach(function(a) {
       var href = a.getAttribute('href');
@@ -193,21 +243,17 @@ document.addEventListener('click', function(e) {
         if (el) allSections.push({ id: href.substring(1), top: el.getBoundingClientRect().top + window.scrollY });
       }
     });
-    // Sort by position on page
     allSections.sort(function(a, b) { return a.top - b.top; });
-    // Find active: last section whose top is above 35% of viewport
     var scrollY = window.scrollY + window.innerHeight * 0.35;
     var activeId = '';
     for (var i = 0; i < allSections.length; i++) {
       if (allSections[i].top <= scrollY) activeId = allSections[i].id;
     }
-    // Highlight matching nav item
     navItems.forEach(function(a) {
       var href = (a.getAttribute('href') || '').substring(1);
       if (href === activeId) a.classList.add('active');
       else a.classList.remove('active');
     });
-    // Highlight more button if active section is inside the dropdown
     var moreBtn = document.getElementById('bottomNavMore');
     if (moreBtn) {
       var inMore = moreTargets.indexOf(activeId) >= 0;
@@ -215,13 +261,22 @@ document.addEventListener('click', function(e) {
       else if (!moreBtn.querySelector('.bottom-nav-more-menu.active')) moreBtn.classList.remove('active');
     }
   }
-  window.addEventListener('scroll', function() {
-    if (scrollTimer) clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(updateActiveNav, 60);
-  }, {passive: true});
-  // Run after a delay to let DB client rebuild nav
-  setTimeout(updateActiveNav, 500);
-  setTimeout(updateActiveNav, 2000);
+  if (isSubpage()) {
+    // Run early + after DOM ready so highlight appears as fast as possible.
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', highlightByPath);
+    } else {
+      highlightByPath();
+    }
+    setTimeout(highlightByPath, 500);
+  } else {
+    window.addEventListener('scroll', function() {
+      if (scrollTimer) clearTimeout(scrollTimer);
+      scrollTimer = setTimeout(updateActiveNavScroll, 60);
+    }, {passive: true});
+    setTimeout(updateActiveNavScroll, 500);
+    setTimeout(updateActiveNavScroll, 2000);
+  }
 })();
 
 document.querySelectorAll('.nav-links a').forEach(function(a) {

@@ -83,6 +83,121 @@ const PLACEHOLDER_PAGE_DATA: Record<PlaceholderPage, {
 const PLACEHOLDER_TG_URL = 'https://t.me/goo_to_top'
 
 // =====================================================================
+// JSON-LD helpers (Phase 3A.3) — emit Schema.org structured data so search
+// engines can render rich results: Organization on `/`, Service on
+// /services + /buyouts, BreadcrumbList on every subpage, LocalBusiness +
+// ContactPoint on /contacts. Returned strings are ready-to-inject
+// `<script type="application/ld+json">…</script>` blocks. We always
+// `JSON.stringify` then escape `</` to defend against any chance of the
+// payload accidentally closing its surrounding <script>.
+// =====================================================================
+function _ldScript(obj: unknown): string {
+  const safe = JSON.stringify(obj).replace(/<\//g, '<\\/')
+  return `<script type="application/ld+json">${safe}</script>`
+}
+
+function buildOrganizationLd(siteOrigin: string): string {
+  return _ldScript({
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    name: 'Go to Top',
+    url: `${siteOrigin}/`,
+    logo: `${siteOrigin}/static/img/logo-gototop.png`,
+    description: 'Маркетплейс-агентство в Ереване: продвижение карточек на Wildberries — выкупы живыми людьми, отзывы с фото, фотосессии, фулфилмент.',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Yerevan',
+      addressRegion: 'Yerevan',
+      addressCountry: 'AM',
+    },
+    contactPoint: [{
+      '@type': 'ContactPoint',
+      contactType: 'customer service',
+      telephone: '+374-55-22-62-24',
+      areaServed: ['AM', 'RU'],
+      availableLanguage: ['Russian', 'Armenian'],
+    }],
+    sameAs: [
+      'https://t.me/goo_to_top',
+      'https://wa.me/37455226224',
+    ],
+  })
+}
+
+function buildServiceLd(opts: {
+  siteOrigin: string,
+  pagePath: string,
+  nameRu: string,
+  nameAm: string,
+  descriptionRu: string,
+  descriptionAm: string,
+  serviceType: string,
+  isAM: boolean,
+}): string {
+  const { siteOrigin, pagePath, isAM } = opts
+  return _ldScript({
+    '@context': 'https://schema.org',
+    '@type': 'Service',
+    name: isAM ? opts.nameAm : opts.nameRu,
+    description: isAM ? opts.descriptionAm : opts.descriptionRu,
+    serviceType: opts.serviceType,
+    url: `${siteOrigin}${pagePath}`,
+    provider: {
+      '@type': 'Organization',
+      name: 'Go to Top',
+      url: `${siteOrigin}/`,
+    },
+    areaServed: [
+      { '@type': 'Country', name: 'Russia' },
+      { '@type': 'Country', name: 'Armenia' },
+    ],
+  })
+}
+
+function buildLocalBusinessLd(siteOrigin: string): string {
+  return _ldScript({
+    '@context': 'https://schema.org',
+    '@type': 'LocalBusiness',
+    name: 'Go to Top',
+    image: `${siteOrigin}/static/img/og-image-dark.png`,
+    url: `${siteOrigin}/contacts`,
+    telephone: '+374-55-22-62-24',
+    address: {
+      '@type': 'PostalAddress',
+      addressLocality: 'Yerevan',
+      addressCountry: 'AM',
+    },
+    priceRange: '$$',
+  })
+}
+
+function buildBreadcrumbLd(opts: {
+  siteOrigin: string,
+  isAM: boolean,
+  page: 'about' | 'services' | 'buyouts' | 'faq' | 'contacts' | 'referral',
+}): string {
+  const { siteOrigin, isAM, page } = opts
+  const homeName = isAM ? 'Գլխավոր' : 'Главная'
+  const pageNames: Record<typeof page, { ru: string, am: string }> = {
+    about:    { ru: 'О нас',     am: 'Մեր մասին' },
+    services: { ru: 'Услуги',    am: 'Ծառայություններ' },
+    buyouts:  { ru: 'Выкупы',    am: 'Հետգնում' },
+    faq:      { ru: 'FAQ',       am: 'ՀՏՀ' },
+    contacts: { ru: 'Контакты',  am: 'Կոնտակտներ' },
+    referral: { ru: 'Бонусы',    am: 'Բոնուսներ' },
+  }
+  const pageName = isAM ? pageNames[page].am : pageNames[page].ru
+  return _ldScript({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: homeName, item: `${siteOrigin}/` },
+      { '@type': 'ListItem', position: 2, name: pageName, item: `${siteOrigin}/${page}` },
+    ],
+  })
+}
+
+// =====================================================================
 // renderPageShell
 // ---------------------------------------------------------------------
 // Shared SSR skeleton for all secondary pages: builds full <html> doc
@@ -385,18 +500,20 @@ ${mainHtml}
 
 <script src="/static/landing.js" defer></script>
 
-<!-- Bottom Navigation Bar (mobile) -->
+<!-- Bottom Navigation Bar (mobile) — Phase 3A: links point to actual subpages
+     so highlightActiveNav() in landing.js can mark the current page active. -->
 <nav class="bottom-nav" id="bottomNav">
 <div class="bottom-nav-items">
-  <a href="/#about" class="bottom-nav-item"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</span></a>
-  <a href="/#services" class="bottom-nav-item"><i class="fas fa-hand-holding"></i><span data-ru="Услуги" data-am="Ծառայություններ">${isAM ? 'Ծառայություններ' : 'Услуги'}</span></a>
-  <a href="/#calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</span></a>
-  <a href="/#guarantee" class="bottom-nav-item"><i class="fas fa-shield-alt"></i><span data-ru="Гарантии" data-am="Երաշխիքներ">${isAM ? 'Երաշխիքներ' : 'Гарантии'}</span></a>
+  <a href="/about" class="bottom-nav-item"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</span></a>
+  <a href="/services" class="bottom-nav-item"><i class="fas fa-hand-holding"></i><span data-ru="Услуги" data-am="Ծառայություններ">${isAM ? 'Ծառայություններ' : 'Услуги'}</span></a>
+  <a href="/services#calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</span></a>
+  <a href="/buyouts" class="bottom-nav-item"><i class="fas fa-shopping-cart"></i><span data-ru="Выкупы" data-am="Հետգնում">${isAM ? 'Հետգնում' : 'Выкупы'}</span></a>
   <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="Ещё" data-am="Ավելին">${isAM ? 'Ավելին' : 'Ещё'}</span>
     <div class="bottom-nav-more-menu" id="bottomMoreMenu">
-      <a href="/#warehouse"><i class="fas fa-warehouse"></i><span data-ru="Склад" data-am="Պահեստ">${isAM ? 'Պահեստ' : 'Склад'}</span></a>
       <a href="/faq"><i class="fas fa-question-circle"></i><span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span></a>
       <a href="/contacts"><i class="fas fa-envelope"></i><span data-ru="Контакты" data-am="Կոնտակտներ">${isAM ? 'Կոնտակտներ' : 'Контакты'}</span></a>
+      <a href="/referral"><i class="fas fa-gift"></i><span data-ru="Бонусы" data-am="Բոնուսներ">${isAM ? 'Բոնուսներ' : 'Бонусы'}</span></a>
+      <a href="/"><i class="fas fa-home"></i><span data-ru="Главная" data-am="Գլխավոր">${isAM ? 'Գլխավոր' : 'Главная'}</span></a>
     </div>
   </button>
 </div>
@@ -688,6 +805,9 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): strin
 </section>
 `
 
+  // SEO: BreadcrumbList lets Google render a "Home > About" trail in search.
+  const jsonLd = buildBreadcrumbLd({ siteOrigin, isAM, page: 'about' })
+
   return renderPageShell({
     page: 'about',
     lang,
@@ -695,7 +815,7 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): strin
     seo,
     bodyClass: 'about-page',
     mainHtml,
-    extraHead,
+    extraHead: extraHead + jsonLd,
   })
 }
 
@@ -1228,6 +1348,20 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
 </section>
 `
 
+  // SEO: Service schema (Wildberries promotion offering) + BreadcrumbList.
+  const jsonLd =
+    buildServiceLd({
+      siteOrigin,
+      pagePath: '/services',
+      nameRu: 'Услуги для продавцов Wildberries — Go to Top',
+      nameAm: 'Ծառայություններ Wildberries-ի վաճառողների համար — Go to Top',
+      descriptionRu: 'Выкупы живыми людьми, отзывы с фото, фотосессии и продвижение по ключевым запросам для продавцов Wildberries.',
+      descriptionAm: 'Իրական մարդկանց հետագնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով առաջխաղացում Wildberries-ի վաճառողների համար.',
+      serviceType: 'Wildberries marketplace promotion',
+      isAM,
+    }) +
+    buildBreadcrumbLd({ siteOrigin, isAM, page: 'services' })
+
   return renderPageShell({
     page: 'services',
     lang,
@@ -1235,7 +1369,7 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
     seo,
     bodyClass: 'services-page',
     mainHtml,
-    extraHead,
+    extraHead: extraHead + jsonLd,
   })
 }
 
@@ -1873,6 +2007,20 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 </section>
 `
 
+  // SEO: Service schema (Wildberries buyouts) + BreadcrumbList.
+  const jsonLd =
+    buildServiceLd({
+      siteOrigin,
+      pagePath: '/buyouts',
+      nameRu: 'Выкупы товаров на Wildberries — Go to Top',
+      nameAm: 'Ապրանքների հետգնում Wildberries-ում — Go to Top',
+      descriptionRu: 'Реальные выкупы живыми людьми по ключевым запросам с собственного склада в Ереване — рост карточки в ТОП Wildberries.',
+      descriptionAm: 'Իրական հետագնումներ կենդանի մարդկանց կողմից բանալի բառերով սեփական պահեստից Երևանում — քարտի աճ Wildberries-ի TOP-ում.',
+      serviceType: 'Wildberries buyouts service',
+      isAM,
+    }) +
+    buildBreadcrumbLd({ siteOrigin, isAM, page: 'buyouts' })
+
   return renderPageShell({
     page: 'buyouts',
     lang,
@@ -1880,7 +2028,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
     seo,
     bodyClass: 'buyouts-page',
     mainHtml,
-    extraHead,
+    extraHead: extraHead + jsonLd,
   })
 }
 
@@ -2119,6 +2267,9 @@ ${faqItemsHtml}
 </section>
 `
 
+  // SEO: BreadcrumbList in addition to the FAQPage schema already inside extraHead.
+  const breadcrumbLd = buildBreadcrumbLd({ siteOrigin, isAM, page: 'faq' })
+
   return renderPageShell({
     page: 'faq',
     lang,
@@ -2126,7 +2277,7 @@ ${faqItemsHtml}
     seo,
     bodyClass: 'faq-page',
     mainHtml,
-    extraHead,
+    extraHead: extraHead + breadcrumbLd,
   })
 }
 
@@ -2426,6 +2577,11 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
 </section>
 `
 
+  // SEO: LocalBusiness for Yerevan presence + BreadcrumbList.
+  const jsonLd =
+    buildLocalBusinessLd(siteOrigin) +
+    buildBreadcrumbLd({ siteOrigin, isAM, page: 'contacts' })
+
   return renderPageShell({
     page: 'contacts',
     lang,
@@ -2433,7 +2589,7 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
     seo,
     bodyClass: 'contacts-page',
     mainHtml,
-    extraHead,
+    extraHead: extraHead + jsonLd,
   })
 }
 
@@ -2900,6 +3056,9 @@ ${faqItemsHtml}
 </section>
 `
 
+  // SEO: BreadcrumbList for referral landing.
+  const jsonLd = buildBreadcrumbLd({ siteOrigin, isAM, page: 'referral' })
+
   return renderPageShell({
     page: 'referral',
     lang,
@@ -2907,7 +3066,7 @@ ${faqItemsHtml}
     seo,
     bodyClass: 'referral-page',
     mainHtml,
-    extraHead,
+    extraHead: extraHead + jsonLd,
   })
 }
 
@@ -6284,18 +6443,29 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     );
   }
 
+  // === SEO: Organization JSON-LD (Phase 3A.3) ===
+  // Inject schema.org Organization so Google can show the knowledge-panel
+  // entry (logo, contact, sameAs links). Inserted before __SITE_DATA below.
+  const orgJsonLd = buildOrganizationLd(siteOrigin);
+  pageHtml = pageHtml.replace('</head>', orgJsonLd + '\n</head>');
+
   // === Inline site-data (started in parallel at the beginning) ===
-  // 3s timeout: if /api/site-data is slow, render without inlined data
+  // 5s timeout: if /api/site-data is slow, render without inlined data
   // (calculator falls back to a client-side fetch instead of hanging the page).
   // Escape `</` in the JSON to prevent any chance of breaking out of the
   // <script> block (defense-in-depth — JSON.stringify already escapes most things).
+  // If injection fails, override Cache-Control to no-store so the broken-without-
+  // calculator response never gets stuck in edge cache (Phase 3A.1 — fixes the
+  // /buyouts AM stale cache where __SITE_DATA was missing).
   const siteDataJson = await Promise.race<string | null>([
     siteDataPromise,
-    new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
   ]);
   if (siteDataJson) {
     const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
     pageHtml = pageHtml.replace('</head>', '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>');
+  } else {
+    c.header('Cache-Control', 'no-store, max-age=0');
   }
 
   return c.html(pageHtml);
@@ -6341,10 +6511,11 @@ for (const page of PLACEHOLDER_PAGES) {
         } catch { return null; }
       })();
       let pageHtml = renderServicesPage({ lang, siteOrigin });
-      // 3s timeout + `</` escape — same defensive pattern as the `/` route.
+      // 5s timeout + `</` escape — same defensive pattern as the `/` route.
+      // On fail: no-store so the calculator-less response doesn't poison cache.
       const siteDataJson = await Promise.race<string | null>([
         siteDataPromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
       ]);
       if (siteDataJson) {
         const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
@@ -6352,6 +6523,8 @@ for (const page of PLACEHOLDER_PAGES) {
           '</head>',
           '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>'
         );
+      } else {
+        c.header('Cache-Control', 'no-store, max-age=0');
       }
       return c.html(pageHtml);
     }
@@ -6368,10 +6541,11 @@ for (const page of PLACEHOLDER_PAGES) {
         } catch { return null; }
       })();
       let pageHtml = renderBuyoutsPage({ lang, siteOrigin });
-      // 3s timeout + escape closing tags — same defensive pattern as the `/` route.
+      // 5s timeout + escape closing tags — same defensive pattern as the `/` route.
+      // On fail: no-store so the calculator-less response doesn't poison cache.
       const siteDataJson = await Promise.race<string | null>([
         siteDataPromise,
-        new Promise<null>((resolve) => setTimeout(() => resolve(null), 3000))
+        new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
       ]);
       if (siteDataJson) {
         const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
@@ -6379,6 +6553,8 @@ for (const page of PLACEHOLDER_PAGES) {
           '</head>',
           '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>'
         );
+      } else {
+        c.header('Cache-Control', 'no-store, max-age=0');
       }
       return c.html(pageHtml);
     }
