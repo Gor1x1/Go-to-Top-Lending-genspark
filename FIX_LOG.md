@@ -105,6 +105,36 @@
 
 ---
 
+## Phase 5 — staging новой главной на /home-new (2026-05-07)
+
+**Контекст:** старый лендинг `/` остаётся неприкосновенным. Параллельно собираем новую главную в стиле подстраниц на `/home-new` для проверки. После одобрения Phase 6 переключит роутинг — `/` начнёт отдавать новый рендер, старый монолит уходит в `/legacy` (или удаляется).
+
+**Архитектура `renderNewHomePage`:**
+- Использует `renderPageShell` с `page: 'home-new'` (тип расширен в `renderPageShell`); единая шапка/подвал/нижняя нав/JS как у других подстраниц.
+- 7 секций: hero (eyebrow + 2-line gradient h1 + 3 stat counters + 2 CTA + photo+badge), ticker (12 пар bilingual badges), stats-bar (4 крупных счётчика), services-short (3 карточки услуг с буллетами + CTA), guarantee (текст + 3 буллета + 0-блокировок-бейдж + warehouse-фото), team-qrs (4 social-карточки 4-колоночная сетка), faq-short (top-3 вопроса в существующем `.faq-item`-стиле + ссылка на `/faq`).
+- Все тексты идут через `tb('home_<key>', idx, fallbackRu, fallbackAm)` хелпер: сначала смотрит CMS-блок с ключом `home_<key>`, иначе hardcoded fallback из старого лендинга. Это значит, что админ позже сможет редактировать тексты главной через Site Blocks.
+- CSS изолирован под префиксом `.nh-*`, не задевает классы старого лендинга.
+- `__SITE_DATA` injection как у `/services` и `/buyouts` (даже если калькулятор сейчас не на главной — задел для будущего).
+- BreadcrumbList JSON-LD с одним node (Главная).
+
+**Тексты извлечены автоматически:** через codebase-explorer субагента из `src/routes/landing.ts` (~4410-5275), `src/seed-data.ts` (`SEED_CONTENT_SECTIONS`), `src/api/routes/admin-site-blocks.ts` (импорт из site_content). Все RU + AM пары верифицированы.
+
+**Acceptance:**
+- `npm run build` — OK (`dist/_worker.js` 2 162 KB → 2 194 KB, +32 KB на новую функцию)
+- v21 присутствует в бандле
+- Dev-сервер: `GET /home-new` → 200 OK, рендерит все 7 секций, RU и AM версии корректны
+- `<title>` в RU: "Go to Top — продвижение на Wildberries для армянских продавцов"
+- Изображения: hero `/static/img/team-new.jpg`, warehouse `/static/img/warehouse1.jpg`, QR-коды `/static/img/qr/qr-*.png` — все существующие пути
+
+**Cache bump:** `v20 → v21` в `src/lib/cache-config.ts`.
+
+**Что осталось (Phase 6 — следующий шаг после одобрения):**
+- Переключить `app.get('/')` чтобы он вызывал `renderNewHomePage` вместо старого монолитного рендера.
+- Старый лендинг переместить в `/legacy` (или удалить, если не нужен).
+- Обновить sitemap/robots, JSON-LD canonical URLs.
+
+---
+
 ## Phase 4 — единая навигация на подстраницах (2026-05-07)
 
 **Контекст / решение пользователя:** старый лендинг (`/`, `/am`, `/ru`) пока остаётся как есть; на 6 подстраницах (`/about`, `/services`, `/buyouts`, `/faq`, `/contacts`, `/referral`) делаем «полноценный сайт» с единой навигацией, ведущей на сами подстраницы (а не якоря главной). После завершения Phase 5/6 главная будет переключена на новую версию в стиле подстраниц, старый лендинг — отключён.

@@ -210,7 +210,7 @@ function buildBreadcrumbLd(opts: {
 // `'home'` literal is reserved for a future migration of `app.get('/')`.
 // =====================================================================
 function renderPageShell(opts: {
-  page: PlaceholderPage | 'home',
+  page: PlaceholderPage | 'home' | 'home-new',
   lang: 'ru' | 'am',
   siteOrigin: string,
   seo: { title: string, description: string, ogImage?: string },
@@ -221,7 +221,9 @@ function renderPageShell(opts: {
   const { page, lang, siteOrigin, seo, mainHtml } = opts
   const bodyClass = opts.bodyClass || ''
   const extraHead = opts.extraHead || ''
-  const path = page === 'home' ? '/' : `/${page}`
+  // Phase 5: 'home-new' is the staging path for the new subpage-styled home.
+  // Once Phase 6 swaps routing, it will live at '/' and this special-case goes away.
+  const path = page === 'home' ? '/' : page === 'home-new' ? '/home-new' : `/${page}`
   const isAM = lang === 'am'
   const htmlLang = isAM ? 'hy' : 'ru'
   const ogLocale = isAM ? 'hy_AM' : 'ru_RU'
@@ -3201,6 +3203,406 @@ ${faqItemsHtml}
     siteOrigin,
     seo,
     bodyClass: 'referral-page',
+    mainHtml,
+    extraHead: extraHead + jsonLd,
+  })
+}
+
+// =====================================================================
+// renderNewHomePage — Phase 5 staging implementation of the future home
+// page (will replace the old monolithic landing on '/' in Phase 6).
+//
+// Sections (per user's spec):
+//   1. Hero      — eyebrow, h1 (2-line gradient), description, 3 stat
+//                  counters, 2 CTA buttons + photo column.
+//   2. Stats bar — 4 large counters (500 поставщиков / 1 000+ аккаунтов
+//                  / 21 день до ТОПа / 200+ выкупов в день).
+//   3. Ticker    — auto-scrolling row of pill-badges with key facts.
+//   4. Services  — 3 service cards (выкупы / отзывы / активация ключевых).
+//   5. Guarantee — h2 + bullets + highlight badge "0 блокировок".
+//   6. Team QRs  — 4 social cards (Instagram / Telegram / FB / WhatsApp).
+//   7. FAQ short — top 3 questions accordion + link to /faq.
+//
+// Every text uses tb('<key>', idx, fallbackRu, fallbackAm) so admins can
+// override texts via site_blocks (page='home'). Falls back to the exact
+// strings extracted from the legacy landing on 2026-05-07.
+// =====================================================================
+export function renderNewHomePage(opts: {
+  lang: 'ru' | 'am',
+  siteOrigin: string,
+  pageBlocks?: Record<string, SubpageBlock>,
+}): string {
+  const { lang, siteOrigin, pageBlocks } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+
+  // Local CMS-aware text helper. Reads `home_<key>__<idx>` first (for
+  // page-scoped overrides), then `<key>` (legacy unprefixed home blocks),
+  // then falls back to the hardcoded RU/AM pair.
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    if (!pageBlocks) return t(fallbackRu, fallbackAm)
+    const blk = pageBlocks[blockKey]
+    if (!blk || blk.is_visible === 0) return t(fallbackRu, fallbackAm)
+    const arr = isAM ? blk.texts_am : blk.texts_ru
+    if (!arr || !arr[idx] || !arr[idx].trim()) return t(fallbackRu, fallbackAm)
+    return arr[idx]
+  }
+
+  const tgUrl = PLACEHOLDER_TG_URL
+
+  const seo = {
+    title: isAM
+      ? 'Go to Top — Wildberries-ի առաջխաղացում Հայաստանում'
+      : 'Go to Top — продвижение на Wildberries для армянских продавцов',
+    description: isAM
+      ? 'Իրական ինքնագնումներ կենդանի մարդկանց կողմից, անհատական քարտեր, սեփական պահեստ Երևանում, 0 արգելափակում 2021 թվականից։'
+      : 'Реальные выкупы живыми людьми, индивидуальные карты, собственный склад в Ереване, 0 блокировок с 2021 года.',
+  }
+
+  // Active-link logic mirrors subpages: nav stays as-is (no "Home" item),
+  // but bottom-nav-more "Главная" picks up active highlighting via the
+  // existing highlightByPath() in landing.js (it matches location.pathname).
+
+  const mainHtml = `
+<!-- ===== HERO ===== -->
+<section class="nh-hero">
+  <div class="container">
+    <div class="nh-hero-grid">
+      <div class="nh-hero-text">
+        <div class="nh-eyebrow">
+          <i class="fas fa-circle-check"></i>
+          <span data-ru="Успешный опыт с 2021 года" data-am="Հաջողված փորձ 2021 թվականից">${tb('home_hero', 0, 'Успешный опыт с 2021 года', 'Հաջողված փորձ 2021 թվականից')}</span>
+        </div>
+        <h1>
+          <span data-ru="Выведем ваш товар" data-am="Մենք կբարձրացնենք ձեր ապրանքը">${tb('home_hero', 1, 'Выведем ваш товар', 'Մենք կբարձրացնենք ձեր ապրանքը')}</span>
+          <span class="gr">${tb('home_hero', 2, 'в ТОП Wildberries', 'Wildberries-ի TOP')}</span>
+        </h1>
+        <p class="nh-hero-desc" data-ru="Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:">${tb('home_hero', 3, 'Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване.', 'Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:')}</p>
+        <div class="nh-hero-stats">
+          <div class="nh-hs-item"><div class="nh-hs-num" data-count-s="847">0</div><div class="nh-hs-lbl" data-ru="товаров в ТОП" data-am="ապրանքներ TOP-ում">${t('товаров в ТОП', 'ապրանքներ TOP-ում')}</div></div>
+          <div class="nh-hs-item"><div class="nh-hs-num" data-count-s="0">0</div><div class="nh-hs-lbl" data-ru="блокировок" data-am="արգելափակում">${t('блокировок', 'արգելափակում')}</div></div>
+          <div class="nh-hs-item"><div class="nh-hs-num" data-count-s="1000">0</div><div class="nh-hs-lbl" data-ru="аккаунтов" data-am="հաշիվներ">${t('аккаунтов', 'հաշիվներ')}</div></div>
+        </div>
+        <div class="nh-hero-cta">
+          <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+            <i class="fab fa-telegram"></i>
+            <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${tb('home_hero', 4, 'Написать в Telegram', 'Գրել Telegram-ով')}</span>
+          </a>
+          <a href="/services#calculator" class="btn btn-outline btn-lg">
+            <i class="fas fa-calculator"></i>
+            <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">${tb('home_hero', 5, 'Рассчитать стоимость', 'Հաշվել արժեքը')}</span>
+          </a>
+        </div>
+      </div>
+      <div class="nh-hero-photo">
+        <img src="/static/img/team-new.jpg" alt="Go to Top" onerror="this.style.display='none'">
+        <div class="nh-photo-badge">
+          <i class="fas fa-shield-alt"></i>
+          <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">${t('Надежный метод продвижения', 'Ապահով առաջխաղացման մեթոդ')}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TICKER ===== -->
+<div class="ticker" data-section-id="ticker">
+  <div class="ticker-track">
+    ${[
+      { i: 'fa-check-circle', ru: 'Реальные люди, не боты', am: 'Իրական մարդիկ, ոչ բոտեր' },
+      { i: 'fa-shield-alt', ru: '0 блокировок за всё время', am: '0 արգելափակում ողջ ընթացքում' },
+      { i: 'fa-warehouse', ru: 'Собственный склад в Ереване', am: 'Սեփական պահեստ Երևանում' },
+      { i: 'fa-mobile-alt', ru: '1000+ аккаунтов', am: '1000+ հաշիվներ' },
+      { i: 'fa-map-marker-alt', ru: 'Ереван, Армения', am: 'Երևան, Հայաստան' },
+      { i: 'fa-star', ru: 'Профессиональные фото для отзывов', am: 'Մասնագիտական լուսանկարներ կարծիքների համար' },
+      { i: 'fa-camera', ru: 'Фотосессии с моделями', am: 'Լուսանկարահանումներ մոդելներով' },
+      { i: 'fa-truck', ru: 'Доставка на склады WB', am: 'Առաքում WB պահեստներ' },
+    ].concat([
+      { i: 'fa-check-circle', ru: 'Реальные люди, не боты', am: 'Իրական մարդիկ, ոչ բոտեր' },
+      { i: 'fa-shield-alt', ru: '0 блокировок за всё время', am: '0 արգելափակում ողջ ընթացքում' },
+      { i: 'fa-warehouse', ru: 'Собственный склад в Ереване', am: 'Սեփական պահեստ Երևանում' },
+      { i: 'fa-mobile-alt', ru: '1000+ аккаунтов', am: '1000+ հաշիվներ' },
+    ]).map(it => `<span class="ticker-item"><i class="fas ${it.i}"></i><span data-ru="${it.ru}" data-am="${it.am}">${t(it.ru, it.am)}</span></span>`).join('')}
+  </div>
+</div>
+
+<!-- ===== STATS BAR ===== -->
+<div class="stats-bar" data-section-id="stats-bar">
+  <div class="container">
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="500">0</div>
+        <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ">${t('поставщиков сотрудничают с нами', 'մատակարար համագործակցում է մեզ հետ')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="1000">0+</div>
+        <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով">${t('аккаунтов с индивидуальной картой', 'հաշիվներ անհատական քարտով')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="21">0</div>
+        <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="օր մինչև TOP-ում հայտնվելը">${t('день до выхода в ТОП', 'օր մինչև TOP-ում հայտնվելը')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-big" data-count-s="200">0+</div>
+        <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">${t('выкупов каждый день', 'գնում ամեն օր')}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ===== SERVICES SHORT ===== -->
+<section id="services" class="section nh-services">
+  <div class="container">
+    <div class="section-eyebrow">
+      <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${t('Наши услуги', 'Մեր ծառայությունները')}</span>
+    </div>
+    <h2 class="section-title" data-ru="Полный спектр продвижения на WB" data-am="WB-ում առաջխաղացման լիարժեք սպեկտր">${t('Полный спектр продвижения на WB', 'WB-ում առաջխաղացման լիարժեք սպեկտր')}</h2>
+    <p class="section-sub" data-ru="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара" data-am="Գնումներ իրական մարդկանցով, կարծիքներ իրական լուսանկարներով, մասնագիտական լուսանկարահանումներ — ամենը ձեր ապրանքի համար">${t('Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара', 'Գնումներ իրական մարդկանցով, կարծիքներ իրական լուսանկարներով, մասնագիտական լուսանկարահանումներ — ամենը ձեր ապրանքի համար')}</p>
+    <div class="nh-services-grid">
+      ${[
+        {
+          icon: 'fa-magnifying-glass-dollar', tr: '/buyouts',
+          tRu: 'Выкупы по ключевым запросам', tAm: 'Գնումներ բանալի հարցումներով',
+          dRu: 'Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.',
+          dAm: 'Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:',
+          bullets: [['Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ'],['Географическое распределение', 'Աշխարհագրական բաշխում'],['Естественное поведение покупателей', 'Գնորդների բնական վարքագիծ'],['Забор товара из ПВЗ', 'Ապրանքի ստացում ՊՎԶ-ից']],
+          cRu: 'Повысить рейтинг', cAm: 'Բարձրացնել վարկանիշը'
+        },
+        {
+          icon: 'fa-star', tr: '/services',
+          tRu: 'Отзывы и оценки', tAm: 'Կարծիքներ և գնահատականներ',
+          dRu: 'Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.',
+          dAm: 'Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:',
+          bullets: [['Текст отзыва + фото/видео', 'Կարծիքի տեքստ + լուսանկար/տեսանյութ'],['Профессиональная фотосессия', 'Մասնագիտական լուսանկարահանում'],['Разные локации и модели', 'Տարբեր վայրեր և մոդելներ'],['До 50% отзывов от выкупов', 'Մինչև 50% կարծիքներ գնումներից']],
+          cRu: 'Начать продвижение', cAm: 'Սկսել առաջխաղացումը'
+        },
+        {
+          icon: 'fa-key', tr: '/services',
+          tRu: 'Активация ключевых слов', tAm: 'Բանալի բառերի ակտիվացում',
+          dRu: 'Целевые выкупы, которые активируют товар по нужным ключевым словам и запускают органический трафик.',
+          dAm: 'Նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ բանալի բառերով և գործարկում օրգանիկ տրաֆիկը։',
+          bullets: [['Резкий рост органики', 'Օրգանիկ տրաֆիկի կտրուկ աճ'],['Укрепление позиций новыми ключевыми словами', 'Դիրքերի ամրապնդում նոր բանալի բառերով'],['Подключение к целевым запросам', 'Միացում թիրախային հարցումներին'],['Стабильные позиции без рекламы', 'Կայուն դիրքեր առանց գովազդի']],
+          cRu: 'Активировать ключевые', cAm: 'Ակտիվացնել բանալիները'
+        }
+      ].map(s => `
+        <div class="nh-svc-card">
+          <div class="nh-svc-icon"><i class="fas ${s.icon}"></i></div>
+          <h3 data-ru="${s.tRu}" data-am="${s.tAm}">${t(s.tRu, s.tAm)}</h3>
+          <p class="nh-svc-desc" data-ru="${s.dRu.replace(/"/g,'&quot;')}" data-am="${s.dAm.replace(/"/g,'&quot;')}">${t(s.dRu, s.dAm)}</p>
+          <ul class="nh-svc-bullets">
+            ${s.bullets.map(b => `<li><i class="fas fa-check"></i><span data-ru="${b[0]}" data-am="${b[1]}">${t(b[0], b[1])}</span></li>`).join('')}
+          </ul>
+          <a href="${s.tr}" class="btn btn-primary"><span data-ru="${s.cRu}" data-am="${s.cAm}">${t(s.cRu, s.cAm)}</span><i class="fas fa-arrow-right"></i></a>
+        </div>
+      `).join('')}
+    </div>
+  </div>
+</section>
+
+<!-- ===== GUARANTEE ===== -->
+<section id="guarantee" class="section nh-guarantee">
+  <div class="container">
+    <div class="nh-guar-grid">
+      <div class="nh-guar-text">
+        <div class="section-eyebrow">
+          <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">${t('Гарантия безопасности', 'Անվտանգության երաշխիք')}</span>
+        </div>
+        <h2 class="section-title" data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը">${t('Всё организовано и по полочкам. Наша команда', 'Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը')}</h2>
+        <p class="nh-guar-desc" data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе." data-am="Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Երբ նախագիծը վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:">${t('За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе.', 'Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Երբ նախագիծը վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:')}</p>
+        <ul class="nh-guar-bullets">
+          <li><i class="fas fa-check"></i><span data-ru="Реальное поведение человека во время выкупа" data-am="Իրական մարդկային վարքագիծ գնում կատարելիս">${t('Реальное поведение человека во время выкупа', 'Իրական մարդկային վարքագիծ գնում կատարելիս')}</span></li>
+          <li><i class="fas fa-check"></i><span data-ru="Реальные аккаунты с историей покупок" data-am="Իրական հաշիվներ գնումների պատմությամբ">${t('Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ')}</span></li>
+          <li><i class="fas fa-check"></i><span data-ru="Естественное распределение по географии" data-am="Բնական աշխարհագրական բաշխում">${t('Естественное распределение по географии', 'Բնական աշխարհագրական բաշխում')}</span></li>
+        </ul>
+        <div class="nh-guar-badge">
+          <i class="fas fa-shield-alt"></i>
+          <span data-ru="0 блокировок за всё время работы" data-am="0 արգելափակում աշխատանքի ողջ ընթացքում">${t('0 блокировок за всё время работы', '0 արգելափակում աշխատանքի ողջ ընթացքում')}</span>
+        </div>
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">${t('Начать продвижение', 'Սկսել առաջխաղացումը')}</span>
+        </a>
+      </div>
+      <div class="nh-guar-photo">
+        <img src="/static/img/warehouse1.jpg" alt="Go to Top" onerror="this.style.display='none'">
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== TEAM QRs ===== -->
+<section class="section nh-qrs">
+  <div class="container">
+    <div class="section-eyebrow">
+      <span data-ru="Связаться с нами" data-am="Կապ հաստատել մեզ հետ">${t('Связаться с нами', 'Կապ հաստատել մեզ հետ')}</span>
+    </div>
+    <h2 class="section-title" data-ru="Сканируйте QR — пишите в любой удобный мессенджер" data-am="Սկանավորեք QR-ը — գրեք ձեզ հարմար ցանկացած մեսենջերով">${t('Сканируйте QR — пишите в любой удобный мессенджер', 'Սկանավորեք QR-ը — գրեք ձեզ հարմար ցանկացած մեսենջերով')}</h2>
+    <div class="nh-qr-grid">
+      ${[
+        { lRu: 'Наш Instagram', lAm: 'Մեր Instagram', qr: '/static/img/qr/qr-instagram.png', link: 'https://www.instagram.com/goo_to_top/', icon: 'fa-instagram', brand: 'Instagram' },
+        { lRu: 'Telegram чат', lAm: 'Telegram чат', qr: '/static/img/qr/qr-telegram.png', link: 'https://t.me/goo_to_top', icon: 'fa-telegram', brand: 'Telegram' },
+        { lRu: 'Наш Facebook', lAm: 'Մեր Facebook', qr: '/static/img/qr/qr-facebook.png', link: 'https://www.facebook.com/gototop.wb', icon: 'fa-facebook', brand: 'Facebook' },
+        { lRu: 'WhatsApp', lAm: 'WhatsApp', qr: '/static/img/qr/qr-whatsapp.png', link: 'https://wa.me/37455226224', icon: 'fa-whatsapp', brand: 'WhatsApp' },
+      ].map(q => `
+        <a href="${q.link}" target="_blank" rel="noopener" class="nh-qr-card">
+          <img src="${q.qr}" alt="${q.brand} QR" onerror="this.style.display='none'">
+          <div class="nh-qr-meta">
+            <i class="fab ${q.icon}"></i>
+            <span data-ru="${q.lRu}" data-am="${q.lAm}">${t(q.lRu, q.lAm)}</span>
+          </div>
+        </a>
+      `).join('')}
+    </div>
+  </div>
+</section>
+
+<!-- ===== FAQ SHORT ===== -->
+<section id="faq" class="section nh-faq">
+  <div class="container">
+    <div class="section-eyebrow">
+      <span data-ru="Часто задаваемые вопросы" data-am="Հաճախ տրվող հարցեր">${t('Часто задаваемые вопросы', 'Հաճախ տրվող հարցեր')}</span>
+    </div>
+    <h2 class="section-title" data-ru="Коротко о главном" data-am="Համառոտ՝ կարևորի մասին">${t('Коротко о главном', 'Համառոտ՝ կարևորի մասին')}</h2>
+    <div class="nh-faq-list">
+      ${[
+        {
+          qRu: 'Могут ли заблокировать мой кабинет?',
+          qAm: 'Կարող են արգելափակել իմ կաբինետը։',
+          aRu: 'За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии.',
+          aAm: 'Մեր աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի կաբինետ չի արգելափակվել: Մենք օգտագործում ենք իրական հաշիվներ գնումների պատմությամբ, սեփական պահեստ և բնական աշխարհագրական բաշխում:'
+        },
+        {
+          qRu: 'Как быстро начнётся продвижение?',
+          qAm: 'Ինչքան արագ կսկսվի առաջխաղացումը։',
+          aRu: 'В течение 24 часов после согласования стратегии и оплаты.',
+          aAm: '24 ժամվա ընթացքում ստրատեգիայի համաձայնեցումից և վճարման հետո:'
+        },
+        {
+          qRu: 'Выкупы делают реальные люди или боты?',
+          qAm: 'Գնումները կատարում են իրական մարդիկ թե բոտեր։',
+          aRu: 'Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов.',
+          aAm: 'Միայն իրական մարդիկ: Մենք ունենք սեփական պահեստ սարքերով և իրական հաշիվներով: Եվ գնումները կատարվում են ձեռքով, ոչ մի բոտ:'
+        }
+      ].map((f, i) => {
+        const e = (s: string) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
+        const qText = isAM ? f.qAm : f.qRu
+        const aText = isAM ? f.aAm : f.aRu
+        return `
+        <div class="faq-item nh-faq-item">
+          <button class="faq-q" type="button" onclick="toggleFaq(this)" aria-expanded="false">
+            <span data-ru="${e(f.qRu)}" data-am="${e(f.qAm)}">${e(qText)}</span>
+            <i class="fas fa-chevron-down faq-i"></i>
+          </button>
+          <div class="faq-a">
+            <p data-ru="${e(f.aRu)}" data-am="${e(f.aAm)}">${e(aText)}</p>
+          </div>
+        </div>`
+      }).join('')}
+    </div>
+    <div class="nh-faq-more">
+      <a href="/faq" class="btn btn-outline">
+        <span data-ru="Все вопросы" data-am="Բոլոր հարցերը">${t('Все вопросы', 'Բոլոր հարցերը')}</span>
+        <i class="fas fa-arrow-right"></i>
+      </a>
+    </div>
+  </div>
+</section>
+`
+
+  // Subpage-style CSS scoped to .nh-* classes so it doesn't collide with
+  // the existing legacy landing CSS (which uses .hero, .services, etc.).
+  const extraHead = `
+<style>
+.nh-hero{padding:140px 0 60px;position:relative;overflow:hidden}
+.nh-hero::before{content:'';position:absolute;top:-120px;right:-120px;width:480px;height:480px;background:radial-gradient(circle,rgba(139,92,246,0.18),transparent 70%);pointer-events:none}
+.nh-hero-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:48px;align-items:center;position:relative;z-index:1}
+.nh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent-light);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.nh-hero-text h1{font-size:clamp(2rem,4.6vw,3.4rem);font-weight:800;line-height:1.12;margin-bottom:18px;letter-spacing:-0.02em}
+.nh-hero-text h1 span{display:block}
+.nh-hero-text h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.nh-hero-desc{font-size:1.02rem;color:var(--text-sec);margin-bottom:24px;line-height:1.7;max-width:580px}
+.nh-hero-stats{display:grid;grid-template-columns:repeat(3,auto);gap:36px;margin-bottom:28px}
+.nh-hs-num{font-size:clamp(2rem,3.6vw,2.6rem);font-weight:900;color:var(--purple);line-height:1}
+.nh-hs-lbl{font-size:0.82rem;color:var(--text-muted);margin-top:6px;font-weight:500}
+.nh-hero-cta{display:flex;gap:12px;flex-wrap:wrap}
+.nh-hero-photo{position:relative}
+.nh-hero-photo img{width:100%;border-radius:var(--r-lg);box-shadow:0 24px 60px rgba(0,0,0,0.4);background:var(--bg-card)}
+.nh-photo-badge{position:absolute;bottom:18px;left:18px;display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(15,10,26,0.85);backdrop-filter:blur(12px);border:1px solid rgba(139,92,246,0.4);border-radius:50px;font-size:0.84rem;color:var(--text);font-weight:600}
+.nh-photo-badge i{color:var(--accent-light)}
+@media(max-width:900px){.nh-hero{padding:120px 0 40px}.nh-hero-grid{grid-template-columns:1fr;gap:32px}.nh-hero-stats{gap:24px}.nh-hero-cta .btn{flex:1;justify-content:center}}
+@media(max-width:540px){.nh-hero-stats{grid-template-columns:repeat(3,1fr);gap:14px}.nh-hs-num{font-size:1.6rem}.nh-hs-lbl{font-size:0.7rem}}
+
+/* services */
+.nh-services{padding:80px 0}
+.section-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent-light);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.section-title{font-size:clamp(1.6rem,3.4vw,2.4rem);font-weight:800;line-height:1.2;margin-bottom:14px;letter-spacing:-0.02em;text-align:center}
+.section-sub{font-size:1rem;color:var(--text-sec);max-width:720px;margin:0 auto 40px;line-height:1.7;text-align:center}
+.nh-services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
+.nh-svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px 24px;transition:var(--t);display:flex;flex-direction:column}
+.nh-svc-card:hover{border-color:rgba(139,92,246,0.5);transform:translateY(-4px);box-shadow:0 20px 50px rgba(139,92,246,0.18)}
+.nh-svc-icon{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;margin-bottom:18px}
+.nh-svc-card h3{font-size:1.18rem;font-weight:700;margin-bottom:10px;color:var(--text)}
+.nh-svc-desc{font-size:0.92rem;color:var(--text-sec);margin-bottom:18px;line-height:1.65}
+.nh-svc-bullets{list-style:none;padding:0;margin:0 0 22px;display:flex;flex-direction:column;gap:8px}
+.nh-svc-bullets li{display:flex;align-items:flex-start;gap:10px;font-size:0.88rem;color:var(--text-sec)}
+.nh-svc-bullets i{color:var(--accent-light);font-size:0.8rem;margin-top:5px}
+.nh-svc-card .btn{margin-top:auto;justify-content:center;font-size:0.92rem;padding:12px 22px}
+@media(max-width:900px){.nh-services-grid{grid-template-columns:1fr;gap:18px}.nh-svc-card{padding:26px 22px}}
+
+/* guarantee */
+.nh-guarantee{padding:80px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.nh-guar-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
+.nh-guar-text .section-title{text-align:left}
+.nh-guar-desc{font-size:1rem;color:var(--text-sec);line-height:1.7;margin-bottom:22px}
+.nh-guar-bullets{list-style:none;padding:0;margin:0 0 26px;display:flex;flex-direction:column;gap:10px}
+.nh-guar-bullets li{display:flex;align-items:flex-start;gap:10px;font-size:0.95rem;color:var(--text)}
+.nh-guar-bullets i{color:var(--accent-light);margin-top:5px}
+.nh-guar-badge{display:inline-flex;align-items:center;gap:10px;padding:12px 22px;border:1px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.1);border-radius:50px;color:#86efac;font-weight:600;font-size:0.92rem;margin-bottom:24px}
+.nh-guar-photo img{width:100%;border-radius:var(--r-lg);box-shadow:0 24px 60px rgba(0,0,0,0.4);background:var(--bg-card)}
+@media(max-width:900px){.nh-guar-grid{grid-template-columns:1fr;gap:32px}}
+
+/* QR cards */
+.nh-qrs{padding:80px 0}
+.nh-qrs .section-eyebrow,.nh-qrs .section-title{display:block;text-align:center;margin-left:auto;margin-right:auto}
+.nh-qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:32px}
+.nh-qr-card{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);transition:var(--t);text-decoration:none}
+.nh-qr-card:hover{border-color:rgba(139,92,246,0.45);transform:translateY(-3px);box-shadow:0 18px 40px rgba(139,92,246,0.15)}
+.nh-qr-card img{width:100%;max-width:160px;aspect-ratio:1/1;background:#fff;border-radius:12px;padding:8px}
+.nh-qr-meta{display:flex;align-items:center;gap:8px;font-size:0.88rem;color:var(--text);font-weight:600}
+.nh-qr-meta i{font-size:1.1rem;color:var(--accent-light)}
+@media(max-width:900px){.nh-qr-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.nh-qr-grid{grid-template-columns:1fr;max-width:280px;margin-left:auto;margin-right:auto}}
+
+/* FAQ short */
+.nh-faq{padding:80px 0;background:var(--bg-surface);border-top:1px solid var(--border)}
+.nh-faq .section-eyebrow,.nh-faq .section-title{display:block;text-align:center;margin-left:auto;margin-right:auto}
+.nh-faq-list{max-width:780px;margin:32px auto 28px;display:flex;flex-direction:column;gap:12px}
+.nh-faq-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
+.nh-faq-item .faq-q{width:100%;padding:18px 22px;background:transparent;border:none;color:var(--text);font-size:1rem;font-weight:600;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:14px}
+.nh-faq-item .faq-q:hover{color:var(--accent-light)}
+.nh-faq-item .faq-i{transition:transform 0.3s ease;color:var(--text-muted)}
+.nh-faq-item.active .faq-i{transform:rotate(180deg);color:var(--accent-light)}
+.nh-faq-item .faq-a{max-height:0;overflow:hidden;transition:max-height 0.4s ease;padding:0 22px}
+.nh-faq-item.active .faq-a{max-height:600px;padding-bottom:18px}
+.nh-faq-item .faq-a p{font-size:0.94rem;color:var(--text-sec);line-height:1.7}
+.nh-faq-more{text-align:center}
+</style>`
+
+  // SEO: BreadcrumbList for the new home (only one node — itself).
+  const jsonLd = `<script type="application/ld+json">${JSON.stringify({
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: isAM ? 'Գլխավոր' : 'Главная', item: `${siteOrigin}/` }
+    ]
+  })}</script>`
+
+  return renderPageShell({
+    page: 'home-new',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'home-new-page',
     mainHtml,
     extraHead: extraHead + jsonLd,
   })
@@ -6629,6 +7031,76 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
   return c.html(pageHtml);
 })
+
+// ===== PHASE 5: NEW HOME (staging at /home-new) =====
+// Subpage-styled rebuild of the home page. Will replace the legacy
+// `/` handler in Phase 6 once content is approved by the owner. Uses
+// the same renderPageShell as the other subpages so navigation, footer,
+// counter logic and i18n are 100% consistent.
+// __SITE_DATA injection mirrors /services and /buyouts so any future
+// calculator block on this page can render without an extra DB round-trip.
+app.get('/home-new', async (c) => {
+  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+
+  const reqUrl = new URL(c.req.url);
+  const urlLang = reqUrl.searchParams.get('lang') || '';
+  const lang: 'ru' | 'am' = (urlLang === 'am' || urlLang === 'hy') ? 'am' : 'ru';
+  const siteOrigin = reqUrl.origin;
+
+  // Optional CMS overrides — uses the existing loadSubpageBlocks helper
+  // with a synthetic "home" prefix. Block keys: home_hero, home_stats, …
+  // (we use single-underscore so they don't collide with the `__` filter
+  // in /api/site-data — those page-scoped subpage blocks stay separate).
+  let pageBlocks: Record<string, SubpageBlock> = {};
+  try {
+    const db = c.env.DB;
+    if (db) {
+      const r = await db.prepare(
+        "SELECT block_key, page, block_type, title_ru, title_am, texts_ru, texts_am, is_visible " +
+        "FROM site_blocks WHERE block_key LIKE 'home\\_%' ESCAPE '\\\\'"
+      ).all<any>();
+      for (const row of (r.results || [])) {
+        const tryParse = (s: any): string[] => {
+          if (!s) return [];
+          try { const v = JSON.parse(s); return Array.isArray(v) ? v.map(String) : []; } catch { return []; }
+        };
+        if (typeof row.block_key === 'string') {
+          pageBlocks[row.block_key] = {
+            block_key: row.block_key, page: row.page, block_type: row.block_type,
+            title_ru: row.title_ru, title_am: row.title_am,
+            texts_ru: tryParse(row.texts_ru), texts_am: tryParse(row.texts_am),
+            is_visible: row.is_visible == null ? 1 : Number(row.is_visible),
+          };
+        }
+      }
+    }
+  } catch { /* CMS optional — fallbacks already in render */ }
+
+  // Heavy page: prefetch /api/site-data in parallel so client JS doesn't
+  // need a second round-trip. Same defensive pattern as /services.
+  const siteDataPromise = (async () => {
+    try {
+      const req = new Request(new URL('/api/site-data', c.req.url).toString());
+      const resp = await app.fetch(req, c.env);
+      return resp.ok ? await resp.text() : null;
+    } catch { return null; }
+  })();
+  let pageHtml = renderNewHomePage({ lang, siteOrigin, pageBlocks });
+  const siteDataJson = await Promise.race<string | null>([
+    siteDataPromise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+  ]);
+  if (siteDataJson) {
+    const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
+    pageHtml = pageHtml.replace(
+      '</head>',
+      '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>'
+    );
+  } else {
+    c.header('Cache-Control', 'no-store, max-age=0');
+  }
+  return c.html(pageHtml);
+});
 
 // ===== PLACEHOLDER PAGES (Phase 1) =====
 // Pure-SSR placeholder routes for /about /buyouts /services /faq /contacts /referral.
