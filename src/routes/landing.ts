@@ -578,6 +578,63 @@ function renderPlaceholderPage(opts: {
 }
 
 // =====================================================================
+// loadSubpageBlocks — Phase 3C subpage CMS loader.
+// Fetches all rows from site_blocks where block_key starts with
+// `<page>__` and returns a Record<blockKey -> SubpageBlock>. Returns {}
+// on any error (network, schema mismatch, missing seed) so render
+// functions can transparently fall back to hard-coded defaults.
+//
+// SQLite LIKE treats '_' as a single-char wildcard, so `<prefix>__%`
+// would match e.g. "aboutXY...". We pass the LIKE pattern through but
+// also re-filter rows in JS using startsWith(prefix + '__') to enforce
+// an exact literal match. This avoids relying on ESCAPE clauses, which
+// are awkward to thread through D1's parameterised LIKE.
+// =====================================================================
+export interface SubpageBlock {
+  texts_ru: string[]
+  texts_am: string[]
+  title_ru: string
+  title_am: string
+  is_visible: number
+}
+
+export async function loadSubpageBlocks(
+  db: D1Database | undefined,
+  pagePrefix: string
+): Promise<Record<string, SubpageBlock>> {
+  const out: Record<string, SubpageBlock> = {}
+  if (!db) return out
+  try {
+    const stmt = db.prepare(
+      "SELECT block_key, title_ru, title_am, texts_ru, texts_am, is_visible FROM site_blocks WHERE block_key LIKE ? ORDER BY sort_order"
+    )
+    const result = await stmt.bind(`${pagePrefix}__%`).all()
+    const rows = (result.results || []).filter((r: any) =>
+      typeof r.block_key === 'string' && r.block_key.startsWith(`${pagePrefix}__`)
+    )
+    for (const r of rows) {
+      const key = r.block_key as string
+      let textsRu: string[] = []
+      let textsAm: string[] = []
+      try { textsRu = JSON.parse((r.texts_ru as string) || '[]') } catch { textsRu = [] }
+      try { textsAm = JSON.parse((r.texts_am as string) || '[]') } catch { textsAm = [] }
+      if (!Array.isArray(textsRu)) textsRu = []
+      if (!Array.isArray(textsAm)) textsAm = []
+      out[key] = {
+        texts_ru: textsRu,
+        texts_am: textsAm,
+        title_ru: (r.title_ru as string) || '',
+        title_am: (r.title_am as string) || '',
+        is_visible: Number(r.is_visible) || 0,
+      }
+    }
+  } catch {
+    return out
+  }
+  return out
+}
+
+// =====================================================================
 // renderAboutPage — phase 2A "light" page for /about.
 // Reuses three sections from `/`: hero (founder), #about (who we are),
 // #guarantee (team & office). No full calculator — only a compact CTA
@@ -586,10 +643,20 @@ function renderPlaceholderPage(opts: {
 // rendered server-side in the requested language so SEO sees real content
 // without relying on the client switchLang() pass.
 // =====================================================================
-function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
-  const { lang, siteOrigin } = opts
+function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks?: Record<string, SubpageBlock> }): string {
+  const { lang, siteOrigin, pageBlocks } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
+  // Phase 3C: tb() reads a single string from a CMS block (texts_ru/am
+  // arrays) and falls back to the hard-coded RU/AM defaults whenever the
+  // block is missing, hidden (is_visible=0) or the index is empty.
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    const block = pageBlocks?.[blockKey]
+    if (!block || block.is_visible === 0) return isAM ? fallbackAm : fallbackRu
+    const arr = isAM ? block.texts_am : block.texts_ru
+    const v = arr?.[idx]
+    return (typeof v === 'string' && v.trim()) ? v : (isAM ? fallbackAm : fallbackRu)
+  }
 
   const seo = {
     title: t(
@@ -668,13 +735,13 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): strin
       <div class="ah-text">
         <div class="ah-eyebrow">
           <i class="fas fa-info-circle"></i>
-          <span data-ru="О компании" data-am="Ընկերության մասին">${t('О компании', 'Ընկերության մասին')}</span>
+          <span data-ru="О компании" data-am="Ընկերության մասին">${tb('about__hero', 0, 'О компании', 'Ընկերության մասին')}</span>
         </div>
         <h1>
-          <span data-ru="О компании" data-am="Go to Top-ի մասին">${t('О компании', 'Go to Top-ի մասին')}</span>
-          <span class="gr" data-ru="Go to Top" data-am="Go to Top">Go to Top</span>
+          <span data-ru="О компании" data-am="Go to Top-ի մասին">${tb('about__hero', 1, 'О компании', 'Go to Top-ի մասին')}</span>
+          <span class="gr" data-ru="Go to Top" data-am="Go to Top">${tb('about__hero', 2, 'Go to Top', 'Go to Top')}</span>
         </h1>
-        <p class="ah-desc" data-ru="Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года." data-am="Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։">${t('Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года.', 'Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։')}</p>
+        <p class="ah-desc" data-ru="Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года." data-am="Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։">${tb('about__hero', 3, 'Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года.', 'Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։')}</p>
         <div class="ah-stats">
           <div class="ah-stat">
             <div class="ah-stat-num">847</div>
@@ -783,13 +850,13 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): strin
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы начать?" data-am="Պատրա՞ստ եք սկսել">${t('Готовы начать?', 'Պատրա՞ստ եք սկսել')}</h3>
-        <p data-ru="Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу." data-am="Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։">${t('Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу.', 'Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։')}</p>
+        <h3 data-ru="Готовы начать?" data-am="Պատրա՞ստ եք սկսել">${tb('about__cta_strip', 0, 'Готовы начать?', 'Պատրա՞ստ եք սկսել')}</h3>
+        <p data-ru="Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу." data-am="Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։">${tb('about__cta_strip', 1, 'Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу.', 'Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։')}</p>
       </div>
       <div class="acs-actions">
         <a href="/#calculator" class="btn btn-primary">
           <i class="fas fa-calculator"></i>
-          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը">${t('Открыть калькулятор', 'Բացել հաշվիչը')}</span>
+          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը">${tb('about__cta_strip', 2, 'Открыть калькулятор', 'Բացել հաշվիչը')}</span>
         </a>
         <a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
@@ -828,10 +895,17 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): strin
 // All copy is bilingual via data-ru / data-am with the requested
 // language rendered server-side so SEO sees real content.
 // =====================================================================
-function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
-  const { lang, siteOrigin } = opts
+function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks?: Record<string, SubpageBlock> }): string {
+  const { lang, siteOrigin, pageBlocks } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    const block = pageBlocks?.[blockKey]
+    if (!block || block.is_visible === 0) return isAM ? fallbackAm : fallbackRu
+    const arr = isAM ? block.texts_am : block.texts_ru
+    const v = arr?.[idx]
+    return (typeof v === 'string' && v.trim()) ? v : (isAM ? fallbackAm : fallbackRu)
+  }
 
   const seo = {
     title: t(
@@ -1005,13 +1079,13 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
     <div class="sh-inner">
       <div class="sh-eyebrow">
         <i class="fas fa-th-large"></i>
-        <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${t('Наши услуги', 'Մեր ծառայությունները')}</span>
+        <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${tb('services__hero', 0, 'Наши услуги', 'Մեր ծառայությունները')}</span>
       </div>
       <h1>
-        <span data-ru="Услуги" data-am="Ծառայություններ">${t('Услуги', 'Ծառայություններ')}</span>
-        <span class="gr" data-ru="для Wildberries" data-am="Wildberries-ի համար">${t('для Wildberries', 'Wildberries-ի համար')}</span>
+        <span data-ru="Услуги" data-am="Ծառայություններ">${tb('services__hero', 1, 'Услуги', 'Ծառայություններ')}</span>
+        <span class="gr" data-ru="для Wildberries" data-am="Wildberries-ի համար">${tb('services__hero', 2, 'для Wildberries', 'Wildberries-ի համար')}</span>
       </h1>
-      <p class="sh-desc" data-ru="Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет." data-am="Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։">${t('Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет.', 'Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։')}</p>
+      <p class="sh-desc" data-ru="Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет." data-am="Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։">${tb('services__hero', 3, 'Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет.', 'Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։')}</p>
       <div class="sh-cta">
         <a href="#calculator" class="btn btn-primary btn-lg">
           <i class="fas fa-calculator"></i>
@@ -1326,13 +1400,13 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы заказать?" data-am="Պատրա՞ստ եք պատվիրել">${t('Готовы заказать?', 'Պատրա՞ստ եք պատվիրել')}</h3>
-        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${t('Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+        <h3 data-ru="Готовы заказать?" data-am="Պատրա՞ստ եք պատվիրել">${tb('services__cta_strip', 0, 'Готовы заказать?', 'Պատրա՞ստ եք պատվիրել')}</h3>
+        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${tb('services__cta_strip', 1, 'Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
-          <span data-ru="Telegram" data-am="Telegram">Telegram</span>
+          <span data-ru="Telegram" data-am="Telegram">${tb('services__cta_strip', 2, 'Telegram', 'Telegram')}</span>
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
@@ -1383,10 +1457,17 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
 // All copy is bilingual via data-ru / data-am with the requested
 // language rendered server-side so SEO sees real content.
 // =====================================================================
-function renderBuyoutsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
-  const { lang, siteOrigin } = opts
+function renderBuyoutsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks?: Record<string, SubpageBlock> }): string {
+  const { lang, siteOrigin, pageBlocks } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    const block = pageBlocks?.[blockKey]
+    if (!block || block.is_visible === 0) return isAM ? fallbackAm : fallbackRu
+    const arr = isAM ? block.texts_am : block.texts_ru
+    const v = arr?.[idx]
+    return (typeof v === 'string' && v.trim()) ? v : (isAM ? fallbackAm : fallbackRu)
+  }
 
   const seo = {
     title: t(
@@ -1614,13 +1695,13 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
     <div class="bh-inner">
       <div class="bh-eyebrow">
         <i class="fas fa-shopping-bag"></i>
-        <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն">${t('Услуга выкупа', 'Գնումի ծառայություն')}</span>
+        <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն">${tb('buyouts__hero', 0, 'Услуга выкупа', 'Գնումի ծառայություն')}</span>
       </div>
       <h1>
-        <span data-ru="Выкупы на" data-am="Հետագնումներ">${t('Выкупы на', 'Հետագնումներ')}</span>
-        <span class="gr">Wildberries</span>
+        <span data-ru="Выкупы на" data-am="Հետագնումներ">${tb('buyouts__hero', 1, 'Выкупы на', 'Հետագնումներ')}</span>
+        <span class="gr">${tb('buyouts__hero', 2, 'Wildberries', 'Wildberries')}</span>
       </h1>
-      <p class="bh-desc" data-ru="Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване." data-am="Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։">${t('Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване.', 'Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։')}</p>
+      <p class="bh-desc" data-ru="Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване." data-am="Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։">${tb('buyouts__hero', 3, 'Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване.', 'Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։')}</p>
       <div class="bh-cta">
         <a href="#calculator" class="btn btn-primary btn-lg">
           <i class="fas fa-calculator"></i>
@@ -1985,13 +2066,13 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы начать выкупы?" data-am="Պատրա՞ստ եք սկսել գնումները">${t('Готовы начать выкупы?', 'Պատրա՞ստ եք սկսել գնումները')}</h3>
-        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${t('Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+        <h3 data-ru="Готовы начать выкупы?" data-am="Պատրա՞ստ եք սկսել գնումները">${tb('buyouts__cta_strip', 0, 'Готовы начать выкупы?', 'Պատրա՞ստ եք սկսել գնումները')}</h3>
+        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${tb('buyouts__cta_strip', 1, 'Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
-          <span>Telegram</span>
+          <span>${tb('buyouts__cta_strip', 2, 'Telegram', 'Telegram')}</span>
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
@@ -2041,15 +2122,22 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 // `extraHead` so Google can pick up rich-result entries; the schema
 // uses the current-language strings for `name` / `text`.
 // =====================================================================
-function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
-  const { lang, siteOrigin } = opts
+function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks?: Record<string, SubpageBlock> }): string {
+  const { lang, siteOrigin, pageBlocks } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    const block = pageBlocks?.[blockKey]
+    if (!block || block.is_visible === 0) return isAM ? fallbackAm : fallbackRu
+    const arr = isAM ? block.texts_am : block.texts_ru
+    const v = arr?.[idx]
+    return (typeof v === 'string' && v.trim()) ? v : (isAM ? fallbackAm : fallbackRu)
+  }
 
   // 12 FAQ items: 7 carried over from the home #faq section + 5 new
   // entries covering payment, guarantees, lead times, paperwork and the
   // legal status of self-buyouts on Wildberries.
-  const faqItems: Array<{ qRu: string, qAm: string, aRu: string, aAm: string }> = [
+  const faqDefaults: Array<{ qRu: string, qAm: string, aRu: string, aAm: string }> = [
     {
       qRu: 'Могут ли заблокировать мой кабинет?',
       qAm: 'Կարող են արգելափակել իմ կաբինետը?',
@@ -2123,6 +2211,29 @@ function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string 
       aAm: 'Wildberries-ը պաշտոնապես հաստատել է թարմացված օֆերտայում, որ ինքնագնումները խախտում չեն, և դրանց համար տուգանքներ նախատեսված չեն: WB-ի ալգորիթմը դասակարգում է ապրանքները վարքագծային ցուցանիշներով — հենց դրանք մենք բարելավում ենք յուրաքանչյուր հետագնման ժամանակ բանալի բառով:',
     },
   ]
+
+  // Phase 3C: try to override the hard-coded list with rows from the
+  // `faq__items` CMS block. The block stores 24 strings as 12 [Q, A]
+  // pairs in the same language array — index 0/2/4/... = question,
+  // 1/3/5/... = answer. If the block is missing/hidden or any row is
+  // malformed we silently fall back to faqDefaults so SEO + JSON-LD
+  // never lose content.
+  const faqItemsBlock = pageBlocks?.['faq__items']
+  const itemsFromDb: Array<{ qRu: string, qAm: string, aRu: string, aAm: string }> = []
+  if (faqItemsBlock && faqItemsBlock.is_visible !== 0) {
+    const ru = faqItemsBlock.texts_ru || []
+    const am = faqItemsBlock.texts_am || []
+    const len = Math.min(Math.floor(ru.length / 2), Math.floor(am.length / 2))
+    for (let i = 0; i < len; i++) {
+      itemsFromDb.push({
+        qRu: ru[2 * i] || '',
+        qAm: am[2 * i] || '',
+        aRu: ru[2 * i + 1] || '',
+        aAm: am[2 * i + 1] || '',
+      })
+    }
+  }
+  const faqItems = itemsFromDb.length > 0 ? itemsFromDb : faqDefaults
 
   const seo = {
     title: t(
@@ -2203,13 +2314,22 @@ function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string 
 
   // Render accordion. First item gets `.active` so the answer is open by
   // default — toggleFaq() in landing.js handles the rest.
+  // Phase 3C: items can come from CMS (faq__items block) — escape every
+  // interpolation so admin-controlled `"`, `<`, `>` cannot break attributes
+  // or inject markup on the public /faq page.
+  const e = (s: string) => String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
   const faqItemsHtml = faqItems.map((item, idx) => {
     const activeCls = idx === 0 ? ' active' : ''
     const qText = t(item.qRu, item.qAm)
     const aText = t(item.aRu, item.aAm)
     return `      <div class="faq-item${activeCls}">
-        <div class="faq-q" onclick="toggleFaq(this)"><span data-ru="${item.qRu}" data-am="${item.qAm}">${qText}</span><i class="fas fa-chevron-down"></i></div>
-        <div class="faq-a"><p data-ru="${item.aRu}" data-am="${item.aAm}">${aText}</p></div>
+        <div class="faq-q" onclick="toggleFaq(this)"><span data-ru="${e(item.qRu)}" data-am="${e(item.qAm)}">${e(qText)}</span><i class="fas fa-chevron-down"></i></div>
+        <div class="faq-a"><p data-ru="${e(item.aRu)}" data-am="${e(item.aAm)}">${e(aText)}</p></div>
       </div>`
   }).join('\n')
 
@@ -2220,13 +2340,13 @@ function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string 
     <div class="fh-inner">
       <div class="fh-eyebrow">
         <i class="fas fa-question-circle"></i>
-        <span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span>
+        <span data-ru="FAQ" data-am="ՀՏՀ">${tb('faq__hero', 0, 'FAQ', 'ՀՏՀ')}</span>
       </div>
       <h1>
-        <span data-ru="Часто задаваемые" data-am="Հաճախ տրվող">${t('Часто задаваемые', 'Հաճախ տրվող')}</span>
-        <span class="gr" data-ru="вопросы" data-am="հարցեր">${t('вопросы', 'հարցեր')}</span>
+        <span data-ru="Часто задаваемые" data-am="Հաճախ տրվող">${tb('faq__hero', 1, 'Часто задаваемые', 'Հաճախ տրվող')}</span>
+        <span class="gr" data-ru="вопросы" data-am="հարցեր">${tb('faq__hero', 2, 'вопросы', 'հարցեր')}</span>
       </h1>
-      <p class="fh-desc" data-ru="Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram." data-am="Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:">${t('Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram.', 'Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:')}</p>
+      <p class="fh-desc" data-ru="Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram." data-am="Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:">${tb('faq__hero', 3, 'Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram.', 'Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:')}</p>
     </div>
   </div>
 </section>
@@ -2245,8 +2365,8 @@ ${faqItemsHtml}
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Не нашли ответ?" data-am="Չգտա՞ք պատասխանը:">${t('Не нашли ответ?', 'Չգտա՞ք պատասխանը:')}</h3>
-        <p data-ru="Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${t('Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+        <h3 data-ru="Не нашли ответ?" data-am="Չգտա՞ք պատասխանը:">${tb('faq__cta_strip', 0, 'Не нашли ответ?', 'Չգտա՞ք պատասխանը:')}</h3>
+        <p data-ru="Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${tb('faq__cta_strip', 1, 'Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
@@ -2255,11 +2375,11 @@ ${faqItemsHtml}
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
-          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('faq__cta_strip', 2, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
         </button>
         <a href="/contacts" class="btn btn-primary">
           <i class="fas fa-envelope"></i>
-          <span data-ru="Контакты" data-am="Կոնտակտներ">${t('Контакты', 'Կոնտակտներ')}</span>
+          <span data-ru="Контакты" data-am="Կոնտակտներ">${tb('faq__cta_strip', 3, 'Контакты', 'Կոնտակտներ')}</span>
         </a>
       </div>
     </div>
@@ -2291,10 +2411,17 @@ ${faqItemsHtml}
 // loaded via extraHead so the phone field gets the country selector;
 // submitForm() gracefully degrades if the library hasn't booted yet.
 // =====================================================================
-function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
-  const { lang, siteOrigin } = opts
+function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks?: Record<string, SubpageBlock> }): string {
+  const { lang, siteOrigin, pageBlocks } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    const block = pageBlocks?.[blockKey]
+    if (!block || block.is_visible === 0) return isAM ? fallbackAm : fallbackRu
+    const arr = isAM ? block.texts_am : block.texts_ru
+    const v = arr?.[idx]
+    return (typeof v === 'string' && v.trim()) ? v : (isAM ? fallbackAm : fallbackRu)
+  }
 
   const seo = {
     title: t(
@@ -2412,13 +2539,13 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
     <div class="ch-inner">
       <div class="ch-eyebrow">
         <i class="fas fa-headset"></i>
-        <span data-ru="Контакты" data-am="Կապ">${t('Контакты', 'Կապ')}</span>
+        <span data-ru="Контакты" data-am="Կապ">${tb('contacts__hero', 0, 'Контакты', 'Կապ')}</span>
       </div>
       <h1>
-        <span data-ru="Свяжитесь" data-am="Կապվեք">${t('Свяжитесь', 'Կապվեք')}</span>
-        <span class="gr" data-ru="с нами" data-am="մեզ հետ">${t('с нами', 'մեզ հետ')}</span>
+        <span data-ru="Свяжитесь" data-am="Կապվեք">${tb('contacts__hero', 1, 'Свяжитесь', 'Կապվեք')}</span>
+        <span class="gr" data-ru="с нами" data-am="մեզ հետ">${tb('contacts__hero', 2, 'с нами', 'մեզ հետ')}</span>
       </h1>
-      <p class="ch-desc" data-ru="Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время." data-am="Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:">${t('Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время.', 'Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
+      <p class="ch-desc" data-ru="Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время." data-am="Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:">${tb('contacts__hero', 3, 'Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время.', 'Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
     </div>
   </div>
 </section>
@@ -2429,9 +2556,9 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
     <div class="cp-channels-grid">
       <div class="cp-channel cp-ch-tg">
         <div class="cp-channel-icon"><i class="fab fa-telegram"></i></div>
-        <h3 data-ru="Telegram — администратор" data-am="Telegram — ադմինիստրատոր">${t('Telegram — администратор', 'Telegram — ադմինիստրատոր')}</h3>
+        <h3 data-ru="Telegram — администратор" data-am="Telegram — ադմինիստրատոր">${tb('contacts__channels', 0, 'Telegram — администратор', 'Telegram — ադմինիստրատոր')}</h3>
         <span class="cp-channel-handle" data-no-rewrite="1">@goo_to_top</span>
-        <p class="cp-channel-desc" data-ru="Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время." data-am="Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:">${t('Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время.', 'Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
+        <p class="cp-channel-desc" data-ru="Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время." data-am="Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:">${tb('contacts__channels', 1, 'Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время.', 'Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
         <a href="${tgUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
           <i class="fab fa-telegram"></i>
           <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
@@ -2439,9 +2566,9 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
       </div>
       <div class="cp-channel cp-ch-tg">
         <div class="cp-channel-icon"><i class="fab fa-telegram"></i></div>
-        <h3 data-ru="Telegram — поддержка" data-am="Telegram — աջակցություն">${t('Telegram — поддержка', 'Telegram — աջակցություն')}</h3>
+        <h3 data-ru="Telegram — поддержка" data-am="Telegram — աջակցություն">${tb('contacts__channels', 2, 'Telegram — поддержка', 'Telegram — աջակցություն')}</h3>
         <span class="cp-channel-handle" data-no-rewrite="1">@suport_admin_2</span>
-        <p class="cp-channel-desc" data-ru="Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер." data-am="Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:">${t('Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер.', 'Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:')}</p>
+        <p class="cp-channel-desc" data-ru="Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер." data-am="Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:">${tb('contacts__channels', 3, 'Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер.', 'Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:')}</p>
         <a href="${tgSupportUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
           <i class="fab fa-telegram"></i>
           <span data-ru="Написать в поддержку" data-am="Գրել աջակցությանը">${t('Написать в поддержку', 'Գրել աջակցությանը')}</span>
@@ -2449,9 +2576,9 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
       </div>
       <div class="cp-channel cp-ch-wa">
         <div class="cp-channel-icon"><i class="fab fa-whatsapp"></i></div>
-        <h3 data-ru="WhatsApp" data-am="WhatsApp">WhatsApp</h3>
+        <h3 data-ru="WhatsApp" data-am="WhatsApp">${tb('contacts__channels', 4, 'WhatsApp', 'WhatsApp')}</h3>
         <span class="cp-channel-handle" data-no-rewrite="1">${waLabel}</span>
-        <p class="cp-channel-desc" data-ru="Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram." data-am="Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:">${t('Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram.', 'Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:')}</p>
+        <p class="cp-channel-desc" data-ru="Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram." data-am="Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:">${tb('contacts__channels', 5, 'Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram.', 'Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:')}</p>
         <a href="${waUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
           <i class="fab fa-whatsapp"></i>
           <span data-ru="Написать в WhatsApp" data-am="Գրել WhatsApp-ով">${t('Написать в WhatsApp', 'Գրել WhatsApp-ով')}</span>
@@ -2563,13 +2690,13 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Не нашли подходящий канал?" data-am="Չգտա՞ք ձեզ հարմար եղանակ:">${t('Не нашли подходящий канал?', 'Չգտա՞ք ձեզ հարմար եղանակ:')}</h3>
-        <p data-ru="Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом." data-am="Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:">${t('Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом.', 'Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:')}</p>
+        <h3 data-ru="Не нашли подходящий канал?" data-am="Չգտա՞ք ձեզ հարմար եղանակ:">${tb('contacts__cta_strip', 0, 'Не нашли подходящий канал?', 'Չգտա՞ք ձեզ հարմար եղանակ:')}</h3>
+        <p data-ru="Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом." data-am="Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:">${tb('contacts__cta_strip', 1, 'Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом.', 'Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:')}</p>
       </div>
       <div class="acs-actions">
         <button type="button" class="btn btn-primary" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
-          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('contacts__cta_strip', 2, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
         </button>
       </div>
     </div>
@@ -2604,10 +2731,17 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): st
 // No __SITE_DATA injection: calculator and #refCodeInput are not used
 // here, so we keep the page maximally edge-cacheable.
 // =====================================================================
-function renderReferralPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
-  const { lang, siteOrigin } = opts
+function renderReferralPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks?: Record<string, SubpageBlock> }): string {
+  const { lang, siteOrigin, pageBlocks } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
+  const tb = (blockKey: string, idx: number, fallbackRu: string, fallbackAm: string): string => {
+    const block = pageBlocks?.[blockKey]
+    if (!block || block.is_visible === 0) return isAM ? fallbackAm : fallbackRu
+    const arr = isAM ? block.texts_am : block.texts_ru
+    const v = arr?.[idx]
+    return (typeof v === 'string' && v.trim()) ? v : (isAM ? fallbackAm : fallbackRu)
+  }
 
   const seo = {
     title: t(
@@ -2891,13 +3025,13 @@ ${bullets}
     <div class="rh-inner">
       <div class="rh-eyebrow">
         <i class="fas fa-handshake"></i>
-        <span data-ru="Партнёрская программа" data-am="Գործընկերային ծրագիր">${t('Партнёрская программа', 'Գործընկերային ծրագիր')}</span>
+        <span data-ru="Партнёрская программа" data-am="Գործընկերային ծրագիր">${tb('referral__hero', 0, 'Партнёрская программа', 'Գործընկերային ծրագիր')}</span>
       </div>
       <h1>
-        <span data-ru="Реферальная программа" data-am="Հղման ծրագիր">${t('Реферальная программа', 'Հղման ծրագիր')}</span>
-        <span class="gr">Go to Top</span>
+        <span data-ru="Реферальная программа" data-am="Հղման ծրագիր">${tb('referral__hero', 1, 'Реферальная программа', 'Հղման ծրագիր')}</span>
+        <span class="gr">${tb('referral__hero', 2, 'Go to Top', 'Go to Top')}</span>
       </h1>
-      <p class="rh-desc" data-ru="Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD." data-am="Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։">${t('Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD.', 'Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։')}</p>
+      <p class="rh-desc" data-ru="Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD." data-am="Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։">${tb('referral__hero', 3, 'Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD.', 'Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։')}</p>
       <div class="rh-cta">
         <a href="${tgPromoUrl}" target="_blank" rel="noopener" class="btn btn-tg btn-lg">
           <i class="fab fa-telegram"></i>
@@ -2929,18 +3063,18 @@ ${bullets}
     <div class="rp-steps-grid">
       <div class="rp-step">
         <div class="rp-step-num">1</div>
-        <h3 data-ru="Получите промокод" data-am="Ստացեք պրոմո կոդ">${t('Получите промокод', 'Ստացեք պրոմո կոդ')}</h3>
-        <p data-ru="Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня." data-am="Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։">${t('Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня.', 'Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։')}</p>
+        <h3 data-ru="Получите промокод" data-am="Ստացեք պրոմո կոդ">${tb('referral__steps', 0, 'Получите промокод', 'Ստացեք պրոմո կոդ')}</h3>
+        <p data-ru="Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня." data-am="Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։">${tb('referral__steps', 1, 'Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня.', 'Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։')}</p>
       </div>
       <div class="rp-step">
         <div class="rp-step-num">2</div>
-        <h3 data-ru="Делитесь с клиентами" data-am="Կիսվեք հաճախորդների հետ">${t('Делитесь с клиентами', 'Կիսվեք հաճախորդների հետ')}</h3>
-        <p data-ru="Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной." data-am="Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։">${t('Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной.', 'Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։')}</p>
+        <h3 data-ru="Делитесь с клиентами" data-am="Կիսվեք հաճախորդների հետ">${tb('referral__steps', 2, 'Делитесь с клиентами', 'Կիսվեք հաճախորդների հետ')}</h3>
+        <p data-ru="Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной." data-am="Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։">${tb('referral__steps', 3, 'Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной.', 'Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։')}</p>
       </div>
       <div class="rp-step">
         <div class="rp-step-num">3</div>
-        <h3 data-ru="Получайте бонус" data-am="Ստացեք բոնուս">${t('Получайте бонус', 'Ստացեք բոնուս')}</h3>
-        <p data-ru="Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию." data-am="Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։">${t('Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию.', 'Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։')}</p>
+        <h3 data-ru="Получайте бонус" data-am="Ստացեք բոնուս">${tb('referral__steps', 4, 'Получайте бонус', 'Ստացեք բոնուս')}</h3>
+        <p data-ru="Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию." data-am="Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։">${tb('referral__steps', 5, 'Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию.', 'Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։')}</p>
       </div>
     </div>
   </div>
@@ -3034,13 +3168,13 @@ ${faqItemsHtml}
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы стать партнёром?" data-am="Պատրա՞ստ եք դառնալ գործընկեր">${t('Готовы стать партнёром?', 'Պատրա՞ստ եք դառնալ գործընկեր')}</h3>
-        <p data-ru="Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов." data-am="Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։">${t('Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов.', 'Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։')}</p>
+        <h3 data-ru="Готовы стать партнёром?" data-am="Պատրա՞ստ եք դառնալ գործընկեր">${tb('referral__cta_strip', 0, 'Готовы стать партнёром?', 'Պատրա՞ստ եք դառնալ գործընկեր')}</h3>
+        <p data-ru="Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов." data-am="Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։">${tb('referral__cta_strip', 1, 'Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов.', 'Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgPromoUrl}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
-          <span data-ru="Получить код" data-am="Ստանալ կոդը">${t('Получить код', 'Ստանալ կոդը')}</span>
+          <span data-ru="Получить код" data-am="Ստանալ կոդը">${tb('referral__cta_strip', 2, 'Получить код', 'Ստանալ կոդը')}</span>
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
@@ -6516,10 +6650,15 @@ for (const page of PLACEHOLDER_PAGES) {
     const lang: 'ru' | 'am' = (urlLang === 'am' || urlLang === 'hy') ? 'am' : 'ru';
     const siteOrigin = reqUrl.origin;
 
+    // Phase 3C: load subpage blocks from CMS for the requested page.
+    // Failures fall back silently — render functions have hardcoded
+    // fallbacks via the local `tb()` helper.
+    const pageBlocks = await loadSubpageBlocks(c.env.DB, page);
+
     // /about now has real content (phase 2A); the rest stay on the
     // placeholder shell until their respective phase-2 subtasks land.
     if (page === 'about') {
-      return c.html(renderAboutPage({ lang, siteOrigin }));
+      return c.html(renderAboutPage({ lang, siteOrigin, pageBlocks }));
     }
     // /services (phase 2B): heavy page with the full calculator. Mirrors
     // the `/` route — kicks off a parallel /api/site-data fetch and inlines
@@ -6533,7 +6672,7 @@ for (const page of PLACEHOLDER_PAGES) {
           return resp.ok ? await resp.text() : null;
         } catch { return null; }
       })();
-      let pageHtml = renderServicesPage({ lang, siteOrigin });
+      let pageHtml = renderServicesPage({ lang, siteOrigin, pageBlocks });
       // 5s timeout + `</` escape — same defensive pattern as the `/` route.
       // On fail: no-store so the calculator-less response doesn't poison cache.
       const siteDataJson = await Promise.race<string | null>([
@@ -6563,7 +6702,7 @@ for (const page of PLACEHOLDER_PAGES) {
           return resp.ok ? await resp.text() : null;
         } catch { return null; }
       })();
-      let pageHtml = renderBuyoutsPage({ lang, siteOrigin });
+      let pageHtml = renderBuyoutsPage({ lang, siteOrigin, pageBlocks });
       // 5s timeout + escape closing tags — same defensive pattern as the `/` route.
       // On fail: no-store so the calculator-less response doesn't poison cache.
       const siteDataJson = await Promise.race<string | null>([
@@ -6587,7 +6726,7 @@ for (const page of PLACEHOLDER_PAGES) {
     // skip the extra D1 round-trip and keep the page maximally cacheable.
     // SEO is amplified with a JSON-LD FAQPage block emitted via extraHead.
     if (page === 'faq') {
-      return c.html(renderFaqPage({ lang, siteOrigin }));
+      return c.html(renderFaqPage({ lang, siteOrigin, pageBlocks }));
     }
     // /contacts (phase 2E): heavy page with channels grid (Telegram x2 +
     // WhatsApp), QR codes, lead form (#leadForm → submitForm() in
@@ -6595,7 +6734,7 @@ for (const page of PLACEHOLDER_PAGES) {
     // CTA strip. No __SITE_DATA injection: the calculator isn't used
     // here, so we skip the extra D1 round-trip and stay edge-cacheable.
     if (page === 'contacts') {
-      return c.html(renderContactsPage({ lang, siteOrigin }));
+      return c.html(renderContactsPage({ lang, siteOrigin, pageBlocks }));
     }
     // /referral (phase 2F): light partner-program page — hero, 3 steps,
     // audience cards (mirrors home #for-whom), bonus tiers (5/8/15%),
@@ -6604,7 +6743,7 @@ for (const page of PLACEHOLDER_PAGES) {
     // __SITE_DATA injection: the calculator and #refCodeInput are not
     // used here, so the page stays maximally edge-cacheable.
     if (page === 'referral') {
-      return c.html(renderReferralPage({ lang, siteOrigin }));
+      return c.html(renderReferralPage({ lang, siteOrigin, pageBlocks }));
     }
     return c.html(renderPlaceholderPage({ page, lang, siteOrigin }));
   });

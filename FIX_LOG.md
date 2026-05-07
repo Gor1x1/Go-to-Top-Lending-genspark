@@ -71,3 +71,34 @@
 | Нераспределённая | 3,637,885 ֏ | ✅ |
 
 **ВСЕ РАСЧЁТЫ СХОДЯТСЯ** ✅
+
+---
+
+## Phase 3C — CMS-интеграция подстраниц (2026-05-07)
+
+**Контекст:** финальная фаза мульти-страничной миграции (Phase 1 — 6 подстраниц, Phase 2 — реальный контент, Phase 3A — polish, Phase 3B — 6 карточек на главной, **Phase 3C — CMS**).
+
+### Подход
+**Soft enforcement** через префикс `<page>__<key>` в `block_key`. Без schema-миграции: existing UNIQUE на `block_key` гарантирует уникальность; колонка `page` заполняется попутно.
+
+### Изменения по файлам
+- **`src/api/routes/admin-site-blocks.ts`** — новый эндпоинт `POST /site-blocks/seed-subpages` (idempotent, `INSERT OR IGNORE`); 15 TIER-1 блоков для 6 подстраниц; защита `import-from-site` от удаления подстраничных блоков.
+- **`src/routes/landing.ts`** — экспортирован helper `loadSubpageBlocks(db, pagePrefix)` + interface `SubpageBlock`; 6 render-функций (`about/services/buyouts/faq/contacts/referral`) расширены опциональным `pageBlocks?`; локальный `tb(blockKey, idx, fallbackRu, fallbackAm)` с авто-фолбэком; FAQ items override через `faq__items` (12 пар Q+A); HTML-эскейп CMS-контента в FAQ-аккордеоне (защита от admin-stored XSS).
+- **`src/routes/public-api.ts`** — фильтр подстраничных блоков из `/api/site-data` через SQL `LIKE … ESCAPE '\\'` + JS belt-and-suspenders.
+- **`src/admin/sections/panel-site-blocks.ts`** и **`src/admin/panel.ts`** — чипсы-фильтр страниц (Все/Главная/Услуги/Выкупы/О нас/FAQ/Контакты/Партнёрка) с counts; бейджи страницы на карточках; спец-редактор `faq__items` (12 пар Q+A с +/−); кнопка «Создать блоки подстраниц» → `seedSubpageBlocks()`.
+
+### Acceptance criteria — все ✅
+- Build passes (`npm run build`, `dist/_worker.js` ≈ 2 161 KB)
+- Маркеры в бандле: `seed-subpages`, `faq__items`, все `<page>__hero` ключи, `seedSubpageBlocks`, `sbPageFilter`, `SUBPAGE_LABELS`, `ESCAPE` clauses
+- Регрессии не задеты: `__SITE_DATA` (калькулятор), `HTMLRewriter`, `data-section-id`, `FAQPage`/`BreadcrumbList` JSON-LD, `telegram_messages`, `calculator_packages`/`calculator_services`
+- Seed-значения **точно совпадают** с фолбэками в `landing.ts` (нет визуального диффа после seed)
+- FAQ-аккордеон HTML-эскейпит CMS-input
+
+### Edge cases
+- `loadSubpageBlocks` возвращает `{}` на любую ошибку БД → render отдаёт фолбэк.
+- `INSERT OR IGNORE` гарантирует idempotency seed (повторный вызов = `inserted: 0`).
+- Home-блоки (без `__`) не затрагиваются — все существующие фичи (HTMLRewriter, calculator) работают как раньше.
+- `about__story` отложен (MVP: 15 блоков вместо 16; admin может добавить вручную через "+ Новый блок").
+
+### Деплой
+- `CACHE_VERSION` bump'нут `v16 → v17` (`src/lib/cache-config.ts`) для сброса edge-кеша `CACHEABLE_PATHS` после деплоя.

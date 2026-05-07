@@ -285,6 +285,50 @@ webapp/
 
 ---
 
+## 🧩 Мульти-страничная архитектура (подстраницы + CMS)
+
+Лендинг разбит на главную (`/`) и **6 подстраниц**: `/about`, `/services`, `/buyouts`, `/faq`, `/contacts`, `/referral`. Все они рендерятся в `src/routes/landing.ts` (SSR) и кешируются на edge (`CACHEABLE_PATHS` в `src/lib/cache-config.ts`).
+
+### Soft enforcement через префикс `block_key`
+
+Чтобы не делать schema-миграцию, подстраничные блоки в `site_blocks` живут с **префиксом `<page>__<key>`** (например, `services__hero`, `faq__items`, `referral__steps`). Существующий `UNIQUE` на `block_key` гарантирует уникальность; колонка `page` заполняется попутно.
+
+- **Главная (home)** — блоки **без `__`** в ключе (легаси: `hero`, `pain_points`, …); затрагивают `HTMLRewriter` и `__SITE_DATA` для калькулятора.
+- **Подстраницы** — блоки с `<page>__…`; не попадают в `/api/site-data` (фильтр `LIKE … ESCAPE '\\'` в `src/routes/public-api.ts`), не мешают калькулятору и аналитике главной.
+
+### Источник правды для текстов
+
+- Hardcoded RU/AM-фолбэки **внутри render-функций** в `landing.ts` — это "ground truth" по умолчанию.
+- Helper `loadSubpageBlocks(db, pagePrefix)` подгружает CMS-блоки страницы; локальный `tb(blockKey, idx, fallbackRu, fallbackAm)` отдаёт CMS-значение **или** фолбэк, если блок не заполнен.
+- Seed-значения в `POST /api/admin/site-blocks/seed-subpages` **точно совпадают** с фолбэками (визуального диффа после seed нет).
+- На любой ошибке БД `loadSubpageBlocks` возвращает `{}` → страница рендерится по фолбэкам.
+
+### Редактирование через админку
+
+**Админ → "Управление сайтом"**:
+
+1. Чипсы-фильтр сверху: **Все / Главная / Услуги / Выкупы / О нас / FAQ / Контакты / Партнёрка** (с counts).
+2. На каждой карточке блока — **бейдж страницы**, к которой он относится.
+3. Кнопка **«Создать блоки подстраниц»** (рядом с фильтром) — однократно создаёт TIER-1 блоки для всех 6 подстраниц через `POST /api/admin/site-blocks/seed-subpages`. **Idempotent**: повторный вызов через `INSERT OR IGNORE` ничего не дублирует (`inserted: 0`).
+4. Спец-редактор для блока `faq__items` — 12 пар Q+A (RU/AM) с кнопками `+`/`−`.
+5. FAQ-аккордеон **HTML-эскейпит** CMS-контент (защита от admin-stored XSS).
+6. Защита `import-from-site` — не удаляет подстраничные блоки.
+
+### Что входит в seed (15 блоков)
+
+| Страница | TIER-1 блоки |
+|----------|--------------|
+| `about` | `about__hero`, `about__cta_strip` |
+| `services` | `services__hero`, `services__cta_strip` |
+| `buyouts` | `buyouts__hero`, `buyouts__cta_strip` |
+| `faq` | `faq__hero`, `faq__items` (12 Q+A), `faq__cta_strip` |
+| `contacts` | `contacts__hero`, `contacts__channels`, `contacts__cta_strip` |
+| `referral` | `referral__hero`, `referral__steps`, `referral__cta_strip` |
+
+> `about__story` отложен (MVP). При необходимости — добавить вручную через "+ Новый блок".
+
+---
+
 ## 🚀 Как запустить локально
 
 ### Требования
@@ -524,7 +568,9 @@ npx wrangler pages deploy dist --project-name gototop-lending
 
 - **Платформа**: Cloudflare Pages + D1
 - **Статус**: ✅ Активен
-- **Версия**: v0.5.0
-- **Последнее обновление**: 2026-03-01
+- **Версия**: v0.6.0 (Phase 3C — CMS-интеграция подстраниц)
+- **CACHE_VERSION**: `v17` (`src/lib/cache-config.ts`) — бампать на каждом деплое
+- **Последнее обновление**: 2026-05-07
 - **Cloudflare Project**: `gototop-lending`
 - **D1 Database**: `gototop-production-eu` (ID: `f49b080f-516f-4ed0-84e9-0efdea1e8a2a`)
+- **Подробности недавних правок**: см. [`FIX_LOG.md`](FIX_LOG.md)

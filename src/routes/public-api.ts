@@ -45,7 +45,13 @@ app.get('/api/site-data', async (c) => {
       db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all(),
       db.prepare("SELECT texts_ru, texts_am, images FROM site_blocks WHERE block_key = 'ticker' LIMIT 1").first().catch(() => null),
       db.prepare("SELECT social_links FROM site_blocks WHERE block_key = 'footer' LIMIT 1").first().catch(() => null),
-      db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 ORDER BY sort_order").all().catch(() => ({ results: [] })),
+      // Phase 3C: exclude subpage blocks (block_key with '__' prefix) — they
+      // belong to /services /buyouts /about /faq /contacts /referral and are
+      // loaded server-side by loadSubpageBlocks() in landing.ts. Including
+      // them here would pollute the home page's __SITE_DATA / textMap.
+      // Note: SQL LIKE treats '_' as a single-char wildcard, so we add a
+      // belt-and-suspenders JS filter on `.startsWith` of any subpage prefix.
+      db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 AND block_key NOT LIKE '%\\_\\_%' ESCAPE '\\' ORDER BY sort_order").all().catch(() => ({ results: [] })),
       db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%' OR key = 'amd_to_rub_rate'").all().catch(() => ({ results: [] })),
     ]);
     
@@ -138,6 +144,11 @@ app.get('/api/site-data', async (c) => {
     // Block features
     const siteBlockFeatures: any[] = [];
     for (const blk of (blocksRes.results || [])) {
+      // Phase 3C belt-and-suspenders: SQL LIKE may unintentionally match
+      // '_' as a wildcard if ESCAPE isn't honoured by the driver — re-filter
+      // here to guarantee subpage blocks (block_key with '__') never leak
+      // into the home page's __SITE_DATA payload.
+      if (typeof blk.block_key === 'string' && blk.block_key.includes('__')) continue;
       let socials: any[] = [];
       try { let parsed = JSON.parse(blk.social_links as string || '[]'); if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch { parsed = []; } } socials = Array.isArray(parsed) ? parsed : []; } catch {}
       let blockOpts: any = {};
