@@ -38,6 +38,7 @@ For every listed file path, verify:
 | `src/lib/db.ts`, `migrations/**`, `seed.sql`, schema-related `*.mjs` | `schema-implementer` |
 | `vite.config.ts`, `wrangler.jsonc`, `tsconfig.json`, `package.json` (tooling) | `platform-engineer` |
 | `src/api/**`, `src/routes/public-api.ts`, `src/routes/seed-api.ts`, `src/lib/auth.ts`, `src/helpers/**`, `src/index.tsx` (app routes/cache) | `implementer` |
+| **`landing_packages`** stack (DB table + `admin-landing-packages` + `panel-landing-packages` + `nh-packages` / `renderPackagePage` + `site-data.landingPackages` in one feature) | **`landing-packages-implementer`** |
 | `src/lib/cache-config.ts` | usually `implementer` (edge cache keys shared with admin purge) |
 | Spec-only finance work | `finance-modeler` / `finance-auditor` produce **specs and audits only** — implementation stays `implementer` / `frontend-implementer` |
 

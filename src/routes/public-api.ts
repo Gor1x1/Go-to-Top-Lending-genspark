@@ -54,6 +54,12 @@ app.get('/api/site-data', async (c) => {
       db.prepare("SELECT block_key, block_type, social_links, images, buttons, custom_html, is_visible, texts_ru, texts_am, text_styles, photo_url FROM site_blocks WHERE is_visible = 1 AND block_key NOT LIKE '%\\_\\_%' ESCAPE '\\' ORDER BY sort_order").all().catch(() => ({ results: [] })),
       db.prepare("SELECT key, value FROM site_settings WHERE key LIKE 'packages_%' OR key = 'amd_to_rub_rate'").all().catch(() => ({ results: [] })),
     ]);
+
+    // Phase 3: landing_packages — separate query (lightweight) so a missing
+    // table on first deploy doesn't break the whole /api/site-data response.
+    const landingPkgsRes = await db.prepare(
+      'SELECT id, slug, title_ru, title_am, description_ru, description_am, price_text_ru, price_text_am, cover_url, sort_order FROM landing_packages WHERE is_visible = 1 ORDER BY sort_order, id'
+    ).all().catch(() => ({ results: [] }));
     
     // Parse content
     const dbContent: Record<string, any[]> = {};
@@ -207,11 +213,12 @@ app.get('/api/site-data', async (c) => {
       tickerItems: tickerItems.length > 0 ? tickerItems : null,
       footerSocials: footerSocials.length > 0 ? footerSocials : null,
       blockFeatures: siteBlockFeatures.length > 0 ? siteBlockFeatures : [],
+      landingPackages: landingPkgsRes.results || [],
       _ts: Date.now()
     });
   } catch (e: any) {
     // If DB not initialized yet, return empty — frontend will use hardcoded fallback
-    return c.json({ content: {}, textMap: {}, tabs: [], services: [], packages: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], tickerItems: null, footerSocials: null, _ts: Date.now() });
+    return c.json({ content: {}, textMap: {}, tabs: [], services: [], packages: [], telegram: {}, scripts: { head: [], body_start: [], body_end: [] }, sectionOrder: [], slotCounters: [], photoBlocks: [], tickerItems: null, footerSocials: null, landingPackages: [], _ts: Date.now() });
   }
 });
 

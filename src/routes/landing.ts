@@ -175,11 +175,24 @@ function buildLocalBusinessLd(siteOrigin: string): string {
 function buildBreadcrumbLd(opts: {
   siteOrigin: string,
   isAM: boolean,
-  page: 'about' | 'services' | 'buyouts' | 'faq' | 'contacts' | 'referral',
+  page: 'about' | 'services' | 'buyouts' | 'faq' | 'contacts' | 'referral' | 'package',
+  packageInfo?: { slug: string; titleRu: string; titleAm: string },
 }): string {
-  const { siteOrigin, isAM, page } = opts
+  const { siteOrigin, isAM, page, packageInfo } = opts
   const homeName = isAM ? 'Գլխավոր' : 'Главная'
-  const pageNames: Record<typeof page, { ru: string, am: string }> = {
+  if (page === 'package' && packageInfo) {
+    const pkgName = isAM ? (packageInfo.titleAm || packageInfo.titleRu) : packageInfo.titleRu
+    return _ldScript({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: homeName, item: `${siteOrigin}/` },
+        { '@type': 'ListItem', position: 2, name: isAM ? 'Փաթեթներ' : 'Пакеты', item: `${siteOrigin}/home#packages` },
+        { '@type': 'ListItem', position: 3, name: pkgName, item: `${siteOrigin}/package/${packageInfo.slug}` },
+      ],
+    })
+  }
+  const pageNames: Record<Exclude<typeof page, 'package'>, { ru: string, am: string }> = {
     about:    { ru: 'О нас',     am: 'Մեր մասին' },
     services: { ru: 'Услуги',    am: 'Ծառայություններ' },
     buyouts:  { ru: 'Выкупы',    am: 'Հետգնում' },
@@ -187,7 +200,7 @@ function buildBreadcrumbLd(opts: {
     contacts: { ru: 'Контакты',  am: 'Կոնտակտներ' },
     referral: { ru: 'Бонусы',    am: 'Բոնուսներ' },
   }
-  const pageName = isAM ? pageNames[page].am : pageNames[page].ru
+  const pageName = isAM ? pageNames[page as Exclude<typeof page, 'package'>].am : pageNames[page as Exclude<typeof page, 'package'>].ru
   return _ldScript({
     '@context': 'https://schema.org',
     '@type': 'BreadcrumbList',
@@ -211,7 +224,7 @@ function buildBreadcrumbLd(opts: {
 // `'home'` literal is reserved for a future migration of `app.get('/')`.
 // =====================================================================
 export function renderPageShell(opts: {
-  page: PlaceholderPage | 'home' | 'home-new' | 'calculator' | 'blog',
+  page: PlaceholderPage | 'home' | 'home-new' | 'calculator' | 'blog' | 'package',
   lang: 'ru' | 'am',
   siteOrigin: string,
   seo: { title: string, description: string, ogImage?: string },
@@ -888,6 +901,174 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBloc
     bodyClass: 'about-page',
     mainHtml,
     extraHead: extraHead + jsonLd,
+  })
+}
+
+// =====================================================================
+// renderPackagePage — Phase 3 detail page for landing packages.
+// Renders /package/:slug. The current package is loaded by the route
+// handler in src/routes/landing.ts and passed in via `pkg`. Other
+// visible packages (max 2) are passed via `otherPackages` for the
+// "Другие пакеты" cross-link grid. Falls back to a 404 if pkg is null.
+// =====================================================================
+export function renderPackagePage(opts: {
+  lang: 'ru' | 'am',
+  siteOrigin: string,
+  pkg: {
+    id: number; slug: string; cover_url: string;
+    title_ru: string; title_am: string;
+    description_ru: string; description_am: string;
+    price_text_ru: string; price_text_am: string;
+  },
+  otherPackages: Array<{
+    id: number; slug: string; cover_url: string;
+    title_ru: string; title_am: string;
+  }>,
+}): string {
+  const { lang, siteOrigin, pkg, otherPackages } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+  const tgUrl = 'https://t.me/gototop_consultant'
+
+  const titleRu = pkg.title_ru || ''
+  const titleAm = pkg.title_am || titleRu
+  const descRu = pkg.description_ru || ''
+  const descAm = pkg.description_am || descRu
+  const priceRu = pkg.price_text_ru || ''
+  const priceAm = pkg.price_text_am || priceRu
+  const cover = pkg.cover_url || '/static/img/svc-buyouts.png'
+  const escTitle = (s: string) => (s || '').replace(/"/g, '&quot;')
+
+  const seo = {
+    title: t(`${titleRu} — Go to Top`, `${titleAm} — Go to Top`),
+    description: t(
+      descRu.slice(0, 160),
+      descAm.slice(0, 160) || descRu.slice(0, 160),
+    ),
+    ogImage: cover.startsWith('http') ? cover : `${siteOrigin}${cover}`,
+  }
+
+  const extraHead = `<style>
+.pkg-page{padding-top:88px}
+.pkg-detail-hero{padding:24px 0 56px}
+.pkg-detail-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:48px;align-items:start}
+.pkg-detail-image{position:relative;border-radius:var(--r-lg);overflow:hidden;background:var(--bg-surface);box-shadow:0 20px 60px rgba(0,0,0,0.45),0 0 60px rgba(139,92,246,0.18)}
+.pkg-detail-image img{width:100%;display:block;object-fit:cover;aspect-ratio:16/10}
+.pkg-detail-text .pkg-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.pkg-detail-text h1{font-size:clamp(1.9rem,3.6vw,2.8rem);font-weight:800;line-height:1.18;margin:0 0 18px;letter-spacing:-0.02em}
+.pkg-detail-text h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.pkg-detail-text .pkg-desc{font-size:1.02rem;color:var(--text-sec);line-height:1.7;margin:0 0 24px;white-space:pre-wrap}
+.pkg-detail-text .pkg-price{display:inline-flex;align-items:baseline;gap:10px;padding:14px 22px;background:linear-gradient(135deg,rgba(139,92,246,0.15),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.3);border-radius:14px;margin-bottom:24px}
+.pkg-price-label{font-size:0.82rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.5px;font-weight:600}
+.pkg-price-value{font-size:1.45rem;font-weight:800;color:var(--text);background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.pkg-detail-actions{display:flex;gap:12px;flex-wrap:wrap}
+.pkg-detail-actions .btn{padding:14px 24px;font-size:0.95rem}
+.pkg-others{padding:48px 0 64px;border-top:1px solid var(--border)}
+.pkg-others h2{font-size:clamp(1.4rem,2.6vw,1.9rem);font-weight:800;margin:0 0 28px;letter-spacing:-0.01em}
+.pkg-others-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}
+.pkg-other-card{display:flex;gap:16px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);text-decoration:none;color:inherit;transition:transform 0.3s ease,box-shadow 0.3s ease,border-color 0.3s ease}
+.pkg-other-card:hover{transform:translateY(-3px);border-color:rgba(139,92,246,0.4);box-shadow:0 12px 32px rgba(0,0,0,0.25)}
+.pkg-other-thumb{width:88px;height:88px;flex-shrink:0;border-radius:12px;overflow:hidden;background:var(--bg-surface)}
+.pkg-other-thumb img{width:100%;height:100%;object-fit:cover}
+.pkg-other-body{display:flex;flex-direction:column;justify-content:center;gap:6px}
+.pkg-other-body h3{margin:0;font-size:0.98rem;font-weight:700;line-height:1.3}
+.pkg-other-body span{display:inline-flex;align-items:center;gap:6px;font-size:0.82rem;color:#a78bfa;font-weight:600}
+.pkg-back{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:50px;color:var(--accent);font-size:0.82rem;font-weight:600;text-decoration:none;margin-bottom:24px;transition:background 0.2s ease}
+.pkg-back:hover{background:rgba(139,92,246,0.16)}
+@media(max-width:900px){
+  .pkg-page{padding-top:80px}
+  .pkg-detail-grid{grid-template-columns:1fr;gap:28px}
+  .pkg-detail-hero{padding:16px 0 36px}
+}
+</style>`
+
+  // Product JSON-LD — packages are offerings
+  const productLd = _ldScript({
+    '@context': 'https://schema.org',
+    '@type': 'Product',
+    name: t(titleRu, titleAm),
+    description: t(descRu, descAm).slice(0, 500),
+    image: cover.startsWith('http') ? cover : `${siteOrigin}${cover}`,
+    brand: { '@type': 'Brand', name: 'Go to Top' },
+    offers: {
+      '@type': 'Offer',
+      priceCurrency: 'AMD',
+      url: `${siteOrigin}/package/${pkg.slug}`,
+      availability: 'https://schema.org/InStock',
+      description: t(priceRu, priceAm),
+    },
+  })
+  const breadcrumbLd = buildBreadcrumbLd({
+    siteOrigin,
+    isAM,
+    page: 'package',
+    packageInfo: { slug: pkg.slug, titleRu, titleAm },
+  })
+
+  const otherCards = otherPackages.slice(0, 4).map(o => {
+    const oTitle = isAM ? (o.title_am || o.title_ru) : o.title_ru
+    const oCover = o.cover_url || '/static/img/svc-buyouts.png'
+    return `<a class="pkg-other-card" href="/package/${encodeURIComponent(o.slug)}${isAM ? '?lang=am' : ''}">
+      <div class="pkg-other-thumb"><img src="${oCover}" alt="${escTitle(oTitle)}" loading="lazy" decoding="async"></div>
+      <div class="pkg-other-body">
+        <h3>${oTitle.replace(/</g, '&lt;')}</h3>
+        <span><span data-ru="Подробнее" data-am="Մանրամասն">${t('Подробнее', 'Մանրամասն')}</span> <i class="fas fa-arrow-right"></i></span>
+      </div>
+    </a>`
+  }).join('')
+
+  const mainHtml = `
+<section class="pkg-detail-hero">
+  <div class="container">
+    <a class="pkg-back" href="/home${isAM ? '?lang=am' : ''}">
+      <i class="fas fa-arrow-left"></i>
+      <span data-ru="Все пакеты" data-am="Բոլոր փաթեթները">${t('Все пакеты', 'Բոլոր փաթեթները')}</span>
+    </a>
+    <div class="pkg-detail-grid">
+      <div class="pkg-detail-image">
+        <img src="${cover}" alt="${escTitle(t(titleRu, titleAm))}" loading="eager" decoding="async">
+      </div>
+      <div class="pkg-detail-text">
+        <div class="pkg-eyebrow"><i class="fas fa-cube"></i> <span data-ru="Пакет" data-am="Փաթեթ">${t('Пакет', 'Փաթեթ')}</span></div>
+        <h1 data-ru="${escTitle(titleRu)}" data-am="${escTitle(titleAm)}"><span class="gr">${t(titleRu, titleAm)}</span></h1>
+        <p class="pkg-desc" data-ru="${escTitle(descRu)}" data-am="${escTitle(descAm)}">${t(descRu, descAm)}</p>
+        ${(priceRu || priceAm) ? `<div class="pkg-price">
+          <span class="pkg-price-label" data-ru="Стоимость" data-am="Արժեք">${t('Стоимость', 'Արժեք')}</span>
+          <span class="pkg-price-value" data-ru="${escTitle(priceRu)}" data-am="${escTitle(priceAm)}">${t(priceRu, priceAm)}</span>
+        </div>` : ''}
+        <div class="pkg-detail-actions">
+          <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary">
+            <i class="fab fa-telegram"></i>
+            <span data-ru="Заказать пакет" data-am="Պատվիրել փաթեթ">${t('Заказать пакет', 'Պատվիրել փաթեթ')}</span>
+          </a>
+          <a href="/calculator${isAM ? '?lang=am' : ''}" class="btn btn-secondary">
+            <i class="fas fa-calculator"></i>
+            <span data-ru="Рассчитать стоимость" data-am="Հաշվարկել արժեքը">${t('Рассчитать стоимость', 'Հաշվարկել արժեքը')}</span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+${otherPackages.length > 0 ? `
+<section class="pkg-others">
+  <div class="container">
+    <h2 data-ru="Другие пакеты" data-am="Այլ փաթեթներ">${t('Другие пакеты', 'Այլ փաթեթներ')}</h2>
+    <div class="pkg-others-grid">${otherCards}</div>
+  </div>
+</section>
+` : ''}
+`
+
+  return renderPageShell({
+    page: 'package',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'pkg-page',
+    mainHtml,
+    extraHead: extraHead + productLd + breadcrumbLd,
   })
 }
 
@@ -1690,16 +1871,15 @@ section#fifty-vs-fifty .why-block > *{order:0!important}
 section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 /* === REVIEWS PROOF (продают / не продают) === */
 #reviews-proof .rp-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:stretch;margin:24px 0 12px}
-.rp-col{background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;display:flex;flex-direction:column;transition:transform 0.3s ease,box-shadow 0.3s ease}
-.rp-col:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.25)}
+#reviews-proof .rp-col{background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;display:flex;flex-direction:column}
 .rp-good{border-color:rgba(16,185,129,0.45)}
 .rp-bad{border-color:rgba(239,68,68,0.45)}
 .rp-label{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;font-size:0.95rem;font-weight:800;letter-spacing:0.4px;text-transform:uppercase;color:#fff}
 .rp-label-good{background:linear-gradient(135deg,#10B981,#059669)}
 .rp-label-bad{background:linear-gradient(135deg,#EF4444,#B91C1C)}
 .rp-label i{font-size:1.1rem}
-.rp-img{display:block;background:#000;text-align:center;cursor:zoom-in;line-height:0}
-.rp-img img{width:100%;max-height:520px;object-fit:contain;display:block}
+.rp-img{display:block;background:#000;text-align:center;line-height:0}
+#reviews-proof .rp-img img{width:100%;max-height:520px;object-fit:contain;display:block;touch-action:manipulation;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
 .rp-text{padding:20px 22px 24px}
 .rp-text h4{font-size:1rem;font-weight:700;margin:0 0 10px;line-height:1.35}
 .rp-good .rp-text h4{color:#10B981}
@@ -1865,7 +2045,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
     <div class="rp-compare">
       <div class="rp-col rp-good">
         <div class="rp-label rp-label-good"><i class="fas fa-check-circle"></i> <span data-ru="ПРОДАЁТ" data-am="ՎԱՃԱՌՈՒՄ Է">${t('ПРОДАЁТ', 'ՎԱՃԱՌՈՒՄ Է')}</span></div>
-        <a href="/static/img/review-good.png" target="_blank" rel="noopener" class="rp-img"><img src="/static/img/review-good.png" alt="Продающий отзыв на Wildberries — высокий рейтинг, фото в использовании" loading="lazy" decoding="async"></a>
+        <div class="rp-img"><img src="/static/img/review-good.png" alt="Продающий отзыв на Wildberries — высокий рейтинг, фото в использовании" loading="lazy" decoding="async"></div>
         <div class="rp-text">
           <h4 data-ru="Качественные фото и подробный текст" data-am="Որակյալ լուսանկարներ և մանրամասն տեքստ">${t('Качественные фото и подробный текст', 'Որակյալ լուսանկարներ և մանրամասն տեքստ')}</h4>
           <p data-ru="Фото в реальном использовании, честный детальный текст, рейтинг 5,0 и тысячи оценок — покупатель видит реальный опыт, доверие растёт, конверсия в заказ повышается." data-am="Լուսանկարներ իրական օգտագործման մեջ, ազնիվ մանրամասն տեքստ, 5,0 վարկանիշ և հազարավոր գնահատականներ — գնորդը տեսնում է իրական փորձը, վստահությունը մեծանում է, պատվերի կոնվերսիան բարձրանում է:">${t('Фото в реальном использовании, честный детальный текст, рейтинг 5,0 и тысячи оценок — покупатель видит реальный опыт, доверие растёт, конверсия в заказ повышается.', 'Լուսանկարներ իրական օգտագործման մեջ, ազնիվ մանրամասն տեքստ, 5,0 վարկանիշ և հազարավոր գնահատականներ — գնորդը տեսնում է իրական փորձը, վստահությունը մեծանում է, պատվերի կոնվերսիան բարձրանում է:')}</p>
@@ -1874,7 +2054,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
       <div class="rp-vs"><span>VS</span></div>
       <div class="rp-col rp-bad">
         <div class="rp-label rp-label-bad"><i class="fas fa-times-circle"></i> <span data-ru="НЕ ПРОДАЁТ" data-am="ՉԻ ՎԱՃԱՌՈՒՄ">${t('НЕ ПРОДАЁТ', 'ՉԻ ՎԱՃԱՌՈՒՄ')}</span></div>
-        <a href="/static/img/review-bad.png" target="_blank" rel="noopener" class="rp-img"><img src="/static/img/review-bad.png" alt="Непродающий отзыв — низкий рейтинг, шаблонные оценки без текста" loading="lazy" decoding="async"></a>
+        <div class="rp-img"><img src="/static/img/review-bad.png" alt="Непродающий отзыв — низкий рейтинг, шаблонные оценки без текста" loading="lazy" decoding="async"></div>
         <div class="rp-text">
           <h4 data-ru="Шаблонные оценки без текста" data-am="Կաղապարային գնահատականներ առանց տեքստի">${t('Шаблонные оценки без текста', 'Կաղապարային գնահատականներ առանց տեքստի')}</h4>
           <p data-ru="Низкий рейтинг (3,8), мало оценок, пустые шаблонные отзывы без фото и без живого текста — покупатель не видит ценности, не доверяет товару и уходит к конкурентам." data-am="Ցածր վարկանիշ (3,8), քիչ գնահատականներ, դատարկ կաղապարային կարծիքներ առանց լուսանկարների և կենդանի տեքստի — գնորդը արժեք չի տեսնում, չի վստահում ապրանքին և գնում է մրցակիցների մոտ:">${t('Низкий рейтинг (3,8), мало оценок, пустые шаблонные отзывы без фото и без живого текста — покупатель не видит ценности, не доверяет товару и уходит к конкурентам.', 'Ցածր վարկանիշ (3,8), քիչ գնահատականներ, դատարկ կաղապարային կարծիքներ առանց լուսանկարների և կենդանի տեքստի — գնորդը արժեք չի տեսնում, չի վստահում ապրանքին և գնում է մրցակիցների մոտ:')}</p>
@@ -3297,8 +3477,15 @@ export function renderNewHomePage(opts: {
   lang: 'ru' | 'am',
   siteOrigin: string,
   pageBlocks?: Record<string, SubpageBlock>,
+  landingPackages?: Array<{
+    id: number; slug: string; cover_url: string;
+    title_ru: string; title_am: string;
+    description_ru?: string; description_am?: string;
+    price_text_ru?: string; price_text_am?: string;
+    sort_order?: number;
+  }>,
 }): string {
-  const { lang, siteOrigin, pageBlocks } = opts
+  const { lang, siteOrigin, pageBlocks, landingPackages = [] } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
 
@@ -3505,6 +3692,34 @@ export function renderNewHomePage(opts: {
   </div>
 </div>
 </section>
+
+<!-- ===== ПАКЕТЫ ЛЕНДИНГА (Phase 3) ===== -->
+${landingPackages.length > 0 ? `
+<section class="section nh-packages" id="packages" data-section-id="packages">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-cube"></i> <span data-ru="Пакеты" data-am="Փաթեթներ">${t('Пакеты', 'Փաթեթներ')}</span></div>
+    <h2 class="section-title" data-ru="Готовые пакеты услуг" data-am="Պատրաստ ծառայությունների փաթեթներ">${isAM ? 'Պատրաստ <span class="gr">ծառայությունների փաթեթներ</span>' : 'Готовые <span class="gr">пакеты услуг</span>'}</h2>
+    <p class="section-sub" data-ru="Выберите пакет, который подходит под вашу задачу — выкупы, отзывы или партнёрство" data-am="Ընտրեք ձեր նպատակին համապատասխան փաթեթը՝ հետագնումներ, կարծիքներ կամ գործընկերություն">${t('Выберите пакет, который подходит под вашу задачу — выкупы, отзывы или партнёрство', 'Ընտրեք ձեր նպատակին համապատասխան փաթեթը՝ հետագնումներ, կարծիքներ կամ գործընկերություն')}</p>
+  </div>
+  <div class="pkg-grid fade-up">
+    ${landingPackages.slice(0, 6).map(p => {
+      const titleRu = p.title_ru || ''
+      const titleAm = p.title_am || titleRu
+      const cover = p.cover_url || '/static/img/svc-buyouts.png'
+      const escTitle = (titleRu || '').replace(/"/g, '&quot;')
+      return `<a class="pkg-card" href="/package/${encodeURIComponent(p.slug)}${isAM ? '?lang=am' : ''}">
+        <div class="pkg-photo"><img src="${cover}" alt="${escTitle}" loading="lazy" decoding="async"></div>
+        <div class="pkg-body">
+          <h3 data-ru="${escTitle}" data-am="${titleAm.replace(/"/g, '&quot;')}">${t(titleRu, titleAm)}</h3>
+          <span class="pkg-arrow"><span data-ru="Подробнее" data-am="Մանրամասն">${t('Подробнее', 'Մանրամասն')}</span> <i class="fas fa-arrow-right"></i></span>
+        </div>
+      </a>`
+    }).join('')}
+  </div>
+</div>
+</section>
+` : ''}
 
 <!-- ===== WHY BUYOUTS BY KEYWORDS ===== -->
 <section class="section" id="why-buyouts" data-section-id="why-buyouts">
@@ -3809,6 +4024,21 @@ export function renderNewHomePage(opts: {
 .fw-body p{font-size:0.9rem;color:var(--text-sec);line-height:1.65;margin:0}
 @media(max-width:980px){.fw-grid{grid-template-columns:repeat(2,1fr);gap:18px}}
 @media(max-width:600px){.fw-grid{grid-template-columns:1fr;gap:16px}.fw-body{padding:18px 20px 22px}}
+/* === LANDING PACKAGES (Phase 3): 3 marketing tiles linking to /package/:slug === */
+.nh-packages{padding:60px 0}
+.pkg-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:24px;margin-top:36px}
+.pkg-card{display:flex;flex-direction:column;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;text-decoration:none;color:inherit;transition:transform 0.3s ease,box-shadow 0.3s ease,border-color 0.3s ease}
+.pkg-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,0.45);box-shadow:0 16px 40px rgba(0,0,0,0.28)}
+.pkg-photo{width:100%;aspect-ratio:16/10;overflow:hidden;background:var(--bg-surface);position:relative}
+.pkg-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.5s ease}
+.pkg-card:hover .pkg-photo img{transform:scale(1.05)}
+.pkg-body{padding:22px 24px 24px;display:flex;flex-direction:column;gap:14px;flex:1}
+.pkg-body h3{font-size:1.1rem;font-weight:700;line-height:1.3;letter-spacing:-0.01em;margin:0}
+.pkg-arrow{display:inline-flex;align-items:center;gap:8px;font-size:0.92rem;font-weight:600;color:#a78bfa;margin-top:auto}
+.pkg-arrow i{transition:transform 0.25s ease}
+.pkg-card:hover .pkg-arrow i{transform:translateX(4px)}
+@media(max-width:980px){.pkg-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}}
+@media(max-width:600px){.pkg-grid{grid-template-columns:1fr;gap:16px}.pkg-body{padding:18px 20px 20px}}
 </style>`
 
 
@@ -7582,6 +7812,9 @@ app.get('/home', async (c) => {
 
   // Heavy page: prefetch /api/site-data in parallel so client JS doesn't
   // need a second round-trip. Same defensive pattern as /services.
+  // Phase 3: site-data now also carries `landingPackages` for the new
+  // marketing-tiles section — we extract it from the response below
+  // (one DB round-trip instead of two).
   const siteDataPromise = (async () => {
     try {
       const req = new Request(new URL('/api/site-data', c.req.url).toString());
@@ -7589,11 +7822,20 @@ app.get('/home', async (c) => {
       return resp.ok ? await resp.text() : null;
     } catch { return null; }
   })();
-  let pageHtml = renderNewHomePage({ lang, siteOrigin, pageBlocks });
   const siteDataJson = await Promise.race<string | null>([
     siteDataPromise,
     new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
   ]);
+  let landingPackages: any[] = [];
+  if (siteDataJson) {
+    try {
+      const parsed = JSON.parse(siteDataJson);
+      if (Array.isArray(parsed?.landingPackages)) {
+        landingPackages = parsed.landingPackages;
+      }
+    } catch { /* malformed JSON — keep empty */ }
+  }
+  let pageHtml = renderNewHomePage({ lang, siteOrigin, pageBlocks, landingPackages });
   if (siteDataJson) {
     const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
     pageHtml = pageHtml.replace(
@@ -7604,6 +7846,53 @@ app.get('/home', async (c) => {
     c.header('Cache-Control', 'no-store, max-age=0');
   }
   return c.html(pageHtml);
+});
+
+// ===== /package/:slug — Phase 3 detail pages for landing packages =====
+// Reads landing_packages by slug, fetches up to 4 other visible packages
+// for the cross-link grid at the bottom, and renders via renderPackagePage.
+// Returns a 404 HTML page if slug is missing or hidden.
+app.get('/package/:slug', async (c) => {
+  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+
+  const reqUrl = new URL(c.req.url);
+  const urlLang = reqUrl.searchParams.get('lang') || '';
+  const lang: 'ru' | 'am' = (urlLang === 'am' || urlLang === 'hy') ? 'am' : 'ru';
+  const siteOrigin = reqUrl.origin;
+  const slug = c.req.param('slug') || '';
+
+  if (!/^[a-z0-9]([a-z0-9-]{0,78}[a-z0-9])?$/.test(slug)) {
+    c.header('Cache-Control', 'no-store, max-age=0');
+    return c.html('<!doctype html><meta charset="utf-8"><title>404</title><h1>Package not found</h1><p><a href="/home">Go home</a></p>', 404);
+  }
+
+  let pkg: any = null;
+  let others: any[] = [];
+  try {
+    const db = c.env.DB;
+    if (db) {
+      await initDatabase(db);
+      pkg = await db.prepare(
+        'SELECT id, slug, title_ru, title_am, description_ru, description_am, price_text_ru, price_text_am, cover_url FROM landing_packages WHERE slug = ? AND is_visible = 1'
+      ).bind(slug).first();
+      if (pkg) {
+        const otherRes = await db.prepare(
+          'SELECT id, slug, title_ru, title_am, cover_url FROM landing_packages WHERE is_visible = 1 AND id != ? ORDER BY sort_order, id LIMIT 4'
+        ).bind(pkg.id).all<any>();
+        others = otherRes.results || [];
+      }
+    }
+  } catch { /* fall through to 404 */ }
+
+  if (!pkg) {
+    c.header('Cache-Control', 'no-store, max-age=0');
+    return c.html(
+      '<!doctype html><meta charset="utf-8"><title>404 — Package not found</title><h1>Package not found</h1><p><a href="/home">Back to home</a></p>',
+      404
+    );
+  }
+
+  return c.html(renderPackagePage({ lang, siteOrigin, pkg, otherPackages: others }));
 });
 
 // ===== PLACEHOLDER PAGES (Phase 1) =====

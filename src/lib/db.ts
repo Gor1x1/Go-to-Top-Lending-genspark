@@ -464,6 +464,22 @@ CREATE TABLE IF NOT EXISTS blog_posts (
   updated_at TEXT DEFAULT (datetime('now')),
   FOREIGN KEY (category_id) REFERENCES blog_categories(id) ON DELETE SET NULL
 );
+
+CREATE TABLE IF NOT EXISTS landing_packages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title_ru TEXT NOT NULL DEFAULT '',
+  title_am TEXT NOT NULL DEFAULT '',
+  description_ru TEXT NOT NULL DEFAULT '',
+  description_am TEXT NOT NULL DEFAULT '',
+  price_text_ru TEXT NOT NULL DEFAULT '',
+  price_text_am TEXT NOT NULL DEFAULT '',
+  cover_url TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_visible INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
 `;
 
 let dbInitialized = false;
@@ -858,6 +874,23 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
     created_at TEXT DEFAULT (datetime('now')),
     updated_at TEXT DEFAULT (datetime('now'))
   )`).run(); } catch {}
+  // Phase 3 — landing_packages: 3 marketing cards on /home + /package/:slug
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS landing_packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug TEXT NOT NULL UNIQUE,
+    title_ru TEXT NOT NULL DEFAULT '',
+    title_am TEXT NOT NULL DEFAULT '',
+    description_ru TEXT NOT NULL DEFAULT '',
+    description_am TEXT NOT NULL DEFAULT '',
+    price_text_ru TEXT NOT NULL DEFAULT '',
+    price_text_am TEXT NOT NULL DEFAULT '',
+    cover_url TEXT NOT NULL DEFAULT '',
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    is_visible INTEGER NOT NULL DEFAULT 1,
+    created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+    updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE INDEX IF NOT EXISTS idx_landing_packages_visible ON landing_packages(is_visible, sort_order)`).run(); } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {
@@ -989,13 +1022,71 @@ async function runSeeds(db: D1Database): Promise<void> {
   // v31: RUB pricing on packages (mirrors runLatestMigrations).
   try { await db.prepare(`ALTER TABLE calculator_packages ADD COLUMN package_price_rub INTEGER NOT NULL DEFAULT 0`).run(); } catch {}
   try { await db.prepare(`ALTER TABLE calculator_packages ADD COLUMN original_price_rub INTEGER NOT NULL DEFAULT 0`).run(); } catch {}
+
+  // Phase 3 — seed 3 starter landing packages so /home renders content from
+  // day one. Idempotent via slug UNIQUE — re-runs are no-ops. Admin can
+  // edit/replace via the new "Пакеты лендинга" section.
+  const seedPkgs: Array<{
+    slug: string;
+    title_ru: string;
+    title_am: string;
+    description_ru: string;
+    description_am: string;
+    price_text_ru: string;
+    price_text_am: string;
+    cover_url: string;
+    sort_order: number;
+  }> = [
+    {
+      slug: 'wb-buyouts',
+      title_ru: 'Выкупы на Wildberries',
+      title_am: 'Հետագնումներ Wildberries-ում',
+      description_ru: 'Реальные выкупы по ключевым словам живыми покупателями. Поднимаем карточку в ТОП за 7-14 дней. Собственный склад в Ереване, 1000+ верифицированных аккаунтов, 0 блокировок с 2021 года.',
+      description_am: 'Իրական հետագնումներ բանալի բառերով կենդանի գնորդների կողմից։ Բարձրացնում ենք քարտը TOP 7-14 օրում։ Սեփական պահեստ Երևանում, 1000+ վերիֆիկացված հաշիվ, 0 արգելափակում 2021 թվականից։',
+      price_text_ru: 'от 50 000 ֏',
+      price_text_am: '50 000 ֏-ից',
+      cover_url: '/static/img/svc-buyouts.png',
+      sort_order: 1,
+    },
+    {
+      slug: 'reviews-turnkey',
+      title_ru: 'Отзывы под ключ',
+      title_am: 'Կարծիքներ բանալիով',
+      description_ru: 'Профессиональные отзывы с фото в реальном использовании, подробным текстом и живыми эмоциями. Каждый отзыв пишется индивидуально под ваш товар после реального выкупа.',
+      description_am: 'Մասնագիտական կարծիքներ իրական օգտագործման լուսանկարներով, մանրամասն տեքստով և կենդանի զգացմունքներով։ Յուրաքանչյուր կարծիք գրվում է անհատապես ձեր ապրանքի համար իրական գնումից հետո։',
+      price_text_ru: 'от 1 500 ֏ за отзыв',
+      price_text_am: '1 500 ֏-ից կարծիքի համար',
+      cover_url: '/static/img/svc-reviews.png',
+      sort_order: 2,
+    },
+    {
+      slug: 'referral-program',
+      title_ru: 'Реферальная программа',
+      title_am: 'Ռեֆերալային ծրագիր',
+      description_ru: 'Партнёрская программа для менеджеров, агентств, владельцев тематических ресурсов и онлайн-школ. Получайте до 15% от каждого заказа клиента, которого вы привели. Промокод действует бессрочно.',
+      description_am: 'Գործընկերային ծրագիր մենեջերների, գործակալությունների, թեմատիկ ռեսուրսների սեփականատերերի և օնլայն-դպրոցների համար։ Ստացեք մինչև 15% բոնուս յուրաքանչյուր ձեր բերած հաճախորդի պատվերից։ Պրոմոկոդն անժամկետ է։',
+      price_text_ru: 'до 15% бонус',
+      price_text_am: 'մինչև 15% բոնուս',
+      cover_url: '/static/img/svc-referral.png',
+      sort_order: 3,
+    },
+  ];
+  for (const p of seedPkgs) {
+    try {
+      await db.prepare(
+        `INSERT OR IGNORE INTO landing_packages
+         (slug, title_ru, title_am, description_ru, description_am, price_text_ru, price_text_am, cover_url, sort_order, is_visible)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`
+      ).bind(p.slug, p.title_ru, p.title_am, p.description_ru, p.description_am, p.price_text_ru, p.price_text_am, p.cover_url, p.sort_order).run();
+    } catch {}
+  }
 }
 
 // ===== ROLES & PERMISSIONS CONFIG =====
 export const ALL_ROLES = ['main_admin', 'developer', 'analyst', 'operator', 'buyer', 'courier'] as const;
 export const ALL_SECTIONS = [
   'dashboard', 'leads', 'analytics', 'employees', 'team_access',
-  'blocks', 'calculator', 'pdf', 'referrals', 'slots',
+  'blocks', 'calculator', 'landing_packages', 'pdf', 'referrals', 'slots',
   'footer', 'telegram', 'tgbot', 'scripts', 'settings'
 ] as const;
 export const ROLE_LABELS: Record<string, string> = {
@@ -1005,7 +1096,8 @@ export const ROLE_LABELS: Record<string, string> = {
 export const SECTION_LABELS: Record<string, string> = {
   dashboard: 'Дашборд', leads: 'Лиды / CRM', analytics: 'Бизнес-аналитика', employees: 'Сотрудники',
   team_access: 'Роли и доступы', blocks: 'Конструктор блоков',
-  calculator: 'Калькулятор', pdf: 'PDF шаблон', referrals: 'Реферальные коды',
+  calculator: 'Калькулятор', landing_packages: 'Пакеты лендинга',
+  pdf: 'PDF шаблон', referrals: 'Реферальные коды',
   slots: 'Счётчики слотов', footer: 'Футер сайта', telegram: 'TG сообщения',
   tgbot: 'TG Бот / Уведомления', scripts: 'Скрипты', settings: 'Настройки',
 };
@@ -1055,6 +1147,32 @@ export async function getCalcPackages(db: D1Database): Promise<any[]> {
     ...p,
     items: itemsByPkg[p.id] || []
   }));
+}
+
+// Phase 3 — landing_packages: 3 marketing cards on /home + /package/:slug.
+// Distinct from calculator_packages (calculator bundles); these are
+// admin-managed marketing tiles with a photo, title, description and
+// price-as-text (no calculator math).
+export async function getLandingPackages(db: D1Database): Promise<any[]> {
+  try {
+    const res = await db.prepare(
+      'SELECT id, slug, title_ru, title_am, description_ru, description_am, price_text_ru, price_text_am, cover_url, sort_order, is_visible, created_at, updated_at FROM landing_packages WHERE is_visible = 1 ORDER BY sort_order, id'
+    ).all();
+    return res.results || [];
+  } catch {
+    return [];
+  }
+}
+
+export async function getLandingPackageBySlug(db: D1Database, slug: string): Promise<any | null> {
+  try {
+    const row = await db.prepare(
+      'SELECT id, slug, title_ru, title_am, description_ru, description_am, price_text_ru, price_text_am, cover_url, sort_order, is_visible FROM landing_packages WHERE slug = ? AND is_visible = 1'
+    ).bind(slug).first();
+    return row || null;
+  } catch {
+    return null;
+  }
 }
 
 export async function getTelegramMessages(db: D1Database): Promise<Record<string, any>> {

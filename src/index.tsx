@@ -107,6 +107,7 @@ app.get('/robots.txt', (c) => {
 app.get('/sitemap.xml', async (c) => {
   const origin = new URL(c.req.url).origin;
   let blogUrls = '';
+  let packageUrls = '';
   try {
     const db = c.env.DB;
     const posts = await db.prepare('SELECT slug, updated_at FROM blog_posts WHERE published = 1').all();
@@ -114,18 +115,28 @@ app.get('/sitemap.xml', async (c) => {
   <url><loc>${origin}/blog/${p.slug}</loc><lastmod>${(p.updated_at || '').substring(0, 10)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`).join('');
   } catch { /* DB not ready */ }
 
+  try {
+    const db = c.env.DB;
+    const pkgs = await db.prepare('SELECT slug FROM landing_packages WHERE is_visible = 1').all();
+    packageUrls = (pkgs.results || []).map((p: any) =>
+      `\n  <url><loc>${origin}/package/${p.slug}</loc><changefreq>monthly</changefreq><priority>0.85</priority></url>`
+    ).join('');
+  } catch { /* DB not ready or table missing */ }
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>${origin}/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
   <url><loc>${origin}/ru</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
   <url><loc>${origin}/am</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>
+  <url><loc>${origin}/home</loc><changefreq>weekly</changefreq><priority>0.95</priority></url>
   <url><loc>${origin}/blog</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/buyouts</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/services</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/calculator</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/faq</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/contacts</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
-  <url><loc>${origin}/referral</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>${blogUrls}
+  <url><loc>${origin}/referral</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>${packageUrls}${blogUrls}
 </urlset>`;
   return new Response(xml, { headers: { 'Content-Type': 'application/xml', 'Cache-Control': 'public, max-age=3600' } });
 });

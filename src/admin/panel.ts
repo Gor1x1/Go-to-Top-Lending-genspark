@@ -400,6 +400,7 @@ const pages = [
   { id: 'team_access', icon: 'fa-shield-alt', label: 'Роли и доступы' },
   { id: 'blocks', icon: 'fa-cubes', label: 'Управление сайтом' },
   { id: 'calculator', icon: 'fa-calculator', label: 'Калькулятор' },
+  { id: 'landing_packages', icon: 'fa-cube', label: 'Пакеты лендинга' },
   { id: 'blog', icon: 'fa-book-open', label: 'Блог' },
   { id: 'tgbot', icon: 'fa-robot', label: 'TG Бот / Уведомления' },
   { id: 'scripts', icon: 'fa-code', label: 'Скрипты' },
@@ -453,6 +454,18 @@ function navigate(page) {
         setTimeout(function() { if (typeof initBlogSortable === 'function') initBlogSortable(); }, 50);
       }
     }).catch(function() {});
+  }
+  // Load landing packages when navigating to landing_packages section
+  if (page === 'landing_packages') {
+    if (typeof reloadLandingPackagesData === 'function') {
+      reloadLandingPackagesData().then(function() {
+        var mainEl4 = document.getElementById('mainArea');
+        if (mainEl4 && currentPage === 'landing_packages') {
+          mainEl4.innerHTML = getPageHtml();
+          setTimeout(function() { if (typeof initLandingPackagesSortable === 'function') initLandingPackagesSortable(); }, 50);
+        }
+      }).catch(function() {});
+    }
   }
   // Fast navigate: only update main area + sidebar active states
   var mainEl = document.getElementById('mainArea');
@@ -15376,6 +15389,240 @@ async function deleteBlogCategory(catId) {
   toast('Категория удалена', 'success');
 }
 
+// ===== LANDING PACKAGES (Phase 3) — admin section «Пакеты лендинга» =====
+var landingPackagesData = { items: [], editing: null };
+
+async function reloadLandingPackagesData() {
+  try {
+    var rows = await api('/landing-packages');
+    landingPackagesData.items = Array.isArray(rows) ? rows : [];
+  } catch(e) {
+    landingPackagesData.items = [];
+  }
+}
+
+function renderLandingPackages() {
+  var h = '<div style="padding:32px"><h1 style="font-size:1.8rem;font-weight:800;margin-bottom:8px"><i class="fas fa-cube" style="color:#8B5CF6;margin-right:10px"></i>Пакеты лендинга</h1>';
+  h += '<p style="color:#94a3b8;margin-bottom:24px">3 маркетинговых пакета на главной странице <code style="background:#0f172a;padding:2px 6px;border-radius:4px;color:#8B5CF6">/home</code> с детальными страницами <code style="background:#0f172a;padding:2px 6px;border-radius:4px;color:#8B5CF6">/package/:slug</code>. Не путать с пакетами калькулятора.</p>';
+  h += '<div style="margin-bottom:20px"><button class="btn btn-primary" onclick="openLandingPackageEditor(null)"><i class="fas fa-plus" style="margin-right:6px"></i>Новый пакет</button></div>';
+
+  var items = landingPackagesData.items || [];
+  if (!items.length) {
+    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-cube" style="font-size:2rem;margin-bottom:12px;display:block"></i>Нет пакетов. Создайте первый!</div></div>';
+    return h;
+  }
+
+  h += '<div id="landingPackagesList">';
+  for (var i = 0; i < items.length; i++) {
+    var p = items[i];
+    var isVisible = p.is_visible == 1;
+    h += '<div class="card landing-pkg-item" data-id="' + p.id + '" style="margin-bottom:12px;display:flex;gap:16px;align-items:flex-start;padding:16px">';
+    h += '<div class="sb-drag-handle landing-pkg-drag" title="Перетащить"><i class="fas fa-grip-vertical"></i></div>';
+    if (p.cover_url) {
+      h += '<img src="' + escHtml(p.cover_url) + '" style="width:96px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0" onerror="this.style.display=\\'none\\'">';
+    } else {
+      h += '<div style="width:96px;height:64px;background:#1e293b;border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0"><i class="fas fa-image" style="color:#475569"></i></div>';
+    }
+    h += '<div style="flex:1;min-width:0">';
+    h += '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">';
+    h += '<span style="font-weight:700;font-size:1rem">' + escHtml(p.title_ru || 'Без заголовка') + '</span>';
+    h += '<span class="badge ' + (isVisible ? 'badge-green' : 'badge-amber') + '">' + (isVisible ? 'Виден' : 'Скрыт') + '</span>';
+    if (p.price_text_ru) h += '<span class="badge badge-purple">' + escHtml(p.price_text_ru) + '</span>';
+    h += '</div>';
+    h += '<div style="font-size:0.8rem;color:#64748b;margin-bottom:6px;font-family:monospace">/package/' + escHtml(p.slug) + '</div>';
+    var descPreview = (p.description_ru || '').replace(/<[^>]+>/g, '').substring(0, 110);
+    if (descPreview) h += '<div style="font-size:0.82rem;color:#94a3b8">' + escHtml(descPreview) + (p.description_ru && p.description_ru.length > 110 ? '…' : '') + '</div>';
+    h += '</div>';
+    h += '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">';
+    h += '<button class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem" onclick="openLandingPackageEditor(' + p.id + ')" title="Редактировать"><i class="fas fa-edit"></i></button>';
+    h += '<button class="btn ' + (isVisible ? 'btn-success' : 'btn-outline') + '" style="padding:6px 12px;font-size:0.8rem" onclick="toggleLandingPackageVisibility(' + p.id + ',' + (isVisible ? 0 : 1) + ')" title="' + (isVisible ? 'Скрыть' : 'Показать') + '"><i class="fas fa-' + (isVisible ? 'eye' : 'eye-slash') + '"></i></button>';
+    h += '<a href="/package/' + escHtml(p.slug) + '" target="_blank" class="btn btn-outline" style="padding:6px 12px;font-size:0.8rem;text-decoration:none" title="Открыть на сайте"><i class="fas fa-external-link-alt"></i></a>';
+    h += '<button class="btn btn-danger" style="padding:6px 12px;font-size:0.8rem" onclick="deleteLandingPackage(' + p.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
+    h += '</div>';
+    h += '</div>';
+  }
+  h += '</div></div>';
+  return h;
+}
+
+function initLandingPackagesSortable() {
+  var el = document.getElementById('landingPackagesList');
+  if (!el || typeof Sortable === 'undefined') return;
+  Sortable.create(el, {
+    handle: '.landing-pkg-drag',
+    animation: 150,
+    onEnd: async function() {
+      var items = el.querySelectorAll('.landing-pkg-item');
+      var order = [];
+      for (var i = 0; i < items.length; i++) {
+        order.push({ id: parseInt(items[i].dataset.id), sort_order: i });
+      }
+      try {
+        await api('/landing-packages/reorder', 'POST', { order: order });
+        await reloadLandingPackagesData();
+        toast('Порядок обновлён', 'success');
+      } catch(e) { toast('Ошибка изменения порядка', 'error'); }
+    }
+  });
+}
+
+function slugifyTitle(s) {
+  if (!s) return '';
+  var translit = { 'а':'a','б':'b','в':'v','г':'g','д':'d','е':'e','ё':'e','ж':'zh','з':'z','и':'i','й':'y','к':'k','л':'l','м':'m','н':'n','о':'o','п':'p','р':'r','с':'s','т':'t','у':'u','ф':'f','х':'kh','ц':'ts','ч':'ch','ш':'sh','щ':'sch','ъ':'','ы':'y','ь':'','э':'e','ю':'yu','я':'ya' };
+  var out = '';
+  var lower = String(s).toLowerCase();
+  for (var i = 0; i < lower.length; i++) {
+    var ch = lower[i];
+    out += (translit[ch] !== undefined) ? translit[ch] : ch;
+  }
+  return out.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').substring(0, 80);
+}
+
+function openLandingPackageEditor(pkgId) {
+  var p = pkgId ? landingPackagesData.items.find(function(x){ return x.id == pkgId; }) : null;
+  var modal = '<div id="lpModal" style="position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:1000;display:flex;align-items:center;justify-content:center;padding:20px" onclick="if(event.target===this)closeLandingPackageModal()">';
+  modal += '<div style="background:#1e293b;border:1px solid #334155;border-radius:16px;padding:32px;width:100%;max-width:840px;max-height:90vh;overflow-y:auto">';
+  modal += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">';
+  modal += '<h2 style="font-size:1.4rem;font-weight:800">' + (p ? 'Редактировать пакет' : 'Новый пакет') + '</h2>';
+  modal += '<button onclick="closeLandingPackageModal()" style="background:none;border:none;color:#64748b;font-size:1.5rem;cursor:pointer">&times;</button>';
+  modal += '</div>';
+
+  modal += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">';
+  modal += '<div class="sb-field-group" style="grid-column:1/-1"><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">SLUG (URL) — латиница, цифры, дефис · 1–80 символов</label>';
+  modal += '<div style="display:flex;gap:8px"><input class="input" id="lpSlug" type="text" value="' + escHtml(p?.slug || '') + '" placeholder="wb-buyouts" style="flex:1">';
+  modal += '<button class="btn btn-outline" type="button" onclick="(function(){var t=document.getElementById(\\'lpTitleRu\\').value; if(t) document.getElementById(\\'lpSlug\\').value=slugifyTitle(t);})()" title="Сгенерировать slug из заголовка"><i class="fas fa-magic"></i></button></div></div>';
+  modal += '<div class="sb-field-group"><label class="sb-field-label ru"><i class="fas fa-circle" style="font-size:6px;color:#8B5CF6"></i>Заголовок RU *</label>';
+  modal += '<input class="input" id="lpTitleRu" type="text" value="' + escHtml(p?.title_ru || '') + '"></div>';
+  modal += '<div class="sb-field-group"><label class="sb-field-label am"><i class="fas fa-circle" style="font-size:6px;color:#F59E0B"></i>Заголовок AM</label>';
+  modal += '<input class="input" id="lpTitleAm" type="text" value="' + escHtml(p?.title_am || '') + '"></div>';
+  modal += '</div>';
+
+  modal += '<div class="sb-field-group" style="margin-top:16px"><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">ОБЛОЖКА ПАКЕТА (загружается в R2)</label>';
+  modal += '<div style="display:flex;gap:10px;align-items:flex-start">';
+  if (p?.cover_url) {
+    modal += '<img id="lpCoverPreview" src="' + escHtml(p.cover_url) + '" style="width:160px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #334155" onerror="this.style.display=\\'none\\'">';
+  } else {
+    modal += '<div id="lpCoverPreview" style="width:160px;height:100px;background:#0f172a;border-radius:8px;border:1px solid #334155;display:flex;align-items:center;justify-content:center;color:#475569"><i class="fas fa-image"></i></div>';
+  }
+  modal += '<div style="flex:1">';
+  modal += '<input type="file" id="lpCoverFile" accept="image/*" style="display:none" onchange="uploadLandingPackageCover(this)">';
+  modal += '<button class="btn btn-outline" style="margin-bottom:8px;display:block" onclick="document.getElementById(\\'lpCoverFile\\').click()"><i class="fas fa-upload" style="margin-right:6px"></i>Загрузить фото</button>';
+  modal += '<input class="input" id="lpCoverUrl" type="text" value="' + escHtml(p?.cover_url || '') + '" placeholder="Или вставьте URL фото" oninput="updateLandingPackageCoverPreview(this.value)" style="font-size:0.8rem">';
+  modal += '<div style="font-size:0.72rem;color:#64748b;margin-top:6px">Подходящее соотношение 16:10. Фото покажется на /home и на детальной странице.</div>';
+  modal += '</div></div></div>';
+
+  modal += '<div class="sb-field-group" style="margin-top:16px"><label class="sb-field-label ru"><i class="fas fa-circle" style="font-size:6px;color:#8B5CF6"></i>Описание RU (отображается на /package/:slug)</label>';
+  modal += '<textarea class="input" id="lpDescRu" style="min-height:120px;font-size:0.9rem">' + escHtml(p?.description_ru || '') + '</textarea></div>';
+  modal += '<div class="sb-field-group" style="margin-top:12px"><label class="sb-field-label am"><i class="fas fa-circle" style="font-size:6px;color:#F59E0B"></i>Описание AM</label>';
+  modal += '<textarea class="input" id="lpDescAm" style="min-height:120px;font-size:0.9rem">' + escHtml(p?.description_am || '') + '</textarea></div>';
+
+  modal += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px">';
+  modal += '<div class="sb-field-group"><label class="sb-field-label ru"><i class="fas fa-circle" style="font-size:6px;color:#8B5CF6"></i>Цена RU (как текст)</label>';
+  modal += '<input class="input" id="lpPriceRu" type="text" value="' + escHtml(p?.price_text_ru || '') + '" placeholder="от 50 000 ֏"></div>';
+  modal += '<div class="sb-field-group"><label class="sb-field-label am"><i class="fas fa-circle" style="font-size:6px;color:#F59E0B"></i>Цена AM</label>';
+  modal += '<input class="input" id="lpPriceAm" type="text" value="' + escHtml(p?.price_text_am || '') + '" placeholder="50 000 ֏-ից"></div>';
+  modal += '</div>';
+
+  modal += '<div style="display:grid;grid-template-columns:1fr 120px;gap:16px;margin-top:12px">';
+  modal += '<div><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">ВИДИМОСТЬ</label>';
+  modal += '<select class="input" id="lpVisible">';
+  modal += '<option value="1" ' + (!p || p.is_visible == 1 ? 'selected' : '') + '>Виден на сайте</option>';
+  modal += '<option value="0" ' + (p && p.is_visible == 0 ? 'selected' : '') + '>Скрыт</option>';
+  modal += '</select></div>';
+  modal += '<div><label style="font-size:0.78rem;font-weight:700;color:#64748b;display:block;margin-bottom:6px">ПОРЯДОК</label>';
+  modal += '<input class="input" id="lpSort" type="number" value="' + (p?.sort_order || 0) + '"></div>';
+  modal += '</div>';
+
+  modal += '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:24px">';
+  modal += '<button class="btn btn-outline" onclick="closeLandingPackageModal()">Отмена</button>';
+  modal += '<button class="btn btn-primary" onclick="saveLandingPackage(' + (p ? p.id : 'null') + ')"><i class="fas fa-save" style="margin-right:6px"></i>Сохранить</button>';
+  modal += '</div>';
+  modal += '</div></div>';
+
+  document.body.insertAdjacentHTML('beforeend', modal);
+}
+
+function closeLandingPackageModal() { var m = document.getElementById('lpModal'); if (m) m.remove(); }
+
+async function uploadLandingPackageCover(input) {
+  if (!input.files || !input.files[0]) return;
+  var formData = new FormData();
+  formData.append('file', input.files[0]);
+  try {
+    var resp = await fetch('/api/admin/upload-image', { method: 'POST', headers: { 'Authorization': 'Bearer ' + localStorage.getItem('gtt_token') }, body: formData });
+    var d = await resp.json();
+    if (d.url) {
+      document.getElementById('lpCoverUrl').value = d.url;
+      updateLandingPackageCoverPreview(d.url);
+      toast('Фото загружено', 'success');
+    } else {
+      toast(d.error || 'Ошибка загрузки', 'error');
+    }
+  } catch(e) { toast('Ошибка загрузки', 'error'); }
+}
+
+function updateLandingPackageCoverPreview(url) {
+  var preview = document.getElementById('lpCoverPreview');
+  if (!preview) return;
+  if (url) {
+    preview.outerHTML = '<img id="lpCoverPreview" src="' + escHtml(url) + '" style="width:160px;height:100px;object-fit:cover;border-radius:8px;border:1px solid #334155" onerror="this.style.display=\\'none\\'">';
+  }
+}
+
+async function saveLandingPackage(pkgId) {
+  var slug = (document.getElementById('lpSlug').value || '').trim().toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-+|-+$/g, '');
+  var titleRu = (document.getElementById('lpTitleRu').value || '').trim();
+  if (!slug) { toast('Введите slug (URL)', 'error'); return; }
+  if (!titleRu) { toast('Введите заголовок на русском', 'error'); return; }
+  if (slug.length < 1 || slug.length > 80) { toast('Slug должен быть 1–80 символов', 'error'); return; }
+
+  var payload = {
+    slug: slug,
+    title_ru: titleRu,
+    title_am: (document.getElementById('lpTitleAm').value || '').trim(),
+    description_ru: (document.getElementById('lpDescRu').value || ''),
+    description_am: (document.getElementById('lpDescAm').value || ''),
+    price_text_ru: (document.getElementById('lpPriceRu').value || '').trim(),
+    price_text_am: (document.getElementById('lpPriceAm').value || '').trim(),
+    cover_url: (document.getElementById('lpCoverUrl').value || '').trim(),
+    sort_order: parseInt(document.getElementById('lpSort').value) || 0,
+    is_visible: parseInt(document.getElementById('lpVisible').value) === 0 ? 0 : 1
+  };
+
+  try {
+    if (pkgId) {
+      await api('/landing-packages/' + pkgId, 'PUT', payload);
+    } else {
+      await api('/landing-packages', 'POST', payload);
+    }
+    closeLandingPackageModal();
+    await reloadLandingPackagesData();
+    render();
+    toast('Пакет сохранён', 'success');
+  } catch(e) {
+    toast((e && e.message) || 'Ошибка сохранения', 'error');
+  }
+}
+
+async function toggleLandingPackageVisibility(pkgId, isVisible) {
+  try {
+    await api('/landing-packages/' + pkgId + '/visibility', 'POST', { is_visible: isVisible });
+    await reloadLandingPackagesData();
+    render();
+    toast(isVisible ? 'Пакет показан' : 'Пакет скрыт', 'success');
+  } catch(e) { toast('Ошибка', 'error'); }
+}
+
+async function deleteLandingPackage(pkgId) {
+  if (!confirm('Удалить пакет? Это действие нельзя отменить.')) return;
+  try {
+    await api('/landing-packages/' + pkgId, 'DELETE');
+    await reloadLandingPackagesData();
+    render();
+    toast('Пакет удалён', 'success');
+  } catch(e) { toast('Ошибка удаления', 'error'); }
+}
+
 function getPageHtml() {
   switch (currentPage) {
     case 'dashboard': return renderDashboard();
@@ -15394,6 +15641,7 @@ function getPageHtml() {
     case 'photos': sbActiveTab = 'photos'; return renderSiteBlocks();
     case 'telegram': sbActiveTab = 'telegram'; return renderSiteBlocks();
     case 'blog': return renderBlog();
+    case 'landing_packages': return (typeof renderLandingPackages === 'function') ? renderLandingPackages() : '<div style="padding:32px;color:#94a3b8">Загрузка…</div>';
     case 'tgbot': return renderTelegramBot();
     case 'scripts': return renderScripts();
     case 'settings': return renderSettings();

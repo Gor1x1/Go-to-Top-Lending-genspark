@@ -22,6 +22,7 @@ import { register as registerAnalytics } from './routes/admin-analytics'
 import { register as registerActivity } from './routes/admin-activity'
 import { register as registerFinance } from './routes/admin-finance'
 import { register as registerBlog } from './routes/admin-blog'
+import { register as registerLandingPackages } from './routes/admin-landing-packages'
 
 type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 const api = new Hono<{ Bindings: Bindings }>()
@@ -252,5 +253,6 @@ registerAnalytics(api, authMiddleware);
 registerActivity(api, authMiddleware);
 registerFinance(api, authMiddleware);
 registerBlog(api, authMiddleware);
+registerLandingPackages(api, authMiddleware);
 
 export default api

@@ -32,6 +32,7 @@ Execute a backend subtask assigned by the planner. This includes: creating or mo
 - `src/api/routes/admin-analytics.ts` — business analytics aggregation queries
 - `src/api/routes/admin-crm-extended.ts` — lead articles, company roles, expense categories, salary, period snapshots, audit log, DB backup
 - `src/api/routes/admin-content.ts` — `site_content` CRUD, calculator tabs/services/packages, telegram messages, custom scripts, seed
+- `src/api/routes/admin-landing-packages.ts` — **Phase 3** — CRUD for `landing_packages` (3 marketing tiles on `/home` + detail pages `/package/:slug`). Distinct from `calculator_packages`. Endpoints: `GET/POST/PUT/DELETE /landing-packages`, `POST /landing-packages/:id/visibility`, `POST /landing-packages/reorder`. Image uploads reuse the shared `/api/admin/upload-image` route in `admin-site-blocks.ts` (R2-backed)
 - `src/api/routes/admin-settings.ts` — `site_settings`, payment methods, PDF templates, package settings
 - `src/api/routes/admin-employees.ts` — user CRUD, password reset
 - `src/api/routes/admin-activity.ts` — heartbeat, online status, vacations, user search, earnings

@@ -401,6 +401,24 @@ CREATE TABLE IF NOT EXISTS period_snapshots (
   UNIQUE(period_type, period_key)
 );
 
+-- Phase 3: landing_packages — 3 marketing cards on /home + /package/:slug
+-- Admin-managed CRUD (separate from calculator_packages).
+CREATE TABLE IF NOT EXISTS landing_packages (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  slug TEXT NOT NULL UNIQUE,
+  title_ru TEXT NOT NULL DEFAULT '',
+  title_am TEXT NOT NULL DEFAULT '',
+  description_ru TEXT NOT NULL DEFAULT '',
+  description_am TEXT NOT NULL DEFAULT '',
+  price_text_ru TEXT NOT NULL DEFAULT '',
+  price_text_am TEXT NOT NULL DEFAULT '',
+  cover_url TEXT NOT NULL DEFAULT '',
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  is_visible INTEGER NOT NULL DEFAULT 1,
+  created_at INTEGER NOT NULL DEFAULT (strftime('%s','now')),
+  updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_content_section ON site_content(section_key);
 CREATE INDEX IF NOT EXISTS idx_calc_svc_tab ON calculator_services(tab_id);
@@ -410,3 +428,4 @@ CREATE INDEX IF NOT EXISTS idx_expenses_category ON expenses(category_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_freq ON expenses(frequency_type_id);
 CREATE INDEX IF NOT EXISTS idx_bonuses_user ON employee_bonuses(user_id);
 CREATE INDEX IF NOT EXISTS idx_snapshots_period ON period_snapshots(period_type, period_key);
+CREATE INDEX IF NOT EXISTS idx_landing_packages_visible ON landing_packages(is_visible, sort_order);
