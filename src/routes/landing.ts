@@ -6,6 +6,7 @@ import { Hono } from 'hono'
 import { html } from 'hono/html'
 import { initDatabase } from '../lib/db'
 import { SEED_CONTENT_SECTIONS, SEED_CALC_TABS, SEED_CALC_SERVICES, SEED_TG_MESSAGES } from '../seed-data'
+import { CACHE_VERSION } from '../lib/cache-config'
 
 type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 
@@ -209,8 +210,8 @@ function buildBreadcrumbLd(opts: {
 // /buyouts, /services, /faq, /contacts, /referral content here too. The
 // `'home'` literal is reserved for a future migration of `app.get('/')`.
 // =====================================================================
-function renderPageShell(opts: {
-  page: PlaceholderPage | 'home' | 'home-new',
+export function renderPageShell(opts: {
+  page: PlaceholderPage | 'home' | 'home-new' | 'calculator' | 'blog',
   lang: 'ru' | 'am',
   siteOrigin: string,
   seo: { title: string, description: string, ogImage?: string },
@@ -392,14 +393,14 @@ ${extraHead}
     <span class="logo-text">Go to Top</span>
   </a>
   <ul class="nav-links" id="navLinks">
+    <li><a href="/home"${page === 'home-new' ? ' class="active" aria-current="page"' : ''} data-ru="Главная" data-am="Գլխավոր">${isAM ? 'Գլխավոր' : 'Главная'}</a></li>
     <li><a href="/about"${page === 'about' ? ' class="active" aria-current="page"' : ''} data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</a></li>
     <li><a href="/services"${page === 'services' ? ' class="active" aria-current="page"' : ''} data-ru="Услуги" data-am="Ծառայություններ">${isAM ? 'Ծառայություններ' : 'Услуги'}</a></li>
     <li><a href="/buyouts"${page === 'buyouts' ? ' class="active" aria-current="page"' : ''} data-ru="Выкупы" data-am="Հետագնումներ">${isAM ? 'Հետագնումներ' : 'Выкупы'}</a></li>
-    <li><a href="/services#calculator" data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</a></li>
+    <li><a href="/calculator"${page === 'calculator' ? ' class="active" aria-current="page"' : ''} data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</a></li>
     <li><a href="/faq"${page === 'faq' ? ' class="active" aria-current="page"' : ''} data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
     <li><a href="/contacts"${page === 'contacts' ? ' class="active" aria-current="page"' : ''} data-ru="Контакты" data-am="Կոնտակտներ">${isAM ? 'Կոնտակտներ' : 'Контакты'}</a></li>
-    <li><a href="/referral"${page === 'referral' ? ' class="active" aria-current="page"' : ''} data-ru="Бонусы" data-am="Բոնուսներ">${isAM ? 'Բոնուսներ' : 'Бонусы'}</a></li>
-    <li><a href="/blog" data-ru="Блог" data-am="Բլոգ">${isAM ? 'Բլոգ' : 'Блог'}</a></li>
+    <li><a href="/blog"${page === 'blog' ? ' class="active" aria-current="page"' : ''} data-ru="Блог" data-am="Բլոգ">${isAM ? 'Բլոգ' : 'Блог'}</a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
@@ -501,23 +502,23 @@ ${mainHtml}
   </div>
 </div>
 
-<script src="/static/landing.js" defer></script>
+<script src="/static/landing.js?v=${CACHE_VERSION}" defer></script>
 
 <!-- Bottom Navigation Bar (mobile) — Phase 3A: links point to actual subpages
      so highlightActiveNav() in landing.js can mark the current page active. -->
 <nav class="bottom-nav" id="bottomNav">
 <div class="bottom-nav-items">
-  <a href="/about" class="bottom-nav-item"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</span></a>
+  <a href="/home" class="bottom-nav-item"><i class="fas fa-home"></i><span data-ru="Главная" data-am="Գլխավոր">${isAM ? 'Գլխավոր' : 'Главная'}</span></a>
   <a href="/services" class="bottom-nav-item"><i class="fas fa-hand-holding"></i><span data-ru="Услуги" data-am="Ծառայություններ">${isAM ? 'Ծառայություններ' : 'Услуги'}</span></a>
   <a href="/buyouts" class="bottom-nav-item"><i class="fas fa-shopping-cart"></i><span data-ru="Выкупы" data-am="Հետագնումներ">${isAM ? 'Հետագնումներ' : 'Выкупы'}</span></a>
-  <a href="/services#calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</span></a>
+  <a href="/calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</span></a>
   <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="Ещё" data-am="Ավելին">${isAM ? 'Ավելին' : 'Ещё'}</span>
     <div class="bottom-nav-more-menu" id="bottomMoreMenu">
+      <a href="/about"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</span></a>
       <a href="/faq"><i class="fas fa-question-circle"></i><span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span></a>
       <a href="/contacts"><i class="fas fa-envelope"></i><span data-ru="Контакты" data-am="Կոնտակտներ">${isAM ? 'Կոնտակտներ' : 'Контакты'}</span></a>
       <a href="/referral"><i class="fas fa-gift"></i><span data-ru="Бонусы" data-am="Բոնուսներ">${isAM ? 'Բոնուսներ' : 'Бонусы'}</span></a>
       <a href="/blog"><i class="fas fa-newspaper"></i><span data-ru="Блог" data-am="Բլոգ">${isAM ? 'Բլոգ' : 'Блог'}</span></a>
-      <a href="/"><i class="fas fa-home"></i><span data-ru="Главная" data-am="Գլխավոր">${isAM ? 'Գլխավոր' : 'Главная'}</span></a>
     </div>
   </button>
 </div>
@@ -3314,7 +3315,7 @@ export function renderNewHomePage(opts: {
         <i class="fab fa-telegram"></i>
         <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
       </a>
-      <a href="/services#calculator" class="btn btn-outline btn-lg">
+      <a href="/calculator" class="btn btn-outline btn-lg">
         <i class="fas fa-calculator"></i>
         <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">${t('Рассчитать стоимость', 'Հաշվել արժեքը')}</span>
       </a>
@@ -3473,6 +3474,74 @@ export function renderNewHomePage(opts: {
   </div>
 </div>
 </section>
+
+<!-- ===== CONTACT CTA (above footer) ===== -->
+<section class="section nh-contact-cta" data-section-id="contact-cta">
+<div class="container">
+  <div class="nh-contact-card">
+    <div class="nh-contact-text">
+      <div class="section-badge"><i class="fas fa-phone-volume"></i> <span data-ru="Свяжитесь с нами" data-am="Կապ հաստատեք մեզ հետ">${t('Свяжитесь с нами', 'Կապ հաստատեք մեզ հետ')}</span></div>
+      <h2 data-ru="Готовы вывести ваш товар в ТОП?" data-am="Պատրա՞ստ եք ապրանքը հասցնել WB-ի TOP">${t('Готовы вывести ваш товар в ТОП?', 'Պատրա՞ստ եք ապրանքը հասցնել WB-ի TOP')}</h2>
+      <p data-ru="Напишите нам в WhatsApp или закажите обратный звонок — менеджер ответит на все вопросы, подберёт стратегию и пакет под ваш бюджет." data-am="Գրեք մեզ WhatsApp-ով կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի բոլոր հարցերին, կընտրի ստրատեգիան և փաթեթը՝ ձեր բյուջեի համար։">${t('Напишите нам в WhatsApp или закажите обратный звонок — менеджер ответит на все вопросы, подберёт стратегию и пакет под ваш бюджет.', 'Գրեք մեզ WhatsApp-ով կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի բոլոր հարցերին, կընտրի ստրատեգիան և փաթեթը՝ ձեր բյուջեի համար։')}</p>
+    </div>
+    <div class="nh-contact-actions">
+      <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="btn nh-btn-whatsapp btn-lg">
+        <i class="fab fa-whatsapp"></i>
+        <span data-ru="Написать в WhatsApp" data-am="Գրել WhatsApp-ով">${t('Написать в WhatsApp', 'Գրել WhatsApp-ով')}</span>
+      </a>
+      <a href="javascript:void(0)" onclick="openCallbackModal()" class="btn btn-outline btn-lg">
+        <i class="fas fa-phone"></i>
+        <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+      </a>
+      <a href="/contacts" class="btn btn-outline btn-lg">
+        <i class="fas fa-envelope-open-text"></i>
+        <span data-ru="Все контакты" data-am="Բոլոր կոնտակտները">${t('Все контакты', 'Բոլոր կոնտակտները')}</span>
+      </a>
+    </div>
+  </div>
+</div>
+</section>
+
+<!-- ===== INLINE BULLETPROOF COUNTER TRIGGER =====
+     The shared landing.js bundle has an IntersectionObserver + setTimeout
+     fallback for the counter animation, but historically this has been
+     flaky on /home (cached JS, deferred load races, browser throttling).
+     This inline script guarantees that within 800ms of HTML parse, every
+     [data-count]/[data-count-s] element animates regardless of whether the
+     external script bundle has finished loading or not. Idempotent: skips
+     elements already marked with data-counter-done="1". -->
+<script>
+(function(){
+  function animate(el, target, suffix){
+    if (el.dataset.counterDone === '1') return;
+    el.dataset.counterDone = '1';
+    if (!target) { el.textContent = '0' + suffix; return; }
+    var dur = 1800, start = performance.now();
+    function step(now){
+      var p = Math.min((now - start) / dur, 1);
+      var v = Math.floor(target * (1 - Math.pow(1 - p, 3)));
+      el.textContent = v.toLocaleString('ru-RU') + suffix;
+      if (p < 1) requestAnimationFrame(step);
+      else el.textContent = target.toLocaleString('ru-RU') + suffix;
+    }
+    requestAnimationFrame(step);
+  }
+  function fire(){
+    document.querySelectorAll('.stat-num[data-count]').forEach(function(el){
+      animate(el, parseInt(el.dataset.count) || 0, '');
+    });
+    document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el){
+      animate(el, parseInt(el.dataset.countS) || 0, (el.textContent||'').indexOf('+') !== -1 ? '+' : '');
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(fire, 100); });
+  } else {
+    setTimeout(fire, 100);
+  }
+  setTimeout(fire, 800);
+})();
+</script>
 `
 
   // CSS — pixel-1:1 copy from the legacy `app.get('/')` <style> block,
@@ -3600,6 +3669,20 @@ export function renderNewHomePage(opts: {
 @media(max-width:480px){
   .qr-codes-grid{grid-template-columns:repeat(2,1fr)}
 }
+
+/* === CONTACT CTA (above footer) === */
+.nh-contact-cta{padding:60px 0 80px}
+.nh-contact-card{position:relative;background:linear-gradient(135deg,rgba(37,211,102,0.08),rgba(139,92,246,0.08));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:48px;display:grid;grid-template-columns:1.4fr 1fr;gap:36px;align-items:center;overflow:hidden}
+.nh-contact-card::before{content:'';position:absolute;top:-80px;right:-80px;width:280px;height:280px;background:radial-gradient(circle,rgba(37,211,102,0.18),transparent 70%);pointer-events:none}
+.nh-contact-text h2{font-size:clamp(1.5rem,2.6vw,2rem);font-weight:800;line-height:1.2;margin:14px 0 14px;letter-spacing:-0.02em}
+.nh-contact-text p{font-size:0.98rem;color:var(--text-sec);line-height:1.7;max-width:560px}
+.nh-contact-actions{display:flex;flex-direction:column;gap:12px;position:relative;z-index:1}
+.nh-contact-actions .btn{justify-content:center;width:100%;font-size:0.95rem}
+.nh-btn-whatsapp{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;box-shadow:0 8px 24px rgba(37,211,102,0.3)}
+.nh-btn-whatsapp:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(37,211,102,0.45)}
+@media(max-width:900px){
+  .nh-contact-card{grid-template-columns:1fr;padding:32px 24px;gap:24px}
+}
 </style>`
 
 
@@ -3620,6 +3703,286 @@ export function renderNewHomePage(opts: {
     bodyClass: 'home-page',
     mainHtml,
     extraHead: extraHead + jsonLd,
+  })
+}
+
+// =====================================================================
+// renderCalculatorPage — dedicated /calculator subpage
+// ---------------------------------------------------------------------
+// Lifts the calc-wrap markup that lives on /services into its own page
+// so the top-nav "Калькулятор" link can route to a self-contained URL
+// instead of jumping the user to the Services tab. The calculator
+// behaviour is identical: client-side JS in landing.js populates the
+// `#calcPackages` container from `db.packages` and runs the tab/qty/
+// total wiring against `db.tabs` + `db.services`. The route handler
+// (registered below) injects `window.__SITE_DATA` into <head> exactly
+// like the /services and /buyouts handlers do.
+// =====================================================================
+export function renderCalculatorPage(opts: { lang: 'ru' | 'am', siteOrigin: string }): string {
+  const { lang, siteOrigin } = opts
+  const isAM = lang === 'am'
+  const t = (ru: string, am: string) => isAM ? am : ru
+  const tgUrl = 'https://t.me/goo_to_top'
+
+  const seo = {
+    title: t(
+      'Калькулятор стоимости — Go to Top | Wildberries',
+      'Արժեքի հաշվիչ — Go to Top | Wildberries'
+    ),
+    description: t(
+      'Рассчитайте стоимость продвижения на Wildberries: выкупы, отзывы, фотосессии, фулфилмент. Готовые пакеты и индивидуальный расчёт.',
+      'Հաշվեք Wildberries-ում առաջխաղացման արժեքը՝ գնումներ, կարծիքներ, լուսանկարահանումներ, ֆուլֆիլմենթ։ Պատրաստ փաթեթներ և անհատական հաշվարկ։'
+    ),
+  }
+
+  const mainHtml = `
+<!-- ===== HERO ===== -->
+<section class="calc-hero">
+  <div class="container">
+    <div class="calc-hero-inner">
+      <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հաշվիչ">${t('Калькулятор', 'Հաշվիչ')}</span></div>
+      <h1 class="calc-hero-title" data-ru="Рассчитайте стоимость продвижения" data-am="Հաշվեք առաջխաղացման արժեքը">${t('Рассчитайте стоимость продвижения', 'Հաշվեք առաջխաղացման արժեքը')}</h1>
+      <p class="calc-hero-sub" data-ru="Выберите готовый пакет или соберите индивидуальный набор услуг — выкупы, отзывы, фотосессии и фулфилмент. Цены без скрытых комиссий, оплата в Telegram." data-am="Ընտրեք պատրաստ փաթեթ կամ հավաքեք անհատական ծառայությունների խումբ՝ գնումներ, կարծիքներ, լուսանկարահանումներ և ֆուլֆիլմենթ։ Գները՝ առանց թաքնված միջնորդավճարների, վճարումը՝ Telegram-ով։">${t('Выберите готовый пакет или соберите индивидуальный набор услуг — выкупы, отзывы, фотосессии и фулфилмент. Цены без скрытых комиссий, оплата в Telegram.', 'Ընտրեք պատրաստ փաթեթ կամ հավաքեք անհատական ծառայությունների խումբ՝ գնումներ, կարծիքներ, լուսանկարահանումներ և ֆուլֆիլմենթ։ Գները՝ առանց թաքնված միջնորդավճարների, վճարումը՝ Telegram-ով։')}</p>
+      <div class="calc-hero-features">
+        <div class="calc-hero-f"><i class="fas fa-bolt"></i><span data-ru="Мгновенный расчёт" data-am="Ակնթարթային հաշվարկ">${t('Мгновенный расчёт', 'Ակնթարթային հաշվարկ')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-tag"></i><span data-ru="Готовые пакеты со скидкой" data-am="Պատրաստ փաթեթներ զեղչով">${t('Готовые пакеты со скидкой', 'Պատրաստ փաթեթներ զեղչով')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-shield-alt"></i><span data-ru="Без скрытых комиссий" data-am="Առանց թաքնված միջնորդավճարների">${t('Без скрытых комиссий', 'Առանց թաքնված միջնորդավճարների')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-percent"></i><span data-ru="Промокод снижает сумму" data-am="Պրոմոկոդը նվազեցնում է գումարը">${t('Промокод снижает сумму', 'Պրոմոկոդը նվազեցնում է գումարը')}</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CALCULATOR (full) ===== -->
+<section class="section section-dark" id="calculator" data-section-id="calculator">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-box-open"></i> <span data-ru="Готовые пакеты + индивидуальный расчёт" data-am="Պատրաստ փաթեթներ + անհատական հաշվարկ">${t('Готовые пакеты + индивидуальный расчёт', 'Պատրաստ փաթեթներ + անհատական հաշվարկ')}</span></div>
+      <h2 class="section-title" data-ru="Выберите пакет или соберите свой" data-am="Ընտրեք փաթեթ կամ հավաքեք ձերը">${t('Выберите пакет или соберите свой', 'Ընտրեք փաթեթ կամ հավաքեք ձերը')}</h2>
+      <p class="section-sub" data-ru="Сверху — три готовых пакета с фиксированной скидкой. Ниже — конструктор: выберите вкладку, отметьте нужное количество, итоговая сумма пересчитывается автоматически." data-am="Վերևում՝ երեք պատրաստ փաթեթ՝ ֆիքսված զեղչով։ Ներքևում՝ կոնստրուկտոր. ընտրեք ներդիր, նշեք քանակ, ընդհանուր գումարը հաշվարկվում է ինքնաբերաբար։">${t('Сверху — три готовых пакета с фиксированной скидкой. Ниже — конструктор: выберите вкладку, отметьте нужное количество, итоговая сумма пересчитывается автоматически.', 'Վերևում՝ երեք պատրաստ փաթեթ՝ ֆիքսված զեղչով։ Ներքևում՝ կոնստրուկտոր. ընտրեք ներդիր, նշեք քանակ, ընդհանուր գումարը հաշվարկվում է ինքնաբերաբար։')}</p>
+    </div>
+    <div class="calc-wrap">
+      <div class="calc-packages" id="calcPackages" style="display:none"></div>
+      <div class="calc-tabs">
+        <div class="calc-tab active" onclick="showCalcTab('buyouts',this)" data-ru="Выкупы" data-am="Գնումներ">${t('Выкупы', 'Գնումներ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('reviews',this)" data-ru="Отзывы" data-am="Կարծիքներ">${t('Отзывы', 'Կարծիքներ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('photo',this)" data-ru="Фотосъёмка" data-am="Լուսանկարահանում">${t('Фотосъёмка', 'Լուսանկարահանում')}</div>
+        <div class="calc-tab" onclick="showCalcTab('ff',this)" data-ru="ФФ" data-am="Ֆուլֆիլմենթ">${t('ФФ', 'Ֆուլֆիլմենթ')}</div>
+        <div class="calc-tab" onclick="showCalcTab('logistics',this)" data-ru="Логистика" data-am="Լոգիստիկա">${t('Логистика', 'Լոգիստիկա')}</div>
+        <div class="calc-tab" onclick="showCalcTab('other',this)" data-ru="Прочие услуги" data-am="Այլ ծառայություններ">${t('Прочие услуги', 'Այլ ծառայություններ')}</div>
+      </div>
+      <!-- Calculator groups are populated client-side from window.__SITE_DATA via landing.js. -->
+      <div class="calc-group active" id="cg-buyouts">
+        <div class="calc-row" data-price="buyout" id="buyoutRow">
+          <div class="calc-label" data-ru="Выкуп + забор из ПВЗ" data-am="Գնում + ստացում ՊՎԶ-ից">${t('Выкуп + забор из ПВЗ', 'Գնում + ստացում ՊՎԶ-ից')}</div>
+          <div class="calc-price" id="buyoutPriceLabel">2 000 ֏</div>
+          <div class="calc-input"><button onclick="ccBuyout(-1)">−</button><input type="number" id="buyoutQty" value="0" min="0" max="999" onchange="onBuyoutInput()" oninput="onBuyoutInput()"><button onclick="ccBuyout(1)">+</button></div>
+        </div>
+      </div>
+      <div class="calc-group" id="cg-reviews"></div>
+      <div class="calc-group" id="cg-photo"></div>
+      <div class="calc-group" id="cg-ff"></div>
+      <div class="calc-group" id="cg-logistics"></div>
+      <div class="calc-group" id="cg-other"></div>
+      <div class="calc-total">
+        <div class="calc-total-label" data-ru="Итого:" data-am="Ընդամենը:">${t('Итого:', 'Ընդամենը:')}</div>
+        <div class="calc-total-value" id="calcTotal" data-total="0">0 ֏</div>
+      </div>
+      <div id="calcRefWrap" style="margin-top:16px;padding:16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm)">
+        <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+          <div style="flex:1;min-width:200px">
+            <label style="display:block;font-size:0.82rem;font-weight:600;color:var(--accent-light);margin-bottom:6px"><i class="fas fa-gift" style="margin-right:6px"></i><span data-ru="Есть промокод?" data-am="Պրոմոկոդ ունեք?">${t('Есть промокод?', 'Պրոմոկոդ ունեք?')}</span></label>
+            <input type="text" id="refCodeInput" placeholder="PROMO2026" style="width:100%;padding:10px 14px;background:var(--bg-surface);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:0.92rem;font-family:inherit;text-transform:uppercase;outline:none;transition:var(--t)" onfocus="this.style.borderColor='var(--purple)'" onblur="this.style.borderColor='var(--border)'">
+          </div>
+          <button onclick="checkRefCode()" class="btn btn-outline" style="padding:10px 20px;font-size:0.88rem;white-space:nowrap"><i class="fas fa-check-circle" style="margin-right:6px"></i><span data-ru="Применить" data-am="Կիրառել">${t('Применить', 'Կիրառել')}</span></button>
+        </div>
+        <div id="refResult" style="display:none;margin-top:10px;padding:10px 14px;border-radius:8px;font-size:0.88rem;font-weight:500"></div>
+      </div>
+      <div class="calc-cta" style="display:none">
+        <a href="https://wa.me/37455226224" id="calcTgBtn" class="btn btn-primary btn-lg" target="_blank">
+          <i class="fab fa-whatsapp"></i>
+          <span data-ru="Заказать сейчас" data-am="Պատվիրել հիմա">${t('Заказать сейчас', 'Պատվիրել հիմա')}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== HOW TO USE ===== -->
+<section class="section calc-how">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как пользоваться" data-am="Ինչպես օգտվել">${t('Как пользоваться', 'Ինչպես օգտվել')}</span></div>
+      <h2 class="section-title" data-ru="3 шага до точной сметы" data-am="3 քայլ ճշգրիտ նախահաշվին">${t('3 шага до точной сметы', '3 քայլ ճշգրիտ նախահաշվին')}</h2>
+    </div>
+    <div class="calc-how-grid">
+      <div class="calc-how-card">
+        <div class="calc-how-num">1</div>
+        <h4 data-ru="Выберите готовый пакет" data-am="Ընտրեք պատրաստ փաթեթ">${t('Выберите готовый пакет', 'Ընտրեք պատրաստ փաթեթ')}</h4>
+        <p data-ru="Базовый, Продвинутый или Максимальный — фиксированная скидка до −32%, состав сразу подгрузится в калькулятор." data-am="Բազային, Առաջադեմ կամ Մաքսիմալ՝ ֆիքսված զեղչ մինչև −32%, կազմը անմիջապես կբեռնվի հաշվիչում։">${t('Базовый, Продвинутый или Максимальный — фиксированная скидка до −32%, состав сразу подгрузится в калькулятор.', 'Բազային, Առաջադեմ կամ Մաքսիմալ՝ ֆիքսված զեղչ մինչև −32%, կազմը անմիջապես կբեռնվի հաշվիչում։')}</p>
+      </div>
+      <div class="calc-how-card">
+        <div class="calc-how-num">2</div>
+        <h4 data-ru="Или соберите вручную" data-am="Կամ հավաքեք ձեռքով">${t('Или соберите вручную', 'Կամ հավաքեք ձեռքով')}</h4>
+        <p data-ru="Переключайте вкладки, добавляйте выкупы, отзывы, фотосессии, ФФ и логистику — итог пересчитывается мгновенно." data-am="Փոխարկեք ներդիրները, ավելացրեք գնումներ, կարծիքներ, լուսանկարահանումներ, ՖՖ և լոգիստիկա՝ ընդհանուրը հաշվարկվում է ակնթարթորեն։">${t('Переключайте вкладки, добавляйте выкупы, отзывы, фотосессии, ФФ и логистику — итог пересчитывается мгновенно.', 'Փոխարկեք ներդիրները, ավելացրեք գնումներ, կարծիքներ, լուսանկարահանումներ, ՖՖ և լոգիստիկա՝ ընդհանուրը հաշվարկվում է ակնթարթորեն։')}</p>
+      </div>
+      <div class="calc-how-card">
+        <div class="calc-how-num">3</div>
+        <h4 data-ru="Введите промокод и оформите" data-am="Մուտքագրեք պրոմոկոդը և ձևակերպեք">${t('Введите промокод и оформите', 'Մուտքագրեք պրոմոկոդը և ձևակերպեք')}</h4>
+        <p data-ru="Если у вас есть промокод партнёра — введите в поле ниже и получите дополнительную скидку. Заказ оформляется в WhatsApp одной кнопкой." data-am="Եթե ունեք գործընկերոջ պրոմոկոդ՝ մուտքագրեք ստորև և ստացեք լրացուցիչ զեղչ։ Պատվերը ձևակերպվում է WhatsApp-ով՝ մեկ կոճակով։">${t('Если у вас есть промокод партнёра — введите в поле ниже и получите дополнительную скидку. Заказ оформляется в WhatsApp одной кнопкой.', 'Եթե ունեք գործընկերոջ պրոմոկոդ՝ մուտքագրեք ստորև և ստացեք լրացուցիչ զեղչ։ Պատվերը ձևակերպվում է WhatsApp-ով՝ մեկ կոճակով։')}</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CTA STRIP ===== -->
+<section class="svc-cta-strip">
+  <div class="container">
+    <div class="acs-card">
+      <div class="acs-text">
+        <h3 data-ru="Не хотите считать сами?" data-am="Չե՞ք ուզում ինքներդ հաշվել">${t('Не хотите считать сами?', 'Չե՞ք ուզում ինքներդ հաշվել')}</h3>
+        <p data-ru="Напишите менеджеру в Telegram или WhatsApp — мы подберём пакет под ваш бюджет и нишу." data-am="Գրեք մենեջերին Telegram-ով կամ WhatsApp-ով՝ մենք կընտրենք փաթեթ ձեր բյուջեի և նիշայի համար։">${t('Напишите менеджеру в Telegram или WhatsApp — мы подберём пакет под ваш бюджет и нишу.', 'Գրեք մենեջերին Telegram-ով կամ WhatsApp-ով՝ մենք կընտրենք փաթեթ ձեր բյուջեի և նիշայի համար։')}</p>
+      </div>
+      <div class="acs-actions">
+        <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="btn nh-btn-whatsapp">
+          <i class="fab fa-whatsapp"></i>
+          <span data-ru="WhatsApp" data-am="WhatsApp">WhatsApp</span>
+        </a>
+        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
+          <i class="fab fa-telegram"></i>
+          <span data-ru="Telegram" data-am="Telegram">Telegram</span>
+        </a>
+        <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
+          <i class="fas fa-phone"></i>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${t('Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</section>
+`
+
+  // Page-only CSS — minimal subset of /services calc styles plus the
+  // /calculator-specific hero & how-to-use grid.
+  const extraHead = `
+<style>
+.calc-hero{padding:140px 0 32px;text-align:center;background:linear-gradient(180deg,rgba(139,92,246,0.08),transparent 80%)}
+.calc-hero-inner{max-width:780px;margin:0 auto}
+.calc-hero-title{font-size:clamp(1.8rem,4vw,2.6rem);font-weight:800;line-height:1.18;margin:14px 0 16px;letter-spacing:-0.02em}
+.calc-hero-sub{font-size:1rem;color:var(--text-sec);line-height:1.7;max-width:680px;margin:0 auto 28px}
+.calc-hero-features{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:760px;margin:0 auto}
+.calc-hero-f{display:flex;flex-direction:column;align-items:center;gap:8px;padding:16px 12px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec)}
+.calc-hero-f i{color:var(--accent-light);font-size:1.2rem}
+@media(max-width:780px){.calc-hero-features{grid-template-columns:repeat(2,1fr)}}
+
+.section{padding:32px 0;overflow:visible}
+.section.section-dark{background:var(--bg-surface)}
+.section-header{text-align:center;margin-bottom:32px}
+.section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent-light);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.section-title{font-size:clamp(1.5rem,3vw,2rem);font-weight:800;line-height:1.2;margin-bottom:14px;letter-spacing:-0.02em}
+.section-sub{font-size:0.98rem;color:var(--text-sec);max-width:720px;margin:0 auto;line-height:1.7}
+
+/* Calculator (1:1 from /services) */
+.calc-wrap{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px;max-width:920px;margin:0 auto}
+.calc-tabs{display:flex;gap:8px;margin-bottom:24px;flex-wrap:wrap}
+.calc-tab{padding:8px 18px;border-radius:50px;font-size:0.82rem;font-weight:600;cursor:pointer;transition:var(--t);background:var(--bg-surface);border:1px solid var(--border);color:var(--text-muted)}
+.calc-tab.active{background:var(--purple);color:white;border-color:var(--purple)}
+.calc-tab:hover:not(.active){border-color:var(--purple);color:var(--text)}
+.calc-group{display:none}
+.calc-group.active{display:block}
+.calc-packages{margin-bottom:24px;padding:24px;background:linear-gradient(135deg,rgba(245,158,11,0.04),rgba(249,115,22,0.02));border:1px solid rgba(245,158,11,0.15);border-radius:16px;overflow:visible}
+.calc-packages-header{text-align:center;margin-bottom:20px}
+.calc-packages-title{font-size:1.2rem;font-weight:800;display:flex;align-items:center;justify-content:center;gap:10px;color:var(--text)}
+.calc-packages-subtitle{font-size:0.85rem;color:var(--text-muted);margin-top:6px;max-width:500px;margin-left:auto;margin-right:auto;line-height:1.5}
+.calc-packages-grid{display:flex;gap:16px;justify-content:center;align-items:stretch;flex-wrap:nowrap;padding:20px 10px;overflow:visible;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.calc-packages-grid::-webkit-scrollbar{display:none}
+.calc-packages-grid.single-pkg{max-width:400px;margin:0 auto}
+.calc-pkg-card{background:var(--bg-surface);border:2px solid var(--border);border-radius:16px;padding:20px;cursor:pointer;transition:all 0.3s ease;position:relative;overflow:hidden;flex:1 1 0;min-width:180px;max-width:280px;display:flex;flex-direction:column;-webkit-tap-highlight-color:transparent}
+.calc-pkg-card:hover{border-color:#f59e0b;transform:translateY(-3px);box-shadow:0 12px 30px rgba(245,158,11,0.12)}
+.calc-pkg-card.selected{border-color:#f59e0b !important;background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(249,115,22,0.04)) !important;box-shadow:0 0 0 3px rgba(245,158,11,0.25),0 8px 20px rgba(245,158,11,0.12) !important}
+.calc-pkg-card.selected::after{content:'\\2713';position:absolute;top:14px;left:14px;width:22px;height:22px;background:#f59e0b;color:white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;z-index:10}
+.calc-pkg-card .pkg-tier-badge{position:absolute;top:0;left:50%;transform:translateX(-50%);background:linear-gradient(135deg,#f59e0b,#f97316);color:#000;font-size:0.72rem;padding:4px 14px;border-radius:0 0 12px 12px;font-weight:700;letter-spacing:0.3px;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(245,158,11,0.3)}
+.calc-pkg-card.pkg-crown-gold{border:2px solid rgba(255,215,0,0.3);border-top:4px solid #FFD700;box-shadow:0 0 8px rgba(255,215,0,0.08),0 4px 12px rgba(255,215,0,0.04);z-index:3;padding:24px 22px;background:linear-gradient(145deg,var(--bg-surface),rgba(255,215,0,0.03));transform:scale(1.03)}
+.calc-pkg-card.pkg-crown-silver{border:2px solid rgba(192,192,192,0.3);border-top:3px solid #C0C0C0;z-index:2}
+.calc-pkg-card.pkg-crown-bronze{border:2px solid rgba(205,127,50,0.25);border-top:3px solid #CD7F32;z-index:1}
+.calc-pkg-card .pkg-name{font-weight:700;font-size:1rem;margin-bottom:6px;margin-top:18px;line-height:1.3}
+.calc-pkg-card .pkg-desc{font-size:0.8rem;color:var(--text-muted);margin-bottom:12px;line-height:1.5;flex-grow:1}
+.calc-pkg-card .pkg-prices{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+.calc-pkg-card .pkg-old-price{text-decoration:line-through;color:var(--text-muted);font-size:0.85rem}
+.calc-pkg-card .pkg-new-price{font-weight:800;font-size:1.25rem;color:#f59e0b}
+.calc-pkg-card .pkg-discount{background:linear-gradient(135deg,#059669,#10B981);color:white;font-size:0.7rem;padding:3px 8px;border-radius:10px;font-weight:700}
+.calc-pkg-card .pkg-items{font-size:0.78rem;color:var(--text-muted);line-height:1.8;border-top:1px solid var(--border);padding-top:10px;margin-top:auto}
+.calc-pkg-card .pkg-items div{margin-bottom:2px;line-height:1.7}
+.calc-pkg-card .pkg-items div i{color:#22c55e;font-size:0.65rem;margin-right:5px;vertical-align:middle}
+.calc-row{display:grid;grid-template-columns:1fr auto auto;gap:16px;align-items:center;padding:12px 0;border-bottom:1px solid var(--border)}
+.calc-row:last-of-type{border-bottom:none}
+.calc-label{font-size:0.92rem;font-weight:500}
+.calc-price{font-size:0.82rem;color:var(--text-muted);white-space:nowrap}
+.calc-input{display:flex;align-items:center;gap:8px}
+.calc-input button{width:30px;height:30px;border-radius:6px;border:1px solid var(--border);background:var(--bg-surface);color:var(--text);font-size:0.95rem;cursor:pointer;transition:var(--t);display:flex;align-items:center;justify-content:center}
+.calc-input button:hover{border-color:var(--purple);background:rgba(139,92,246,0.1)}
+.calc-input input[type="number"]{width:48px;text-align:center;font-weight:600;font-size:1rem;background:var(--bg-surface);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:5px 3px;-moz-appearance:textfield;outline:none}
+.calc-input input[type="number"]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(139,92,246,0.15)}
+.calc-input input[type="number"]::-webkit-outer-spin-button,.calc-input input[type="number"]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.calc-total{display:flex;justify-content:space-between;align-items:flex-start;padding:24px 0;margin-top:16px;border-top:2px solid var(--purple);gap:12px;flex-wrap:wrap}
+.calc-total-label{font-size:1.1rem;font-weight:600;flex-shrink:0;white-space:nowrap}
+.calc-total-value{font-size:1.8rem;font-weight:800;color:var(--purple);white-space:normal;text-align:right;min-width:0;overflow-wrap:break-word}
+.calc-old-price{font-size:1rem;font-weight:600;color:var(--text-sec);text-decoration:line-through;opacity:0.7;margin-right:6px}
+.calc-discount-line{font-size:0.82rem;color:var(--success);font-weight:600;margin-top:2px}
+.calc-total-prices{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.calc-cta{margin-top:24px;text-align:center}
+.buyout-tier-info{margin-top:8px;padding:12px 16px;background:rgba(139,92,246,0.05);border:1px solid var(--border);border-radius:var(--r-sm);font-size:0.82rem;color:var(--text-sec);line-height:1.6}
+.buyout-tier-info strong{color:var(--accent-light)}
+
+/* How-to-use grid */
+.calc-how{padding:48px 0}
+.calc-how-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1080px;margin:0 auto}
+.calc-how-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;display:flex;flex-direction:column;gap:10px}
+.calc-how-card:hover{border-color:rgba(139,92,246,0.4);transform:translateY(-3px);transition:var(--t)}
+.calc-how-num{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--accent-light));color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1rem;margin-bottom:6px}
+.calc-how-card h4{font-size:1.05rem;font-weight:700;margin:0}
+.calc-how-card p{font-size:0.92rem;color:var(--text-sec);line-height:1.65;margin:0}
+@media(max-width:900px){.calc-how-grid{grid-template-columns:1fr}}
+
+/* CTA strip (re-used) */
+.svc-cta-strip{padding:24px 0 64px}
+.svc-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.svc-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.svc-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.svc-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.svc-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+.btn-tg{background:linear-gradient(135deg,#0088cc,#0077b5);color:#fff;box-shadow:0 4px 15px rgba(0,136,204,0.3)}
+.btn-tg:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,136,204,0.5)}
+.nh-btn-whatsapp{background:linear-gradient(135deg,#25D366,#128C7E);color:#fff;box-shadow:0 4px 15px rgba(37,211,102,0.3)}
+.nh-btn-whatsapp:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(37,211,102,0.45)}
+
+@media(max-width:900px){
+  .calc-wrap{padding:24px}
+  .svc-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .svc-cta-strip .acs-actions{width:100%}
+  .svc-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:120px}
+}
+@media(max-width:768px){
+  .calc-packages{padding:16px 0;overflow:visible;position:relative}
+  .calc-packages-grid{display:flex;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;gap:12px;padding:12px 16px;justify-content:flex-start}
+  .calc-packages-grid::-webkit-scrollbar{display:none}
+  .calc-pkg-card{flex:0 0 72vw;max-width:72vw;min-width:0;padding:18px 16px;border-radius:14px;scroll-snap-align:center}
+  .calc-pkg-card.pkg-crown-gold{transform:none;flex:0 0 72vw;max-width:72vw}
+}
+@media(max-width:480px){
+  .calc-wrap{padding:14px}
+  .calc-tab{padding:5px 10px;font-size:0.72rem}
+}
+</style>`
+
+  return renderPageShell({
+    page: 'calculator',
+    lang,
+    siteOrigin,
+    seo,
+    bodyClass: 'calculator-page',
+    mainHtml,
+    extraHead,
   })
 }
 
@@ -5863,7 +6226,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </div>
 </div>
 
-<script src="/static/landing.js" defer></script>
+<script src="/static/landing.js?v=${CACHE_VERSION}" defer></script>
 
 <!-- Bottom Navigation Bar (mobile) -->
 <nav class="bottom-nav" id="bottomNav">
@@ -7237,6 +7600,42 @@ for (const page of PLACEHOLDER_PAGES) {
     return c.html(renderPlaceholderPage({ page, lang, siteOrigin }));
   });
 }
+
+// ===== /calculator (Phase 5c) =====
+// Standalone calculator page. Same `__SITE_DATA` injection pattern as
+// /services/buyouts so window._calcPackages and the tab/qty/total wiring
+// in landing.js initialise the calculator without an extra fetch.
+app.get('/calculator', async (c) => {
+  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+  const reqUrl = new URL(c.req.url);
+  const urlLang = reqUrl.searchParams.get('lang') || '';
+  const lang: 'ru' | 'am' = (urlLang === 'am' || urlLang === 'hy') ? 'am' : 'ru';
+  const siteOrigin = reqUrl.origin;
+
+  const siteDataPromise = (async () => {
+    try {
+      const req = new Request(new URL('/api/site-data', c.req.url).toString());
+      const resp = await app.fetch(req, c.env);
+      return resp.ok ? await resp.text() : null;
+    } catch { return null; }
+  })();
+
+  let pageHtml = renderCalculatorPage({ lang, siteOrigin });
+  const siteDataJson = await Promise.race<string | null>([
+    siteDataPromise,
+    new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
+  ]);
+  if (siteDataJson) {
+    const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
+    pageHtml = pageHtml.replace(
+      '</head>',
+      '<script>window.__SITE_DATA=' + safeSiteData + '</script>\n</head>'
+    );
+  } else {
+    c.header('Cache-Control', 'no-store, max-age=0');
+  }
+  return c.html(pageHtml);
+})
 
 // Language-specific routes: /am and /ru — rewrite to / with lang query param
 // These must render the SAME page (not redirect) so Telegram/WhatsApp see OG tags

@@ -69,8 +69,9 @@ registerSeedApi(app)
 // Clean URLs that render a lightweight redirect page pointing to the
 // appropriate anchor on the main landing page.
 // This allows proper sharing/bookmarking of /services, /calculator etc.
+// NOTE: /calculator was removed from this map in Phase 5c — it now has
+// a dedicated subpage in landing.ts (renderCalculatorPage).
 const PAGE_SECTIONS: Record<string, { anchor: string; title_ru: string; title_am: string }> = {
-  calculator: { anchor: 'calculator', title_ru: 'Калькулятор',  title_am: 'Հաշվիչ' },
   guarantee:  { anchor: 'guarantee',  title_ru: 'Гарантии',     title_am: 'Երաշխիքներ' },
 };
 
