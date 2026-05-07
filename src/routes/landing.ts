@@ -1688,6 +1688,30 @@ section#fifty-vs-fifty .why-block{order:1!important}
 section#fifty-vs-fifty .section-cta{order:2!important}
 section#fifty-vs-fifty .why-block > *{order:0!important}
 section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
+/* === REVIEWS PROOF (продают / не продают) === */
+#reviews-proof .rp-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:stretch;margin:24px 0 12px}
+.rp-col{background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;display:flex;flex-direction:column;transition:transform 0.3s ease,box-shadow 0.3s ease}
+.rp-col:hover{transform:translateY(-4px);box-shadow:0 16px 40px rgba(0,0,0,0.25)}
+.rp-good{border-color:rgba(16,185,129,0.45)}
+.rp-bad{border-color:rgba(239,68,68,0.45)}
+.rp-label{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;font-size:0.95rem;font-weight:800;letter-spacing:0.4px;text-transform:uppercase;color:#fff}
+.rp-label-good{background:linear-gradient(135deg,#10B981,#059669)}
+.rp-label-bad{background:linear-gradient(135deg,#EF4444,#B91C1C)}
+.rp-label i{font-size:1.1rem}
+.rp-img{display:block;background:#000;text-align:center;cursor:zoom-in;line-height:0}
+.rp-img img{width:100%;max-height:520px;object-fit:contain;display:block}
+.rp-text{padding:20px 22px 24px}
+.rp-text h4{font-size:1rem;font-weight:700;margin:0 0 10px;line-height:1.35}
+.rp-good .rp-text h4{color:#10B981}
+.rp-bad .rp-text h4{color:#EF4444}
+.rp-text p{font-size:0.9rem;color:var(--text-sec);line-height:1.65;margin:0}
+.rp-vs{display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:900;color:var(--text-muted);letter-spacing:0.05em;min-width:48px}
+.rp-vs span{display:inline-flex;align-items:center;justify-content:center;width:60px;height:60px;border-radius:50%;background:var(--bg-card);border:1px solid var(--border);box-shadow:0 6px 16px rgba(0,0,0,0.18)}
+@media(max-width:900px){
+  #reviews-proof .rp-compare{grid-template-columns:1fr;gap:16px}
+  .rp-vs{padding:6px 0}
+  .rp-vs span{width:52px;height:52px;font-size:1.3rem}
+}
 </style>`
 
   const tgUrl = PLACEHOLDER_TG_URL
@@ -1825,6 +1849,41 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 
     <div class="section-cta">
       <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы" data-am="Սկսել գնումները">${t('Начать выкупы', 'Սկսել գնումները')}</span></a>
+    </div>
+  </div>
+</section>
+
+<!-- ===== ОТЗЫВЫ ПРОДАЮТ / НЕ ПРОДАЮТ ===== -->
+<section class="section" id="reviews-proof" data-section-id="reviews-proof">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-badge"><i class="fas fa-star"></i> <span data-ru="Социальное доказательство" data-am="Սոցիալական ապացույց">${t('Социальное доказательство', 'Սոցիալական ապացույց')}</span></div>
+      <h2 class="section-title" data-ru="Вот такие отзывы — продают" data-am="Ահա այսպիսի կարծիքները՝ վաճառում են">${t('Вот такие отзывы — ', 'Ահա այսպիսի կարծիքները՝ ')}<span class="gr">${t('продают', 'վաճառում են')}</span></h2>
+      <p class="section-sub" data-ru="Реальные фото, подробные описания, живые эмоции — именно это убеждает следующего покупателя оформить заказ. Сравните сами:" data-am="Իրական լուսանկարներ, մանրամասն նկարագրություններ, կենդանի զգացմունքներ — հենց դա է համոզում հաջորդ գնորդին պատվիրել: Համեմատեք ինքներդ՝">${t('Реальные фото, подробные описания, живые эмоции — именно это убеждает следующего покупателя оформить заказ. Сравните сами:', 'Իրական լուսանկարներ, մանրամասն նկարագրություններ, կենդանի զգացմունքներ — հենց դա է համոզում հաջորդ գնորդին պատվիրել: Համեմատեք ինքներդ՝')}</p>
+    </div>
+
+    <div class="rp-compare">
+      <div class="rp-col rp-good">
+        <div class="rp-label rp-label-good"><i class="fas fa-check-circle"></i> <span data-ru="ПРОДАЁТ" data-am="ՎԱՃԱՌՈՒՄ Է">${t('ПРОДАЁТ', 'ՎԱՃԱՌՈՒՄ Է')}</span></div>
+        <a href="/static/img/review-good.png" target="_blank" rel="noopener" class="rp-img"><img src="/static/img/review-good.png" alt="Продающий отзыв на Wildberries — высокий рейтинг, фото в использовании" loading="lazy" decoding="async"></a>
+        <div class="rp-text">
+          <h4 data-ru="Качественные фото и подробный текст" data-am="Որակյալ լուսանկարներ և մանրամասն տեքստ">${t('Качественные фото и подробный текст', 'Որակյալ լուսանկարներ և մանրամասն տեքստ')}</h4>
+          <p data-ru="Фото в реальном использовании, честный детальный текст, рейтинг 5,0 и тысячи оценок — покупатель видит реальный опыт, доверие растёт, конверсия в заказ повышается." data-am="Լուսանկարներ իրական օգտագործման մեջ, ազնիվ մանրամասն տեքստ, 5,0 վարկանիշ և հազարավոր գնահատականներ — գնորդը տեսնում է իրական փորձը, վստահությունը մեծանում է, պատվերի կոնվերսիան բարձրանում է:">${t('Фото в реальном использовании, честный детальный текст, рейтинг 5,0 и тысячи оценок — покупатель видит реальный опыт, доверие растёт, конверсия в заказ повышается.', 'Լուսանկարներ իրական օգտագործման մեջ, ազնիվ մանրամասն տեքստ, 5,0 վարկանիշ և հազարավոր գնահատականներ — գնորդը տեսնում է իրական փորձը, վստահությունը մեծանում է, պատվերի կոնվերսիան բարձրանում է:')}</p>
+        </div>
+      </div>
+      <div class="rp-vs"><span>VS</span></div>
+      <div class="rp-col rp-bad">
+        <div class="rp-label rp-label-bad"><i class="fas fa-times-circle"></i> <span data-ru="НЕ ПРОДАЁТ" data-am="ՉԻ ՎԱՃԱՌՈՒՄ">${t('НЕ ПРОДАЁТ', 'ՉԻ ՎԱՃԱՌՈՒՄ')}</span></div>
+        <a href="/static/img/review-bad.png" target="_blank" rel="noopener" class="rp-img"><img src="/static/img/review-bad.png" alt="Непродающий отзыв — низкий рейтинг, шаблонные оценки без текста" loading="lazy" decoding="async"></a>
+        <div class="rp-text">
+          <h4 data-ru="Шаблонные оценки без текста" data-am="Կաղապարային գնահատականներ առանց տեքստի">${t('Шаблонные оценки без текста', 'Կաղապարային գնահատականներ առանց տեքստի')}</h4>
+          <p data-ru="Низкий рейтинг (3,8), мало оценок, пустые шаблонные отзывы без фото и без живого текста — покупатель не видит ценности, не доверяет товару и уходит к конкурентам." data-am="Ցածր վարկանիշ (3,8), քիչ գնահատականներ, դատարկ կաղապարային կարծիքներ առանց լուսանկարների և կենդանի տեքստի — գնորդը արժեք չի տեսնում, չի վստահում ապրանքին և գնում է մրցակիցների մոտ:">${t('Низкий рейтинг (3,8), мало оценок, пустые шаблонные отзывы без фото и без живого текста — покупатель не видит ценности, не доверяет товару и уходит к конкурентам.', 'Ցածր վարկանիշ (3,8), քիչ գնահատականներ, դատարկ կաղապարային կարծիքներ առանց լուսանկարների և կենդանի տեքստի — գնորդը արժեք չի տեսնում, չի վստահում ապրանքին և գնում է մրցակիցների մոտ:')}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-cta">
+      <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg"><i class="fas fa-star"></i> <span data-ru="Заказать продающие отзывы" data-am="Պատվիրել վաճառող կարծիքներ">${t('Заказать продающие отзывы', 'Պատվիրել վաճառող կարծիքներ')}</span></a>
     </div>
   </div>
 </section>
@@ -3475,6 +3534,60 @@ export function renderNewHomePage(opts: {
 </div>
 </section>
 
+<!-- ===== ДЛЯ КОГО ПОЛЕЗЕН НАШ СЕРВИС ===== -->
+<section class="section nh-for-whom" id="for-whom" data-section-id="for-whom">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-users"></i> <span data-ru="Для кого" data-am="Ում համար">${t('Для кого', 'Ում համար')}</span></div>
+    <h2 class="section-title" data-ru="Для кого полезен наш сервис" data-am="Ում համար է օգտակար մեր ծառայությունը">${isAM ? 'Ում համար է օգտակար <span class="gr">մեր ծառայությունը</span>' : 'Для кого полезен <span class="gr">наш сервис</span>'}</h2>
+    <p class="section-sub" data-ru="Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств" data-am="Մենք աշխատում ենք բիզնեսի տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև խոշոր գործակալություններ">${t('Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств', 'Մենք աշխատում ենք բիզնեսի տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև խոշոր գործակալություններ')}</p>
+  </div>
+  <div class="fw-grid fade-up">
+    <div class="fw-card">
+      <div class="fw-photo"><img src="/static/img/for-whom-manager.png" alt="Менеджер по маркетплейсам" loading="lazy" decoding="async"></div>
+      <div class="fw-body">
+        <h3 data-ru="Менеджер по маркетплейсам" data-am="Մարկետփլեյս մենեջեր">${t('Менеджер по маркетплейсам', 'Մարկետփլեյս մենեջեր')}</h3>
+        <p data-ru="Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе" data-am="Ունեք մատակարարների մեծ բազա WB-ում և Ozon-ում — դարձեք մեր գործընկերը և վաստակեք յուրաքանչյուր պատվերից">${t('Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе', 'Ունեք մատակարարների մեծ բազա WB-ում և Ozon-ում — դարձեք մեր գործընկերը և վաստակեք յուրաքանչյուր պատվերից')}</p>
+      </div>
+    </div>
+    <div class="fw-card">
+      <div class="fw-photo"><img src="/static/img/for-whom-agency.png" alt="Агентство или компания" loading="lazy" decoding="async"></div>
+      <div class="fw-body">
+        <h3 data-ru="Агентство или компания" data-am="Գործակալություն կամ ընկերություն">${t('Агентство или компания', 'Գործակալություն կամ ընկերություն')}</h3>
+        <p data-ru="Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход" data-am="Աշխատում եք մարկետփլեյսների մատակարարների հետ՝ ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթում և մեծացրեք եկամուտը">${t('Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход', 'Աշխատում եք մարկետփլեյսների մատակարարների հետ՝ ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթում և մեծացրեք եկամուտը')}</p>
+      </div>
+    </div>
+    <div class="fw-card">
+      <div class="fw-photo"><img src="/static/img/for-whom-blogger.png" alt="Владелец ресурса" loading="lazy" decoding="async"></div>
+      <div class="fw-body">
+        <h3 data-ru="Владелец ресурса" data-am="Ռեսուրսի սեփականատեր">${t('Владелец ресурса', 'Ռեսուրսի սեփականատեր')}</h3>
+        <p data-ru="Ведёте тематический блог, YouTube-канал или Telegram-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию" data-am="Վարում եք թեմատիկ բլոգ, YouTube-ալիք կամ Telegram-ալիք մարկետփլեյսների մասին՝ դարձեք գործընկեր և դրամայնացրեք լսարանը">${t('Ведёте тематический блог, YouTube-канал или Telegram-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию', 'Վարում եք թեմատիկ բլոգ, YouTube-ալիք կամ Telegram-ալիք մարկետփլեյսների մասին՝ դարձեք գործընկեր և դրամայնացրեք լսարանը')}</p>
+      </div>
+    </div>
+    <div class="fw-card">
+      <div class="fw-photo"><img src="/static/img/for-whom-school.png" alt="Онлайн-школа" loading="lazy" decoding="async"></div>
+      <div class="fw-body">
+        <h3 data-ru="Онлайн-школа" data-am="Օնլայն-դպրոց">${t('Онлайн-школа', 'Օնլայն-դպրոց')}</h3>
+        <p data-ru="Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение" data-am="Ուսուցանում եք մարկետփլեյսներում աշխատելը՝ խորհուրդ տվեք մեր ծառայությունը ուսանողներին և ստացեք ռեֆերալային պարգևատրում">${t('Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение', 'Ուսուցանում եք մարկետփլեյսներում աշխատելը՝ խորհուրդ տվեք մեր ծառայությունը ուսանողներին և ստացեք ռեֆերալային պարգևատրում')}</p>
+      </div>
+    </div>
+    <div class="fw-card">
+      <div class="fw-photo"><img src="/static/img/for-whom-course.png" alt="Интенсив или курс" loading="lazy" decoding="async"></div>
+      <div class="fw-body">
+        <h3 data-ru="Интенсив или курс" data-am="Ինտենսիվ կամ դասընթաց">${t('Интенсив или курс', 'Ինտենսիվ կամ դասընթաց')}</h3>
+        <p data-ru="Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами" data-am="Անցկացնում եք ուսուցում մարկետփլեյսների վերաբերյալ՝ ներառեք մեր ծառայությունը որպես գործնական գործիք և օգնեք ուսանողներին իրական գնումներով">${t('Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами', 'Անցկացնում եք ուսուցում մարկետփլեյսների վերաբերյալ՝ ներառեք մեր ծառայությունը որպես գործնական գործիք և օգնեք ուսանողներին իրական գնումներով')}</p>
+      </div>
+    </div>
+  </div>
+  <div style="text-align:center;margin-top:36px" class="fade-up">
+    <a href="/referral" class="btn btn-primary btn-lg">
+      <i class="fas fa-comments"></i>
+      <span data-ru="Обсудить партнёрство" data-am="Քննարկել գործընկերությունը">${t('Обсудить партнёрство', 'Քննարկել գործընկերությունը')}</span>
+    </a>
+  </div>
+</div>
+</section>
+
 <!-- ===== CONTACT CTA (above footer) ===== -->
 <section class="section nh-contact-cta" data-section-id="contact-cta">
 <div class="container">
@@ -3683,6 +3796,19 @@ export function renderNewHomePage(opts: {
 @media(max-width:900px){
   .nh-contact-card{grid-template-columns:1fr;padding:32px 24px;gap:24px}
 }
+/* === FOR-WHOM (5 cards with photos, like competitor toptopwb.ru) === */
+.nh-for-whom{padding:60px 0}
+.fw-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:36px}
+.fw-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden;display:flex;flex-direction:column;transition:transform 0.3s ease,box-shadow 0.3s ease,border-color 0.3s ease}
+.fw-card:hover{transform:translateY(-4px);border-color:rgba(139,92,246,0.4);box-shadow:0 16px 40px rgba(0,0,0,0.25)}
+.fw-photo{width:100%;aspect-ratio:16/10;overflow:hidden;background:var(--bg-surface);position:relative}
+.fw-photo img{width:100%;height:100%;object-fit:cover;display:block;transition:transform 0.5s ease}
+.fw-card:hover .fw-photo img{transform:scale(1.05)}
+.fw-body{padding:22px 24px 26px;display:flex;flex-direction:column;gap:10px;flex:1}
+.fw-body h3{font-size:1.05rem;font-weight:700;line-height:1.3;letter-spacing:-0.01em;margin:0}
+.fw-body p{font-size:0.9rem;color:var(--text-sec);line-height:1.65;margin:0}
+@media(max-width:980px){.fw-grid{grid-template-columns:repeat(2,1fr);gap:18px}}
+@media(max-width:600px){.fw-grid{grid-template-columns:1fr;gap:16px}.fw-body{padding:18px 20px 22px}}
 </style>`
 
 

@@ -4,7 +4,7 @@
  * 
  * IMPORTANT: Bump CACHE_VERSION on every deploy to bust stale edge caches.
  */
-export const CACHE_VERSION = 'v24';
+export const CACHE_VERSION = 'v25';
 export const CACHEABLE_PATHS = [
   '/',
   '/am',
