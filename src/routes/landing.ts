@@ -291,6 +291,7 @@ img{max-width:100%;height:auto}
 .nav-links{display:flex;align-items:center;gap:4px;list-style:none;flex:1;justify-content:center;flex-wrap:nowrap;overflow:hidden}
 .nav-links a{font-size:clamp(0.65rem,0.78vw,0.85rem);font-weight:500;color:var(--text-sec);transition:var(--t);white-space:nowrap;padding:5px 7px;border-radius:6px}
 .nav-links a:hover{color:var(--text)}
+.nav-links a.active{color:var(--purple);background:rgba(139,92,246,0.12);font-weight:600}
 .nav-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .lang-switch{display:flex;background:var(--bg-card);border-radius:8px;overflow:hidden;border:1px solid var(--border)}
 .lang-btn{padding:5px 10px;font-size:1.1rem;cursor:pointer;background:transparent;border:none;color:var(--text-muted);display:flex;align-items:center;gap:4px}
@@ -389,14 +390,14 @@ ${extraHead}
     <span class="logo-text">Go to Top</span>
   </a>
   <ul class="nav-links" id="navLinks">
-    <li><a href="/#about" data-ru="О нас" data-am="Մեր մասին">О нас</a></li>
-    <li><a href="/#services" data-ru="Услуги" data-am="Ծառայություններ">Услуги</a></li>
-    <li><a href="/#calculator" data-ru="Калькулятор" data-am="Հաշվիչ">Калькулятор</a></li>
-    <li><a href="/#warehouse" data-ru="Склад" data-am="Պահեստ">Склад</a></li>
-    <li><a href="/#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ">Гарантии</a></li>
-    <li><a href="/#faq" data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
-    <li><a href="/#contact" data-ru="Контакты" data-am="Կոնտակտներ">Контакты</a></li>
-    <li><a href="/blog" data-ru="Блог" data-am="Բլոգ">Блог</a></li>
+    <li><a href="/about"${page === 'about' ? ' class="active" aria-current="page"' : ''} data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</a></li>
+    <li><a href="/services"${page === 'services' ? ' class="active" aria-current="page"' : ''} data-ru="Услуги" data-am="Ծառայություններ">${isAM ? 'Ծառայություններ' : 'Услуги'}</a></li>
+    <li><a href="/buyouts"${page === 'buyouts' ? ' class="active" aria-current="page"' : ''} data-ru="Выкупы" data-am="Հետագնումներ">${isAM ? 'Հետագնումներ' : 'Выкупы'}</a></li>
+    <li><a href="/services#calculator" data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</a></li>
+    <li><a href="/faq"${page === 'faq' ? ' class="active" aria-current="page"' : ''} data-ru="FAQ" data-am="ՀՏՀ">FAQ</a></li>
+    <li><a href="/contacts"${page === 'contacts' ? ' class="active" aria-current="page"' : ''} data-ru="Контакты" data-am="Կոնտակտներ">${isAM ? 'Կոնտակտներ' : 'Контакты'}</a></li>
+    <li><a href="/referral"${page === 'referral' ? ' class="active" aria-current="page"' : ''} data-ru="Бонусы" data-am="Բոնուսներ">${isAM ? 'Բոնուսներ' : 'Бонусы'}</a></li>
+    <li><a href="/blog" data-ru="Блог" data-am="Բլոգ">${isAM ? 'Բլոգ' : 'Блог'}</a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
@@ -506,13 +507,14 @@ ${mainHtml}
 <div class="bottom-nav-items">
   <a href="/about" class="bottom-nav-item"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին">${isAM ? 'Մեր մասին' : 'О нас'}</span></a>
   <a href="/services" class="bottom-nav-item"><i class="fas fa-hand-holding"></i><span data-ru="Услуги" data-am="Ծառայություններ">${isAM ? 'Ծառայություններ' : 'Услуги'}</span></a>
+  <a href="/buyouts" class="bottom-nav-item"><i class="fas fa-shopping-cart"></i><span data-ru="Выкупы" data-am="Հետագնումներ">${isAM ? 'Հետագնումներ' : 'Выкупы'}</span></a>
   <a href="/services#calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ">${isAM ? 'Հաշվիչ' : 'Калькулятор'}</span></a>
-  <a href="/buyouts" class="bottom-nav-item"><i class="fas fa-shopping-cart"></i><span data-ru="Выкупы" data-am="Հետգնում">${isAM ? 'Հետգնում' : 'Выкупы'}</span></a>
   <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="Ещё" data-am="Ավելին">${isAM ? 'Ավելին' : 'Ещё'}</span>
     <div class="bottom-nav-more-menu" id="bottomMoreMenu">
       <a href="/faq"><i class="fas fa-question-circle"></i><span data-ru="FAQ" data-am="ՀՏՀ">FAQ</span></a>
       <a href="/contacts"><i class="fas fa-envelope"></i><span data-ru="Контакты" data-am="Կոնտակտներ">${isAM ? 'Կոնտակտներ' : 'Контакты'}</span></a>
       <a href="/referral"><i class="fas fa-gift"></i><span data-ru="Бонусы" data-am="Բոնուսներ">${isAM ? 'Բոնուսներ' : 'Бонусы'}</span></a>
+      <a href="/blog"><i class="fas fa-newspaper"></i><span data-ru="Блог" data-am="Բլոգ">${isAM ? 'Բլոգ' : 'Блог'}</span></a>
       <a href="/"><i class="fas fa-home"></i><span data-ru="Главная" data-am="Գլխավոր">${isAM ? 'Գլխավոր' : 'Главная'}</span></a>
     </div>
   </button>
