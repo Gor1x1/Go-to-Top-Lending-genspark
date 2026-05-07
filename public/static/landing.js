@@ -282,20 +282,25 @@ document.addEventListener('click', function(e) {
 document.querySelectorAll('.nav-links a').forEach(function(a) {
   a.addEventListener('click', function(e) {
     var href = this.getAttribute('href');
-    // Don't block external links (WhatsApp, Telegram, etc.)
+    // External links (target="_blank" or absolute URL): close menu and let browser navigate.
     if (this.getAttribute('target') === '_blank' || (href && href.startsWith('http'))) {
       closeMenu();
-      return; // Let the browser handle the link normally
+      return;
     }
+    // Cross-page links (like /, /about, /services, /#about, /blog): close menu and let
+    // the browser navigate normally. This is the path used on all subpages.
+    if (!href || !href.startsWith('#')) {
+      closeMenu();
+      return;
+    }
+    // Same-page anchor (#about, #services, etc.): intercept for smooth scroll.
     e.preventDefault();
     closeMenu();
-    if (href && href.startsWith('#')) {
-      var target = document.querySelector(href);
-      if (target) {
-        setTimeout(function() {
-          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        }, 100);
-      }
+    var target = document.querySelector(href);
+    if (target) {
+      setTimeout(function() {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
     }
   });
 });
