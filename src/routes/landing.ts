@@ -221,9 +221,9 @@ function renderPageShell(opts: {
   const { page, lang, siteOrigin, seo, mainHtml } = opts
   const bodyClass = opts.bodyClass || ''
   const extraHead = opts.extraHead || ''
-  // Phase 5: 'home-new' is the staging path for the new subpage-styled home.
+  // Phase 5: 'home-new' is the page literal but its URL is `/home`.
   // Once Phase 6 swaps routing, it will live at '/' and this special-case goes away.
-  const path = page === 'home' ? '/' : page === 'home-new' ? '/home-new' : `/${page}`
+  const path = page === 'home' ? '/' : page === 'home-new' ? '/home' : `/${page}`
   const isAM = lang === 'am'
   const htmlLang = isAM ? 'hy' : 'ru'
   const ogLocale = isAM ? 'hy_AM' : 'ru_RU'
@@ -3212,20 +3212,26 @@ ${faqItemsHtml}
 // renderNewHomePage — Phase 5 staging implementation of the future home
 // page (will replace the old monolithic landing on '/' in Phase 6).
 //
-// Sections (per user's spec):
-//   1. Hero      — eyebrow, h1 (2-line gradient), description, 3 stat
-//                  counters, 2 CTA buttons + photo column.
-//   2. Stats bar — 4 large counters (500 поставщиков / 1 000+ аккаунтов
-//                  / 21 день до ТОПа / 200+ выкупов в день).
-//   3. Ticker    — auto-scrolling row of pill-badges with key facts.
-//   4. Services  — 3 service cards (выкупы / отзывы / активация ключевых).
-//   5. Guarantee — h2 + bullets + highlight badge "0 блокировок".
-//   6. Team QRs  — 4 social cards (Instagram / Telegram / FB / WhatsApp).
-//   7. FAQ short — top 3 questions accordion + link to /faq.
+// Goal of this revision: pixel-1:1 with the legacy landing for the user-
+// approved blocks. The HTML and CSS below are **literal copies** from
+// `app.get('/')` rendering (lines ~4812-5158 + relevant <style> blocks),
+// just hosted inside renderPageShell so navigation, footer, mobile nav
+// and i18n stay consistent with all the other subpages.
 //
-// Every text uses tb('<key>', idx, fallbackRu, fallbackAm) so admins can
-// override texts via site_blocks (page='home'). Falls back to the exact
-// strings extracted from the legacy landing on 2026-05-07.
+// Sections (matching the screenshots provided by the owner):
+//   1. Hero       — left text column + right photo with floating badge
+//                   AND 4-cell QR grid under the photo.
+//   2. Ticker     — empty .ticker-track filled by /static/landing.js.
+//   3. WB banner  — pink/purple "WB официально отменил штрафы" card +
+//                   right callout with rocket icon and "Узнать" CTA.
+//   4. Stats bar  — 500 / 1000+ / 21 / 200+ counters.
+//   5. Services   — 3 cards (выкупы / отзывы / активация ключевых),
+//                   blue / green / purple CTA buttons respectively.
+//   6. Why buyouts— h2 + 6 numbered .why-step boxes + highlight-result
+//                   strip + warning-orange "Начать выкупы" CTA.
+//
+// All texts also gain data-ru/data-am so `switchLang()` in landing.js
+// handles the RU↔AM toggle transparently.
 // =====================================================================
 export function renderNewHomePage(opts: {
   lang: 'ru' | 'am',
@@ -3247,8 +3253,10 @@ export function renderNewHomePage(opts: {
     if (!arr || !arr[idx] || !arr[idx].trim()) return t(fallbackRu, fallbackAm)
     return arr[idx]
   }
+  // Suppress "unused" warning for tb — it's reserved for future CMS overrides.
+  void tb
 
-  const tgUrl = PLACEHOLDER_TG_URL
+  const tgUrl = 'https://t.me/goo_to_top'
 
   const seo = {
     title: isAM
@@ -3259,334 +3267,341 @@ export function renderNewHomePage(opts: {
       : 'Реальные выкупы живыми людьми, индивидуальные карты, собственный склад в Ереване, 0 блокировок с 2021 года.',
   }
 
-  // Active-link logic mirrors subpages: nav stays as-is (no "Home" item),
-  // but bottom-nav-more "Главная" picks up active highlighting via the
-  // existing highlightByPath() in landing.js (it matches location.pathname).
+  // Server-side ticker items. Mirrors the JS array in landing.js but doubled
+  // so the CSS animation has enough content to scroll smoothly without gaps.
+  const tickerItems = [
+    { i: 'fa-check-circle', ru: 'Реальные люди, не боты', am: 'Իրական մարդիկ, ոչ բոտեր' },
+    { i: 'fa-shield-alt', ru: '0 блокировок за всё время', am: '0 արգելափակում ողջ ընթացքում' },
+    { i: 'fa-warehouse', ru: 'Собственный склад в Ереване', am: 'Սեփական պահեստ Երևանում' },
+    { i: 'fa-mobile-alt', ru: '1000+ аккаунтов', am: '1000+ հաշիվներ' },
+    { i: 'fa-map-marker-alt', ru: 'Ереван, Армения', am: 'Երևան, Հայաստան' },
+    { i: 'fa-star', ru: 'Профессиональные фото для отзывов', am: 'Մասնագիտական լուսանկարներ կարծիքների համար' },
+    { i: 'fa-camera', ru: 'Фотосессии с моделями', am: 'Լուսանկարահանումներ մոդելներով' },
+    { i: 'fa-truck', ru: 'Доставка на склады WB', am: 'Առաքում WB պահեստներ' },
+  ]
+  const tickerHtml = (tickerItems.concat(tickerItems)).map(it =>
+    `<div class="ticker-item"><i class="fas ${it.i}"></i><span data-ru="${it.ru}" data-am="${it.am}">${t(it.ru, it.am)}</span></div>`
+  ).join('')
 
   const mainHtml = `
 <!-- ===== HERO ===== -->
-<section class="nh-hero">
-  <div class="container">
-    <div class="nh-hero-grid">
-      <div class="nh-hero-text">
-        <div class="nh-eyebrow">
-          <i class="fas fa-circle-check"></i>
-          <span data-ru="Успешный опыт с 2021 года" data-am="Հաջողված փորձ 2021 թվականից">${tb('home_hero', 0, 'Успешный опыт с 2021 года', 'Հաջողված փորձ 2021 թվականից')}</span>
-        </div>
-        <h1>
-          <span data-ru="Выведем ваш товар" data-am="Մենք կբարձրացնենք ձեր ապրանքը">${tb('home_hero', 1, 'Выведем ваш товар', 'Մենք կբարձրացնենք ձեր ապրանքը')}</span>
-          <span class="gr">${tb('home_hero', 2, 'в ТОП Wildberries', 'Wildberries-ի TOP')}</span>
-        </h1>
-        <p class="nh-hero-desc" data-ru="Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:">${tb('home_hero', 3, 'Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване.', 'Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:')}</p>
-        <div class="nh-hero-stats">
-          <div class="nh-hs-item"><div class="nh-hs-num" data-count-s="847">0</div><div class="nh-hs-lbl" data-ru="товаров в ТОП" data-am="ապրանքներ TOP-ում">${t('товаров в ТОП', 'ապրանքներ TOP-ում')}</div></div>
-          <div class="nh-hs-item"><div class="nh-hs-num" data-count-s="0">0</div><div class="nh-hs-lbl" data-ru="блокировок" data-am="արգելափակում">${t('блокировок', 'արգելափակում')}</div></div>
-          <div class="nh-hs-item"><div class="nh-hs-num" data-count-s="1000">0</div><div class="nh-hs-lbl" data-ru="аккаунтов" data-am="հաշիվներ">${t('аккаунтов', 'հաշիվներ')}</div></div>
-        </div>
-        <div class="nh-hero-cta">
-          <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
-            <i class="fab fa-telegram"></i>
-            <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${tb('home_hero', 4, 'Написать в Telegram', 'Գրել Telegram-ով')}</span>
-          </a>
-          <a href="/services#calculator" class="btn btn-outline btn-lg">
-            <i class="fas fa-calculator"></i>
-            <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">${tb('home_hero', 5, 'Рассчитать стоимость', 'Հաշվել արժեքը')}</span>
-          </a>
-        </div>
-      </div>
-      <div class="nh-hero-photo">
-        <img src="/static/img/team-new.jpg" alt="Go to Top" onerror="this.style.display='none'">
-        <div class="nh-photo-badge">
-          <i class="fas fa-shield-alt"></i>
-          <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">${t('Надежный метод продвижения', 'Ապահով առաջխաղացման մեթոդ')}</span>
-        </div>
-      </div>
+<section class="hero" id="hero" data-section-id="hero">
+<div class="container">
+<div class="hero-grid">
+  <div class="hero-el-title">
+    <div class="hero-badge">
+      <i class="fas fa-circle" style="color:var(--success);font-size:0.5rem"></i>
+      <span data-ru="Успешный опыт с 2021 года" data-am="Հաջողված փորձ 2021 թվականից">${t('Успешный опыт с 2021 года', 'Հաջողված փորձ 2021 թվականից')}</span>
+    </div>
+    <h1>
+      <span data-ru="Выведем ваш товар" data-am="Մենք կբարձրացնենք ձեր ապրանքը">${t('Выведем ваш товар', 'Մենք կբարձրացնենք ձեր ապրանքը')}</span><br>
+      <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի TOP">${t('в ТОП Wildberries', 'Wildberries-ի TOP')}</span>
+    </h1>
+  </div>
+  <div class="hero-el-texts">
+    <p class="hero-desc" data-ru="Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:">${t('Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване.', 'Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:')}</p>
+  </div>
+  <div class="hero-el-stats">
+    <div class="hero-stats">
+      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանքներ TOP-ում">${t('товаров в ТОП', 'ապրանքներ TOP-ում')}</div></div>
+      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արգելափակում">${t('блокировок', 'արգելափակում')}</div></div>
+      <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հաշիվներ">${t('аккаунтов', 'հաշիվներ')}</div></div>
     </div>
   </div>
+  <div class="hero-el-buttons">
+    <div class="hero-buttons">
+      <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
+        <i class="fab fa-telegram"></i>
+        <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
+      </a>
+      <a href="/services#calculator" class="btn btn-outline btn-lg">
+        <i class="fas fa-calculator"></i>
+        <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">${t('Рассчитать стоимость', 'Հաշվել արժեքը')}</span>
+      </a>
+    </div>
+  </div>
+  <div class="hero-image">
+    <div class="hero-photo-wrap">
+      <img src="/static/img/founder.jpg" alt="Go to Top" loading="eager" fetchpriority="high" decoding="async" onerror="this.onerror=null;this.src='/static/img/team-new.jpg'">
+      <div class="hero-badge-img">
+        <i class="fas fa-shield-alt"></i>
+        <span data-ru="Надежный метод продвижения" data-am="Ապահով առաջխաղացման մեթոդ">${t('Надежный метод продвижения', 'Ապահով առաջխաղացման մեթոդ')}</span>
+      </div>
+    </div>
+    <div class="qr-codes-grid">
+      <a href="https://www.instagram.com/goo_to_top/" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-instagram.png" alt="Instagram QR">
+        <span data-ru="Наш Instagram" data-am="Մեր Instagram">${t('Наш Instagram', 'Մեր Instagram')}</span>
+      </a>
+      <a href="${tgUrl}" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-telegram.png" alt="Telegram QR">
+        <span data-ru="Telegram чат" data-am="Telegram чат">Telegram чат</span>
+      </a>
+      <a href="https://www.facebook.com/gototop.wb" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-facebook.png" alt="Facebook QR">
+        <span data-ru="Наш Facebook" data-am="Մեր Facebook">${t('Наш Facebook', 'Մեր Facebook')}</span>
+      </a>
+      <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="qr-card">
+        <img src="/static/img/qr/qr-whatsapp.png" alt="WhatsApp QR">
+        <span data-ru="WhatsApp" data-am="WhatsApp">WhatsApp</span>
+      </a>
+    </div>
+  </div>
+</div>
+</div>
 </section>
 
 <!-- ===== TICKER ===== -->
 <div class="ticker" data-section-id="ticker">
-  <div class="ticker-track">
-    ${[
-      { i: 'fa-check-circle', ru: 'Реальные люди, не боты', am: 'Իրական մարդիկ, ոչ բոտեր' },
-      { i: 'fa-shield-alt', ru: '0 блокировок за всё время', am: '0 արգելափակում ողջ ընթացքում' },
-      { i: 'fa-warehouse', ru: 'Собственный склад в Ереване', am: 'Սեփական պահեստ Երևանում' },
-      { i: 'fa-mobile-alt', ru: '1000+ аккаунтов', am: '1000+ հաշիվներ' },
-      { i: 'fa-map-marker-alt', ru: 'Ереван, Армения', am: 'Երևան, Հայաստան' },
-      { i: 'fa-star', ru: 'Профессиональные фото для отзывов', am: 'Մասնագիտական լուսանկարներ կարծիքների համար' },
-      { i: 'fa-camera', ru: 'Фотосессии с моделями', am: 'Լուսանկարահանումներ մոդելներով' },
-      { i: 'fa-truck', ru: 'Доставка на склады WB', am: 'Առաքում WB պահեստներ' },
-    ].concat([
-      { i: 'fa-check-circle', ru: 'Реальные люди, не боты', am: 'Իրական մարդիկ, ոչ բոտեր' },
-      { i: 'fa-shield-alt', ru: '0 блокировок за всё время', am: '0 արգելափակում ողջ ընթացքում' },
-      { i: 'fa-warehouse', ru: 'Собственный склад в Ереване', am: 'Սեփական պահեստ Երևանում' },
-      { i: 'fa-mobile-alt', ru: '1000+ аккаунтов', am: '1000+ հաշիվներ' },
-    ]).map(it => `<span class="ticker-item"><i class="fas ${it.i}"></i><span data-ru="${it.ru}" data-am="${it.am}">${t(it.ru, it.am)}</span></span>`).join('')}
+<div class="ticker-track" id="tickerTrack">${tickerHtml}</div>
+</div>
+
+<!-- ===== WB BANNER ===== -->
+<div class="wb-banner fade-up" data-section-id="wb-banner">
+<div class="container">
+<div class="wb-banner-inner">
+  <div class="wb-banner-card">
+    <i class="fas fa-gavel wb-icon"></i>
+    <div class="wb-text" data-ru="WB официально отменил штрафы за выкупы!" data-am="WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!">${t('WB официально отменил штрафы за выкупы!', 'WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!')}</div>
   </div>
+  <div class="wb-banner-right">
+    <span class="wb-r-icon">🚀</span>
+    <div class="wb-r-text" data-ru="Повысь рейтинг магазина прямо сейчас" data-am="Բարձրացրեք խանութի վարկանիշը հիմա">${t('Повысь рейтинг магазина прямо сейчас', 'Բարձրացրեք խանութի վարկանիշը հիմա')}</div>
+    <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary"><span data-ru="Узнать" data-am="Իմանալ">${t('Узнать', 'Իմանալ')}</span></a>
+  </div>
+</div>
+</div>
 </div>
 
 <!-- ===== STATS BAR ===== -->
-<div class="stats-bar" data-section-id="stats-bar">
-  <div class="container">
-    <div class="stats-grid">
-      <div class="stat-card">
-        <div class="stat-big" data-count-s="500">0</div>
-        <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ">${t('поставщиков сотрудничают с нами', 'մատակարար համագործակցում է մեզ հետ')}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-big" data-count-s="1000">0+</div>
-        <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով">${t('аккаунтов с индивидуальной картой', 'հաշիվներ անհատական քարտով')}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-big" data-count-s="21">0</div>
-        <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="օր մինչև TOP-ում հայտնվելը">${t('день до выхода в ТОП', 'օր մինչև TOP-ում հայտնվելը')}</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-big" data-count-s="200">0+</div>
-        <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">${t('выкупов каждый день', 'գնում ամեն օր')}</div>
-      </div>
+<div class="stats-bar fade-up" data-section-id="stats-bar">
+<div class="container">
+  <div class="stats-grid">
+    <div class="stat-card">
+      <div class="stat-big" data-count-s="500">0</div>
+      <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ">${t('поставщиков сотрудничают с нами', 'մատակարար համագործակցում է մեզ հետ')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-big" data-count-s="1000">0+</div>
+      <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով">${t('аккаунтов с индивидуальной картой', 'հաշիվներ անհատական քարտով')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-big" data-count-s="21">0</div>
+      <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="ապրանք TOP-ում օրական">${t('день до выхода в ТОП', 'ապրանք TOP-ում օրական')}</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-big" data-count-s="200">0+</div>
+      <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">${t('выкупов каждый день', 'գնում ամեն օր')}</div>
     </div>
   </div>
 </div>
+</div>
 
-<!-- ===== SERVICES SHORT ===== -->
-<section id="services" class="section nh-services">
-  <div class="container">
-    <div class="section-eyebrow">
-      <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${t('Наши услуги', 'Մեր ծառայությունները')}</span>
-    </div>
+<!-- ===== SERVICES ===== -->
+<section class="section" id="services" data-section-id="services">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${t('Наши услуги', 'Մեր ծառայությունները')}</span></div>
     <h2 class="section-title" data-ru="Полный спектр продвижения на WB" data-am="WB-ում առաջխաղացման լիարժեք սպեկտր">${t('Полный спектр продвижения на WB', 'WB-ում առաջխաղացման լիարժեք սպեկտր')}</h2>
     <p class="section-sub" data-ru="Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара" data-am="Գնումներ իրական մարդկանցով, կարծիքներ իրական լուսանկարներով, մասնագիտական լուսանկարահանումներ — ամենը ձեր ապրանքի համար">${t('Выкупы живыми людьми, отзывы с реальными фото, профессиональные фотосессии — всё для вашего товара', 'Գնումներ իրական մարդկանցով, կարծիքներ իրական լուսանկարներով, մասնագիտական լուսանկարահանումներ — ամենը ձեր ապրանքի համար')}</p>
-    <div class="nh-services-grid">
-      ${[
-        {
-          icon: 'fa-magnifying-glass-dollar', tr: '/buyouts',
-          tRu: 'Выкупы по ключевым запросам', tAm: 'Գնումներ բանալի հարցումներով',
-          dRu: 'Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.',
-          dAm: 'Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:',
-          bullets: [['Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ'],['Географическое распределение', 'Աշխարհագրական բաշխում'],['Естественное поведение покупателей', 'Գնորդների բնական վարքագիծ'],['Забор товара из ПВЗ', 'Ապրանքի ստացում ՊՎԶ-ից']],
-          cRu: 'Повысить рейтинг', cAm: 'Բարձրացնել վարկանիշը'
-        },
-        {
-          icon: 'fa-star', tr: '/services',
-          tRu: 'Отзывы и оценки', tAm: 'Կարծիքներ և գնահատականներ',
-          dRu: 'Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.',
-          dAm: 'Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:',
-          bullets: [['Текст отзыва + фото/видео', 'Կարծիքի տեքստ + լուսանկար/տեսանյութ'],['Профессиональная фотосессия', 'Մասնագիտական լուսանկարահանում'],['Разные локации и модели', 'Տարբեր վայրեր և մոդելներ'],['До 50% отзывов от выкупов', 'Մինչև 50% կարծիքներ գնումներից']],
-          cRu: 'Начать продвижение', cAm: 'Սկսել առաջխաղացումը'
-        },
-        {
-          icon: 'fa-key', tr: '/services',
-          tRu: 'Активация ключевых слов', tAm: 'Բանալի բառերի ակտիվացում',
-          dRu: 'Целевые выкупы, которые активируют товар по нужным ключевым словам и запускают органический трафик.',
-          dAm: 'Նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ բանալի բառերով և գործարկում օրգանիկ տրաֆիկը։',
-          bullets: [['Резкий рост органики', 'Օրգանիկ տրաֆիկի կտրուկ աճ'],['Укрепление позиций новыми ключевыми словами', 'Դիրքերի ամրապնդում նոր բանալի բառերով'],['Подключение к целевым запросам', 'Միացում թիրախային հարցումներին'],['Стабильные позиции без рекламы', 'Կայուն դիրքեր առանց գովազդի']],
-          cRu: 'Активировать ключевые', cAm: 'Ակտիվացնել բանալիները'
-        }
-      ].map(s => `
-        <div class="nh-svc-card">
-          <div class="nh-svc-icon"><i class="fas ${s.icon}"></i></div>
-          <h3 data-ru="${s.tRu}" data-am="${s.tAm}">${t(s.tRu, s.tAm)}</h3>
-          <p class="nh-svc-desc" data-ru="${s.dRu.replace(/"/g,'&quot;')}" data-am="${s.dAm.replace(/"/g,'&quot;')}">${t(s.dRu, s.dAm)}</p>
-          <ul class="nh-svc-bullets">
-            ${s.bullets.map(b => `<li><i class="fas fa-check"></i><span data-ru="${b[0]}" data-am="${b[1]}">${t(b[0], b[1])}</span></li>`).join('')}
-          </ul>
-          <a href="${s.tr}" class="btn btn-primary"><span data-ru="${s.cRu}" data-am="${s.cAm}">${t(s.cRu, s.cAm)}</span><i class="fas fa-arrow-right"></i></a>
-        </div>
-      `).join('')}
+  </div>
+  <div class="services-grid">
+    <div class="svc-card fade-up">
+      <div class="svc-icon"><i class="fas fa-shopping-cart"></i></div>
+      <h3 data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի հարցումներով">${t('Выкупы по ключевым запросам', 'Գնումներ բանալի հարցումներով')}</h3>
+      <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану." data-am="Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:">${t('Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.', 'Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:')}</p>
+      <ul class="svc-features">
+        <li><i class="fas fa-check"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Իրական հաշիվներ գնումների պատմությամբ">${t('Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Географическое распределение" data-am="Աշխարհագրական բաշխում">${t('Географическое распределение', 'Աշխարհագրական բաշխում')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Естественное поведение покупателей" data-am="Գնորդների բնական վարքագիծ">${t('Естественное поведение покупателей', 'Գնորդների բնական վարքագիծ')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Забор товара из ПВЗ" data-am="Ապրանքի ստացում ՊՎԶ-ից">${t('Забор товара из ПВЗ', 'Ապրանքի ստացում ՊՎԶ-ից')}</span></li>
+      </ul>
+      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Повысить рейтинг" data-am="Բարձրացնել վարկանիշը">${t('Повысить рейтинг', 'Բարձրացնել վարկանիշը')}</span></a></div>
+    </div>
+    <div class="svc-card fade-up">
+      <div class="svc-icon"><i class="fas fa-star"></i></div>
+      <h3 data-ru="Отзывы и оценки" data-am="Կարծիքներ և գնահատականներ">${t('Отзывы и оценки', 'Կարծիքներ և գնահատականներ')}</h3>
+      <p data-ru="Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга." data-am="Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:">${t('Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.', 'Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:')}</p>
+      <ul class="svc-features">
+        <li><i class="fas fa-check"></i> <span data-ru="Текст отзыва + фото/видео" data-am="Կարծիքի տեքստ + լուսանկար/տեսանյութ">${t('Текст отзыва + фото/видео', 'Կարծիքի տեքստ + լուսանկար/տեսանյութ')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Профессиональная фотосессия" data-am="Մասնագիտական լուսանկարահանում">${t('Профессиональная фотосессия', 'Մասնագիտական լուսանկարահանում')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Տարբեր վայրեր և մոդելներ">${t('Разные локации и модели', 'Տարբեր վայրեր և մոդելներ')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Մինչև 50% կարծիքներ գնումներից">${t('До 50% отзывов от выкупов', 'Մինչև 50% կարծիքներ գնումներից')}</span></li>
+      </ul>
+      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-success" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">${t('Начать продвижение', 'Սկսել առաջխաղացումը')}</span></a></div>
+    </div>
+    <div class="svc-card fade-up">
+      <div class="svc-icon"><i class="fas fa-key"></i></div>
+      <h3 data-ru="Активация ключевых слов" data-am="Բանալի բառերի ակտիվացում">${t('Активация ключевых слов', 'Բանալի բառերի ակտիվացում')}</h3>
+      <p data-ru="Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере." data-am="Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգորիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։">${t('Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере.', 'Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգորիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։')}</p>
+      <ul class="svc-features">
+        <li><i class="fas fa-check"></i> <span data-ru="Органический трафик — резкий рост" data-am="Օրգանիկ տրաֆիկի կտրուկ աճ">${t('Органический трафик — резкий рост', 'Օրգանիկ տրաֆիկի կտրուկ աճ')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Укрепление позиций новыми ключевыми словами" data-am="Դիրքերի ամրապնդում նոր բանալի բառերով">${t('Укрепление позиций новыми ключевыми словами', 'Դիրքերի ամրապնդում նոր բանալի բառերով')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Подключение к целевым и прибыльным запросам" data-am="Միացում թիրախային և եկամտաբեր հարցումներին">${t('Подключение к целевым и прибыльным запросам', 'Միացում թիրախային և եկամտաբեր հարցումներին')}</span></li>
+        <li><i class="fas fa-check"></i> <span data-ru="Стабильные позиции без рекламы" data-am="Կայուն դիրքեր առանց գովազդի">${t('Стабильные позиции без рекламы', 'Կայուն դիրքեր առանց գովազդի')}</span></li>
+      </ul>
+      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-key"></i> <span data-ru="Активировать ключевые" data-am="Ակտիվացնել բանալիները">${t('Активировать ключевые', 'Ակտիվացնել բանալիները')}</span></a></div>
     </div>
   </div>
+</div>
 </section>
 
-<!-- ===== GUARANTEE ===== -->
-<section id="guarantee" class="section nh-guarantee">
-  <div class="container">
-    <div class="nh-guar-grid">
-      <div class="nh-guar-text">
-        <div class="section-eyebrow">
-          <span data-ru="Гарантия безопасности" data-am="Անվտանգության երաշխիք">${t('Гарантия безопасности', 'Անվտանգության երաշխիք')}</span>
-        </div>
-        <h2 class="section-title" data-ru="Всё организовано и по полочкам. Наша команда" data-am="Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը">${t('Всё организовано и по полочкам. Наша команда', 'Ամեն ինչ կազմակերպված է և կարգավորված։ Մեր թիմը')}</h2>
-        <p class="nh-guar-desc" data-ru="За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе." data-am="Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Երբ նախագիծը վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:">${t('За всё время работы ни один кабинет клиента не получил блокировку. Каждый проект ведётся опытной командой с полным контролем на каждом этапе.', 'Աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի հաշիվ չի արգելափակվել: Երբ նախագիծը վարվում է փորձառու թիմի կողմից լիարժեք վերահսկողությամբ յուրաքանչյուր փուլում:')}</p>
-        <ul class="nh-guar-bullets">
-          <li><i class="fas fa-check"></i><span data-ru="Реальное поведение человека во время выкупа" data-am="Իրական մարդկային վարքագիծ գնում կատարելիս">${t('Реальное поведение человека во время выкупа', 'Իրական մարդկային վարքագիծ գնում կատարելիս')}</span></li>
-          <li><i class="fas fa-check"></i><span data-ru="Реальные аккаунты с историей покупок" data-am="Իրական հաշիվներ գնումների պատմությամբ">${t('Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ')}</span></li>
-          <li><i class="fas fa-check"></i><span data-ru="Естественное распределение по географии" data-am="Բնական աշխարհագրական բաշխում">${t('Естественное распределение по географии', 'Բնական աշխարհագրական բաշխում')}</span></li>
-        </ul>
-        <div class="nh-guar-badge">
-          <i class="fas fa-shield-alt"></i>
-          <span data-ru="0 блокировок за всё время работы" data-am="0 արգելափակում աշխատանքի ողջ ընթացքում">${t('0 блокировок за всё время работы', '0 արգելափակում աշխատանքի ողջ ընթացքում')}</span>
-        </div>
-        <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
-          <i class="fab fa-telegram"></i>
-          <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">${t('Начать продвижение', 'Սկսել առաջխաղացումը')}</span>
-        </a>
-      </div>
-      <div class="nh-guar-photo">
-        <img src="/static/img/warehouse1.jpg" alt="Go to Top" onerror="this.style.display='none'">
-      </div>
-    </div>
+<!-- ===== WHY BUYOUTS BY KEYWORDS ===== -->
+<section class="section" id="why-buyouts" data-section-id="why-buyouts">
+<div class="container">
+  <div class="section-header fade-up">
+    <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աշխատում.">${t('Почему это работает', 'Ինչու է սա աշխատում.')}</span></div>
+    <h2 class="section-title" data-ru="Почему выкупы по ключевым запросам — самый эффективный способ продвижения" data-am="Ինչու է գնումները բանալի բառերով — ամենա արդյունավետը">${isAM ? 'Ինչու է գնումները բանալի բառերով — ամենա արդյունավետը' : 'Почему выкупы по ключевым запросам — <span class="gr">самый эффективный способ</span> продвижения'}</h2>
   </div>
-</section>
 
-<!-- ===== TEAM QRs ===== -->
-<section class="section nh-qrs">
-  <div class="container">
-    <div class="section-eyebrow">
-      <span data-ru="Связаться с нами" data-am="Կապ հաստատել մեզ հետ">${t('Связаться с нами', 'Կապ հաստատել մեզ հետ')}</span>
+  <div class="why-block fade-up">
+    <h3><i class="fas fa-funnel-dollar"></i> <span data-ru="Мы не просто покупаем ваш товар — мы прокачиваем всю воронку" data-am="Մենք ոչ միայն գնում ենք — մենք բարձրացնում ենք բոլոր քայլերի կոնվերսիաները">${t('Мы не просто покупаем ваш товар — мы прокачиваем всю воронку', 'Մենք ոչ միայն գնում ենք — մենք բարձրացնում ենք բոլոր քայլերի կոնվերսիաները')}</span></h3>
+    <p data-ru="Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:" data-am="Յուրաքանչյուր գնում բանալի բառով — լիարժեք առաջխաղացման մեթոդ.">${t('Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:', 'Յուրաքանչյուր գնում բանալի բառով — լիարժեք առաջխաղացման մեթոդ.')}</p>
+    <div class="why-steps">
+      <div class="why-step"><div class="why-step-num">1</div><div><h4 data-ru="Поиск по ключевому запросу" data-am="Որոնում բանալի բառով">${t('Поиск по ключевому запросу', 'Որոնում բանալի բառով')}</h4><p data-ru="Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB" data-am="Գտնում ենք ձեր ապրանքը ճիշտ այնպես, ինչպես որոնում է իրական գնորդը՝ WB-ի որոնման տողի միջոցով">${t('Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB', 'Գտնում ենք ձեր ապրանքը ճիշտ այնպես, ինչպես որոնում է իրական գնորդը՝ WB-ի որոնման տողի միջոցով')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">2</div><div><h4 data-ru="Просмотр карточки" data-am="Քարտի դիտարկում">${t('Просмотр карточки', 'Քարտի դիտարկում')}</h4><p data-ru="Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход" data-am="Լիարժեք ուսումնասիրում ենք ֆոտոները, վիդեոները, նկարագրությունը. Բարելավում ենք վարքագծային գործոնները և CTR ցուցանիշը">${t('Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход', 'Լիարժեք ուսումնասիրում ենք ֆոտոները, վիդեոները, նկարագրությունը. Բարելավում ենք վարքագծային գործոնները և CTR ցուցանիշը')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">3</div><div><h4 data-ru="Работа с отзывами" data-am="Աշխատանք կարծիքների հետ">${t('Работа с отзывами', 'Աշխատանք կարծիքների հետ')}</h4><p data-ru="Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов" data-am="Թերթում ենք կարծիքները և հավանում դրականները՝ Հաճախորդները 70% ժամանակը անցկացնում են կարծիքների բաժնում">${t('Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов', 'Թերթում ենք կարծիքները և հավանում դրականները՝ Հաճախորդները 70% ժամանակը անցկացնում են կարծիքների բաժնում')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">4</div><div><h4 data-ru="Добавление конкурентов" data-am="Մրցակիցների ավելացում">${t('Добавление конкурентов', 'Մրցակիցների ավելացում')}</h4><p data-ru="Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя" data-am="Զամբյուղում ավելացնում ենք մրցակիցների ապրանքներ ձերի հետ միասին՝ կրկնօրինակելով իրական գնորդի վարքագիծը">${t('Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя', 'Զամբյուղում ավելացնում ենք մրցակիցների ապրանքներ ձերի հետ միասին՝ կրկնօրինակելով իրական գնորդի վարքագիծը')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">5</div><div><h4 data-ru="Удаление конкурентов из корзины" data-am="Մրցակիցների հեռացում զամբյուղից">${t('Удаление конкурентов из корзины', 'Մրցակիցների հեռացում զամբյուղից')}</h4><p data-ru="В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас" data-am="Պատվիրելու պահին մենք հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը. WB-ն տեսնում է, որ մարդիկ ընտրում են ձեզ">${t('В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас', 'Պատվիրելու պահին մենք հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը. WB-ն տեսնում է, որ մարդիկ ընտրում են ձեզ')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">6</div><div><h4 data-ru="Заказ и получение" data-am="Պատվեր և ստացում">${t('Заказ и получение', 'Պատվեր և ստացում')}</h4><p data-ru="Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя" data-am="Պատվիրում ենք ապրանքը, վերցնում ենք այն ստացման կետից և թողնում ենք կարծիք՝ իրական հաճախորդի ամբողջական ճանապարհ">${t('Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя', 'Պատվիրում ենք ապրանքը, վերցնում ենք այն ստացման կետից և թողնում ենք կարծիք՝ իրական հաճախորդի ամբողջական ճանապարհ')}</p></div></div>
     </div>
-    <h2 class="section-title" data-ru="Сканируйте QR — пишите в любой удобный мессенджер" data-am="Սկանավորեք QR-ը — գրեք ձեզ հարմար ցանկացած մեսենջերով">${t('Сканируйте QR — пишите в любой удобный мессенджер', 'Սկանավորեք QR-ը — գրեք ձեզ հարմար ցանկացած մեսենջերով')}</h2>
-    <div class="nh-qr-grid">
-      ${[
-        { lRu: 'Наш Instagram', lAm: 'Մեր Instagram', qr: '/static/img/qr/qr-instagram.png', link: 'https://www.instagram.com/goo_to_top/', icon: 'fa-instagram', brand: 'Instagram' },
-        { lRu: 'Telegram чат', lAm: 'Telegram чат', qr: '/static/img/qr/qr-telegram.png', link: 'https://t.me/goo_to_top', icon: 'fa-telegram', brand: 'Telegram' },
-        { lRu: 'Наш Facebook', lAm: 'Մեր Facebook', qr: '/static/img/qr/qr-facebook.png', link: 'https://www.facebook.com/gototop.wb', icon: 'fa-facebook', brand: 'Facebook' },
-        { lRu: 'WhatsApp', lAm: 'WhatsApp', qr: '/static/img/qr/qr-whatsapp.png', link: 'https://wa.me/37455226224', icon: 'fa-whatsapp', brand: 'WhatsApp' },
-      ].map(q => `
-        <a href="${q.link}" target="_blank" rel="noopener" class="nh-qr-card">
-          <img src="${q.qr}" alt="${q.brand} QR" onerror="this.style.display='none'">
-          <div class="nh-qr-meta">
-            <i class="fab ${q.icon}"></i>
-            <span data-ru="${q.lRu}" data-am="${q.lAm}">${t(q.lRu, q.lAm)}</span>
-          </div>
-        </a>
-      `).join('')}
-    </div>
+    <div class="highlight-result" data-ru="Результат: повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Արդյունքում՝ ձեր ապրանքը բարձրանում է 3-4-րդ էջերից և ամրապնդվում է TOP-ում 7-ից 14 օրերի ընթացքում՝ ձեր բանալի բառերով։ Ստանում եք բարձր վարկանիշ և կայուն օրգանիկ վաճառքներ։"><i class="fas fa-bolt"></i> ${isAM ? 'Արդյունքում՝ ձեր ապրանքը բարձրանում է 3-4-րդ էջերից և ամրապնդվում է TOP-ում 7-ից 14 օրերի ընթացքում՝ ձեր բանալի բառերով։ Ստանում եք բարձր վարկանիշ և կայուն օրգանիկ վաճառքներ։' : '<strong>Результат:</strong> повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.'}</div>
   </div>
-</section>
 
-<!-- ===== FAQ SHORT ===== -->
-<section id="faq" class="section nh-faq">
-  <div class="container">
-    <div class="section-eyebrow">
-      <span data-ru="Часто задаваемые вопросы" data-am="Հաճախ տրվող հարցեր">${t('Часто задаваемые вопросы', 'Հաճախ տրվող հարցեր')}</span>
-    </div>
-    <h2 class="section-title" data-ru="Коротко о главном" data-am="Համառոտ՝ կարևորի մասին">${t('Коротко о главном', 'Համառոտ՝ կարևորի մասին')}</h2>
-    <div class="nh-faq-list">
-      ${[
-        {
-          qRu: 'Могут ли заблокировать мой кабинет?',
-          qAm: 'Կարող են արգելափակել իմ կաբինետը։',
-          aRu: 'За всё время нашей работы ни один кабинет клиента не получил блокировку. Мы используем реальные аккаунты с историей покупок, собственный склад и естественное распределение по географии.',
-          aAm: 'Մեր աշխատանքի ողջ ընթացքում ոչ մի հաճախորդի կաբինետ չի արգելափակվել: Մենք օգտագործում ենք իրական հաշիվներ գնումների պատմությամբ, սեփական պահեստ և բնական աշխարհագրական բաշխում:'
-        },
-        {
-          qRu: 'Как быстро начнётся продвижение?',
-          qAm: 'Ինչքան արագ կսկսվի առաջխաղացումը։',
-          aRu: 'В течение 24 часов после согласования стратегии и оплаты.',
-          aAm: '24 ժամվա ընթացքում ստրատեգիայի համաձայնեցումից և վճարման հետո:'
-        },
-        {
-          qRu: 'Выкупы делают реальные люди или боты?',
-          qAm: 'Գնումները կատարում են իրական մարդիկ թե բոտեր։',
-          aRu: 'Только реальные люди. У нас собственный склад с устройствами и реальными аккаунтами. Каждый выкуп делается вручную, никаких ботов.',
-          aAm: 'Միայն իրական մարդիկ: Մենք ունենք սեփական պահեստ սարքերով և իրական հաշիվներով: Եվ գնումները կատարվում են ձեռքով, ոչ մի բոտ:'
-        }
-      ].map((f, i) => {
-        const e = (s: string) => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;')
-        const qText = isAM ? f.qAm : f.qRu
-        const aText = isAM ? f.aAm : f.aRu
-        return `
-        <div class="faq-item nh-faq-item">
-          <button class="faq-q" type="button" onclick="toggleFaq(this)" aria-expanded="false">
-            <span data-ru="${e(f.qRu)}" data-am="${e(f.qAm)}">${e(qText)}</span>
-            <i class="fas fa-chevron-down faq-i"></i>
-          </button>
-          <div class="faq-a">
-            <p data-ru="${e(f.aRu)}" data-am="${e(f.aAm)}">${e(aText)}</p>
-          </div>
-        </div>`
-      }).join('')}
-    </div>
-    <div class="nh-faq-more">
-      <a href="/faq" class="btn btn-outline">
-        <span data-ru="Все вопросы" data-am="Բոլոր հարցերը">${t('Все вопросы', 'Բոլոր հարցերը')}</span>
-        <i class="fas fa-arrow-right"></i>
-      </a>
-    </div>
+  <div class="section-cta">
+    <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы" data-am="Սկսել գնումները">${t('Начать выкупы', 'Սկսել գնումները')}</span></a>
   </div>
+</div>
 </section>
 `
 
-  // Subpage-style CSS scoped to .nh-* classes so it doesn't collide with
-  // the existing legacy landing CSS (which uses .hero, .services, etc.).
+  // CSS — pixel-1:1 copy from the legacy `app.get('/')` <style> block,
+  // but pruned down to only the rules used by the 6 sections above. Hosted
+  // here as `extraHead` so renderPageShell injects it into <head>; it does
+  // NOT collide with the legacy landing's CSS because the legacy page is
+  // served from a different route (`/`) by a different render function.
   const extraHead = `
 <style>
-.nh-hero{padding:140px 0 60px;position:relative;overflow:hidden}
-.nh-hero::before{content:'';position:absolute;top:-120px;right:-120px;width:480px;height:480px;background:radial-gradient(circle,rgba(139,92,246,0.18),transparent 70%);pointer-events:none}
-.nh-hero-grid{display:grid;grid-template-columns:1.15fr 1fr;gap:48px;align-items:center;position:relative;z-index:1}
-.nh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent-light);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
-.nh-hero-text h1{font-size:clamp(2rem,4.6vw,3.4rem);font-weight:800;line-height:1.12;margin-bottom:18px;letter-spacing:-0.02em}
-.nh-hero-text h1 span{display:block}
-.nh-hero-text h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
-.nh-hero-desc{font-size:1.02rem;color:var(--text-sec);margin-bottom:24px;line-height:1.7;max-width:580px}
-.nh-hero-stats{display:grid;grid-template-columns:repeat(3,auto);gap:36px;margin-bottom:28px}
-.nh-hs-num{font-size:clamp(2rem,3.6vw,2.6rem);font-weight:900;color:var(--purple);line-height:1}
-.nh-hs-lbl{font-size:0.82rem;color:var(--text-muted);margin-top:6px;font-weight:500}
-.nh-hero-cta{display:flex;gap:12px;flex-wrap:wrap}
-.nh-hero-photo{position:relative}
-.nh-hero-photo img{width:100%;border-radius:var(--r-lg);box-shadow:0 24px 60px rgba(0,0,0,0.4);background:var(--bg-card)}
-.nh-photo-badge{position:absolute;bottom:18px;left:18px;display:inline-flex;align-items:center;gap:8px;padding:10px 16px;background:rgba(15,10,26,0.85);backdrop-filter:blur(12px);border:1px solid rgba(139,92,246,0.4);border-radius:50px;font-size:0.84rem;color:var(--text);font-weight:600}
-.nh-photo-badge i{color:var(--accent-light)}
-@media(max-width:900px){.nh-hero{padding:120px 0 40px}.nh-hero-grid{grid-template-columns:1fr;gap:32px}.nh-hero-stats{gap:24px}.nh-hero-cta .btn{flex:1;justify-content:center}}
-@media(max-width:540px){.nh-hero-stats{grid-template-columns:repeat(3,1fr);gap:14px}.nh-hs-num{font-size:1.6rem}.nh-hs-lbl{font-size:0.7rem}}
+/* === HERO === */
+.hero{padding:120px 0 60px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-50%;right:-30%;width:80%;height:150%;background:radial-gradient(ellipse,rgba(139,92,246,0.08) 0%,transparent 70%);pointer-events:none}
+.hero-grid{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);grid-template-areas:"title photo" "texts photo" "stats photo" "buttons photo";gap:0 60px;align-items:start;position:relative;z-index:1}
+.hero-el-title{grid-area:title}
+.hero-el-texts{grid-area:texts}
+.hero-el-stats{grid-area:stats;margin-bottom:36px}
+.hero-el-buttons{grid-area:buttons}
+.hero-image{grid-area:photo;align-self:start;display:flex;flex-direction:column;gap:16px}
+.hero-photo-wrap{position:relative;width:100%}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;padding:8px 18px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.85rem;font-weight:500;color:var(--accent-light);margin-bottom:24px}
+.hero h1{font-size:clamp(2rem,4.4vw,3rem);font-weight:800;line-height:1.15;margin-bottom:20px;letter-spacing:-0.02em}
+.hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.hero-desc{font-size:1.05rem;color:var(--text-sec);margin-bottom:32px;max-width:520px;line-height:1.8}
+.hero-stats{display:flex;gap:32px}
+.stat{text-align:left}
+.stat-num{font-size:2rem;font-weight:800;color:var(--purple)}
+.stat-label{font-size:0.78rem;color:var(--text-muted);margin-top:2px}
+.hero-buttons{display:flex;gap:16px;flex-wrap:wrap}
+.hero-image img,.hero-photo-wrap img{border-radius:var(--r-lg);width:100%;height:auto;aspect-ratio:3/4;max-height:520px;object-fit:cover;object-position:center;border:1px solid var(--border);display:block;background:var(--bg-card)}
+.hero-badge-img{position:absolute;bottom:20px;left:20px;background:rgba(15,10,26,0.9);backdrop-filter:blur(10px);padding:12px 18px;border-radius:var(--r-sm);display:flex;align-items:center;gap:10px;border:1px solid var(--border)}
+.hero-badge-img i{color:var(--success);font-size:1.1rem}
+.hero-badge-img span{font-size:0.85rem;font-weight:500}
 
-/* services */
-.nh-services{padding:80px 0}
-.section-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.25);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent-light);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
-.section-title{font-size:clamp(1.6rem,3.4vw,2.4rem);font-weight:800;line-height:1.2;margin-bottom:14px;letter-spacing:-0.02em;text-align:center}
-.section-sub{font-size:1rem;color:var(--text-sec);max-width:720px;margin:0 auto 40px;line-height:1.7;text-align:center}
-.nh-services-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
-.nh-svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px 24px;transition:var(--t);display:flex;flex-direction:column}
-.nh-svc-card:hover{border-color:rgba(139,92,246,0.5);transform:translateY(-4px);box-shadow:0 20px 50px rgba(139,92,246,0.18)}
-.nh-svc-icon{width:56px;height:56px;border-radius:14px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:#fff;margin-bottom:18px}
-.nh-svc-card h3{font-size:1.18rem;font-weight:700;margin-bottom:10px;color:var(--text)}
-.nh-svc-desc{font-size:0.92rem;color:var(--text-sec);margin-bottom:18px;line-height:1.65}
-.nh-svc-bullets{list-style:none;padding:0;margin:0 0 22px;display:flex;flex-direction:column;gap:8px}
-.nh-svc-bullets li{display:flex;align-items:flex-start;gap:10px;font-size:0.88rem;color:var(--text-sec)}
-.nh-svc-bullets i{color:var(--accent-light);font-size:0.8rem;margin-top:5px}
-.nh-svc-card .btn{margin-top:auto;justify-content:center;font-size:0.92rem;padding:12px 22px}
-@media(max-width:900px){.nh-services-grid{grid-template-columns:1fr;gap:18px}.nh-svc-card{padding:26px 22px}}
+/* === BUTTONS (extra variants used on home) === */
+.btn-tg{background:linear-gradient(135deg,#0088cc,#0077b5);color:white;box-shadow:0 4px 15px rgba(0,136,204,0.3)}
+.btn-tg:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(0,136,204,0.5)}
+.btn-success{background:linear-gradient(135deg,#10B981,#059669);color:white;box-shadow:0 4px 15px rgba(16,185,129,0.3)}
+.btn-success:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(16,185,129,0.5)}
+.btn-warning{background:linear-gradient(135deg,#F59E0B,#D97706);color:white;box-shadow:0 4px 15px rgba(245,158,11,0.3)}
+.btn-warning:hover{transform:translateY(-2px);box-shadow:0 8px 30px rgba(245,158,11,0.5)}
 
-/* guarantee */
-.nh-guarantee{padding:80px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.nh-guar-grid{display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:center}
-.nh-guar-text .section-title{text-align:left}
-.nh-guar-desc{font-size:1rem;color:var(--text-sec);line-height:1.7;margin-bottom:22px}
-.nh-guar-bullets{list-style:none;padding:0;margin:0 0 26px;display:flex;flex-direction:column;gap:10px}
-.nh-guar-bullets li{display:flex;align-items:flex-start;gap:10px;font-size:0.95rem;color:var(--text)}
-.nh-guar-bullets i{color:var(--accent-light);margin-top:5px}
-.nh-guar-badge{display:inline-flex;align-items:center;gap:10px;padding:12px 22px;border:1px solid rgba(34,197,94,0.4);background:rgba(34,197,94,0.1);border-radius:50px;color:#86efac;font-weight:600;font-size:0.92rem;margin-bottom:24px}
-.nh-guar-photo img{width:100%;border-radius:var(--r-lg);box-shadow:0 24px 60px rgba(0,0,0,0.4);background:var(--bg-card)}
-@media(max-width:900px){.nh-guar-grid{grid-template-columns:1fr;gap:32px}}
+/* === QR CODES === */
+.qr-codes-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.qr-card{display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px;background:rgba(139,92,246,0.05);border:1px solid rgba(139,92,246,0.15);border-radius:12px;transition:all 0.2s;text-decoration:none;color:var(--text)}
+.qr-card:hover{border-color:var(--purple);background:rgba(139,92,246,0.1);transform:translateY(-2px)}
+.qr-card img{width:80px;height:80px;object-fit:contain;border-radius:8px;background:#fff;padding:4px}
+.qr-card span{font-size:0.7rem;font-weight:600;color:var(--text-sec);text-align:center}
 
-/* QR cards */
-.nh-qrs{padding:80px 0}
-.nh-qrs .section-eyebrow,.nh-qrs .section-title{display:block;text-align:center;margin-left:auto;margin-right:auto}
-.nh-qr-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:32px}
-.nh-qr-card{display:flex;flex-direction:column;align-items:center;gap:12px;padding:22px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);transition:var(--t);text-decoration:none}
-.nh-qr-card:hover{border-color:rgba(139,92,246,0.45);transform:translateY(-3px);box-shadow:0 18px 40px rgba(139,92,246,0.15)}
-.nh-qr-card img{width:100%;max-width:160px;aspect-ratio:1/1;background:#fff;border-radius:12px;padding:8px}
-.nh-qr-meta{display:flex;align-items:center;gap:8px;font-size:0.88rem;color:var(--text);font-weight:600}
-.nh-qr-meta i{font-size:1.1rem;color:var(--accent-light)}
-@media(max-width:900px){.nh-qr-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:480px){.nh-qr-grid{grid-template-columns:1fr;max-width:280px;margin-left:auto;margin-right:auto}}
+/* === TICKER === */
+.ticker{padding:20px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden}
+.ticker-track{display:flex;animation:ticker 40s linear infinite;white-space:nowrap}
+.ticker-item{display:flex;align-items:center;gap:10px;padding:0 40px;font-size:0.88rem;color:var(--text-sec);flex-shrink:0}
+.ticker-item i{color:var(--purple)}
+@keyframes ticker{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
-/* FAQ short */
-.nh-faq{padding:80px 0;background:var(--bg-surface);border-top:1px solid var(--border)}
-.nh-faq .section-eyebrow,.nh-faq .section-title{display:block;text-align:center;margin-left:auto;margin-right:auto}
-.nh-faq-list{max-width:780px;margin:32px auto 28px;display:flex;flex-direction:column;gap:12px}
-.nh-faq-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);overflow:hidden}
-.nh-faq-item .faq-q{width:100%;padding:18px 22px;background:transparent;border:none;color:var(--text);font-size:1rem;font-weight:600;text-align:left;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:14px}
-.nh-faq-item .faq-q:hover{color:var(--accent-light)}
-.nh-faq-item .faq-i{transition:transform 0.3s ease;color:var(--text-muted)}
-.nh-faq-item.active .faq-i{transform:rotate(180deg);color:var(--accent-light)}
-.nh-faq-item .faq-a{max-height:0;overflow:hidden;transition:max-height 0.4s ease;padding:0 22px}
-.nh-faq-item.active .faq-a{max-height:600px;padding-bottom:18px}
-.nh-faq-item .faq-a p{font-size:0.94rem;color:var(--text-sec);line-height:1.7}
-.nh-faq-more{text-align:center}
+/* === WB BANNER === */
+.wb-banner{padding:20px 0;background:var(--bg-surface);border-bottom:1px solid var(--border)}
+.wb-banner-inner{display:flex;align-items:center;justify-content:center;gap:24px;flex-wrap:wrap}
+.wb-banner-card{display:flex;align-items:center;gap:16px;padding:16px 28px;background:linear-gradient(135deg,#ff3366,var(--purple));border-radius:var(--r);flex:1;min-width:280px;position:relative;overflow:hidden}
+.wb-banner-card::after{content:"!";position:absolute;right:16px;top:50%;transform:translateY(-50%);font-size:3.5rem;font-weight:900;color:rgba(255,255,255,0.15)}
+.wb-banner-card .wb-icon{font-size:1.6rem;color:#fff}
+.wb-banner-card .wb-text{font-weight:800;font-size:1rem;color:#fff;line-height:1.3;text-transform:uppercase}
+.wb-banner-right{display:flex;align-items:center;gap:16px;padding:16px 28px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);flex:1;min-width:280px}
+.wb-banner-right .wb-r-icon{font-size:1.4rem}
+.wb-banner-right .wb-r-text{font-weight:700;font-size:0.92rem;line-height:1.4}
+.wb-banner-right .btn{margin-left:auto;white-space:nowrap;font-size:0.82rem;padding:10px 20px}
+
+/* === STATS BAR === */
+.stats-bar{padding:60px 0;background:var(--bg-surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:32px;text-align:center}
+.stat-card .stat-big{font-size:clamp(2rem,3.4vw,2.8rem);font-weight:900;color:var(--purple);line-height:1}
+.stat-card .stat-desc{font-size:0.88rem;color:var(--text-sec);margin-top:6px;font-weight:500}
+
+/* === SECTION HEADERS (services / why-buyouts shared) === */
+.section{padding:56px 0;overflow:visible}
+.section-header{text-align:center;margin-bottom:40px}
+.section-badge{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent-light);margin-bottom:16px;text-transform:uppercase;letter-spacing:0.5px}
+.section-title{font-size:clamp(1.6rem,3.4vw,2.2rem);font-weight:800;line-height:1.2;margin-bottom:16px;letter-spacing:-0.02em}
+.section-title .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.section-sub{font-size:1rem;color:var(--text-sec);max-width:640px;margin:0 auto;line-height:1.7}
+.section-cta{display:flex;gap:14px;justify-content:center;align-items:center;flex-wrap:wrap;margin-top:28px;padding-top:24px;border-top:1px solid var(--border)}
+.section-cta .btn{font-size:0.9rem;padding:12px 24px}
+
+/* === SERVICES === */
+.services-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:28px;margin-bottom:16px}
+.svc-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:32px;transition:var(--t);position:relative;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.06);display:flex;flex-direction:column}
+.svc-card:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-4px);box-shadow:0 20px 50px rgba(139,92,246,0.18)}
+.svc-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--purple),var(--accent-light));opacity:1}
+.svc-icon{width:56px;height:56px;border-radius:14px;background:rgba(139,92,246,0.1);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple);margin-bottom:20px}
+.svc-card h3{font-size:1.2rem;font-weight:700;margin-bottom:10px}
+.svc-card p{color:var(--text-sec);font-size:0.92rem;line-height:1.7;margin-bottom:16px}
+.svc-features{list-style:none;flex:1;padding:0}
+.svc-features li{display:flex;align-items:flex-start;gap:10px;padding:5px 0;font-size:0.88rem;color:var(--text-sec)}
+.svc-features li i{color:var(--success);margin-top:4px;font-size:0.78rem}
+
+/* === WHY BUYOUTS / 6 STEPS === */
+.why-block{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:40px;margin-bottom:24px}
+.why-block h3{font-size:1.3rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+.why-block h3 i{color:var(--purple);font-size:1.1rem}
+.why-block p{color:var(--text-sec);font-size:0.92rem;line-height:1.8;margin-bottom:16px}
+.why-steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:24px 0}
+.why-step{background:var(--bg-surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;display:flex;gap:14px;align-items:flex-start;transition:var(--t)}
+.why-step:hover{border-color:rgba(139,92,246,0.3);transform:translateY(-2px)}
+.why-step-num{width:36px;height:36px;min-width:36px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--accent-light));color:white;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.85rem}
+.why-step h4{font-size:0.95rem;font-weight:600;margin-bottom:4px}
+.why-step p{font-size:0.85rem;color:var(--text-sec);line-height:1.6;margin:0}
+.highlight-result{background:linear-gradient(135deg,rgba(139,92,246,0.08),rgba(168,85,247,0.08));border:1px solid rgba(139,92,246,0.2);border-radius:var(--r);padding:20px 24px;margin:20px 0;font-size:0.95rem;line-height:1.7}
+.highlight-result i{color:var(--purple);margin-right:8px}
+.highlight-result strong{color:var(--text)}
+
+/* Mobile tightening */
+@media(max-width:900px){
+  .hero{padding:100px 0 40px}
+  .hero-grid{grid-template-columns:1fr;grid-template-areas:"title" "photo" "texts" "stats" "buttons";gap:24px}
+  .hero-image{align-self:stretch}
+  .hero-stats{flex-wrap:wrap;gap:18px}
+  .stats-grid{grid-template-columns:repeat(2,1fr);gap:24px}
+  .why-steps{grid-template-columns:1fr}
+  .qr-codes-grid{grid-template-columns:repeat(4,1fr);gap:8px}
+  .qr-card img{width:56px;height:56px}
+  .qr-card span{font-size:0.6rem}
+  .qr-card{padding:8px}
+  .why-block{padding:24px}
+}
+@media(max-width:480px){
+  .qr-codes-grid{grid-template-columns:repeat(2,1fr)}
+}
 </style>`
+
 
   // SEO: BreadcrumbList for the new home (only one node — itself).
   const jsonLd = `<script type="application/ld+json">${JSON.stringify({
@@ -3602,7 +3617,7 @@ export function renderNewHomePage(opts: {
     lang,
     siteOrigin,
     seo,
-    bodyClass: 'home-new-page',
+    bodyClass: 'home-page',
     mainHtml,
     extraHead: extraHead + jsonLd,
   })
@@ -7032,14 +7047,14 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   return c.html(pageHtml);
 })
 
-// ===== PHASE 5: NEW HOME (staging at /home-new) =====
+// ===== PHASE 5: NEW HOME (staging at /home) =====
 // Subpage-styled rebuild of the home page. Will replace the legacy
 // `/` handler in Phase 6 once content is approved by the owner. Uses
 // the same renderPageShell as the other subpages so navigation, footer,
 // counter logic and i18n are 100% consistent.
 // __SITE_DATA injection mirrors /services and /buyouts so any future
 // calculator block on this page can render without an extra DB round-trip.
-app.get('/home-new', async (c) => {
+app.get('/home', async (c) => {
   c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
 
   const reqUrl = new URL(c.req.url);
