@@ -102,3 +102,22 @@
 
 ### Деплой
 - `CACHE_VERSION` bump'нут `v16 → v17` (`src/lib/cache-config.ts`) для сброса edge-кеша `CACHEABLE_PATHS` после деплоя.
+
+---
+
+## Phase 3C-hotfix — счётчики на /buyouts (2026-05-07)
+
+**Симптом:** на live `/buyouts` счётчики hero-секции (500, 1 000+, 21, 200+) застревают в начальном состоянии `0 / 0+ / 0 / 0+`. На главной аналогичные `.stat-big[data-count-s]` работают, потому что страница помечается `<html class="server-injected">` и блоки получают `.section-revealed` мгновенно. На подстраницах этого класса нет → CSS `.stats-bar{opacity:0}` держит контейнер невидимым, а `forceRunCounters()` хоть и стартует, но реально завершить анимацию мог не успеть до того, как пользователь делал скриншот / уходил со страницы (а в редких race-кейсах rAF на уже невидимом элементе вообще не отрабатывал).
+
+**Файл:** `public/static/landing.js`
+
+**Что сделано (две страховки + bump кеша):**
+1. **`immediateReveal()`** теперь умеет работать и для подстраниц: если у `<main>` есть `data-page` ≠ `home`, мы сразу же ставим `section-revealed` на `div.wb-banner`, `div.stats-bar`, `div.ticker`, `div.slot-counter-bar`. Это снимает зависимость от завершения `loadSiteData` и от 8-секундного safety-fallback'a — hero и stat-bar становятся видимы с первого кадра рендера.
+2. **«Ultimate counter fallback»** — новый `setTimeout(..., 3000)` после `forceRunCounters`: если через 3 секунды у любого `.stat-num[data-count]` или `.stat-big[data-count-s]` числовая часть всё ещё `'0'` при положительном `target`, мы форсированно подставляем финальное число (`target.toLocaleString('ru-RU') + '+'?`), сохраняя плюс из исходного `textContent`. Анимации не будет, но «нолика» — точно тоже.
+3. `CACHE_VERSION` поднят `v17 → v18` чтобы Cloudflare edge не отдавал старую страницу с кешем.
+
+**Acceptance:**
+- `node -c public/static/landing.js` — OK
+- `npm run build` — OK (`dist/_worker.js` ≈ 2 161 KB)
+- В бандле виден `v18` (1 occurrence в `CACHE_VERSION`); в `landing.js` — `ULTIMATE COUNTER FALLBACK` (1) и `isSubpage` (4).
+- Никаких изменений в `index.tsx`, `admin/*`, `db.ts`, `pdf.ts`. Поведение главной не задето: ветка `isServerInjected` без изменений.

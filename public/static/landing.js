@@ -1094,6 +1094,29 @@ if (document.readyState === 'loading') {
 window.addEventListener('load', function() { setTimeout(forceRunCounters, 200); });
 setTimeout(forceRunCounters, 1500);
 
+/* ===== ULTIMATE COUNTER FALLBACK =====
+   If for ANY reason RAF / IntersectionObserver / forceRunCounters all fail
+   (rare race conditions, browser throttling background tabs, etc.) we still
+   force-set the FINAL number after 3s, so the user never sees "0" stuck.
+   We also guarantee stats-bar / wb-banner / ticker visibility (in case the
+   reveal cascade in loadSiteData never finished). */
+setTimeout(function() {
+  try {
+    document.querySelectorAll('.stats-bar:not(.section-revealed),.wb-banner:not(.section-revealed),.ticker:not(.section-revealed),.slot-counter-bar:not(.section-revealed)').forEach(function(s) { s.classList.add('section-revealed'); });
+    document.querySelectorAll('.stat-num[data-count]').forEach(function(el) {
+      var t = parseInt(el.dataset.count) || 0;
+      var stuck = el.textContent.replace(/[^0-9]/g, '') === '0' && t > 0;
+      if (stuck) { el.textContent = t.toLocaleString('ru-RU'); el.dataset.counterDone = '1'; }
+    });
+    document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) {
+      var t = parseInt(el.dataset.countS) || 0;
+      var hasPlus = (el.textContent || '').indexOf('+') !== -1;
+      var stuck = el.textContent.replace(/[^0-9]/g, '') === '0' && t > 0;
+      if (stuck) { el.textContent = t.toLocaleString('ru-RU') + (hasPlus ? '+' : ''); el.dataset.counterDone = '1'; }
+    });
+  } catch(e) {}
+}, 3000);
+
 /* ===== SMOOTH SCROLL ===== */
 document.querySelectorAll('a[href^="#"]').forEach(function(a) {
   a.addEventListener('click', function(e) {
@@ -1537,9 +1560,15 @@ switchLang = function(l) {
 };
 
 // ===== IMMEDIATE SECTION REVEAL (before loadSiteData) =====
-// On server-injected pages, reveal all sections IMMEDIATELY — don't wait for data loading
+// On server-injected pages, reveal all sections IMMEDIATELY — don't wait for data loading.
+// On subpages (/about, /services, /buyouts, /faq, /contacts, /referral) we ALSO reveal
+// stats-bar / wb-banner / ticker right away so counter animation isn't held back by an
+// invisible (opacity:0) container while loadSiteData is still in flight.
 (function immediateReveal() {
-  var isServerInjected = document.documentElement.classList.contains('server-injected');
+  var html = document.documentElement;
+  var isServerInjected = html.classList.contains('server-injected');
+  var page = (document.querySelector('main[data-page]') || {}).dataset && document.querySelector('main[data-page]').dataset.page;
+  var isSubpage = page && page !== 'home';
   if (isServerInjected) {
     document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(sec) {
       sec.classList.add('section-revealed');
@@ -1547,6 +1576,11 @@ switchLang = function(l) {
     });
     var ft = document.querySelector('footer.footer');
     if (ft) ft.style.opacity = '1';
+  } else if (isSubpage) {
+    // Reveal hero-adjacent banners/stats on subpages so they're visible from the start.
+    document.querySelectorAll('div.wb-banner, div.stats-bar, div.ticker, div.slot-counter-bar').forEach(function(sec) {
+      sec.classList.add('section-revealed');
+    });
   }
 })();
 
