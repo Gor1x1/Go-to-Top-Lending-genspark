@@ -1871,15 +1871,17 @@ section#fifty-vs-fifty .why-block > *{order:0!important}
 section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 /* === REVIEWS PROOF (продают / не продают) === */
 #reviews-proof .rp-compare{display:grid;grid-template-columns:1fr auto 1fr;gap:24px;align-items:stretch;margin:24px 0 12px}
-#reviews-proof .rp-col{background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;display:flex;flex-direction:column}
+#reviews-proof .rp-col{background:var(--bg-card);border:2px solid var(--border);border-radius:var(--r-lg);padding:0;overflow:hidden;display:flex;flex-direction:column;transition:transform 0.3s ease,box-shadow 0.3s ease}
+#reviews-proof .rp-col:hover{transform:translateY(-4px);box-shadow:0 16px 48px rgba(0,0,0,0.3)}
 .rp-good{border-color:rgba(16,185,129,0.45)}
 .rp-bad{border-color:rgba(239,68,68,0.45)}
 .rp-label{display:flex;align-items:center;justify-content:center;gap:10px;padding:14px 18px;font-size:0.95rem;font-weight:800;letter-spacing:0.4px;text-transform:uppercase;color:#fff}
 .rp-label-good{background:linear-gradient(135deg,#10B981,#059669)}
 .rp-label-bad{background:linear-gradient(135deg,#EF4444,#B91C1C)}
 .rp-label i{font-size:1.1rem}
-.rp-img{display:block;background:#000;text-align:center;line-height:0}
-#reviews-proof .rp-img img{width:100%;max-height:520px;object-fit:contain;display:block;touch-action:manipulation;-webkit-user-drag:none;-webkit-touch-callout:none;user-select:none}
+.rp-img{display:block;overflow:hidden;line-height:0;background:var(--bg-card)}
+#reviews-proof .rp-img img{width:100%;height:auto;display:block;cursor:default;pointer-events:none;transition:transform 0.35s ease;-webkit-user-drag:none;user-select:none}
+#reviews-proof .rp-col:hover .rp-img img{transform:scale(1.04)}
 .rp-text{padding:20px 22px 24px}
 .rp-text h4{font-size:1rem;font-weight:700;margin:0 0 10px;line-height:1.35}
 .rp-good .rp-text h4{color:#10B981}
