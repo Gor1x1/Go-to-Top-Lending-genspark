@@ -568,9 +568,41 @@ npx wrangler pages deploy dist --project-name gototop-lending
 
 - **Платформа**: Cloudflare Pages + D1
 - **Статус**: ✅ Активен
-- **Версия**: v0.6.0 (Phase 3C — CMS-интеграция подстраниц)
-- **CACHE_VERSION**: `v17` (`src/lib/cache-config.ts`) — бампать на каждом деплое
-- **Последнее обновление**: 2026-05-07
+- **Версия**: v0.7.0 (Phase 4 — Полный профессиональный CMS)
+- **CACHE_VERSION**: `v28` (`src/lib/cache-config.ts`) — бампать на каждом деплое
+- **Последнее обновление**: 2026-05-08
 - **Cloudflare Project**: `gototop-lending`
 - **D1 Database**: `gototop-production-eu` (ID: `f49b080f-516f-4ed0-84e9-0efdea1e8a2a`)
 - **Подробности недавних правок**: см. [`FIX_LOG.md`](FIX_LOG.md)
+
+### Что появилось в Phase 4
+
+**Часть А — все тексты сайта редактируются через админку.**
+Любой видимый текст и подпись кнопки на сайте читается из таблицы `site_blocks` через helper `tb()`. Если запись отсутствует или скрыта — fallback на тот же текст, что и раньше. CMS-блоки покрывают: shell (шапка/футер/модалка/попапы/нижняя навигация), `home`, `calculator`, `package`, `blog` (chrome), плюс уже существовавшие about/services/buyouts/faq/contacts/referral. Армянские опечатки правятся через админку, без правки кода.
+
+**Часть Б — раздел «Управление сайтом» стал полноценным CMS-интерфейсом.**
+12 фич реализованы:
+1. Группировка блоков по страницам с заголовками и счётчиками
+2. Drag-and-drop блоков между страницами (rename `block_key`-префикса)
+3. Side-by-side двуязычный редактор (RU и AM в две колонки)
+4. Массовые действия (выделить чекбоксами → скрыть/показать/удалить/перенести)
+5. Подсказки везде (`title=""`, hint-тексты, empty states с CTA)
+6. Status badges (видимость, заполненность, CMS/Дефолт)
+7. Шаблоны блоков (Hero / 3-cards / CTA / FAQ / Преимущества / Two-column)
+8. Живой preview через slide-in iframe (RU/AM toggle, reload, открыть в новой вкладке)
+9. Экспорт / импорт всей БД блоков в JSON
+10. История изменений (таблица `site_blocks_history`, восстановление одним кликом)
+11. Адаптив админки под планшеты/мобильные
+12. Горячие клавиши (`/`, `Esc`, `Ctrl+A`, `Ctrl+Shift+E`, `Ctrl+S`)
+
+**Backend endpoints (новые):**
+- `POST /api/admin/site-blocks/seed-pro` — idempotent seed для shell/home/calculator/package/blog (нажимается из empty state админки)
+- `POST /api/admin/site-blocks/bulk-visibility` — `{ ids, is_visible }`
+- `POST /api/admin/site-blocks/bulk-delete` — `{ ids }`
+- `POST /api/admin/site-blocks/move-page` — `{ id, new_page }`
+- `GET /api/admin/site-blocks/export` — JSON-дамп
+- `POST /api/admin/site-blocks/import` — `{ blocks: [...] }`
+- `GET /api/admin/site-blocks/:id/history?limit=50`
+- `POST /api/admin/site-blocks/:id/restore/:historyId`
+
+**После деплоя:** в админке → раздел «Управление сайтом» → нажать кнопку **«Загрузить шаблоны Phase 4»** в empty state (или напрямую `seed-pro` endpoint). Это создаёт в БД 18 новых CMS-блоков с дефолтными текстами 1:1 как fallback'и.

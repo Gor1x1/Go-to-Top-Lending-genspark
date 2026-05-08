@@ -1,10 +1,66 @@
 /**
  * Admin API — Site blocks constructor, import, sync, image upload/serving
+ *
+ * Phase 4 additions:
+ *   - History/restore: every UPDATE/DELETE writes a JSON snapshot to
+ *     `site_blocks_history` so admins can roll back. List + restore
+ *     endpoints below.
+ *   - Bulk actions: bulk visibility toggle / bulk delete / move blocks
+ *     between pages (renames the `<page>__` prefix in `block_key`).
+ *   - Export / Import: full JSON dump for backup, idempotent INSERT OR
+ *     REPLACE on import (matches by `block_key`).
+ *   - Pro seed: massively extended `seed-subpages` payload now covers
+ *     home / calculator / package / shell / blog chrome on top of the
+ *     existing 6 subpages — so the admin "Управление сайтом" can edit
+ *     literally every visible string and button label on the site.
  */
 import { Hono } from 'hono'
 import { SEED_CONTENT_SECTIONS } from '../../seed-data'
 type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 type AuthMiddleware = (c: any, next: () => Promise<void>) => Promise<any>
+
+// ---------------------------------------------------------------------
+// History helper — saves a JSON snapshot of a block right BEFORE every
+// update/delete so admins can restore via the new "История" UI. Trims
+// per-block history to the latest 200 entries.
+// ---------------------------------------------------------------------
+async function recordBlockHistory(
+  db: D1Database,
+  blockId: number | string,
+  action: 'update' | 'delete' | 'restore',
+  user: { id?: number | null; name?: string } = {}
+): Promise<void> {
+  try {
+    const existing = await db.prepare('SELECT * FROM site_blocks WHERE id = ?').bind(blockId).first()
+    if (!existing) return
+    const snapshot = JSON.stringify(existing)
+    await db.prepare(
+      'INSERT INTO site_blocks_history (block_id, block_key, snapshot, action, user_id, user_name) VALUES (?, ?, ?, ?, ?, ?)'
+    ).bind(
+      Number(blockId), String(existing.block_key || ''), snapshot, action,
+      user.id ?? null, user.name ?? ''
+    ).run()
+    // Trim history per block to the most recent 200 entries.
+    await db.prepare(
+      "DELETE FROM site_blocks_history WHERE block_id = ? AND id NOT IN (SELECT id FROM site_blocks_history WHERE block_id = ? ORDER BY id DESC LIMIT 200)"
+    ).bind(Number(blockId), Number(blockId)).run()
+  } catch (e) {
+    // History is best-effort — never block the actual mutation.
+  }
+}
+
+function getActorFromContext(c: any): { id?: number | null; name?: string } {
+  try {
+    const user = c.get('user')
+    if (!user) return {}
+    return {
+      id: user.user_id ?? user.id ?? null,
+      name: user.username || user.display_name || user.name || ''
+    }
+  } catch {
+    return {}
+  }
+}
 
 export function register(api: Hono<{ Bindings: Bindings }>, authMiddleware: AuthMiddleware) {
 // ===== SITE BLOCKS (unified block constructor) =====
@@ -43,6 +99,8 @@ api.put('/site-blocks/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
   const d = await c.req.json();
+  // Phase 4: capture pre-update snapshot for history (best-effort, never blocks).
+  await recordBlockHistory(db, id, 'update', getActorFromContext(c));
   const fields: string[] = [];
   const vals: any[] = [];
   if (d.block_key !== undefined) { fields.push('block_key=?'); vals.push(d.block_key); }
@@ -83,6 +141,8 @@ api.put('/site-blocks/:id', authMiddleware, async (c) => {
 api.delete('/site-blocks/:id', authMiddleware, async (c) => {
   const db = c.env.DB;
   const id = c.req.param('id');
+  // Phase 4: snapshot the row before deletion so admin can restore it.
+  await recordBlockHistory(db, id, 'delete', getActorFromContext(c));
   await db.prepare('DELETE FROM site_blocks WHERE id = ?').bind(id).run();
   return c.json({ success: true });
 });
@@ -1171,6 +1231,639 @@ api.post('/leads/:id/recalc', authMiddleware, async (c) => {
   }
   await updateLeadArticlesCount(db, Number(leadId));
   return c.json({ success: true, total_amount: totalAmount, commission_amount: commissionAmount, articles_count: articles.length, calc_data: JSON.parse(calcData) });
+});
+
+// =====================================================================
+// Phase 4 — Pro CMS endpoints
+// =====================================================================
+
+// Bulk visibility toggle
+api.post('/site-blocks/bulk-visibility', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { ids, is_visible } = await c.req.json();
+  if (!Array.isArray(ids) || ids.length === 0) return c.json({ error: 'ids required' }, 400);
+  const v = is_visible ? 1 : 0;
+  const actor = getActorFromContext(c);
+  let updated = 0;
+  for (const id of ids) {
+    await recordBlockHistory(db, id, 'update', actor);
+    const r = await db.prepare('UPDATE site_blocks SET is_visible = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(v, id).run();
+    if ((r?.meta as any)?.changes) updated++;
+  }
+  return c.json({ success: true, updated });
+});
+
+// Bulk delete
+api.post('/site-blocks/bulk-delete', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { ids } = await c.req.json();
+  if (!Array.isArray(ids) || ids.length === 0) return c.json({ error: 'ids required' }, 400);
+  const actor = getActorFromContext(c);
+  let deleted = 0;
+  for (const id of ids) {
+    await recordBlockHistory(db, id, 'delete', actor);
+    const r = await db.prepare('DELETE FROM site_blocks WHERE id = ?').bind(id).run();
+    if ((r?.meta as any)?.changes) deleted++;
+  }
+  return c.json({ success: true, deleted });
+});
+
+// Move block to another page — renames the `<page>__<sub>` prefix in
+// block_key and updates the page column. Idempotent: skips if the new
+// key collides with an existing one. Used by drag-drop between page
+// groups in the admin UI.
+api.post('/site-blocks/move-page', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const { id, new_page } = await c.req.json();
+  if (!id || !new_page) return c.json({ error: 'id and new_page required' }, 400);
+  // Whitelist target pages so we can't be tricked into arbitrary keys.
+  const ALLOWED_PAGES = new Set(['home', 'about', 'services', 'buyouts', 'faq', 'contacts', 'referral', 'calculator', 'package', 'shell', 'blog']);
+  if (!ALLOWED_PAGES.has(new_page)) return c.json({ error: 'invalid new_page' }, 400);
+  const block = await db.prepare('SELECT * FROM site_blocks WHERE id = ?').bind(id).first();
+  if (!block) return c.json({ error: 'Not found' }, 404);
+  const oldKey = String(block.block_key || '');
+  // Compute the sub-key (everything after `__`).
+  let sub = oldKey;
+  const idx = oldKey.indexOf('__');
+  if (idx >= 0) sub = oldKey.slice(idx + 2);
+  // Avoid empty sub keys.
+  if (!sub) sub = 'section';
+  // For target 'home', historically blocks live without prefix. We keep
+  // the prefix to stay searchable & filterable in the admin UI.
+  const newKey = `${new_page}__${sub}`;
+  if (newKey === oldKey) {
+    await db.prepare('UPDATE site_blocks SET page = ? WHERE id = ?').bind(new_page, id).run();
+    return c.json({ success: true, unchanged: true, key: newKey });
+  }
+  // Collision check.
+  const exists = await db.prepare('SELECT id FROM site_blocks WHERE block_key = ?').bind(newKey).first();
+  if (exists) {
+    return c.json({ error: 'Block with key ' + newKey + ' already exists. Rename or delete it first.' }, 409);
+  }
+  await recordBlockHistory(db, id, 'update', getActorFromContext(c));
+  await db.prepare('UPDATE site_blocks SET block_key = ?, page = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').bind(newKey, new_page, id).run();
+  return c.json({ success: true, key: newKey });
+});
+
+// Export all site_blocks as a JSON document (download from admin UI).
+api.get('/site-blocks/export', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const res = await db.prepare('SELECT * FROM site_blocks ORDER BY page, sort_order, id').all();
+  const blocks = (res.results || []).map((b: any) => ({
+    block_key: b.block_key,
+    page: b.page,
+    block_type: b.block_type,
+    title_ru: b.title_ru,
+    title_am: b.title_am,
+    texts_ru: b.texts_ru,
+    texts_am: b.texts_am,
+    images: b.images,
+    buttons: b.buttons,
+    custom_css: b.custom_css,
+    custom_html: b.custom_html,
+    is_visible: b.is_visible,
+    sort_order: b.sort_order,
+    social_links: b.social_links
+  }));
+  return c.json({ exported_at: new Date().toISOString(), version: 1, count: blocks.length, blocks });
+});
+
+// Import from JSON dump — INSERT OR REPLACE on block_key. Designed to
+// pair with /export. Each block must have a `block_key`. Returns
+// counts of inserted/updated rows.
+api.post('/site-blocks/import', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const body = await c.req.json();
+  const blocks = Array.isArray(body?.blocks) ? body.blocks : [];
+  if (blocks.length === 0) return c.json({ error: 'No blocks' }, 400);
+  let imported = 0;
+  for (const b of blocks) {
+    if (!b.block_key) continue;
+    const existing = await db.prepare('SELECT id FROM site_blocks WHERE block_key = ?').bind(b.block_key).first();
+    if (existing) {
+      await recordBlockHistory(db, existing.id as number, 'update', getActorFromContext(c));
+      await db.prepare(
+        'UPDATE site_blocks SET page=?, block_type=?, title_ru=?, title_am=?, texts_ru=?, texts_am=?, images=?, buttons=?, custom_css=?, custom_html=?, is_visible=?, sort_order=?, social_links=?, updated_at=CURRENT_TIMESTAMP WHERE block_key=?'
+      ).bind(
+        b.page || 'home', b.block_type || 'section', b.title_ru || '', b.title_am || '',
+        typeof b.texts_ru === 'string' ? b.texts_ru : JSON.stringify(b.texts_ru || []),
+        typeof b.texts_am === 'string' ? b.texts_am : JSON.stringify(b.texts_am || []),
+        typeof b.images === 'string' ? b.images : JSON.stringify(b.images || []),
+        typeof b.buttons === 'string' ? b.buttons : JSON.stringify(b.buttons || []),
+        b.custom_css || '', b.custom_html || '',
+        b.is_visible ? 1 : 0, b.sort_order || 0,
+        typeof b.social_links === 'string' ? b.social_links : JSON.stringify(b.social_links || []),
+        b.block_key
+      ).run();
+    } else {
+      await db.prepare(
+        'INSERT INTO site_blocks (block_key, page, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+      ).bind(
+        b.block_key, b.page || 'home', b.block_type || 'section',
+        b.title_ru || '', b.title_am || '',
+        typeof b.texts_ru === 'string' ? b.texts_ru : JSON.stringify(b.texts_ru || []),
+        typeof b.texts_am === 'string' ? b.texts_am : JSON.stringify(b.texts_am || []),
+        typeof b.images === 'string' ? b.images : JSON.stringify(b.images || []),
+        typeof b.buttons === 'string' ? b.buttons : JSON.stringify(b.buttons || []),
+        b.custom_css || '', b.custom_html || '',
+        b.is_visible ? 1 : 0, b.sort_order || 0,
+        typeof b.social_links === 'string' ? b.social_links : JSON.stringify(b.social_links || [])
+      ).run();
+    }
+    imported++;
+  }
+  return c.json({ success: true, imported });
+});
+
+// History list for a single block — newest first, capped to 50 by default.
+api.get('/site-blocks/:id/history', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const limit = Math.min(Math.max(parseInt(c.req.query('limit') || '50', 10) || 50, 1), 200);
+  const res = await db.prepare(
+    'SELECT id, block_id, block_key, action, user_id, user_name, created_at FROM site_blocks_history WHERE block_id = ? ORDER BY id DESC LIMIT ?'
+  ).bind(id, limit).all();
+  return c.json({ history: res.results || [] });
+});
+
+// Restore a block from a specific history entry. Records a fresh
+// snapshot of the current state before applying the restore.
+api.post('/site-blocks/:id/restore/:historyId', authMiddleware, async (c) => {
+  const db = c.env.DB;
+  const id = c.req.param('id');
+  const historyId = c.req.param('historyId');
+  const histRow = await db.prepare('SELECT * FROM site_blocks_history WHERE id = ? AND block_id = ?').bind(historyId, id).first();
+  if (!histRow) return c.json({ error: 'History entry not found' }, 404);
+  let snap: any = null;
+  try { snap = JSON.parse(histRow.snapshot as string); } catch { return c.json({ error: 'Invalid snapshot' }, 500); }
+  if (!snap) return c.json({ error: 'Empty snapshot' }, 500);
+  // Save current state before restoring.
+  await recordBlockHistory(db, id, 'restore', getActorFromContext(c));
+  // For DELETE history entries, the row may not currently exist — INSERT
+  // OR REPLACE handles both cases. We never resurrect old `id`s; instead
+  // we update the block row matched by `block_key` if present, or insert
+  // a new row otherwise. The HTTP route still uses the original id for
+  // future history queries.
+  const existing = await db.prepare('SELECT id FROM site_blocks WHERE block_key = ?').bind(snap.block_key).first();
+  if (existing) {
+    await db.prepare(
+      'UPDATE site_blocks SET page=?, block_type=?, title_ru=?, title_am=?, texts_ru=?, texts_am=?, images=?, buttons=?, custom_css=?, custom_html=?, is_visible=?, sort_order=?, social_links=?, updated_at=CURRENT_TIMESTAMP WHERE id=?'
+    ).bind(
+      snap.page || 'home', snap.block_type || 'section', snap.title_ru || '', snap.title_am || '',
+      snap.texts_ru || '[]', snap.texts_am || '[]', snap.images || '[]', snap.buttons || '[]',
+      snap.custom_css || '', snap.custom_html || '',
+      snap.is_visible ? 1 : 0, snap.sort_order || 0,
+      snap.social_links || '[]', existing.id
+    ).run();
+    return c.json({ success: true, restored_to_id: existing.id });
+  }
+  // The block was deleted; recreate it.
+  await db.prepare(
+    'INSERT INTO site_blocks (block_key, page, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+  ).bind(
+    snap.block_key, snap.page || 'home', snap.block_type || 'section',
+    snap.title_ru || '', snap.title_am || '', snap.texts_ru || '[]', snap.texts_am || '[]',
+    snap.images || '[]', snap.buttons || '[]', snap.custom_css || '', snap.custom_html || '',
+    snap.is_visible ? 1 : 0, snap.sort_order || 0, snap.social_links || '[]'
+  ).run();
+  return c.json({ success: true, recreated: true });
+});
+
+// =====================================================================
+// Phase 4 — Pro seed: shell + home + calculator + package + blog blocks
+// =====================================================================
+// Mirrors the layout used by `seed-subpages` (Phase 3C). Idempotent via
+// INSERT OR IGNORE on UNIQUE block_key. Adds the chrome blocks that
+// were previously hardcoded in `landing.ts`:
+//   - shell__nav      8 nav items + CTA label (header + bottom nav share strings)
+//   - shell__footer   brand line, nav heading, 5 nav links, contacts heading, 2 contact labels, copyright, location
+//   - shell__modal    callback popup labels + placeholders
+//   - shell__floats   floating WhatsApp + calculator buttons
+//   - shell__bottom   labels for the 5 main bottom-nav slots + 5 "more" menu items
+//   - home__*         hero / ticker / wb_banner / stats_bar / services / why_buyouts / for_whom / contact_cta
+//   - calculator__*   hero / features / how_to / cta_strip
+//   - package__chrome surrounding labels for /package/:slug detail pages
+//   - blog__chrome    listing + post chrome strings
+api.post('/site-blocks/seed-pro', authMiddleware, async (c) => {
+  const db = c.env.DB;
+
+  type ProBlock = {
+    key: string;
+    page: string;
+    sort: number;
+    titleRu: string;
+    titleAm: string;
+    textsRu: string[];
+    textsAm: string[];
+  };
+
+  const PRO_BLOCKS: ProBlock[] = [
+    // ===== shell (sort 1-9) =====
+    {
+      key: 'shell__nav', page: 'shell', sort: 1,
+      titleRu: 'Шапка: пункты меню', titleAm: 'Շապիկ: մենյու',
+      // 8 nav labels (RU/AM pairs) + 1 CTA label = 9 strings
+      textsRu: ['Главная', 'О нас', 'Услуги', 'Выкупы', 'Калькулятор', 'FAQ', 'Контакты', 'Блог', 'Перезвоните мне'],
+      textsAm: ['Գլխավոր', 'Մեր մասին', 'Ծառայություններ', 'Հետագնումներ', 'Հաշվիչ', 'ՀՏՀ', 'Կոնտակտներ', 'Բլոգ', 'Հետ զանգահարեք']
+    },
+    {
+      key: 'shell__footer', page: 'shell', sort: 2,
+      titleRu: 'Футер: тексты', titleAm: 'Footer: տեքստեր',
+      // [0] brand_p, [1] nav_h4, [2..6] nav_links, [7] contacts_h4, [8] admin_label, [9] manager_label, [10] copyright, [11] location
+      textsRu: [
+        'Безопасное продвижение на Wildberries для армянских продавцов.',
+        'Навигация',
+        'Услуги и цены',
+        'Калькулятор',
+        'Наш склад',
+        'Гарантии',
+        'FAQ',
+        'Контакты',
+        'Администратор',
+        'Менеджер',
+        'Все права защищены',
+        'Ереван, Армения'
+      ],
+      textsAm: [
+        'Անվտանգ առաջխաղացում Wildberries-ում հայ վաճառողների համար։',
+        'Նավիգացիա',
+        'Ծառայություններ և գներ',
+        'Հաշվիչ',
+        'Մեր պահեստը',
+        'Երաշխիքներ',
+        'ՀՏՀ',
+        'Կոնտակտներ',
+        'Ադմինիստրատոր',
+        'Մենեջեր',
+        'Բոլոր իրավունքները պաշտպանված են',
+        'Երևան, Հայաստան'
+      ]
+    },
+    {
+      key: 'shell__modal', page: 'shell', sort: 3,
+      titleRu: 'Модалка обратного звонка', titleAm: 'Հետ զանգի մոդալ',
+      // [0] title, [1] sub, [2] name_label, [3] phone_label, [4] time_label, [5] question_label, [6] name_placeholder, [7] phone_placeholder, [8] time_placeholder, [9] question_placeholder, [10] submit_btn
+      textsRu: [
+        'Перезвоните мне',
+        'Оставьте заявку — мы свяжемся в удобное для вас время',
+        'Ваше имя *',
+        'Номер телефона *',
+        'Удобное время для звонка',
+        'Ваш вопрос (необязательно)',
+        'Иван Иванов',
+        '+7 (___) ___-__-__',
+        'Например: после 18:00',
+        'Кратко опишите, что хотите обсудить...',
+        'Отправить заявку'
+      ],
+      textsAm: [
+        'Հետ զանգահարեք',
+        'Թողեք հայտ — կզանգահարենք ձեզ հարմար ժամանակ',
+        'Ձեր անունը *',
+        'Հեռախոսահամար *',
+        'Հարմարավետ ժամ զանգի համար',
+        'Ձեր հարցը (ոչ պարտադիր)',
+        'Անուն Ազգանուն',
+        '+374 __ ______',
+        'Օրինակ՝ 18:00-ից հետո',
+        'Կարճ նկարագրեք, ինչ եք ուզում քննարկել...',
+        'Ուղարկել հայտը'
+      ]
+    },
+    {
+      key: 'shell__floats', page: 'shell', sort: 4,
+      titleRu: 'Плавающие кнопки', titleAm: 'Լողացող կոճակներ',
+      // [0] whatsapp_label, [1] calc_label
+      textsRu: ['Написать нам', 'Калькулятор'],
+      textsAm: ['Գրել հիմա', 'Հաշվիչ']
+    },
+    {
+      key: 'shell__bottom', page: 'shell', sort: 5,
+      titleRu: 'Нижняя навигация (моб.)', titleAm: 'Ներքևի մենյու',
+      // 5 main + 5 more menu = 10 strings
+      // [0] Главная, [1] Услуги, [2] Выкупы, [3] Калькулятор, [4] Ещё, [5] О нас, [6] FAQ, [7] Контакты, [8] Бонусы, [9] Блог
+      textsRu: ['Главная', 'Услуги', 'Выкупы', 'Калькулятор', 'Ещё', 'О нас', 'FAQ', 'Контакты', 'Бонусы', 'Блог'],
+      textsAm: ['Գլխավոր', 'Ծառայություններ', 'Հետագնումներ', 'Հաշվիչ', 'Ավելին', 'Մեր մասին', 'ՀՏՀ', 'Կոնտակտներ', 'Բոնուսներ', 'Բլոգ']
+    },
+    // ===== home (new homepage chrome) sort 50-59 =====
+    {
+      key: 'home__hero', page: 'home', sort: 50,
+      titleRu: 'Home: Hero', titleAm: 'Home: Hero',
+      // [0] eyebrow, [1] h1_line1, [2] h1_line2_grad, [3] desc, [4..6] stat labels, [7] cta_main, [8] cta_secondary
+      textsRu: [
+        'Wildberries · продвижение',
+        'Реальные выкупы',
+        'без блокировок',
+        'Маркетплейс-агентство в Ереване: 1000+ реальных аккаунтов, собственный склад, выкупы по ключевым запросам, отзывы с фото — за 7-14 дней ваш товар поднимается в ТОП.',
+        'товаров в ТОП',
+        'блокировок с 2021',
+        'реальных аккаунтов',
+        'Рассчитать стоимость',
+        'Написать в Telegram'
+      ],
+      textsAm: [
+        'Wildberries · առաջխաղացում',
+        'Իրական հետագնումներ',
+        'առանց արգելափակումների',
+        'Մարքեթփլեյս գործակալություն Երևանում՝ 1000+ իրական հաշիվ, սեփական պահեստ, հետագնումներ բանալի բառերով, լուսանկարներով կարծիքներ — 7-14 օրում ձեր ապրանքը բարձրանում է TOP-ում:',
+        'ապրանք TOP-ում',
+        'արգելափակում 2021-ից',
+        'իրական հաշիվ',
+        'Հաշվել արժեքը',
+        'Գրել Telegram-ով'
+      ]
+    },
+    {
+      key: 'home__wb_banner', page: 'home', sort: 51,
+      titleRu: 'Home: WB банер', titleAm: 'Home: WB բաններ',
+      // [0] title_html, [1] sub, [2] cta
+      textsRu: [
+        'WB официально отменил штрафы за выкупы!',
+        'В обновлённой оферте Wildberries: самовыкупы НЕ являются нарушением. Выкупы по ключевым словам — это легальный путь в ТОП.',
+        'Узнать'
+      ],
+      textsAm: [
+        'WB-ը պաշտոնապես չեղարկել է հետագնումների տուգանքները!',
+        'Wildberries-ի թարմացված օֆերտայում՝ ինքնագնումները խախտում չեն: Բանալի բառերով հետագնումները՝ TOP-ի օրինական ճանապարհն են:',
+        'Իմանալ'
+      ]
+    },
+    {
+      key: 'home__stats_bar', page: 'home', sort: 52,
+      titleRu: 'Home: Полоса статистики', titleAm: 'Home: Վիճակագրություն',
+      // 4 labels (numbers stay hardcoded, only labels are CMS)
+      textsRu: ['товаров вывели в ТОП', 'верифицированных аккаунтов', 'месяца на рынке', 'выкупов в день'],
+      textsAm: ['ապրանք բարձրացրինք TOP', 'վերիֆիկացված հաշիվ', 'ամիս շուկայում', 'հետագնում օրական']
+    },
+    {
+      key: 'home__services', page: 'home', sort: 53,
+      titleRu: 'Home: Услуги (3 карточки)', titleAm: 'Home: Ծառայություններ',
+      // 3 services × (title + desc + cta) = 9 strings
+      textsRu: [
+        'Отзывы с фото',
+        'Профессиональные отзывы с фото в реальном использовании. Каждый отзыв пишется индивидуально под ваш товар после реального выкупа.',
+        'Повысить рейтинг',
+        'Выкупы по ключам',
+        'Реальные люди покупают ваш товар по нужным ключевым запросам. Карточка поднимается в ТОП за 7-14 дней. Собственный склад в Ереване.',
+        'Начать продвижение',
+        'Работа с ключами',
+        'Анализ ниши, подбор и активация высокочастотных ключевых запросов, постоянный мониторинг позиций. Полный цикл SEO-продвижения карточки на WB.',
+        'Активировать ключевые'
+      ],
+      textsAm: [
+        'Կարծիքներ լուսանկարով',
+        'Մասնագիտական կարծիքներ իրական օգտագործման լուսանկարներով: Յուրաքանչյուր կարծիք գրվում է անհատապես ձեր ապրանքի համար իրական գնումից հետո:',
+        'Բարձրացնել վարկանիշը',
+        'Հետագնումներ բանալիներով',
+        'Իրական մարդիկ գնում են ձեր ապրանքը անհրաժեշտ բանալի բառերով: Քարտը 7-14 օրում բարձրանում է TOP: Սեփական պահեստ Երևանում:',
+        'Սկսել առաջխաղացումը',
+        'Աշխատանք բանալիների հետ',
+        'Նիշայի վերլուծություն, բարձր հաճախականության բանալի բառերի ընտրություն և ակտիվացում, դիրքերի անընդհատ մոնիթորինգ: SEO-առաջխաղացման ամբողջական ցիկլ WB-ում:',
+        'Ակտիվացնել բանալիները'
+      ]
+    },
+    {
+      key: 'home__why_buyouts', page: 'home', sort: 54,
+      titleRu: 'Home: Почему это работает (6 шагов)', titleAm: 'Home: Ինչու է աշխատում',
+      // header + 6 steps (title+desc) + result line + final CTA = 1 + 12 + 1 + 1 = 15
+      textsRu: [
+        'Почему выкупы работают',
+        'Поиск по ключевому слову',
+        'Покупатель вводит запрос → ваш товар появляется в выдаче',
+        'Просмотр карточки',
+        'Покупатель открывает товар → растёт CTR (поведенческая метрика)',
+        'Работа с отзывами',
+        'Покупатель читает отзывы → высокий рейтинг + фото = доверие',
+        'Добавление в корзину',
+        'Покупатель добавляет конкурентов в корзину для сравнения',
+        'Удаление конкурентов',
+        'Покупатель удаляет товары конкурентов и оставляет ваш',
+        'Заказ и получение',
+        'Покупатель оформляет заказ и забирает с ПВЗ → завершённая воронка',
+        'Результат: повышаются ВСЕ конверсии — алгоритм WB видит «горячую» карточку и поднимает её в ТОП.',
+        'Начать выкупы'
+      ],
+      textsAm: [
+        'Ինչու են հետագնումները աշխատում',
+        'Որոնում բանալի բառով',
+        'Գնորդը մուտքագրում է հարցումը → ձեր ապրանքը հայտնվում է ցուցակում',
+        'Քարտի դիտարկում',
+        'Գնորդը բացում է ապրանքը → աճում է CTR (վարքային ցուցանիշ)',
+        'Աշխատանք կարծիքների հետ',
+        'Գնորդը կարդում է կարծիքները → բարձր վարկանիշ + լուսանկարներ = վստահություն',
+        'Մրցակիցների ավելացում',
+        'Գնորդը ավելացնում է մրցակիցների ապրանքները զամբյուղում համեմատելու համար',
+        'Մրցակիցների հեռացում',
+        'Գնորդը հեռացնում է մրցակիցների ապրանքները և թողնում ձերը',
+        'Պատվեր և ստացում',
+        'Գնորդը ձևակերպում է պատվերը և վերցնում ՊՎԶ-ից → ավարտված ձագար',
+        'Արդյունքում՝ բարձրանում են ԲՈԼՈՐ կոնվերսիաները — WB-ի ալգորիթմը տեսնում է «թեժ» քարտը և բարձրացնում TOP:',
+        'Սկսել հետագնումները'
+      ]
+    },
+    {
+      key: 'home__for_whom', page: 'home', sort: 55,
+      titleRu: 'Home: Для кого (5 карточек)', titleAm: 'Home: Ում համար է',
+      // header (eyebrow + h2 + h2_grad + desc) + 5 cards × (title + desc) = 4 + 10 = 14
+      textsRu: [
+        'Для кого',
+        'Для кого полезен',
+        'наш сервис',
+        'Прозрачные условия и быстрый старт — для тех, кто продаёт сам или помогает другим продавцам.',
+        'Менеджеры WB',
+        'Получите реальные результаты для своих клиентов: ТОП-позиции, рост заказов, отзывы с фото — без рисков для кабинета.',
+        'Агентства',
+        'Расширьте линейку услуг для клиентов: выкупы, отзывы, фото — под ключ от партнёра с собственным складом.',
+        'Блогеры и инфлюенсеры',
+        'Зарабатывайте на промокодах: ваш код = бонус с каждой оплаты от приведённых клиентов. До 15% с заказа.',
+        'Онлайн-школы',
+        'Продвижение карточек ваших учеников — практическая работа с реальными выкупами, отзывами и аналитикой.',
+        'Курсы и марафоны',
+        'Демонстрируйте результаты учеников через настоящие кейсы — выкупы, отзывы, рост позиций в WB.'
+      ],
+      textsAm: [
+        'Ում համար է',
+        'Ում համար է օգտակար',
+        'մեր ծառայությունը',
+        'Թափանցիկ պայմաններ և արագ սկիզբ — նրանց համար, ովքեր վաճառում են իրենց կամ օգնում են այլ վաճառողներին:',
+        'WB մենեջերներ',
+        'Ստացեք իրական արդյունքներ ձեր հաճախորդների համար՝ TOP-դիրքեր, պատվերների աճ, լուսանկարներով կարծիքներ — առանց կաբինետի ռիսկերի:',
+        'Գործակալություններ',
+        'Ընդարձակեք ձեր ծառայությունների ցանկը հաճախորդների համար՝ հետագնումներ, կարծիքներ, լուսանկարներ — բանալիով սեփական պահեստ ունեցող գործընկերից:',
+        'Բլոգերներ և ինֆլյուենսերներ',
+        'Վաստակեք պրոմոկոդերով՝ ձեր կոդը = բոնուս յուրաքանչյուր վճարումից բերված հաճախորդներից: Մինչև 15% պատվերից:',
+        'Օնլայն-դպրոցներ',
+        'Ձեր աշակերտների քարտերի առաջխաղացում — գործնական աշխատանք իրական հետագնումներով, կարծիքներով և անալիտիկայով:',
+        'Դասընթացներ և մարաթոններ',
+        'Ցույց տվեք աշակերտների արդյունքները իրական դեպքերով՝ հետագնումներ, կարծիքներ, դիրքերի աճ WB-ում:'
+      ]
+    },
+    {
+      key: 'home__contact_cta', page: 'home', sort: 56,
+      titleRu: 'Home: Свяжитесь с нами', titleAm: 'Home: Կապ',
+      // [0] eyebrow, [1] h2, [2] desc, [3] whatsapp_btn, [4] callback_btn, [5] contacts_btn
+      textsRu: [
+        'Свяжитесь с нами',
+        'Готовы вывести ваш товар в ТОП?',
+        'Напишите в WhatsApp или Telegram, либо закажите обратный звонок — менеджер ответит в течение 5 минут.',
+        'WhatsApp',
+        'Перезвоните мне',
+        'Все контакты'
+      ],
+      textsAm: [
+        'Կապվեք մեզ հետ',
+        'Պատրա՞ստ եք բարձրացնել ձեր ապրանքը TOP-ում',
+        'Գրեք WhatsApp կամ Telegram-ով, կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի 5 րոպեի ընթացքում:',
+        'WhatsApp',
+        'Հետ զանգահարեք',
+        'Բոլոր կոնտակտները'
+      ]
+    },
+    // ===== calculator (sort 70-73) =====
+    {
+      key: 'calculator__hero', page: 'calculator', sort: 70,
+      titleRu: 'Calculator: Hero', titleAm: 'Calculator: Hero',
+      // [0] eyebrow, [1] h1_line1, [2] h1_line2_grad, [3] desc, [4..7] feature chips
+      textsRu: [
+        'Калькулятор',
+        'Рассчитайте стоимость',
+        'продвижения',
+        'Выберите услуги, укажите количество, получите готовое предложение в Telegram. Прозрачные цены без скрытых комиссий.',
+        'Мгновенный расчёт',
+        'Готовые пакеты',
+        'Без скрытых комиссий',
+        'Промокод-скидка'
+      ],
+      textsAm: [
+        'Հաշվիչ',
+        'Հաշվեք առաջխաղացման',
+        'արժեքը',
+        'Ընտրեք ծառայությունները, նշեք քանակը, ստացեք պատրաստի առաջարկ Telegram-ով: Թափանցիկ գներ առանց թաքնված միջնորդավճարների:',
+        'Ակնթարթային հաշվարկ',
+        'Պատրաստի փաթեթներ',
+        'Առանց թաքնված միջնորդավճարների',
+        'Պրոմո-զեղչ'
+      ]
+    },
+    {
+      key: 'calculator__packages_header', page: 'calculator', sort: 71,
+      titleRu: 'Calculator: Заголовок пакетов', titleAm: 'Calculator: Փաթեթների վերնագիր',
+      // [0] h2, [1] sub
+      textsRu: [
+        'Готовые пакеты + индивидуальный расчёт',
+        'Выберите готовый пакет или соберите свой набор услуг — система пересчитает итог в реальном времени.'
+      ],
+      textsAm: [
+        'Պատրաստի փաթեթներ + անհատական հաշվարկ',
+        'Ընտրեք պատրաստի փաթեթ կամ ստեղծեք ձեր սեփական ծառայությունների հավաքածուն — համակարգը կվերահաշվի ընդհանուրը իրական ժամանակում:'
+      ]
+    },
+    {
+      key: 'calculator__how_to', page: 'calculator', sort: 72,
+      titleRu: 'Calculator: Как пользоваться', titleAm: 'Calculator: Ինչպես օգտվել',
+      // header (eyebrow + h2) + 3 cards × (title + desc) = 2 + 6 = 8
+      textsRu: [
+        'Как пользоваться',
+        'Три простых шага',
+        'Выберите пакет',
+        'Готовый набор услуг с фиксированной ценой — нажмите на пакет и переходите к оформлению.',
+        'Соберите вручную',
+        'Откройте табы калькулятора, выберите услуги и количество. Итог обновляется в реальном времени.',
+        'Введите промокод',
+        'Получите дополнительную скидку или бесплатные услуги по партнёрскому коду от блогеров и менеджеров.'
+      ],
+      textsAm: [
+        'Ինչպես օգտվել',
+        'Երեք պարզ քայլ',
+        'Ընտրեք փաթեթը',
+        'Պատրաստի ծառայությունների հավաքածու ֆիքսված գնով — սեղմեք փաթեթի վրա և անցեք ձևակերպման:',
+        'Հավաքեք ձեռքով',
+        'Բացեք հաշվիչի թաբերը, ընտրեք ծառայությունները և քանակը: Ընդհանուրը թարմացվում է իրական ժամանակում:',
+        'Մուտքագրեք պրոմո-կոդը',
+        'Ստացեք լրացուցիչ զեղչ կամ անվճար ծառայություններ բլոգերներից ու մենեջերներից գործընկերային կոդով:'
+      ]
+    },
+    {
+      key: 'calculator__cta_strip', page: 'calculator', sort: 73,
+      titleRu: 'Calculator: CTA полоса', titleAm: 'Calculator: CTA',
+      // [0] h3, [1] sub, [2] whatsapp_btn, [3] telegram_btn, [4] callback_btn
+      textsRu: [
+        'Готовы оформить?',
+        'Напишите в WhatsApp или Telegram с готовым расчётом, либо закажите обратный звонок.',
+        'WhatsApp',
+        'Telegram',
+        'Перезвоните мне'
+      ],
+      textsAm: [
+        'Պատրա՞ստ եք ձևակերպել',
+        'Գրեք WhatsApp կամ Telegram-ով պատրաստի հաշվարկով, կամ պատվիրեք հետադարձ զանգ:',
+        'WhatsApp',
+        'Telegram',
+        'Հետ զանգահարեք'
+      ]
+    },
+    // ===== package detail page chrome (sort 80) =====
+    {
+      key: 'package__chrome', page: 'package', sort: 80,
+      titleRu: 'Package: Подписи', titleAm: 'Package: Տեքստեր',
+      // [0] back_link, [1] eyebrow, [2] price_label, [3] order_btn, [4] calculator_btn, [5] others_h2, [6] others_more
+      textsRu: ['Все пакеты', 'Пакет', 'Стоимость', 'Заказать пакет', 'Рассчитать стоимость', 'Другие пакеты', 'Подробнее'],
+      textsAm: ['Բոլոր փաթեթները', 'Փաթեթ', 'Արժեք', 'Պատվիրել փաթեթը', 'Հաշվել արժեքը', 'Այլ փաթեթներ', 'Մանրամասն']
+    },
+    // ===== blog chrome (sort 90) =====
+    {
+      key: 'blog__chrome', page: 'blog', sort: 90,
+      titleRu: 'Blog: Подписи', titleAm: 'Blog: Տեքստեր',
+      // [0] hero_eyebrow, [1] hero_title, [2] hero_sub, [3] all_chip, [4] empty_state, [5] read_more, [6] back_to_list, [7] related_h2, [8] cta_h3, [9] cta_text, [10] cta_btn
+      textsRu: [
+        'Блог',
+        'Статьи',
+        'Кейсы, разборы и инструкции по продвижению на Wildberries — от команды Go to Top.',
+        'Все',
+        'Здесь пока ничего нет — мы готовим новые материалы.',
+        'Читать →',
+        'Вернуться в блог',
+        'Другие статьи',
+        'Понравилась статья?',
+        'Подпишитесь на наш Telegram, чтобы не пропускать новые материалы.',
+        'Подписаться'
+      ],
+      textsAm: [
+        'Բլոգ',
+        'Հոդվածներ',
+        'Դեպքեր, վերլուծություններ և ուղեցույցներ Wildberries-ում առաջխաղացման մասին — Go to Top-ի թիմից:',
+        'Բոլորը',
+        'Այստեղ դեռ ոչինչ չկա — մենք պատրաստում ենք նոր նյութեր:',
+        'Կարդալ →',
+        'Վերադառնալ բլոգ',
+        'Այլ հոդվածներ',
+        'Հավանեցի՞ք հոդվածը',
+        'Բաժանորդագրվեք մեր Telegram-ին՝ նոր նյութերը բաց չթողնելու համար:',
+        'Բաժանորդագրվել'
+      ]
+    }
+  ];
+
+  for (const b of PRO_BLOCKS) {
+    if (b.textsRu.length !== b.textsAm.length) {
+      return c.json({ error: `Block ${b.key}: texts_ru/texts_am length mismatch (${b.textsRu.length} vs ${b.textsAm.length})` }, 500);
+    }
+  }
+
+  let inserted = 0;
+  for (const b of PRO_BLOCKS) {
+    const res = await db.prepare(
+      'INSERT OR IGNORE INTO site_blocks (block_key, page, block_type, title_ru, title_am, texts_ru, texts_am, images, buttons, custom_css, custom_html, is_visible, sort_order, social_links, text_styles) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).bind(
+      b.key, b.page, 'subpage', b.titleRu, b.titleAm,
+      JSON.stringify(b.textsRu), JSON.stringify(b.textsAm),
+      '[]', '[]', '', '{}', 1, b.sort, '[]', '[]'
+    ).run();
+    const changes = res?.meta && (res.meta as any).changes;
+    if (typeof changes === 'number' && changes > 0) inserted++;
+  }
+
+  return c.json({ success: true, total: PRO_BLOCKS.length, inserted });
 });
 
 }

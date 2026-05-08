@@ -45,6 +45,17 @@ CREATE TABLE IF NOT EXISTS site_blocks (
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS site_blocks_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  block_id INTEGER NOT NULL,
+  block_key TEXT NOT NULL DEFAULT '',
+  snapshot TEXT NOT NULL DEFAULT '{}',
+  action TEXT NOT NULL DEFAULT 'update',
+  user_id INTEGER DEFAULT NULL,
+  user_name TEXT DEFAULT '',
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS activity_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   user_id INTEGER,
@@ -891,6 +902,45 @@ async function runLatestMigrations(db: D1Database): Promise<void> {
     updated_at INTEGER NOT NULL DEFAULT (strftime('%s','now'))
   )`).run(); } catch {}
   try { await db.prepare(`CREATE INDEX IF NOT EXISTS idx_landing_packages_visible ON landing_packages(is_visible, sort_order)`).run(); } catch {}
+
+  // Phase 4 — site_blocks_history: per-block change log for the
+  // "history + restore" feature in admin "Управление сайтом".
+  // Stores a JSON snapshot of the block right BEFORE every update or delete.
+  // Stays within ~200 entries per block by trimming on insert.
+  try { await db.prepare(`CREATE TABLE IF NOT EXISTS site_blocks_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    block_id INTEGER NOT NULL,
+    block_key TEXT NOT NULL DEFAULT '',
+    snapshot TEXT NOT NULL DEFAULT '{}',
+    action TEXT NOT NULL DEFAULT 'update',
+    user_id INTEGER DEFAULT NULL,
+    user_name TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )`).run(); } catch {}
+  try { await db.prepare(`CREATE INDEX IF NOT EXISTS idx_site_blocks_history_block ON site_blocks_history(block_id, id DESC)`).run(); } catch {}
+  try { await db.prepare(`CREATE INDEX IF NOT EXISTS idx_site_blocks_history_key ON site_blocks_history(block_key, id DESC)`).run(); } catch {}
+
+  // Phase 4 — backfill site_blocks.page from block_key prefix for any
+  // existing rows where page is still default 'home' but block_key has a
+  // page__ prefix (Phase 3C soft-enforcement). Idempotent.
+  try {
+    await db.prepare(`UPDATE site_blocks
+      SET page = CASE
+        WHEN block_key LIKE 'about\\_\\_%' ESCAPE '\\' THEN 'about'
+        WHEN block_key LIKE 'services\\_\\_%' ESCAPE '\\' THEN 'services'
+        WHEN block_key LIKE 'buyouts\\_\\_%' ESCAPE '\\' THEN 'buyouts'
+        WHEN block_key LIKE 'faq\\_\\_%' ESCAPE '\\' THEN 'faq'
+        WHEN block_key LIKE 'contacts\\_\\_%' ESCAPE '\\' THEN 'contacts'
+        WHEN block_key LIKE 'referral\\_\\_%' ESCAPE '\\' THEN 'referral'
+        WHEN block_key LIKE 'home\\_\\_%' ESCAPE '\\' THEN 'home'
+        WHEN block_key LIKE 'calculator\\_\\_%' ESCAPE '\\' THEN 'calculator'
+        WHEN block_key LIKE 'package\\_\\_%' ESCAPE '\\' THEN 'package'
+        WHEN block_key LIKE 'shell\\_\\_%' ESCAPE '\\' THEN 'shell'
+        WHEN block_key LIKE 'blog\\_\\_%' ESCAPE '\\' THEN 'blog'
+        ELSE page
+      END
+      WHERE page IS NULL OR page = '' OR page = 'home'`).run();
+  } catch {}
 }
 
 async function runSeeds(db: D1Database): Promise<void> {

@@ -97,6 +97,73 @@ export function getAdminHTML(): string {
   .sb-tab { padding: 8px 16px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s; color: #94a3b8; background: transparent; border: none; }
   .sb-tab.active { background: #8B5CF6; color: white; }
   .sb-tab:hover:not(.active) { background: #1e293b; color: #e2e8f0; }
+  /* ===== PHASE 4 — site-blocks CMS pro UI ===== */
+  .sb-side-grid { display: grid; grid-template-columns: 1fr 32px 1fr; gap: 8px; align-items: start; }
+  .sb-side-grid .sb-side-divider { display: flex; align-items: center; justify-content: center; color: #475569; padding-top: 22px; }
+  .sb-side-grid .sb-side-warn { border: 1px solid #ef4444 !important; }
+  .sb-side-warn-msg { color: #ef4444; font-size: 0.7rem; margin-top: 3px; display: flex; align-items: center; gap: 4px; }
+  @media(max-width:1100px) { .sb-side-grid { grid-template-columns: 1fr; gap: 4px; } .sb-side-grid .sb-side-divider { display: none; } }
+  .sb-hint { font-size: 0.74rem; color: #94a3b8; margin-top: 4px; line-height: 1.45; padding: 6px 10px; background: rgba(139,92,246,0.05); border-left: 2px solid rgba(139,92,246,0.4); border-radius: 4px; }
+  .sb-hint i { color: #a78bfa; margin-right: 4px; }
+  .sb-empty-state { text-align: center; padding: 48px 32px; background: rgba(139,92,246,0.04); border: 1px dashed rgba(139,92,246,0.3); border-radius: 14px; margin: 24px 0; }
+  .sb-empty-state .sb-empty-icon { font-size: 3rem; color: #475569; margin-bottom: 16px; display: block; }
+  .sb-empty-state h3 { margin-bottom: 8px; font-size: 1.15rem; font-weight: 700; color: #e2e8f0; }
+  .sb-empty-state p { color: #94a3b8; margin-bottom: 20px; font-size: 0.88rem; }
+  .sb-empty-state .sb-empty-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .sb-bulk-bar { position: sticky; top: 0; z-index: 50; background: linear-gradient(135deg, rgba(139,92,246,0.18), rgba(139,92,246,0.08)); border: 1px solid rgba(139,92,246,0.4); border-radius: 12px; padding: 10px 14px; margin-bottom: 14px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; box-shadow: 0 8px 24px rgba(0,0,0,0.25); }
+  .sb-bulk-bar .sb-bulk-count { font-weight: 700; color: #c4b5fd; margin-right: 8px; }
+  .sb-bulk-bar .btn { padding: 6px 12px; font-size: 0.78rem; }
+  .sb-bulk-check { width: 18px; height: 18px; cursor: pointer; accent-color: #8B5CF6; flex-shrink: 0; }
+  .sb-bulk-bar .sb-bulk-move-wrap { position: relative; }
+  .sb-bulk-move-menu { position: absolute; top: 100%; left: 0; margin-top: 4px; background: #1a1128; border: 1px solid rgba(139,92,246,0.4); border-radius: 10px; padding: 6px; min-width: 200px; box-shadow: 0 16px 48px rgba(0,0,0,0.5); z-index: 60; max-height: 320px; overflow-y: auto; }
+  .sb-bulk-move-menu button { width: 100%; text-align: left; padding: 8px 12px; background: transparent; border: none; color: #e2e8f0; font-size: 0.82rem; cursor: pointer; border-radius: 6px; }
+  .sb-bulk-move-menu button:hover { background: rgba(139,92,246,0.15); color: #c4b5fd; }
+  .sb-group-header { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin: 18px 0 10px; background: linear-gradient(90deg, rgba(139,92,246,0.18), rgba(139,92,246,0.04)); border-left: 4px solid #8B5CF6; border-radius: 10px; cursor: pointer; user-select: none; transition: background 0.2s; }
+  .sb-group-header:hover { background: linear-gradient(90deg, rgba(139,92,246,0.25), rgba(139,92,246,0.06)); }
+  .sb-group-header h3 { font-size: 1rem; font-weight: 800; color: #e2e8f0; margin: 0; flex: 1; display: flex; align-items: center; gap: 8px; }
+  .sb-group-header h3 .sb-group-icon { color: #a78bfa; font-size: 1.05rem; }
+  .sb-group-header .sb-group-count { font-size: 0.78rem; color: #94a3b8; font-weight: 500; }
+  .sb-group-header .sb-group-actions { display: flex; gap: 6px; }
+  .sb-group-header .sb-group-actions button { background: transparent; border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd; font-size: 0.7rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+  .sb-group-header .sb-group-actions button:hover { background: rgba(139,92,246,0.2); }
+  .sb-group-body { padding: 0 0 8px; }
+  .sb-group-body.sb-group-collapsed { display: none; }
+  .sb-group-body.sb-group-target { background: rgba(139,92,246,0.08); border: 2px dashed rgba(139,92,246,0.5); border-radius: 10px; padding: 8px; }
+  .sb-status-summary { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.78rem; color: #94a3b8; padding: 8px 12px; background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; margin-bottom: 12px; }
+  .sb-status-summary span { display: inline-flex; align-items: center; gap: 4px; }
+  .sb-block-badge { display: inline-block; padding: 2px 7px; border-radius: 8px; font-size: 0.66rem; font-weight: 700; letter-spacing: 0.3px; white-space: nowrap; }
+  .sb-block-badge.bg-active { background: rgba(16,185,129,0.18); color: #34d399; }
+  .sb-block-badge.bg-hidden { background: rgba(100,116,139,0.18); color: #94a3b8; }
+  .sb-block-badge.bg-filled { background: rgba(59,130,246,0.18); color: #60a5fa; }
+  .sb-block-badge.bg-empty { background: rgba(245,158,11,0.18); color: #fbbf24; }
+  .sb-block-badge.bg-cms { background: rgba(139,92,246,0.18); color: #a78bfa; }
+  .sb-block-badge.bg-default { background: rgba(100,116,139,0.12); color: #64748b; }
+  .sb-templates-menu { position: absolute; top: 100%; right: 0; margin-top: 4px; background: #1a1128; border: 1px solid rgba(139,92,246,0.4); border-radius: 10px; padding: 6px; min-width: 280px; box-shadow: 0 16px 48px rgba(0,0,0,0.5); z-index: 60; }
+  .sb-templates-menu button { width: 100%; text-align: left; padding: 10px 12px; background: transparent; border: none; color: #e2e8f0; font-size: 0.82rem; cursor: pointer; border-radius: 6px; display: flex; gap: 10px; align-items: flex-start; }
+  .sb-templates-menu button:hover { background: rgba(139,92,246,0.15); }
+  .sb-templates-menu .sb-tpl-icon { color: #a78bfa; font-size: 1.1rem; min-width: 22px; padding-top: 2px; }
+  .sb-templates-menu .sb-tpl-name { font-weight: 700; color: #e2e8f0; margin-bottom: 2px; }
+  .sb-templates-menu .sb-tpl-desc { font-size: 0.72rem; color: #94a3b8; }
+  .sb-preview-pane { position: fixed; top: 0; right: 0; height: 100vh; width: 50vw; background: #0f0a1a; border-left: 2px solid rgba(139,92,246,0.3); z-index: 9999; display: none; flex-direction: column; box-shadow: -8px 0 32px rgba(0,0,0,0.5); }
+  .sb-preview-pane.active { display: flex; }
+  .sb-preview-header { padding: 12px 16px; background: #1A1128; border-bottom: 1px solid rgba(139,92,246,0.2); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sb-preview-header .sb-preview-title { font-weight: 700; color: #c4b5fd; flex: 1; min-width: 120px; font-size: 0.85rem; }
+  .sb-preview-header button { background: transparent; border: 1px solid rgba(139,92,246,0.4); color: #c4b5fd; font-size: 0.72rem; padding: 4px 10px; border-radius: 6px; cursor: pointer; }
+  .sb-preview-header button.active { background: rgba(139,92,246,0.3); color: white; }
+  .sb-preview-header button:hover { background: rgba(139,92,246,0.2); }
+  .sb-preview-frame { flex: 1; border: none; width: 100%; background: #fff; }
+  @media(max-width:900px) { .sb-preview-pane { width: 100vw; } }
+  .sb-history-row { display: grid; grid-template-columns: 160px 100px 1fr 100px; gap: 10px; padding: 10px 12px; background: #1a2236; border: 1px solid #293548; border-radius: 8px; margin-bottom: 6px; align-items: center; font-size: 0.82rem; }
+  .sb-history-row .sb-history-action.update { color: #60a5fa; }
+  .sb-history-row .sb-history-action.delete { color: #f87171; }
+  .sb-history-row .sb-history-action.restore { color: #34d399; }
+  @media(max-width:768px) {
+    .sb-bulk-bar { flex-direction: column; align-items: stretch; }
+    .sb-bulk-bar .btn, .sb-bulk-bar .sb-bulk-move-wrap { width: 100%; }
+    .sb-group-header { padding: 10px 12px; }
+    .sb-group-header .sb-group-actions { display: none; }
+    .sb-history-row { grid-template-columns: 1fr; gap: 4px; }
+  }
 </style>
 </head>
 <body>
@@ -12470,17 +12537,97 @@ async function cloneCompanyRole(id) {
 
 
 // ===== SITE BLOCKS CONSTRUCTOR — Professional Workspace V3 =====
-var sbLangView = 'both'; // 'both', 'ru', 'am'
+var sbLangView = 'both'; // 'both', 'ru', 'am', 'side'
 var sbExpandedBlocks = {}; // track which blocks are expanded
 var sbSearchQuery = ''; // search/filter blocks
-var sbSortableInstance = null; // SortableJS instance
+var sbSortableInstance = null; // SortableJS instance (single-page mode)
+var sbGroupSortables = []; // SortableJS instances per page-group (Phase 4)
 var sbSaveTimers = {}; // per-block debounce timers
 var sbSaveStatus = 'hidden'; // 'hidden', 'saving', 'saved'
 var sbActiveTab = 'blocks'; // 'blocks', 'calculator', 'telegram', 'slots', 'footer', 'photos'
-var sbPageFilter = 'all'; // 'all' | 'home' | 'services' | 'buyouts' | 'about' | 'faq' | 'contacts' | 'referral'
+var sbPageFilter = 'all'; // 'all' | 'home' | 'services' | 'buyouts' | 'about' | 'faq' | 'contacts' | 'referral' | 'calculator' | 'package' | 'shell' | 'blog'
+
+// Phase 4: bulk-select state and group-collapse state
+var sbSelectedIds = {}; // { [blockId]: true } — selected for bulk ops
+var sbCollapsedGroups = {}; // { [pageId]: true } — which page groups are collapsed
+var _sbHotkeysBound = false; // ensure single keydown listener
+var _sbPreviewState = { open: false, blockKey: '', page: '', lang: 'ru' };
 
 // Phase 3C: subpage prefix → human-readable label (admin RU only)
-var SUBPAGE_LABELS = { services: 'Услуги', buyouts: 'Выкупы', about: 'О нас', faq: 'FAQ', contacts: 'Контакты', referral: 'Партнёрка' };
+// Phase 4: extended with calculator/package/shell/blog
+var SUBPAGE_LABELS = {
+  services: 'Услуги', buyouts: 'Выкупы', about: 'О нас', faq: 'FAQ',
+  contacts: 'Контакты', referral: 'Партнёрка',
+  calculator: 'Калькулятор', package: 'Пакеты', shell: 'Шапка/Футер', blog: 'Блог'
+};
+
+// Phase 4: ordered list of pages for grouping in "Все" view
+var SB_PAGES_ORDER = ['home', 'about', 'services', 'buyouts', 'faq', 'contacts', 'referral', 'calculator', 'package', 'blog', 'shell'];
+
+// Phase 4: BLOCK_TEMPLATES — pre-configured block scaffolds
+var BLOCK_TEMPLATES = [
+  {
+    id: 'hero', name_ru: 'Hero блок', name_am: 'Hero բլոկ', icon: 'fa-star', color: '#a78bfa',
+    desc: 'Заголовок + подзаголовок + CTA-кнопка. Главный экран секции.',
+    block_type: 'hero',
+    defaults: {
+      texts_ru: ['Заголовок Hero', 'Краткое описание/подзаголовок', 'Дополнительный текст'],
+      texts_am: ['Hero վերնագիր', 'Կարճ նկարագրություն', ''],
+      buttons: [{ text_ru: 'Узнать подробнее', text_am: 'Իմանալ ավելին', url: '#calculator', icon: 'fas fa-arrow-right', action_type: 'link' }]
+    }
+  },
+  {
+    id: 'cards3', name_ru: '3 карточки', name_am: '3 քարտ', icon: 'fa-th-large', color: '#60a5fa',
+    desc: 'Заголовок секции + 3 карточки (заголовок + описание + CTA в каждой).',
+    block_type: 'section',
+    defaults: {
+      texts_ru: ['Заголовок секции', 'Карточка 1: заголовок', 'Карточка 1: описание', 'Карточка 2: заголовок', 'Карточка 2: описание', 'Карточка 3: заголовок', 'Карточка 3: описание'],
+      texts_am: ['Բաժնի վերնագիր', '', '', '', '', '', ''],
+      buttons: [
+        { text_ru: 'Подробнее 1', text_am: '', url: '#', icon: 'fas fa-arrow-right', action_type: 'link' },
+        { text_ru: 'Подробнее 2', text_am: '', url: '#', icon: 'fas fa-arrow-right', action_type: 'link' },
+        { text_ru: 'Подробнее 3', text_am: '', url: '#', icon: 'fas fa-arrow-right', action_type: 'link' }
+      ]
+    }
+  },
+  {
+    id: 'cta', name_ru: 'CTA-полоса', name_am: 'CTA-գոտի', icon: 'fa-bullhorn', color: '#f59e0b',
+    desc: 'Заголовок + текст + одна крупная кнопка призыва к действию.',
+    block_type: 'cta_banner',
+    defaults: {
+      texts_ru: ['Готовы начать?', 'Оставьте заявку и мы свяжемся с вами в течение часа.'],
+      texts_am: ['Պատրա՞ստ եք սկսել', 'Թողեք հայտ և մենք կզանգահարենք մեկ ժամվա ընթացքում:'],
+      buttons: [{ text_ru: 'Оставить заявку', text_am: 'Թողնել հայտ', url: '#calculator', icon: 'fas fa-rocket', action_type: 'link' }]
+    }
+  },
+  {
+    id: 'faq', name_ru: 'FAQ-аккордеон', name_am: 'FAQ-ակորդեոն', icon: 'fa-question-circle', color: '#34d399',
+    desc: 'Заголовок + 5 пар вопрос/ответ (формат faq__items).',
+    block_type: 'section',
+    defaults: {
+      texts_ru: ['Вопрос 1?', 'Ответ на вопрос 1.', 'Вопрос 2?', 'Ответ на вопрос 2.', 'Вопрос 3?', 'Ответ на вопрос 3.', 'Вопрос 4?', 'Ответ на вопрос 4.', 'Вопрос 5?', 'Ответ на вопрос 5.'],
+      texts_am: ['Հարց 1?', 'Պատասխան 1', 'Հարց 2?', 'Պատասխան 2', 'Հարց 3?', 'Պատասխան 3', 'Հարց 4?', 'Պատասխան 4', 'Հարց 5?', 'Պատասխան 5']
+    }
+  },
+  {
+    id: 'benefits', name_ru: 'Список преимуществ', name_am: 'Առավելությունների ցանկ', icon: 'fa-list-check', color: '#10b981',
+    desc: 'Заголовок + 4-6 буллетов преимуществ (плюс иконки).',
+    block_type: 'section',
+    defaults: {
+      texts_ru: ['Наши преимущества', 'Быстрый результат — первые продажи через 7 дней', 'Прозрачная отчётность по каждому артикулу', 'Команда экспертов с опытом 5+ лет', 'Гарантия результата или возврат средств', 'Работаем 24/7 без выходных'],
+      texts_am: ['Մեր առավելությունները', '', '', '', '', '']
+    }
+  },
+  {
+    id: 'two_col_photo', name_ru: 'Две колонки + фото', name_am: 'Երկու սյունակ + նկար', icon: 'fa-columns', color: '#3b82f6',
+    desc: 'Фото слева + заголовок и текст справа (текст-фото блок).',
+    block_type: 'text_photo',
+    defaults: {
+      texts_ru: ['Заголовок раздела', 'Основной текст с описанием. Расскажите подробнее о вашем предложении или подходе.', 'Дополнительный абзац или итог.'],
+      texts_am: ['Բաժնի վերնագիր', 'Հիմնական տեքստ', '']
+    }
+  }
+];
 
 // Returns the page label for a block (used in the page badge on each card)
 function sbBlockPageLabel(blockKey) {
@@ -12609,16 +12756,20 @@ function renderSiteBlocks() {
     return h;
   }
 
-  // ── Phase 3C: Page-filter chips + Seed-subpages button ──
+  // ── Phase 4: Page-filter chips + Seed-subpages + Templates + Backup buttons ──
   var sbPageChips = [
     { id: 'all', label: 'Все' },
     { id: 'home', label: 'Главная' },
+    { id: 'about', label: 'О нас' },
     { id: 'services', label: 'Услуги' },
     { id: 'buyouts', label: 'Выкупы' },
-    { id: 'about', label: 'О нас' },
     { id: 'faq', label: 'FAQ' },
     { id: 'contacts', label: 'Контакты' },
-    { id: 'referral', label: 'Партнёрка' }
+    { id: 'referral', label: 'Партнёрка' },
+    { id: 'calculator', label: 'Калькулятор' },
+    { id: 'package', label: 'Пакеты' },
+    { id: 'blog', label: 'Блог' },
+    { id: 'shell', label: 'Шапка/Футер' }
   ];
   h += '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center">' +
     '<span style="font-size:0.78rem;color:#94a3b8;font-weight:600;margin-right:4px">Страница:</span>';
@@ -12626,59 +12777,151 @@ function renderSiteBlocks() {
     var pc = sbPageChips[pci];
     var pcCount = sbCountForPage(allBlocks, pc.id);
     var pcActive = (sbPageFilter === pc.id) || (!sbPageFilter && pc.id === 'all');
-    h += '<button class="sb-page-chip" style="' + sbChipStyle(pcActive) + '" onclick="sbPageFilter=&apos;' + pc.id + '&apos;;render()">' +
+    h += '<button class="sb-page-chip" style="' + sbChipStyle(pcActive) + '" onclick="sbPageFilter=&apos;' + pc.id + '&apos;;sbSelectedIds={};render()" title="Показать только блоки страницы «' + escHtml(pc.label) + '»">' +
       pc.label + ' <small style="opacity:0.7;font-weight:500">(' + pcCount + ')</small>' +
     '</button>';
   }
-  h += '<button class="btn btn-outline" style="margin-left:auto;font-size:0.78rem;padding:6px 12px;white-space:nowrap" onclick="seedSubpageBlocks()" title="Создать недостающие блоки для подстраниц (idempotent)">' +
-    '<i class="fas fa-magic" style="margin-right:4px"></i>Создать блоки подстраниц' +
-  '</button>';
+  h += '<div style="margin-left:auto;display:flex;gap:6px;flex-wrap:wrap">';
+  h += '<button class="btn btn-outline" style="font-size:0.76rem;padding:6px 12px;white-space:nowrap" onclick="seedSubpageBlocks()" title="Создать недостающие блоки для подстраниц (idempotent)"><i class="fas fa-magic" style="margin-right:4px"></i>Подстраницы</button>';
+  h += '<button class="btn btn-outline" style="font-size:0.76rem;padding:6px 12px;white-space:nowrap" onclick="sbRunSeedPro()" title="Загрузить шаблоны Phase 4 (shell/home/calculator/package/blog) — idempotent"><i class="fas fa-bolt" style="margin-right:4px"></i>Шаблоны Pro</button>';
+  h += '</div>';
   h += '</div>';
 
-  // ── Search + Toolbar (only for blocks/calculator tabs) ──
+  // ── Phase 4: Search + Toolbar (export/import + templates dropdown + create) ──
   h += '<div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:16px">' +
-    '<div style="flex:1;min-width:200px;max-width:320px" class="sb-search-box"><i class="fas fa-search"></i><input class="input" placeholder="Поиск по блокам..." value="' + escHtml(sbSearchQuery) + '" oninput="sbSearchQuery=this.value;render()" style="font-size:0.85rem"></div>' +
-    '<div style="display:flex;gap:8px;margin-left:auto">' +
-      '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
-      '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
+    '<div style="flex:1;min-width:200px;max-width:320px" class="sb-search-box"><i class="fas fa-search"></i><input class="input" id="sbSearchInput" placeholder="Поиск по блокам... (нажми /)" value="' + escHtml(sbSearchQuery) + '" oninput="sbSearchQuery=this.value;render()" style="font-size:0.85rem" title="Поиск по названию, ключу или содержимому блоков. Нажмите / для быстрого фокуса."></div>' +
+    '<div style="display:flex;gap:8px;margin-left:auto;flex-wrap:wrap">' +
+      '<button class="btn btn-outline" onclick="sbExportBackup()" style="white-space:nowrap;font-size:0.82rem" title="Скачать JSON-бэкап всех блоков (Ctrl+Shift+E)"><i class="fas fa-cloud-download-alt" style="margin-right:5px"></i>Скачать бэкап</button>' +
+      '<label class="btn btn-outline" style="white-space:nowrap;font-size:0.82rem;cursor:pointer" title="Загрузить блоки из JSON-бэкапа (INSERT OR REPLACE)"><i class="fas fa-cloud-upload-alt" style="margin-right:5px"></i>Загрузить из бэкапа<input type="file" accept=".json,application/json" style="display:none" onchange="sbImportBackup(this)"></label>' +
+      '<div style="position:relative">' +
+        '<button class="btn btn-outline" onclick="sbToggleTemplatesMenu(event)" style="white-space:nowrap;font-size:0.82rem" title="Создать блок из шаблона"><i class="fas fa-clone" style="margin-right:5px"></i>Из шаблона<i class="fas fa-caret-down" style="margin-left:6px"></i></button>' +
+        '<div id="sbTemplatesMenu" class="sb-templates-menu" style="display:none">' + sbBuildTemplatesMenuHTML() + '</div>' +
+      '</div>' +
+      '<button class="btn btn-success" onclick="importSiteBlocks()" style="white-space:nowrap;font-size:0.82rem" title="Импортировать тексты из site_content (старая система)"><i class="fas fa-download" style="margin-right:5px"></i>Загрузить с сайта</button>' +
+      '<button class="btn btn-primary" onclick="createSiteBlock()" style="white-space:nowrap;font-size:0.82rem" title="Создать новый блок"><i class="fas fa-plus" style="margin-right:5px"></i>Новый блок</button>' +
     '</div>' +
   '</div>';
 
-  // ── Toolbar: Language + Stats + Expand ──
-  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">' +
-    '<div style="display:flex;gap:4px;align-items:center">' +
+  // ── Phase 4: Toolbar — language (incl. side mode) + status summary + expand ──
+  var visCount = blocks.filter(function(b){return b.is_visible}).length;
+  var hidCount = blocks.length - visCount;
+  var emptyCount = blocks.filter(function(b) {
+    var tr = (b.texts_ru || []), ta = (b.texts_am || []);
+    var bb = (b.buttons || []);
+    var hasText = tr.some(function(t){return (t||'').trim()}) || ta.some(function(t){return (t||'').trim()});
+    return !hasText && bb.length === 0;
+  }).length;
+  h += '<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">' +
+    '<div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap">' +
       '<span style="font-size:0.78rem;color:#64748b;margin-right:4px"><i class="fas fa-language" style="margin-right:3px"></i>Язык:</span>' +
-      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;both&apos;;render()">RU + AM</button>' +
-      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;ru&apos;;render()">RU</button>' +
-      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;am&apos;;render()">AM</button>' +
+      '<button class="btn ' + (sbLangView==='both'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;both&apos;;render()" title="RU и AM в одной колонке (стек)">RU + AM</button>' +
+      '<button class="btn ' + (sbLangView==='side'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;side&apos;;render()" title="RU и AM рядом, с подсветкой непереведённых полей"><i class="fas fa-columns" style="margin-right:4px"></i>RU + AM рядом</button>' +
+      '<button class="btn ' + (sbLangView==='ru'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;ru&apos;;render()" title="Только русский">RU</button>' +
+      '<button class="btn ' + (sbLangView==='am'?'btn-primary':'btn-outline') + '" style="padding:5px 14px;font-size:0.78rem" onclick="sbLangView=&apos;am&apos;;render()" title="Только армянский">AM</button>' +
     '</div>' +
     '<div style="display:flex;gap:10px;align-items:center;font-size:0.78rem;color:#475569">' +
-      '<span><i class="fas fa-eye" style="color:#10B981;margin-right:3px"></i>' + blocks.filter(function(b){return b.is_visible}).length + ' видимых</span>' +
-      '<span>|</span>' +
-      '<span style="cursor:pointer;color:#8B5CF6" onclick="sbExpandAll()"><i class="fas fa-expand-alt" style="margin-right:3px"></i>Раскрыть</span>' +
-      '<span style="cursor:pointer;color:#94a3b8" onclick="sbCollapseAll()"><i class="fas fa-compress-alt" style="margin-right:3px"></i>Свернуть</span>' +
+      '<span style="cursor:pointer;color:#8B5CF6" onclick="sbExpandAll()" title="Раскрыть все блоки"><i class="fas fa-expand-alt" style="margin-right:3px"></i>Раскрыть</span>' +
+      '<span style="cursor:pointer;color:#94a3b8" onclick="sbCollapseAll()" title="Свернуть все блоки"><i class="fas fa-compress-alt" style="margin-right:3px"></i>Свернуть</span>' +
     '</div>' +
+  '</div>';
+  // Stats summary row
+  h += '<div class="sb-status-summary">' +
+    '<span><i class="fas fa-cubes" style="color:#a78bfa"></i><b style="color:#e2e8f0">' + blocks.length + '</b> блоков</span>' +
+    '<span>·</span>' +
+    '<span><i class="fas fa-eye" style="color:#10B981"></i>' + visCount + ' видимы</span>' +
+    '<span>·</span>' +
+    '<span><i class="fas fa-eye-slash" style="color:#94a3b8"></i>' + hidCount + ' скрыты</span>' +
+    '<span>·</span>' +
+    '<span><i class="fas fa-circle-exclamation" style="color:#fbbf24"></i>' + emptyCount + ' пустых</span>' +
   '</div>';
   h += '</div>'; // end header
 
-  if (blocks.length === 0 && !sbSearchQuery && (!sbPageFilter || sbPageFilter === 'all')) {
-    h += '<div class="card" style="text-align:center;padding:60px;color:#64748b">' +
-      '<i class="fas fa-layer-group" style="font-size:3rem;margin-bottom:16px;display:block;opacity:0.3"></i>' +
-      '<p style="font-size:1.1rem;margin-bottom:8px">Блоки ещё не загружены</p>' +
-      '<p style="font-size:0.85rem;margin-bottom:20px">Нажмите «Загрузить с сайта» чтобы импортировать все секции.</p>' +
-      '<button class="btn btn-success" onclick="importSiteBlocks()"><i class="fas fa-download" style="margin-right:6px"></i>Загрузить с сайта</button></div>';
+  // ── Phase 4: bulk action bar (visible only when ≥ 1 block selected) ──
+  var selectedIdList = Object.keys(sbSelectedIds).filter(function(k){return sbSelectedIds[k]}).map(function(k){return parseInt(k,10)}).filter(function(n){return !isNaN(n)});
+  if (selectedIdList.length > 0) {
+    h += '<div class="sb-bulk-bar">' +
+      '<span class="sb-bulk-count"><i class="fas fa-check-square" style="margin-right:6px"></i>Выбрано: ' + selectedIdList.length + '</span>' +
+      '<button class="btn btn-success" onclick="sbBulkVisibility(1)" title="Показать все выбранные на сайте"><i class="fas fa-eye" style="margin-right:4px"></i>Показать</button>' +
+      '<button class="btn btn-outline" onclick="sbBulkVisibility(0)" title="Скрыть все выбранные с сайта"><i class="fas fa-eye-slash" style="margin-right:4px"></i>Скрыть</button>' +
+      '<div class="sb-bulk-move-wrap">' +
+        '<button class="btn btn-outline" onclick="sbToggleBulkMoveMenu(event)" title="Перенести выбранные блоки на другую страницу"><i class="fas fa-arrows-alt" style="margin-right:4px"></i>Перенести на страницу<i class="fas fa-caret-down" style="margin-left:6px"></i></button>' +
+        '<div id="sbBulkMoveMenu" class="sb-bulk-move-menu" style="display:none">' + sbBuildPageMoveMenuHTML() + '</div>' +
+      '</div>' +
+      '<button class="btn btn-danger" onclick="sbBulkDelete()" title="Удалить все выбранные блоки (необратимо)"><i class="fas fa-trash" style="margin-right:4px"></i>Удалить</button>' +
+      '<span style="flex:1"></span>' +
+      '<button class="btn btn-outline" onclick="sbBulkClear()" title="Снять выделение"><i class="fas fa-times" style="margin-right:4px"></i>Снять выделение</button>' +
+    '</div>';
+  }
+
+  if (allBlocks.length === 0 && !sbSearchQuery) {
+    // Phase 4: friendly empty state with three primary actions
+    h += '<div class="sb-empty-state">' +
+      '<i class="fas fa-layer-group sb-empty-icon"></i>' +
+      '<h3>В разделе пока нет блоков</h3>' +
+      '<p>Создайте первый блок вручную, импортируйте тексты с сайта или загрузите готовые шаблоны Phase 4.</p>' +
+      '<div class="sb-empty-actions">' +
+        '<button class="btn btn-primary" onclick="createSiteBlock()" title="Открыть мастер создания нового блока"><i class="fas fa-plus" style="margin-right:6px"></i>Создать первый блок</button>' +
+        '<button class="btn btn-success" onclick="importSiteBlocks()" title="Импортировать тексты из site_content"><i class="fas fa-download" style="margin-right:6px"></i>Импортировать из site_content</button>' +
+        '<button class="btn btn-outline" onclick="sbRunSeedPro()" title="Загрузить shell + home + calculator + package + blog шаблоны"><i class="fas fa-bolt" style="margin-right:6px"></i>Загрузить шаблоны Phase 4</button>' +
+      '</div>' +
+    '</div>';
   } else if (blocks.length === 0 && sbSearchQuery) {
-    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b"><i class="fas fa-search" style="font-size:2rem;margin-bottom:12px;display:block;opacity:0.3"></i><p>Ничего не найдено по запросу «' + escHtml(sbSearchQuery) + '»</p></div>';
+    h += '<div class="sb-empty-state">' +
+      '<i class="fas fa-search sb-empty-icon"></i>' +
+      '<h3>По вашему запросу ничего не найдено</h3>' +
+      '<p>Попробуйте изменить фильтр страницы или текст поиска. Текущий запрос: «' + escHtml(sbSearchQuery) + '».</p>' +
+      '<div class="sb-empty-actions">' +
+        '<button class="btn btn-outline" onclick="sbSearchQuery=&apos;&apos;;render()"><i class="fas fa-times" style="margin-right:6px"></i>Сбросить поиск</button>' +
+        '<button class="btn btn-outline" onclick="sbPageFilter=&apos;all&apos;;render()"><i class="fas fa-th-large" style="margin-right:6px"></i>Все страницы</button>' +
+      '</div>' +
+    '</div>';
   } else if (blocks.length === 0 && sbPageFilter && sbPageFilter !== 'all') {
     var emptyPageLabel = sbPageFilter === 'home' ? 'Главная' : (SUBPAGE_LABELS[sbPageFilter] || sbPageFilter);
-    h += '<div class="card" style="text-align:center;padding:40px;color:#64748b">' +
-      '<i class="fas fa-folder-open" style="font-size:2rem;margin-bottom:12px;display:block;opacity:0.3"></i>' +
-      '<p style="margin-bottom:14px">Нет блоков для страницы «' + escHtml(emptyPageLabel) + '»</p>' +
-      '<button class="btn btn-outline" style="font-size:0.78rem;padding:6px 14px" onclick="seedSubpageBlocks()"><i class="fas fa-magic" style="margin-right:4px"></i>Создать блоки подстраниц</button>' +
+    h += '<div class="sb-empty-state">' +
+      '<i class="fas fa-folder-open sb-empty-icon"></i>' +
+      '<h3>Нет блоков для страницы «' + escHtml(emptyPageLabel) + '»</h3>' +
+      '<p>Создайте новый блок или загрузите готовые шаблоны для этой страницы.</p>' +
+      '<div class="sb-empty-actions">' +
+        '<button class="btn btn-primary" onclick="createSiteBlock()"><i class="fas fa-plus" style="margin-right:6px"></i>Создать блок</button>' +
+        '<button class="btn btn-outline" onclick="seedSubpageBlocks()"><i class="fas fa-magic" style="margin-right:6px"></i>Создать блоки подстраниц</button>' +
+        '<button class="btn btn-outline" onclick="sbRunSeedPro()"><i class="fas fa-bolt" style="margin-right:6px"></i>Шаблоны Phase 4</button>' +
+      '</div>' +
     '</div>';
   } else {
-    // ── Block list (sortable) ──
-    h += '<div id="sbBlockList">';
+    // ── Phase 4: in 'all' mode, group blocks by page; otherwise show flat list ──
+    var isAllPagesView = (!sbPageFilter || sbPageFilter === 'all');
+    var blockGroups = []; // [{ page, label, blocks }]
+    if (isAllPagesView) {
+      var pageBlocks = {};
+      for (var gi = 0; gi < blocks.length; gi++) {
+        var bb = blocks[gi];
+        var pageKey = ((bb.block_key || '') + '').indexOf('__') < 0 ? 'home' : (bb.block_key + '').split('__')[0];
+        if (!pageBlocks[pageKey]) pageBlocks[pageKey] = [];
+        pageBlocks[pageKey].push(bb);
+      }
+      for (var poi = 0; poi < SB_PAGES_ORDER.length; poi++) {
+        var pgKey = SB_PAGES_ORDER[poi];
+        if (pageBlocks[pgKey]) {
+          blockGroups.push({ page: pgKey, label: (pgKey === 'home' ? 'Главная' : (SUBPAGE_LABELS[pgKey] || pgKey)), blocks: pageBlocks[pgKey] });
+          delete pageBlocks[pgKey];
+        }
+      }
+      for (var extraKey in pageBlocks) {
+        if (Object.prototype.hasOwnProperty.call(pageBlocks, extraKey)) {
+          blockGroups.push({ page: extraKey, label: extraKey, blocks: pageBlocks[extraKey] });
+        }
+      }
+      blocks = [];
+      for (var bgI = 0; bgI < blockGroups.length; bgI++) blocks = blocks.concat(blockGroups[bgI].blocks);
+    } else {
+      blockGroups.push({ page: sbPageFilter, label: (sbPageFilter === 'home' ? 'Главная' : (SUBPAGE_LABELS[sbPageFilter] || sbPageFilter)), blocks: blocks });
+    }
+
+    // ── Block list wrapper ──
+    h += isAllPagesView ? '<div id="sbBlockListWrap">' : '<div id="sbBlockList" data-page="' + escHtml(sbPageFilter || 'all') + '">';
+    var currentGroupPage = null;
+    var currentGroupOpen = false;
+
     for (var bi = 0; bi < blocks.length; bi++) {
       var b = blocks[bi];
       var isExpanded = !!sbExpandedBlocks[b.id];
@@ -12690,14 +12933,44 @@ function renderSiteBlocks() {
       var maxTexts = Math.max(textsRu.length, textsAm.length);
       var btnsCount = (b.buttons||[]).length;
       var isTicker = (b.block_key === 'ticker' || b.block_type === 'ticker');
+      var pageOfBlock = ((b.block_key || '') + '').indexOf('__') < 0 ? 'home' : (b.block_key + '').split('__')[0];
 
-      h += '<div class="card sb-block-item" data-block-id="' + b.id + '" style="margin-bottom:12px;padding:0;overflow:hidden;opacity:' + (b.is_visible ? '1' : '0.5') + ';border-left:4px solid ' + (b.is_visible ? '#8B5CF6' : '#475569') + '">';
+      // ── Phase 4: emit group header at page transitions when in all-view ──
+      if (isAllPagesView && pageOfBlock !== currentGroupPage) {
+        if (currentGroupOpen) { h += '</div>'; currentGroupOpen = false; }
+        currentGroupPage = pageOfBlock;
+        var grpInfo = null;
+        for (var bgFi = 0; bgFi < blockGroups.length; bgFi++) {
+          if (blockGroups[bgFi].page === pageOfBlock) { grpInfo = blockGroups[bgFi]; break; }
+        }
+        if (!grpInfo) grpInfo = { page: pageOfBlock, label: pageOfBlock, blocks: [] };
+        var grpCollapsed = !!sbCollapsedGroups[pageOfBlock];
+        h += '<div class="sb-group-header" data-page="' + escHtml(pageOfBlock) + '" onclick="sbToggleGroup(&apos;' + escHtml(pageOfBlock) + '&apos;)" title="Кликните, чтобы свернуть/раскрыть группу">' +
+          '<h3><i class="fas fa-folder' + (grpCollapsed ? '' : '-open') + ' sb-group-icon"></i>' + escHtml(grpInfo.label) + ' <span class="sb-group-count">(' + grpInfo.blocks.length + ' блок.)</span></h3>' +
+          '<div class="sb-group-actions" onclick="event.stopPropagation()">' +
+            '<button onclick="sbToggleGroup(&apos;' + escHtml(pageOfBlock) + '&apos;)" title="Свернуть всю группу"><i class="fas fa-chevron-' + (grpCollapsed ? 'down' : 'up') + '"></i> ' + (grpCollapsed ? 'Раскрыть' : 'Свернуть') + '</button>' +
+            '<button onclick="sbPageFilter=&apos;' + escHtml(pageOfBlock) + '&apos;;sbSelectedIds={};render()" title="Показать только эту страницу"><i class="fas fa-filter"></i> Только эту</button>' +
+          '</div>' +
+        '</div>';
+        h += '<div class="sb-group-body' + (grpCollapsed ? ' sb-group-collapsed' : '') + '" id="sbGroup_' + escHtml(pageOfBlock) + '" data-page="' + escHtml(pageOfBlock) + '">';
+        currentGroupOpen = true;
+      }
+
+      // Phase 4: status badges
+      var hasContent = textsRu.some(function(t){return (t||'').trim()}) || textsAm.some(function(t){return (t||'').trim()}) || btnsCount > 0 || (b.images||[]).length > 0;
+      var isCms = ((b.title_ru||'').trim() || (b.title_am||'').trim() || hasContent);
+      var isSelected = !!sbSelectedIds[b.id];
+
+      h += '<div class="card sb-block-item" data-block-id="' + b.id + '" data-page="' + escHtml(pageOfBlock) + '" style="margin-bottom:12px;padding:0;overflow:hidden;opacity:' + (b.is_visible ? '1' : '0.5') + ';border-left:4px solid ' + (isSelected ? '#a78bfa' : (b.is_visible ? '#8B5CF6' : '#475569')) + '">';
 
       // ── Block header (always visible) ──
       h += '<div style="display:flex;align-items:center;gap:8px;padding:12px 16px;background:' + (isExpanded ? '#141c2e' : '#1e293b') + ';cursor:pointer;user-select:none" onclick="toggleSbExpand(' + b.id + ')">';
 
+      // Phase 4: bulk-select checkbox
+      h += '<input type="checkbox" class="sb-bulk-check" data-id="' + b.id + '"' + (isSelected ? ' checked' : '') + ' onclick="event.stopPropagation();sbToggleBulkSelect(' + b.id + ',this.checked)" title="Выбрать для массовых действий">';
+
       // Drag handle (grab with mouse to reorder)
-      h += '<div class="sb-drag-handle" onclick="event.stopPropagation()" title="Зажмите и перетащите для изменения порядка">' +
+      h += '<div class="sb-drag-handle" onclick="event.stopPropagation()" title="Зажмите и перетащите для изменения порядка (между группами — для переноса на другую страницу)">' +
         '<i class="fas fa-grip-vertical" style="font-size:1.4rem"></i>' +
       '</div>';
 
@@ -12707,8 +12980,12 @@ function renderSiteBlocks() {
       // Title + badges
       h += '<div style="flex:1;display:flex;align-items:center;gap:8px;flex-wrap:wrap;overflow:hidden">';
       h += '<span style="font-weight:700;font-size:0.95rem;color:' + (b.is_visible ? '#e2e8f0' : '#94a3b8') + ';white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:280px">' + escHtml(b.title_ru || b.block_key) + '</span>';
-      h += '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.7rem;font-weight:600;letter-spacing:0.3px">' + escHtml(sbBlockPageLabel(b.block_key)) + '</span>';
-      h += '<span class="badge badge-purple" style="font-size:0.68rem">' + escHtml(b.block_key) + '</span>';
+      h += '<span style="display:inline-block;padding:2px 8px;border-radius:8px;background:rgba(139,92,246,0.15);color:#a78bfa;font-size:0.7rem;font-weight:600;letter-spacing:0.3px" title="Страница, на которой отображается блок">' + escHtml(sbBlockPageLabel(b.block_key)) + '</span>';
+      // Phase 4: status badges
+      h += '<span class="sb-block-badge ' + (b.is_visible ? 'bg-active' : 'bg-hidden') + '" title="' + (b.is_visible ? 'Блок виден на сайте' : 'Блок скрыт с сайта') + '">' + (b.is_visible ? 'Активен' : 'Скрыт') + '</span>';
+      h += '<span class="sb-block-badge ' + (hasContent ? 'bg-filled' : 'bg-empty') + '" title="' + (hasContent ? 'В блоке есть тексты, кнопки или фото' : 'Блок не содержит данных — добавьте контент') + '">' + (hasContent ? 'Заполнен' : 'Пустой') + '</span>';
+      h += '<span class="sb-block-badge ' + (isCms ? 'bg-cms' : 'bg-default') + '" title="' + (isCms ? 'Управляется через CMS' : 'Используются дефолтные тексты сайта') + '">' + (isCms ? 'CMS' : 'Дефолт') + '</span>';
+      h += '<span class="badge badge-purple" style="font-size:0.68rem" title="Уникальный идентификатор блока (block_key)">' + escHtml(b.block_key) + '</span>';
       if (b.block_type && b.block_type !== 'section') h += '<span class="badge" style="background:rgba(251,191,36,0.12);color:#fbbf24;font-size:0.68rem">' + escHtml(b.block_type) + '</span>';
       if (maxTexts > 0) h += '<span class="badge" style="background:rgba(59,130,246,0.12);color:#60a5fa;font-size:0.68rem">' + maxTexts + ' текст.</span>';
       if (btnsCount > 0) h += '<span class="badge badge-amber" style="font-size:0.68rem">' + btnsCount + ' кноп.</span>';
@@ -12716,12 +12993,12 @@ function renderSiteBlocks() {
 
       // Quick actions
       h += '<div style="display:flex;gap:3px" onclick="event.stopPropagation()">';
-      h += '<button class="btn ' + (b.is_visible ? 'btn-outline' : 'btn-danger') + '" style="padding:4px 8px;font-size:0.72rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')" title="' + (b.is_visible ? 'Скрыть блок' : 'Показать блок') + '">' + (b.is_visible ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>';
-      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem;color:#f87171;border-color:rgba(248,113,113,0.3)" onclick="delSiteBlock(' + b.id + ')" title="Удалить"><i class="fas fa-trash"></i></button>';
+      h += '<button class="btn ' + (b.is_visible ? 'btn-outline' : 'btn-danger') + '" style="padding:4px 8px;font-size:0.72rem" onclick="toggleSbVisible(' + b.id + ',' + (b.is_visible?0:1) + ')" title="' + (b.is_visible ? 'Скрыть с сайта' : 'Показать на сайте') + '">' + (b.is_visible ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>') + '</button>';
+      h += '<button class="btn btn-outline" style="padding:4px 8px;font-size:0.72rem;color:#f87171;border-color:rgba(248,113,113,0.3)" onclick="delSiteBlock(' + b.id + ')" title="Удалить блок"><i class="fas fa-trash"></i></button>';
       h += '</div>';
 
       // Expand arrow
-      h += '<i class="fas fa-chevron-' + (isExpanded ? 'up' : 'down') + '" style="color:#475569;font-size:0.8rem;min-width:16px;text-align:center"></i>';
+      h += '<i class="fas fa-chevron-' + (isExpanded ? 'up' : 'down') + '" style="color:#475569;font-size:0.8rem;min-width:16px;text-align:center" title="' + (isExpanded ? 'Свернуть редактор' : 'Раскрыть редактор') + '"></i>';
       h += '</div>'; // end header
 
       // ── Expanded editor ──
@@ -12730,7 +13007,7 @@ function renderSiteBlocks() {
 
         // ── Block ID + Title row ──
         h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '200px 1fr 1fr' : '200px 1fr') + ';gap:12px;margin-bottom:18px">';
-        h += '<div class="sb-field-group"><div class="sb-field-label" style="color:#64748b"><i class="fas fa-key"></i> ID блока</div><input class="input" value="' + escHtml(b.block_key) + '" disabled style="font-size:0.82rem;opacity:0.6;cursor:not-allowed"></div>';
+        h += '<div class="sb-field-group"><div class="sb-field-label" style="color:#64748b"><i class="fas fa-key"></i> ID блока</div><input class="input" value="' + escHtml(b.block_key) + '" disabled title="Уникальный идентификатор. Префикс home__/services__/buyouts__ и т.д. определяет страницу" style="font-size:0.82rem;opacity:0.6;cursor:not-allowed"><div class="sb-hint" style="font-size:0.7rem;padding:4px 8px;margin-top:4px"><i class="fas fa-lightbulb"></i>Префикс <code style="color:#a78bfa">home__</code>, <code style="color:#a78bfa">services__</code> и т.д. определяет, на какой странице блок отображается.</div></div>';
         if (showRu) h += '<div class="sb-field-group"><div class="sb-field-label ru"><i class="fas fa-heading"></i> Название блока (RU)</div><input class="input" id="sb_title_ru_' + b.id + '" value="' + escHtml(b.title_ru) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         if (showAm) h += '<div class="sb-field-group"><div class="sb-field-label am"><i class="fas fa-heading"></i> Վերնագիր (AM)</div><input class="input" id="sb_title_am_' + b.id + '" value="' + escHtml(b.title_am) + '" style="font-weight:700;font-size:0.95rem" onchange="sbAutoSave(' + b.id + ')"></div>';
         h += '</div>';
@@ -13056,22 +13333,25 @@ function renderSiteBlocks() {
           h += '</div>';
         } else {
           // ── Semantic text pairs (for non-ticker blocks) ──
+          var isSideMode = (sbLangView === 'side');
           h += '<div style="margin-bottom:16px">';
           h += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">' +
             '<h4 style="font-size:0.85rem;font-weight:700;color:#94a3b8"><i class="fas fa-align-left" style="color:#8B5CF6;margin-right:6px"></i>Тексты блока <span style="font-weight:400;color:#475569;font-size:0.78rem">(' + maxTexts + ' элементов)</span></h4>' +
-            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTextPair(' + b.id + ')"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
+            '<button class="btn btn-outline" style="padding:4px 12px;font-size:0.72rem" onclick="sbAddTextPair(' + b.id + ')" title="Добавить новую пару RU/AM"><i class="fas fa-plus" style="margin-right:4px"></i>Добавить текст</button>' +
           '</div>';
+          h += '<div class="sb-hint"><i class="fas fa-info-circle"></i>Каждая строка — отдельный фрагмент текста (заголовок, кнопка, описание). Порядок важен: индекс используется в коде сайта.</div>';
 
           for (var ti = 0; ti < maxTexts; ti++) {
             var ruText = (ti < textsRu.length ? textsRu[ti] : '') || '';
             var amText = (ti < textsAm.length ? textsAm[ti] : '') || '';
             var isLong = ruText.length > 100 || amText.length > 100;
             var fieldLabel = sbGetFieldLabel(b.block_key, ti, maxTexts);
+            var amWarn = isSideMode && (ruText || '').trim().length > 0 && (amText || '').trim().length === 0;
 
             h += '<div class="sb-text-pair" draggable="true" data-block-id="' + b.id + '" data-text-idx="' + ti + '" ondragstart="sbDragStart(event,&apos;text&apos;,' + b.id + ',' + ti + ')" ondragover="sbDragOver(event)" ondragleave="sbDragLeave(event)" ondrop="sbDrop(event,&apos;text&apos;,' + b.id + ',' + ti + ')">';
             h += '<div class="sb-text-pair-num" style="display:flex;align-items:center;justify-content:space-between;gap:8px">';
             h += '<div style="display:flex;align-items:center;gap:6px">';
-            h += '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:0.75rem" title="Перетащить"></i>';
+            h += '<i class="fas fa-grip-vertical" style="color:#475569;cursor:grab;font-size:0.75rem" title="Перетащить для изменения порядка"></i>';
             if (ti > 0) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px;font-size:0.7rem" onclick="sbMoveText(' + b.id + ',' + ti + ',-1)" title="Вверх"><i class="fas fa-chevron-up"></i></button>';
             if (ti < maxTexts - 1) h += '<button style="background:none;border:none;color:#8B5CF6;cursor:pointer;padding:2px;font-size:0.7rem" onclick="sbMoveText(' + b.id + ',' + ti + ',1)" title="Вниз"><i class="fas fa-chevron-down"></i></button>';
             h += '<span>' + fieldLabel + '</span>';
@@ -13085,8 +13365,9 @@ function renderSiteBlocks() {
             }
             h += '</select>';
             h += '</div>';
-            h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
-            if (showRu) {
+            // Phase 4: side-by-side layout when sbLangView === 'side'
+            if (isSideMode) {
+              h += '<div class="sb-side-grid">';
               h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
               if (isLong) {
                 h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(ruText) + '</textarea>';
@@ -13094,17 +13375,38 @@ function renderSiteBlocks() {
                 h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
               }
               h += '</div>';
-            }
-            if (showAm) {
+              h += '<div class="sb-side-divider" title="RU слева — AM справа"><i class="fas fa-grip-lines-vertical"></i></div>';
               h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label am" style="margin-bottom:3px">AM</div>';
               if (isLong) {
-                h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>';
+                h += '<textarea class="input' + (amWarn ? ' sb-side-warn' : '') + '" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>';
               } else {
-                h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
+                h += '<input class="input' + (amWarn ? ' sb-side-warn' : '') + '" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
+              }
+              if (amWarn) h += '<div class="sb-side-warn-msg"><i class="fas fa-exclamation-triangle"></i>Не переведено</div>';
+              h += '</div>';
+              h += '</div>';
+            } else {
+              h += '<div style="display:grid;grid-template-columns:' + (showRu && showAm ? '1fr 1fr' : '1fr') + ';gap:10px;align-items:start">';
+              if (showRu) {
+                h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label ru" style="margin-bottom:3px">RU</div>';
+                if (isLong) {
+                  h += '<textarea class="input" id="sb_tru_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(ruText) + '</textarea>';
+                } else {
+                  h += '<input class="input" id="sb_tru_' + b.id + '_' + ti + '" value="' + escHtml(ruText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
+                }
+                h += '</div>';
+              }
+              if (showAm) {
+                h += '<div class="sb-field-group" style="margin-bottom:0"><div class="sb-field-label am" style="margin-bottom:3px">AM</div>';
+                if (isLong) {
+                  h += '<textarea class="input" id="sb_tam_' + b.id + '_' + ti + '" style="min-height:60px;font-size:0.84rem;line-height:1.5" onchange="sbAutoSave(' + b.id + ')">' + escHtml(amText) + '</textarea>';
+                } else {
+                  h += '<input class="input" id="sb_tam_' + b.id + '_' + ti + '" value="' + escHtml(amText) + '" style="font-size:0.84rem" onchange="sbAutoSave(' + b.id + ')">';
+                }
+                h += '</div>';
               }
               h += '</div>';
             }
-            h += '</div>';
             // ── Nav link target selector (only for nav block) ──
             if (b.block_key === 'nav') {
               var navOpts = {}; try { navOpts = JSON.parse(b.custom_html || '{}'); } catch(e) { navOpts = {}; }
@@ -13596,14 +13898,16 @@ function renderSiteBlocks() {
         h += '<span title="Последнее обновление"><i class="fas fa-clock" style="margin-right:2px"></i>' + (b.updated_at ? new Date(b.updated_at).toLocaleString('ru') : 'не задано') + '</span>';
         h += '</div>';
         
-        h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center">' +
-          '<div style="display:flex;gap:6px">' +
-            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbPreviewBlock(&apos;' + b.block_key + '&apos;)" title="Предпросмотр блока на сайте"><i class="fas fa-external-link-alt"></i></button>' +
+        h += '<div style="display:flex;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap">' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap">' +
+            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbPreviewBlock(&apos;' + b.block_key + '&apos;)" title="Открыть страницу в новой вкладке"><i class="fas fa-external-link-alt"></i></button>' +
+            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbOpenPreviewPane(&apos;' + escHtml(b.block_key) + '&apos;)" title="Живой предпросмотр в боковой панели"><i class="fas fa-eye" style="margin-right:4px"></i>Предпросмотр</button>' +
+            '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbShowHistory(' + b.id + ')" title="История изменений блока"><i class="fas fa-history" style="margin-right:4px"></i>История</button>' +
             '<button class="btn btn-outline" style="padding:4px 10px;font-size:0.72rem" onclick="sbResetBlock(' + b.id + ')" title="Сбросить до оригинала"><i class="fas fa-undo"></i></button>' +
           '</div>' +
-          '<div style="display:flex;gap:8px">' +
-            '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')" style="font-size:0.82rem">Свернуть</button>' +
-            '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:160px;font-size:0.82rem"><i class="fas fa-save" style="margin-right:5px"></i>Сохранить и синхр.</button>' +
+          '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
+            '<button class="btn btn-outline" onclick="toggleSbExpand(' + b.id + ')" style="font-size:0.82rem" title="Свернуть редактор">Свернуть</button>' +
+            '<button class="btn btn-success" onclick="sbSaveBlock(' + b.id + ')" style="min-width:160px;font-size:0.82rem" title="Сохранить (Ctrl+S) и синхронизировать с сайтом"><i class="fas fa-save" style="margin-right:5px"></i>Сохранить и синхр.</button>' +
           '</div>' +
         '</div>';
         h += '</div>';
@@ -13612,7 +13916,8 @@ function renderSiteBlocks() {
       }
       h += '</div>'; // end card
     }
-    h += '</div>'; // end #sbBlockList
+    if (isAllPagesView && currentGroupOpen) h += '</div>'; // close last group body
+    h += '</div>'; // end wrapper (#sbBlockList or #sbBlockListWrap)
   }
 
   // ── Save status indicator ──
@@ -13623,8 +13928,12 @@ function renderSiteBlocks() {
 
   h += '</div>'; // end wrapper
 
-  // ── Post-render: init SortableJS ──
-  setTimeout(function() { sbInitSortable(); sbInitPhotoSortables(); }, 50);
+  // ── Post-render: init SortableJS + hotkeys ──
+  setTimeout(function() {
+    sbInitSortable();
+    sbInitPhotoSortables();
+    if (typeof sbInitHotkeys === 'function') sbInitHotkeys();
+  }, 50);
 
   return h;
 }
@@ -13748,20 +14057,73 @@ function sbSetNavLink(blockId, textIdx, target) {
 }
 
 // ── Init SortableJS on block list ──
+// Phase 4: when in 'all' (grouped) view, init per-group sortable with shared
+// group name 'site-blocks' so blocks can be drag-dropped between page groups.
+// On cross-group drop we call POST /site-blocks/move-page to rename the
+// block_key prefix on the backend.
 function sbInitSortable() {
+  // Always destroy previous instances first
+  if (sbSortableInstance) { try { sbSortableInstance.destroy(); } catch(e) {} sbSortableInstance = null; }
+  if (Array.isArray(sbGroupSortables)) {
+    sbGroupSortables.forEach(function(s) { try { s.destroy(); } catch(e) {} });
+  }
+  sbGroupSortables = [];
+
+  // Single-page mode: existing flat list
   var el = document.getElementById('sbBlockList');
-  if (!el) return;
-  if (sbSortableInstance) { try { sbSortableInstance.destroy(); } catch(e) {} }
-  sbSortableInstance = new Sortable(el, {
-    handle: '.sb-drag-handle',
-    animation: 200,
-    ghostClass: 'sortable-ghost',
-    chosenClass: 'sortable-chosen',
-    dragClass: 'sortable-drag',
-    onEnd: function(evt) {
-      if (evt.oldIndex === evt.newIndex) return;
-      sbReorderAfterDrag();
-    }
+  if (el) {
+    sbSortableInstance = new Sortable(el, {
+      handle: '.sb-drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      onEnd: function(evt) {
+        if (evt.oldIndex === evt.newIndex) return;
+        sbReorderAfterDrag();
+      }
+    });
+    return;
+  }
+
+  // Phase 4: 'all' / grouped mode — one Sortable per group body, shared name
+  var wrap = document.getElementById('sbBlockListWrap');
+  if (!wrap) return;
+  var groups = wrap.querySelectorAll('.sb-group-body');
+  groups.forEach(function(groupEl) {
+    var inst = new Sortable(groupEl, {
+      group: { name: 'site-blocks', pull: true, put: true },
+      handle: '.sb-drag-handle',
+      animation: 200,
+      ghostClass: 'sortable-ghost',
+      chosenClass: 'sortable-chosen',
+      dragClass: 'sortable-drag',
+      onAdd: async function(evt) {
+        // Block was dropped into a different group — rename its block_key prefix
+        var item = evt.item;
+        var blockId = parseInt(item.getAttribute('data-block-id'), 10);
+        var newPage = groupEl.getAttribute('data-page');
+        if (!blockId || !newPage) return;
+        try {
+          var resp = await api('/site-blocks/move-page', { method: 'POST', body: JSON.stringify({ id: blockId, new_page: newPage }) });
+          if (resp && resp.error) { toast('Ошибка переноса: ' + resp.error, 'error'); }
+          else { toast('Блок перенесён на страницу «' + (newPage === 'home' ? 'Главная' : (SUBPAGE_LABELS[newPage] || newPage)) + '»'); }
+        } catch(e) {
+          toast('Ошибка переноса: ' + (e.message || 'network'), 'error');
+        }
+        // Reload data to get the new block_key + recomputed positions
+        await loadData();
+        render();
+      },
+      onEnd: function(evt) {
+        // Pure within-group reorder (same from === to)
+        if (evt.from === evt.to) {
+          if (evt.oldIndex === evt.newIndex) return;
+          sbReorderAfterDrag();
+        }
+      }
+    });
+    sbGroupSortables.push(inst);
   });
 }
 
@@ -13827,7 +14189,8 @@ function sbReorderPhotos(blockId, container) {
 
 // ── Reorder after drag-and-drop ──
 async function sbReorderAfterDrag() {
-  var el = document.getElementById('sbBlockList');
+  // Phase 4: support both single-page (#sbBlockList) and grouped (#sbBlockListWrap) layouts
+  var el = document.getElementById('sbBlockList') || document.getElementById('sbBlockListWrap');
   if (!el) return;
   var items = el.querySelectorAll('.sb-block-item');
   var newIds = [];
@@ -15057,6 +15420,398 @@ async function seedSubpageBlocks() {
   } catch(e) {
     toast('Ошибка: ' + ((e && e.message) || 'unknown'), 'error');
   }
+}
+
+// ── Phase 4: seed-pro — load shell/home/calculator/package/blog templates (idempotent) ──
+async function sbRunSeedPro() {
+  if (!confirm('Загрузить готовые шаблоны Phase 4 (shell, home, calculator, package, blog)?\\nСуществующие блоки НЕ будут перезаписаны (idempotent INSERT OR IGNORE).')) return;
+  toast('Загрузка шаблонов...', 'info');
+  try {
+    var resp = await api('/site-blocks/seed-pro', { method: 'POST' });
+    if (!resp || resp.error || resp.success === false) {
+      throw new Error((resp && resp.error) || 'Ошибка');
+    }
+    var inserted = (typeof resp.inserted === 'number') ? resp.inserted : 0;
+    var total = (typeof resp.total === 'number') ? resp.total : 0;
+    toast('Создано: ' + inserted + ' из ' + total + ' шаблонов', 'success');
+    await loadData();
+    render();
+  } catch(e) {
+    toast('Ошибка: ' + ((e && e.message) || 'unknown'), 'error');
+  }
+}
+
+// ── Phase 4: BULK ACTIONS ──
+function sbToggleBulkSelect(blockId, checked) {
+  if (checked) sbSelectedIds[blockId] = true;
+  else delete sbSelectedIds[blockId];
+  // Lightweight re-render — just refresh, no data reload needed
+  render();
+}
+
+function sbBulkClear() {
+  sbSelectedIds = {};
+  render();
+}
+
+function _sbGetSelectedIds() {
+  var out = [];
+  for (var k in sbSelectedIds) {
+    if (Object.prototype.hasOwnProperty.call(sbSelectedIds, k) && sbSelectedIds[k]) {
+      var n = parseInt(k, 10);
+      if (!isNaN(n)) out.push(n);
+    }
+  }
+  return out;
+}
+
+async function sbBulkVisibility(visible) {
+  var ids = _sbGetSelectedIds();
+  if (ids.length === 0) { toast('Не выбрано ни одного блока', 'error'); return; }
+  toast((visible ? 'Показываем ' : 'Скрываем ') + ids.length + ' блоков...', 'info');
+  try {
+    var resp = await api('/site-blocks/bulk-visibility', { method: 'POST', body: JSON.stringify({ ids: ids, is_visible: visible ? 1 : 0 }) });
+    if (resp && resp.error) { toast('Ошибка: ' + resp.error, 'error'); return; }
+    toast(visible ? 'Показаны на сайте' : 'Скрыты с сайта');
+    sbSelectedIds = {};
+    await refreshSiteManagement();
+  } catch(e) { toast('Ошибка: ' + (e.message || 'network'), 'error'); }
+}
+
+async function sbBulkDelete() {
+  var ids = _sbGetSelectedIds();
+  if (ids.length === 0) { toast('Не выбрано ни одного блока', 'error'); return; }
+  if (!confirm('Удалить ' + ids.length + ' блок(ов)? Это действие НЕОБРАТИМО.\\nИстория сохранится — блоки можно восстановить из истории каждого block_id, если у вас есть резервная копия.')) return;
+  toast('Удаление ' + ids.length + ' блоков...', 'info');
+  try {
+    var resp = await api('/site-blocks/bulk-delete', { method: 'POST', body: JSON.stringify({ ids: ids }) });
+    if (resp && resp.error) { toast('Ошибка: ' + resp.error, 'error'); return; }
+    toast('Удалено: ' + (resp && typeof resp.deleted === 'number' ? resp.deleted : ids.length));
+    sbSelectedIds = {};
+    ids.forEach(function(id) { delete sbExpandedBlocks[id]; });
+    await refreshSiteManagement();
+  } catch(e) { toast('Ошибка: ' + (e.message || 'network'), 'error'); }
+}
+
+function sbToggleBulkMoveMenu(e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var menu = document.getElementById('sbBulkMoveMenu');
+  if (!menu) return;
+  var visible = menu.style.display !== 'none';
+  // Close any other open dropdown first
+  var t = document.getElementById('sbTemplatesMenu'); if (t) t.style.display = 'none';
+  menu.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    setTimeout(function() {
+      document.addEventListener('click', function _close() {
+        menu.style.display = 'none';
+        document.removeEventListener('click', _close);
+      });
+    }, 50);
+  }
+}
+
+function sbBuildPageMoveMenuHTML() {
+  var html = '';
+  for (var pi = 0; pi < SB_PAGES_ORDER.length; pi++) {
+    var pg = SB_PAGES_ORDER[pi];
+    var lbl = pg === 'home' ? 'Главная' : (SUBPAGE_LABELS[pg] || pg);
+    html += '<button onclick="sbBulkMovePage(&apos;' + pg + '&apos;)" title="Перенести выбранные блоки на страницу «' + lbl + '»"><i class="fas fa-arrow-right" style="color:#a78bfa;margin-right:6px"></i>' + lbl + ' <span style="color:#64748b;font-size:0.7rem">(' + pg + ')</span></button>';
+  }
+  return html;
+}
+
+async function sbBulkMovePage(targetPage) {
+  var menu = document.getElementById('sbBulkMoveMenu'); if (menu) menu.style.display = 'none';
+  var ids = _sbGetSelectedIds();
+  if (ids.length === 0) { toast('Не выбрано ни одного блока', 'error'); return; }
+  if (!confirm('Перенести ' + ids.length + ' блок(ов) на страницу «' + (targetPage === 'home' ? 'Главная' : (SUBPAGE_LABELS[targetPage] || targetPage)) + '»?\\nПрефикс block_key будет переименован.')) return;
+  toast('Перенос ' + ids.length + ' блоков...', 'info');
+  var ok = 0, fail = 0;
+  for (var i = 0; i < ids.length; i++) {
+    try {
+      var r = await api('/site-blocks/move-page', { method: 'POST', body: JSON.stringify({ id: ids[i], new_page: targetPage }) });
+      if (r && r.error) fail++; else ok++;
+    } catch(e) { fail++; }
+  }
+  toast('Готово: ' + ok + (fail > 0 ? ', ошибок: ' + fail : ''), fail > 0 ? 'error' : 'success');
+  sbSelectedIds = {};
+  await refreshSiteManagement();
+}
+
+// ── Phase 4: Group collapse toggle ──
+function sbToggleGroup(pageKey) {
+  if (sbCollapsedGroups[pageKey]) delete sbCollapsedGroups[pageKey];
+  else sbCollapsedGroups[pageKey] = true;
+  render();
+}
+
+// ── Phase 4: TEMPLATES menu ──
+function sbBuildTemplatesMenuHTML() {
+  var html = '';
+  for (var ti = 0; ti < BLOCK_TEMPLATES.length; ti++) {
+    var t = BLOCK_TEMPLATES[ti];
+    html += '<button onclick="sbCreateFromTemplate(&apos;' + t.id + '&apos;)" title="' + escHtml(t.desc) + '">' +
+      '<i class="fas ' + t.icon + ' sb-tpl-icon" style="color:' + t.color + '"></i>' +
+      '<span><span class="sb-tpl-name">' + escHtml(t.name_ru) + '</span><span class="sb-tpl-desc">' + escHtml(t.desc) + '</span></span>' +
+    '</button>';
+  }
+  return html;
+}
+
+function sbToggleTemplatesMenu(e) {
+  if (e) { e.stopPropagation(); e.preventDefault(); }
+  var menu = document.getElementById('sbTemplatesMenu');
+  if (!menu) return;
+  var visible = menu.style.display !== 'none';
+  // Close any other open dropdown
+  var bm = document.getElementById('sbBulkMoveMenu'); if (bm) bm.style.display = 'none';
+  menu.style.display = visible ? 'none' : 'block';
+  if (!visible) {
+    setTimeout(function() {
+      document.addEventListener('click', function _closeTpl() {
+        menu.style.display = 'none';
+        document.removeEventListener('click', _closeTpl);
+      });
+    }, 50);
+  }
+}
+
+async function sbCreateFromTemplate(tplId) {
+  var menu = document.getElementById('sbTemplatesMenu'); if (menu) menu.style.display = 'none';
+  var tpl = null;
+  for (var i = 0; i < BLOCK_TEMPLATES.length; i++) { if (BLOCK_TEMPLATES[i].id === tplId) { tpl = BLOCK_TEMPLATES[i]; break; } }
+  if (!tpl) { toast('Шаблон не найден', 'error'); return; }
+  // Choose target page (default: home, or current page filter)
+  var defaultPage = (sbPageFilter && sbPageFilter !== 'all') ? sbPageFilter : 'home';
+  var pageKey = prompt('На какую страницу добавить блок?\\nВарианты: home, services, buyouts, about, faq, contacts, referral, calculator, package, blog, shell', defaultPage);
+  if (!pageKey) return;
+  pageKey = pageKey.trim().toLowerCase();
+  // Generate unique block_key
+  var basePrefix = (pageKey === 'home') ? '' : (pageKey + '__');
+  var defaultKey = basePrefix + tpl.id + '_' + Date.now().toString(36);
+  var blockKey = prompt('Уникальный ID блока (block_key):', defaultKey);
+  if (!blockKey) return;
+  blockKey = blockKey.trim().replace(/\\s+/g, '_');
+
+  var defaults = tpl.defaults || {};
+  var blockData = {
+    block_key: blockKey,
+    block_type: tpl.block_type || 'section',
+    title_ru: tpl.name_ru,
+    title_am: tpl.name_am || '',
+    texts_ru: defaults.texts_ru || [],
+    texts_am: defaults.texts_am || [],
+    images: [],
+    buttons: defaults.buttons || [],
+    social_links: '[]',
+    is_visible: 1,
+    custom_css: '',
+    custom_html: JSON.stringify({ template_id: tpl.id, bg_class: 'section-dark' })
+  };
+  toast('Создаём блок из шаблона...', 'info');
+  try {
+    var resp = await api('/site-blocks', { method: 'POST', body: JSON.stringify(blockData) });
+    if (resp && resp.error) { toast('Ошибка: ' + resp.error, 'error'); return; }
+    toast('Блок «' + tpl.name_ru + '» создан! Откройте его и заполните контент.');
+    await loadData();
+    render();
+  } catch(e) { toast('Ошибка: ' + (e.message || 'network'), 'error'); }
+}
+
+// ── Phase 4: EXPORT / IMPORT JSON backup ──
+async function sbExportBackup() {
+  toast('Подготовка бэкапа...', 'info');
+  try {
+    var dump = await api('/site-blocks/export');
+    if (!dump || dump.error) { toast('Ошибка экспорта: ' + ((dump && dump.error) || 'unknown'), 'error'); return; }
+    var blob = new Blob([JSON.stringify(dump, null, 2)], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'gtt-site-blocks-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(url); a.remove(); }, 200);
+    toast('Бэкап скачан: ' + (dump.count || 0) + ' блоков');
+  } catch(e) { toast('Ошибка: ' + (e.message || 'network'), 'error'); }
+}
+
+function sbImportBackup(input) {
+  var file = input.files && input.files[0];
+  if (!file) return;
+  var reader = new FileReader();
+  reader.onload = async function() {
+    try {
+      var parsed = JSON.parse(reader.result);
+      var blocksArr = Array.isArray(parsed) ? parsed : (parsed && parsed.blocks);
+      if (!Array.isArray(blocksArr)) { toast('Неверный формат файла (нет массива blocks)', 'error'); return; }
+      if (!confirm('Импортировать ' + blocksArr.length + ' блок(ов)?\\nINSERT OR REPLACE по block_key — существующие блоки будут перезаписаны (история сохраняется).')) return;
+      toast('Импорт ' + blocksArr.length + ' блоков...', 'info');
+      var resp = await api('/site-blocks/import', { method: 'POST', body: JSON.stringify({ blocks: blocksArr }) });
+      if (resp && resp.error) { toast('Ошибка импорта: ' + resp.error, 'error'); return; }
+      var imported = (resp && typeof resp.imported === 'number') ? resp.imported : blocksArr.length;
+      toast('Импортировано: ' + imported + ' блоков', 'success');
+      await refreshSiteManagement();
+    } catch(e) { toast('Ошибка чтения файла: ' + (e.message || 'parse error'), 'error'); }
+    input.value = ''; // allow re-import same file
+  };
+  reader.onerror = function() { toast('Не удалось прочитать файл', 'error'); };
+  reader.readAsText(file);
+}
+
+// ── Phase 4: HISTORY modal + restore ──
+async function sbShowHistory(blockId) {
+  toast('Загрузка истории...', 'info');
+  var bRef = (data.siteBlocks || []).find(function(x) { return x.id === blockId; });
+  var blockLabel = bRef ? (bRef.title_ru || bRef.block_key) : ('#' + blockId);
+  try {
+    var resp = await api('/site-blocks/' + blockId + '/history?limit=50');
+    var entries = (resp && resp.history) || [];
+    var modal = document.createElement('div');
+    modal.id = 'sbHistoryModal';
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.7);z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    var actionLabels = { update: 'Изменён', delete: 'Удалён', restore: 'Восстановлен' };
+    var rows = '';
+    if (entries.length === 0) {
+      rows = '<div style="text-align:center;color:#64748b;padding:30px"><i class="fas fa-clock-rotate-left" style="font-size:2rem;margin-bottom:12px;display:block;opacity:0.4"></i>История пуста — блок ещё не редактировался.</div>';
+    } else {
+      for (var ei = 0; ei < entries.length; ei++) {
+        var e = entries[ei];
+        var dt = e.created_at ? new Date(e.created_at).toLocaleString('ru-RU') : '—';
+        var actLbl = actionLabels[e.action] || e.action;
+        var actCls = (e.action === 'update' || e.action === 'delete' || e.action === 'restore') ? e.action : 'update';
+        rows += '<div class="sb-history-row">' +
+          '<div style="color:#94a3b8"><i class="far fa-clock" style="margin-right:5px"></i>' + escHtml(dt) + '</div>' +
+          '<div class="sb-history-action ' + actCls + '" style="font-weight:700">' + escHtml(actLbl) + '</div>' +
+          '<div style="color:#cbd5e1;overflow:hidden;text-overflow:ellipsis"><i class="fas fa-user" style="color:#475569;margin-right:5px"></i>' + escHtml(e.user_name || 'system') + '</div>' +
+          '<div style="text-align:right"><button class="btn btn-outline" style="font-size:0.72rem;padding:4px 10px" onclick="sbRestoreFromHistory(' + blockId + ',' + e.id + ')" title="Восстановить блок к этому состоянию"><i class="fas fa-undo" style="margin-right:4px"></i>Восстановить</button></div>' +
+        '</div>';
+      }
+    }
+    modal.innerHTML = '<div class="card" style="background:#0f172a;border:1px solid #334155;width:760px;max-width:95vw;max-height:88vh;overflow:auto;padding:24px" onclick="event.stopPropagation()">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">' +
+        '<h3 style="font-size:1.1rem;font-weight:700"><i class="fas fa-history" style="color:#8B5CF6;margin-right:8px"></i>История блока «' + escHtml(blockLabel) + '»</h3>' +
+        '<button class="btn btn-outline" style="padding:6px 10px" onclick="document.getElementById(&apos;sbHistoryModal&apos;).remove()"><i class="fas fa-times"></i></button>' +
+      '</div>' +
+      '<div class="sb-hint" style="margin-bottom:14px"><i class="fas fa-info-circle"></i>Каждое сохранение создаёт snapshot. Хранится последние 200 версий на блок.</div>' +
+      rows +
+    '</div>';
+    var existing = document.getElementById('sbHistoryModal');
+    if (existing) existing.remove();
+    document.body.appendChild(modal);
+  } catch(err) { toast('Ошибка загрузки истории: ' + (err.message || 'unknown'), 'error'); }
+}
+
+async function sbRestoreFromHistory(blockId, historyId) {
+  if (!confirm('Восстановить блок к этой версии?\\nТекущее состояние сохранится в истории как новая запись.')) return;
+  toast('Восстановление...', 'info');
+  try {
+    var resp = await api('/site-blocks/' + blockId + '/restore/' + historyId, { method: 'POST' });
+    if (resp && resp.error) { toast('Ошибка: ' + resp.error, 'error'); return; }
+    toast('Блок восстановлен');
+    var modal = document.getElementById('sbHistoryModal'); if (modal) modal.remove();
+    await refreshSiteManagement();
+  } catch(e) { toast('Ошибка: ' + (e.message || 'network'), 'error'); }
+}
+
+// ── Phase 4: LIVE PREVIEW PANE ──
+function sbOpenPreviewPane(blockKey) {
+  var b = (data.siteBlocks || []).find(function(x) { return x.block_key === blockKey; });
+  var pageKey = ((blockKey || '') + '').indexOf('__') < 0 ? 'home' : (blockKey + '').split('__')[0];
+  var page = (pageKey === 'home') ? '/' : ('/' + pageKey);
+  var anchor = '#sb-' + (blockKey + '').replace(/_/g, '-');
+  _sbPreviewState = { open: true, blockKey: blockKey, page: page, lang: _sbPreviewState.lang || 'ru' };
+  var existing = document.getElementById('sbPreviewPane');
+  if (existing) existing.remove();
+  var pane = document.createElement('div');
+  pane.id = 'sbPreviewPane';
+  pane.className = 'sb-preview-pane active';
+  var title = b ? (b.title_ru || b.block_key) : blockKey;
+  pane.innerHTML =
+    '<div class="sb-preview-header">' +
+      '<span class="sb-preview-title"><i class="fas fa-eye" style="color:#a78bfa;margin-right:6px"></i>' + escHtml(title) + '</span>' +
+      '<button onclick="sbPreviewSetLang(&apos;ru&apos;)" id="sbPrevLangRu" class="' + (_sbPreviewState.lang === 'ru' ? 'active' : '') + '" title="Русская версия">RU</button>' +
+      '<button onclick="sbPreviewSetLang(&apos;am&apos;)" id="sbPrevLangAm" class="' + (_sbPreviewState.lang === 'am' ? 'active' : '') + '" title="Армянская версия">AM</button>' +
+      '<button onclick="sbPreviewReload()" title="Обновить (после сохранения)"><i class="fas fa-sync-alt"></i></button>' +
+      '<button onclick="window.open(document.getElementById(&apos;sbPreviewFrame&apos;).src,&apos;_blank&apos;)" title="Открыть в новой вкладке"><i class="fas fa-external-link-alt"></i></button>' +
+      '<button onclick="sbClosePreviewPane()" title="Закрыть (Esc)"><i class="fas fa-times"></i></button>' +
+    '</div>' +
+    '<iframe id="sbPreviewFrame" class="sb-preview-frame" src="' + escHtml(page) + '?lang=' + _sbPreviewState.lang + anchor + '"></iframe>';
+  document.body.appendChild(pane);
+}
+
+function sbClosePreviewPane() {
+  _sbPreviewState.open = false;
+  var p = document.getElementById('sbPreviewPane');
+  if (p) p.remove();
+}
+
+function sbPreviewReload() {
+  var iframe = document.getElementById('sbPreviewFrame');
+  if (iframe) iframe.src = iframe.src;
+}
+
+function sbPreviewSetLang(lang) {
+  _sbPreviewState.lang = lang;
+  var iframe = document.getElementById('sbPreviewFrame');
+  if (!iframe) return;
+  var src = iframe.src.split('?')[0];
+  var anchor = '#sb-' + ((_sbPreviewState.blockKey || '') + '').replace(/_/g, '-');
+  iframe.src = src + '?lang=' + lang + anchor;
+  var ru = document.getElementById('sbPrevLangRu'); var am = document.getElementById('sbPrevLangAm');
+  if (ru) ru.className = (lang === 'ru' ? 'active' : '');
+  if (am) am.className = (lang === 'am' ? 'active' : '');
+}
+
+// ── Phase 4: HOTKEYS (bound once globally, only active when on blocks page) ──
+function sbInitHotkeys() {
+  if (_sbHotkeysBound) return;
+  _sbHotkeysBound = true;
+  document.addEventListener('keydown', function(e) {
+    // Only active when on blocks page
+    if (typeof currentPage !== 'undefined' && currentPage !== 'blocks') return;
+    var tag = (e.target && e.target.tagName) || '';
+    var isInput = (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || (e.target && e.target.isContentEditable));
+
+    // Esc — close preview / modal
+    if (e.key === 'Escape') {
+      if (_sbPreviewState.open) { sbClosePreviewPane(); e.preventDefault(); return; }
+      var hist = document.getElementById('sbHistoryModal');
+      if (hist) { hist.remove(); e.preventDefault(); return; }
+      var sbm = document.getElementById('siteBlockModal');
+      if (sbm) { sbm.remove(); e.preventDefault(); return; }
+      return;
+    }
+
+    // / — focus search input (when not already in input)
+    if (e.key === '/' && !isInput) {
+      var search = document.getElementById('sbSearchInput');
+      if (search) { e.preventDefault(); search.focus(); search.select(); }
+      return;
+    }
+
+    // Ctrl+Shift+E — export backup
+    if ((e.ctrlKey || e.metaKey) && e.shiftKey && (e.key === 'E' || e.key === 'e')) {
+      e.preventDefault();
+      sbExportBackup();
+      return;
+    }
+
+    // Ctrl+A inside block list — select all visible blocks for bulk
+    if ((e.ctrlKey || e.metaKey) && (e.key === 'a' || e.key === 'A') && !isInput) {
+      var wrap = document.getElementById('sbBlockListWrap') || document.getElementById('sbBlockList');
+      if (!wrap) return;
+      e.preventDefault();
+      var checks = wrap.querySelectorAll('.sb-bulk-check');
+      checks.forEach(function(c) {
+        var id = parseInt(c.getAttribute('data-id'), 10);
+        if (!isNaN(id)) sbSelectedIds[id] = true;
+      });
+      render();
+    }
+  });
 }
 
 // ── Import all blocks from site ──

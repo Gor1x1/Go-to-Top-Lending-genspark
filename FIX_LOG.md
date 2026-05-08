@@ -5,6 +5,73 @@
 
 ---
 
+## Phase 4 — Полный профессиональный CMS (2026-05-08)
+
+**Кэш:** CACHE_VERSION `v27 → v28`.
+**Файлы:**
+- `src/lib/db.ts` — новая таблица `site_blocks_history` (для отката изменений) + миграции в `runLatestMigrations`, бэкфилл `site_blocks.page` из `block_key`-префиксов
+- `src/api/routes/admin-site-blocks.ts` — 8 новых endpoints + history snapshots в PUT/DELETE + большой seed `seed-pro` для shell/home/calculator/package/blog
+- `src/routes/landing.ts` — миграция ~126 hardcoded-строк на CMS через `tb()` helper, новый `loadShellBlocks()`, расширена `renderPageShell` параметром `shellBlocks`, обновлены все route handlers (Promise.all загружает page+shell блоки)
+- `src/admin/panel.ts` — все 12 pro-UX фич в разделе «Управление сайтом»
+- `src/lib/cache-config.ts` — bump версии
+
+### Часть А — Все тексты сайта теперь редактируются через админку
+
+Любой текст или подпись кнопки на сайте читается так:
+1. Сначала из `site_blocks` (по `block_key + index`).
+2. Если блок отсутствует или скрыт — из hardcoded-fallback (поведение 1:1 как до Phase 4).
+
+Это значит, что любой текст можно поменять в админке без правки кода. Армянский язык также правится через админку.
+
+**Покрытие:**
+- **shell** (5 блоков, 51 строка): шапка nav 8+1, футер 12, callback модалка 11, плавающие кнопки 2, нижняя навигация 10
+- **home** (7 блоков, 58 строк): hero, WB банер, полоса статистики, 3 услуги, why-buyouts (6 шагов), для-кого (5 карточек), contact CTA
+- **calculator** (4 блока, 22 строки): hero, packages header, how-to (3 шага), CTA strip
+- **package** (1 блок, 7 строк): chrome (back link, eyebrow, price label, кнопки, "Другие пакеты")
+- **blog** (1 блок, 11 строк): hero/eyebrow/empty/read-more/back/CTA
+- **about / services / buyouts / faq / contacts / referral**: hero + CTA-strip и FAQ-items уже были на CMS с Phase 3C
+
+Итого: **~165 текстов** (RU+AM-пары) перенесены в CMS.
+
+### Часть Б — Профессиональный интерфейс «Управление сайтом»
+
+Все 12 фич реализованы сразу:
+
+1. **Группировка по страницам** — в режиме «Все» блоки сгруппированы по странице с заголовком-разделителем, иконкой, count'ом и кнопками «Свернуть всю группу» / «Только эту страницу».
+2. **Drag-and-drop между страницами** — SortableJS с одинаковым `group: 'site-blocks'`. На drop вызывается `POST /site-blocks/move-page` (rename `block_key` префикса + смена `page`).
+3. **Side-by-side двуязычный редактор** — четвёртый режим `RU+AM рядом` рисует RU и AM input'ы в две колонки. На узких экранах (<1100px) — стек. Подсветка непереведённых полей красной рамкой.
+4. **Массовые действия** — чекбоксы на карточках, sticky bulk-bar показывается при ≥1 выбранных. Действия: Показать / Скрыть / Удалить / Перенести (dropdown стран). API: `bulk-visibility`, `bulk-delete`, цикл `move-page`.
+5. **Подсказки и empty states** — `title=""` tooltips на каждой кнопке, `sb-hint` под основными полями, big empty state с тремя CTA («Создать первый блок», «Импортировать из site_content», «Загрузить шаблоны Phase 4»).
+6. **Status badges** — на каждой карточке Активен/Скрыт + Заполнен/Пустой + CMS/Дефолт. Сводка над списком: «X блоков · Y видимы · Z скрыты · W пустых».
+7. **Шаблоны блоков** — кнопка «Из шаблона ▾» с popup-меню. 6 шаблонов: Hero, 3 карточки, CTA-полоса, FAQ, преимущества, two-column-photo. Создаёт блок с предзаполненными RU/AM текстами.
+8. **Живой preview** — slide-in боковая панель 50vw с iframe `?lang=ru/am`. Кнопки RU/AM/Reload/Open-new-tab/Close. Кнопка «Предпросмотр» в каждом раскрытом редакторе.
+9. **Экспорт / Импорт JSON** — `Скачать бэкап` (`GET /site-blocks/export` → файл `gtt-site-blocks-YYYY-MM-DD.json`) и `Загрузить из бэкапа` (`POST /site-blocks/import`, INSERT OR REPLACE по `block_key`).
+10. **История изменений** — `site_blocks_history` хранит JSON-snapshot блока перед каждым `update`/`delete`. UI: кнопка «История» открывает modal со списком (action, дата, пользователь) + кнопка «Восстановить» (`POST /site-blocks/:id/restore/:historyId`). Trim до 200 записей на блок.
+11. **Адаптив админки** — bulk-bar и group-header стек на ≤768px, modals и preview pane full-screen на ≤900px.
+12. **Горячие клавиши** — `/` (фокус поиска), `Esc` (закрыть preview/модалку), `Ctrl+A` (выделить все блоки), `Ctrl+Shift+E` (экспорт), `Ctrl+S` (сохранить — оставлен).
+
+### Главное правило фазы
+
+**Главный URL `/` НЕ переключается** — старый длинный лендинг остаётся как есть до самого конца. Армянские опечатки руками не правились — это делается через админку, теперь когда CMS-блоки готовы.
+
+Главный домен: `gototopwb.ru` (переключение в самом конце).
+
+### Acceptance
+
+- `npm run build` PASS, `dist/_worker.js` ≈ 2.38 MB.
+- В бандле подтверждены маркеры: `shell__nav`, `home__hero`, `calculator__hero`, `package__chrome`, `bulk-visibility`, `seed-pro`, `sb-bulk-check`, `sb-side-grid`, `sb-preview-pane`, `BLOCK_TEMPLATES`, `move-page`, `loadShellBlocks` — всего 56 совпадений.
+- Локальные `curl` smoke-tests: `/`, `/home`, `/calculator`, `/buyouts`, `/package/wb-buyouts`, `/admin` все возвращают 200.
+- При пустой БД (нет блоков `shell__*`/`home__*`/etc.) — страницы рендерятся идентично прежнему (через fallback'и).
+- Существующие фичи админки (drag внутри страницы, поиск, RU/AM, expand/collapse, Ctrl+S, photo upload, FAQ editor, ticker, SEO/OG, calculator block, contact cards, nav-link selector) сохранены без изменений.
+
+### После деплоя
+
+В админке зайдите в раздел **«Управление сайтом»** → empty state → нажмите **«Загрузить шаблоны Phase 4»** (вызов `POST /api/admin/site-blocks/seed-pro`). Это создаст в БД 18 новых CMS-блоков (shell, home, calculator, package, blog) с дефолтными текстами, идентичными fallback'ам. После этого все тексты сайта можно править в админке.
+
+Существующий endpoint `seed-subpages` (для about/services/buyouts/faq/contacts/referral) можно вызвать из той же кнопки «Создать блоки подстраниц».
+
+---
+
 ## Phase 5c — нав-фиксы + страница /calculator + контактный блок (2026-05-07)
 
 **Кэш:** CACHE_VERSION `v22 → v24` (бамп позволяет очистить edge-cache на /home, /calculator, /blog).
