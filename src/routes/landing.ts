@@ -418,14 +418,14 @@ ${extraHead}
     <span class="logo-text">Go to Top</span>
   </a>
   <ul class="nav-links" id="navLinks">
-    <li><a href="/home"${page === 'home-new' ? ' class="active" aria-current="page"' : ''} data-ru="Главная" data-am="Գլխավոր">${tb('shell__nav', 0, 'Главная', 'Գլխավոր')}</a></li>
-    <li><a href="/about"${page === 'about' ? ' class="active" aria-current="page"' : ''} data-ru="О нас" data-am="Մեր մասին">${tb('shell__nav', 1, 'О нас', 'Մեր մասին')}</a></li>
-    <li><a href="/services"${page === 'services' ? ' class="active" aria-current="page"' : ''} data-ru="Услуги" data-am="Ծառայություններ">${tb('shell__nav', 2, 'Услуги', 'Ծառայություններ')}</a></li>
-    <li><a href="/buyouts"${page === 'buyouts' ? ' class="active" aria-current="page"' : ''} data-ru="Выкупы" data-am="Հետագնումներ">${tb('shell__nav', 3, 'Выкупы', 'Հետագնումներ')}</a></li>
-    <li><a href="/calculator"${page === 'calculator' ? ' class="active" aria-current="page"' : ''} data-ru="Калькулятор" data-am="Հաշվիչ">${tb('shell__nav', 4, 'Калькулятор', 'Հաշվիչ')}</a></li>
-    <li><a href="/faq"${page === 'faq' ? ' class="active" aria-current="page"' : ''} data-ru="FAQ" data-am="ՀՏՀ">${tb('shell__nav', 5, 'FAQ', 'FAQ')}</a></li>
-    <li><a href="/contacts"${page === 'contacts' ? ' class="active" aria-current="page"' : ''} data-ru="Контакты" data-am="Կոնտակտներ">${tb('shell__nav', 6, 'Контакты', 'Կոնտակտներ')}</a></li>
-    <li><a href="/blog"${page === 'blog' ? ' class="active" aria-current="page"' : ''} data-ru="Блог" data-am="Բլոգ">${tb('shell__nav', 7, 'Блог', 'Բլոգ')}</a></li>
+    <li><a href="/home"${page === 'home-new' ? ' class="active" aria-current="page"' : ''} data-ru="Главная" data-am="Գլխավոր" data-edit-key="shell__nav" data-edit-idx="0">${tb('shell__nav', 0, 'Главная', 'Գլխավոր')}</a></li>
+    <li><a href="/about"${page === 'about' ? ' class="active" aria-current="page"' : ''} data-ru="О нас" data-am="Մեր մասին" data-edit-key="shell__nav" data-edit-idx="1">${tb('shell__nav', 1, 'О нас', 'Մեր մասին')}</a></li>
+    <li><a href="/services"${page === 'services' ? ' class="active" aria-current="page"' : ''} data-ru="Услуги" data-am="Ծառայություններ" data-edit-key="shell__nav" data-edit-idx="2">${tb('shell__nav', 2, 'Услуги', 'Ծառայություններ')}</a></li>
+    <li><a href="/buyouts"${page === 'buyouts' ? ' class="active" aria-current="page"' : ''} data-ru="Выкупы" data-am="Հետագնումներ" data-edit-key="shell__nav" data-edit-idx="3">${tb('shell__nav', 3, 'Выкупы', 'Հետագնումներ')}</a></li>
+    <li><a href="/calculator"${page === 'calculator' ? ' class="active" aria-current="page"' : ''} data-ru="Калькулятор" data-am="Հաշվիչ" data-edit-key="shell__nav" data-edit-idx="4">${tb('shell__nav', 4, 'Калькулятор', 'Հաշվիչ')}</a></li>
+    <li><a href="/faq"${page === 'faq' ? ' class="active" aria-current="page"' : ''} data-ru="FAQ" data-am="ՀՏՀ" data-edit-key="shell__nav" data-edit-idx="5">${tb('shell__nav', 5, 'FAQ', 'FAQ')}</a></li>
+    <li><a href="/contacts"${page === 'contacts' ? ' class="active" aria-current="page"' : ''} data-ru="Контакты" data-am="Կոնտակտներ" data-edit-key="shell__nav" data-edit-idx="6">${tb('shell__nav', 6, 'Контакты', 'Կոնտակտներ')}</a></li>
+    <li><a href="/blog"${page === 'blog' ? ' class="active" aria-current="page"' : ''} data-ru="Блог" data-am="Բլոգ" data-edit-key="shell__nav" data-edit-idx="7">${tb('shell__nav', 7, 'Блог', 'Բլոգ')}</a></li>
   </ul>
   <div class="nav-right">
     <div class="lang-switch">
@@ -434,7 +434,7 @@ ${extraHead}
     </div>
     <a href="javascript:void(0)" onclick="openCallbackModal()" class="nav-cta">
       <i class="fas fa-phone"></i>
-      <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('shell__nav', 8, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
+      <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք" data-edit-key="shell__nav" data-edit-idx="8">${tb('shell__nav', 8, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
     </a>
   </div>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()">
@@ -455,29 +455,29 @@ ${mainHtml}
   <div class="footer-grid">
     <div class="footer-brand">
       <div class="logo"><img src="/static/img/logo-gototop.png" alt="Go to Top" style="height:44px"><span class="logo-text">Go to Top</span></div>
-      <p data-ru="Безопасное продвижение на Wildberries для армянских продавцов." data-am="Անվտանգ առաջխաղացում Wildberries-ում հայ վաճառողների համար։" data-no-rewrite="1">${tb('shell__footer', 0, 'Безопасное продвижение на Wildberries для армянских продавцов.', 'Անվտանգ առաջխաղացում Wildberries-ում հայ վաճառողների համար։')}</p>
+      <p data-ru="Безопасное продвижение на Wildberries для армянских продавцов." data-am="Անվտանգ առաջխաղացում Wildberries-ում հայ վաճառողների համար։" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="0">${tb('shell__footer', 0, 'Безопасное продвижение на Wildberries для армянских продавцов.', 'Անվտանգ առաջխաղացում Wildberries-ում հայ վաճառողների համար։')}</p>
     </div>
     <div class="footer-col">
-      <h4 data-ru="Навигация" data-am="Նավիգացիա" data-no-rewrite="1">${tb('shell__footer', 1, 'Навигация', 'Նավիգացիա')}</h4>
+      <h4 data-ru="Навигация" data-am="Նավիգացիա" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="1">${tb('shell__footer', 1, 'Навигация', 'Նավիգացիա')}</h4>
       <ul>
-        <li><a href="/#services" data-ru="Услуги и цены" data-am="Ծառայություններ և գներ" data-no-rewrite="1">${tb('shell__footer', 2, 'Услуги и цены', 'Ծառայություններ և գներ')}</a></li>
-        <li><a href="/#calculator" data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1">${tb('shell__footer', 3, 'Калькулятор', 'Հաշվիչ')}</a></li>
-        <li><a href="/#warehouse" data-ru="Наш склад" data-am="Մեր պահեստը" data-no-rewrite="1">${tb('shell__footer', 4, 'Наш склад', 'Մեր պահեստը')}</a></li>
-        <li><a href="/#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ" data-no-rewrite="1">${tb('shell__footer', 5, 'Гарантии', 'Երաշխիքներ')}</a></li>
-        <li><a href="/faq" data-ru="FAQ" data-am="ՀՏՀ" data-no-rewrite="1">${tb('shell__footer', 6, 'FAQ', 'ՀՏՀ')}</a></li>
+        <li><a href="/#services" data-ru="Услуги и цены" data-am="Ծառայություններ և գներ" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="2">${tb('shell__footer', 2, 'Услуги и цены', 'Ծառայություններ և գներ')}</a></li>
+        <li><a href="/#calculator" data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="3">${tb('shell__footer', 3, 'Калькулятор', 'Հաշվիչ')}</a></li>
+        <li><a href="/#warehouse" data-ru="Наш склад" data-am="Մեր պահեստը" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="4">${tb('shell__footer', 4, 'Наш склад', 'Մեր պահեստը')}</a></li>
+        <li><a href="/#guarantee" data-ru="Гарантии" data-am="Երաշխիքներ" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="5">${tb('shell__footer', 5, 'Гарантии', 'Երաշխիքներ')}</a></li>
+        <li><a href="/faq" data-ru="FAQ" data-am="ՀՏՀ" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="6">${tb('shell__footer', 6, 'FAQ', 'ՀՏՀ')}</a></li>
       </ul>
     </div>
     <div class="footer-col">
-      <h4 data-ru="Контакты" data-am="Կոնտակտներ" data-no-rewrite="1">${tb('shell__footer', 7, 'Контакты', 'Կոնտակտներ')}</h4>
+      <h4 data-ru="Контакты" data-am="Կոնտակտներ" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="7">${tb('shell__footer', 7, 'Контакты', 'Կոնտակտներ')}</h4>
       <ul>
-        <li><a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Ադմինիստրատոր" data-no-rewrite="1">${tb('shell__footer', 8, 'Администратор', 'Ադմինիստրատոր')}</span></a></li>
-        <li><a href="https://t.me/suport_admin_2" target="_blank" rel="noopener"><i class="fab fa-telegram"></i> <span data-ru="Менеджер" data-am="Մենեջեր" data-no-rewrite="1">${tb('shell__footer', 9, 'Менеджер', 'Մենեջեր')}</span></a></li>
+        <li><a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener"><i class="fab fa-telegram"></i> <span data-ru="Администратор" data-am="Ադմինիստրատոր" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="8">${tb('shell__footer', 8, 'Администратор', 'Ադմինիստրատոր')}</span></a></li>
+        <li><a href="https://t.me/suport_admin_2" target="_blank" rel="noopener"><i class="fab fa-telegram"></i> <span data-ru="Менеджер" data-am="Մենեջեր" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="9">${tb('shell__footer', 9, 'Менеджер', 'Մենեջեր')}</span></a></li>
       </ul>
     </div>
   </div>
   <div class="footer-bottom">
-    <span>© 2026 Go to Top. <span data-ru="Все права защищены" data-am="Բոլոր իրավունքները պաշտպանված են" data-no-rewrite="1">${tb('shell__footer', 10, 'Все права защищены', 'Բոլոր իրավունքները պաշտպանված են')}</span></span>
-    <span data-ru="Ереван, Армения" data-am="Երևան, Հայաստան" data-no-rewrite="1">${tb('shell__footer', 11, 'Ереван, Армения', 'Երևան, Հայաստան')}</span>
+    <span>© 2026 Go to Top. <span data-ru="Все права защищены" data-am="Բոլոր իրավունքները պաշտպանված են" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="10">${tb('shell__footer', 10, 'Все права защищены', 'Բոլոր իրավունքները պաշտպանված են')}</span></span>
+    <span data-ru="Ереван, Армения" data-am="Երևան, Հայաստան" data-no-rewrite="1" data-edit-key="shell__footer" data-edit-idx="11">${tb('shell__footer', 11, 'Ереван, Армения', 'Երևան, Հայաստան')}</span>
   </div>
 </div>
 </footer>
@@ -485,13 +485,13 @@ ${mainHtml}
 <!-- FLOATING TG BUTTON -->
 <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="tg-float">
   <i class="fab fa-whatsapp"></i>
-  <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1">${tb('shell__floats', 0, 'Написать нам', 'Գրել հիմա')}</span>
+  <span data-ru="Написать нам" data-am="Գրել հիմա" data-no-rewrite="1" data-edit-key="shell__floats" data-edit-idx="0">${tb('shell__floats', 0, 'Написать нам', 'Գրել հիմա')}</span>
 </a>
 
 <!-- FLOATING CALC BUTTON -->
 <a href="/#calculator" class="calc-float" id="calcFloatBtn">
   <i class="fas fa-calculator"></i>
-  <span data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1">${tb('shell__floats', 1, 'Калькулятор', 'Հաշվիչ')}</span>
+  <span data-ru="Калькулятор" data-am="Հաշվիչ" data-no-rewrite="1" data-edit-key="shell__floats" data-edit-idx="1">${tb('shell__floats', 1, 'Калькулятор', 'Հաշվիչ')}</span>
 </a>
 
 <!-- CALLBACK MODAL (shared with /) -->
@@ -499,51 +499,52 @@ ${mainHtml}
   <div class="popup-card" id="callbackCard">
     <button class="popup-close" onclick="closeCallbackModal()" aria-label="Закрыть">&times;</button>
     <div class="popup-icon"><i class="fas fa-phone-alt"></i></div>
-    <h3 data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('shell__modal', 0, 'Перезвоните мне', 'Հետ զանգահարեք')}</h3>
-    <p class="popup-sub" data-ru="Оставьте заявку — мы свяжемся в удобное для вас время" data-am="Թողեք հայտ — կզանգահարենք ձեզ հարմար ժամանակ">${tb('shell__modal', 1, 'Оставьте заявку — мы свяжемся в удобное для вас время', 'Թողեք հայտ — կզանգահարենք ձեզ հարմար ժամանակ')}</p>
+    <h3 data-ru="Перезвоните мне" data-am="Հետ զանգահարեք" data-edit-key="shell__modal" data-edit-idx="0">${tb('shell__modal', 0, 'Перезвоните мне', 'Հետ զանգահարեք')}</h3>
+    <p class="popup-sub" data-ru="Оставьте заявку — мы свяжемся в удобное для вас время" data-am="Թողեք հայտ — կզանգահարենք ձեզ հարմար ժամանակ" data-edit-key="shell__modal" data-edit-idx="1">${tb('shell__modal', 1, 'Оставьте заявку — мы свяжемся в удобное для вас время', 'Թողեք հայտ — կզանգահարենք ձեզ հարմար ժամանակ')}</p>
     <form id="callbackForm" onsubmit="submitCallbackForm(event)">
       <div class="pf-group">
-        <label class="pf-label" data-ru="Ваше имя *" data-am="Ձեր անունը *">${tb('shell__modal', 2, 'Ваше имя *', 'Ձեր անունը *')}</label>
+        <label class="pf-label" data-ru="Ваше имя *" data-am="Ձեր անունը *" data-edit-key="shell__modal" data-edit-idx="2">${tb('shell__modal', 2, 'Ваше имя *', 'Ձեր անունը *')}</label>
         <input type="text" id="cb_name" class="pf-input" placeholder="${tb('shell__modal', 6, 'Иван Иванов', 'Անուն Ազգանուն')}" required>
       </div>
       <div class="pf-group">
-        <label class="pf-label" data-ru="Номер телефона *" data-am="Հեռախոսահամար *">${tb('shell__modal', 3, 'Номер телефона *', 'Հեռախոսահամար *')}</label>
+        <label class="pf-label" data-ru="Номер телефона *" data-am="Հեռախոսահամար *" data-edit-key="shell__modal" data-edit-idx="3">${tb('shell__modal', 3, 'Номер телефона *', 'Հեռախոսահամար *')}</label>
         <input type="tel" id="cb_phone" class="pf-input" placeholder="${tb('shell__modal', 7, '+7 (___) ___-__-__', '+374 __ ______')}" required>
       </div>
       <div class="pf-group">
-        <label class="pf-label" data-ru="Удобное время для звонка" data-am="Հարմարավետ ժամ զանգի համար">${tb('shell__modal', 4, 'Удобное время для звонка', 'Հարմարավետ ժամ զանգի համար')}</label>
+        <label class="pf-label" data-ru="Удобное время для звонка" data-am="Հարմարավետ ժամ զանգի համար" data-edit-key="shell__modal" data-edit-idx="4">${tb('shell__modal', 4, 'Удобное время для звонка', 'Հարմարավետ ժամ զանգի համար')}</label>
         <input type="text" id="cb_time" class="pf-input" placeholder="${tb('shell__modal', 8, 'Например: после 18:00', 'Օրինակ՝ 18:00-ից հետո')}">
       </div>
       <div class="pf-group">
-        <label class="pf-label" data-ru="Ваш вопрос (необязательно)" data-am="Ձեր հարցը (ոչ պարտադիր)">${tb('shell__modal', 5, 'Ваш вопрос (необязательно)', 'Ձեր հարցը (ոչ պարտադիր)')}</label>
+        <label class="pf-label" data-ru="Ваш вопрос (необязательно)" data-am="Ձեր հարցը (ոչ պարտադիր)" data-edit-key="shell__modal" data-edit-idx="5">${tb('shell__modal', 5, 'Ваш вопрос (необязательно)', 'Ձեր հարցը (ոչ պարտադիր)')}</label>
         <textarea id="cb_question" class="pf-input" rows="3" placeholder="${tb('shell__modal', 9, 'Кратко опишите, что хотите обсудить...', 'Կարճ նկարագրեք, ինչ եք ուզում քննարկել...')}" style="resize:vertical;min-height:72px"></textarea>
       </div>
       <div id="callbackResult" style="display:none;padding:12px;border-radius:8px;margin-bottom:12px;font-size:0.88rem;text-align:center"></div>
       <button type="submit" class="btn btn-primary btn-lg" style="width:100%;justify-content:center;margin-top:8px">
         <i class="fas fa-paper-plane"></i>
-        <span data-ru="Отправить заявку" data-am="Ուղարկել հայտը">${tb('shell__modal', 10, 'Отправить заявку', 'Ուղարկել հայտը')}</span>
+        <span data-ru="Отправить заявку" data-am="Ուղարկել հայտը" data-edit-key="shell__modal" data-edit-idx="10">${tb('shell__modal', 10, 'Отправить заявку', 'Ուղարկել հայտը')}</span>
       </button>
     </form>
   </div>
 </div>
 
 <script src="/static/landing.js?v=${CACHE_VERSION}" defer></script>
+<script src="/static/editor.js?v=${CACHE_VERSION}" defer></script>
 
 <!-- Bottom Navigation Bar (mobile) — Phase 3A: links point to actual subpages
      so highlightActiveNav() in landing.js can mark the current page active. -->
 <nav class="bottom-nav" id="bottomNav">
 <div class="bottom-nav-items">
-  <a href="/home" class="bottom-nav-item"><i class="fas fa-home"></i><span data-ru="Главная" data-am="Գլխավոր">${tb('shell__bottom', 0, 'Главная', 'Գլխավոր')}</span></a>
-  <a href="/services" class="bottom-nav-item"><i class="fas fa-hand-holding"></i><span data-ru="Услуги" data-am="Ծառայություններ">${tb('shell__bottom', 1, 'Услуги', 'Ծառայություններ')}</span></a>
-  <a href="/buyouts" class="bottom-nav-item"><i class="fas fa-shopping-cart"></i><span data-ru="Выкупы" data-am="Հետագնումներ">${tb('shell__bottom', 2, 'Выкупы', 'Հետագնումներ')}</span></a>
-  <a href="/calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ">${tb('shell__bottom', 3, 'Калькулятор', 'Հաշվիչ')}</span></a>
-  <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="Ещё" data-am="Ավելին">${tb('shell__bottom', 4, 'Ещё', 'Ավելին')}</span>
+  <a href="/home" class="bottom-nav-item"><i class="fas fa-home"></i><span data-ru="Главная" data-am="Գլխավոր" data-edit-key="shell__bottom" data-edit-idx="0">${tb('shell__bottom', 0, 'Главная', 'Գլխավոր')}</span></a>
+  <a href="/services" class="bottom-nav-item"><i class="fas fa-hand-holding"></i><span data-ru="Услуги" data-am="Ծառայություններ" data-edit-key="shell__bottom" data-edit-idx="1">${tb('shell__bottom', 1, 'Услуги', 'Ծառայություններ')}</span></a>
+  <a href="/buyouts" class="bottom-nav-item"><i class="fas fa-shopping-cart"></i><span data-ru="Выкупы" data-am="Հետագնումներ" data-edit-key="shell__bottom" data-edit-idx="2">${tb('shell__bottom', 2, 'Выкупы', 'Հետագնումներ')}</span></a>
+  <a href="/calculator" class="bottom-nav-item"><i class="fas fa-calculator"></i><span data-ru="Калькулятор" data-am="Հաշվիչ" data-edit-key="shell__bottom" data-edit-idx="3">${tb('shell__bottom', 3, 'Калькулятор', 'Հաշվիչ')}</span></a>
+  <button class="bottom-nav-item bottom-nav-more" id="bottomNavMore" onclick="toggleBottomMore()"><i class="fas fa-ellipsis-h"></i><span data-ru="Ещё" data-am="Ավելին" data-edit-key="shell__bottom" data-edit-idx="4">${tb('shell__bottom', 4, 'Ещё', 'Ավելին')}</span>
     <div class="bottom-nav-more-menu" id="bottomMoreMenu">
-      <a href="/about"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին">${tb('shell__bottom', 5, 'О нас', 'Մեր մասին')}</span></a>
-      <a href="/faq"><i class="fas fa-question-circle"></i><span data-ru="FAQ" data-am="ՀՏՀ">${tb('shell__bottom', 6, 'FAQ', 'ՀՏՀ')}</span></a>
-      <a href="/contacts"><i class="fas fa-envelope"></i><span data-ru="Контакты" data-am="Կոնտակտներ">${tb('shell__bottom', 7, 'Контакты', 'Կոնտակտներ')}</span></a>
-      <a href="/referral"><i class="fas fa-gift"></i><span data-ru="Бонусы" data-am="Բոնուսներ">${tb('shell__bottom', 8, 'Бонусы', 'Բոնուսներ')}</span></a>
-      <a href="/blog"><i class="fas fa-newspaper"></i><span data-ru="Блог" data-am="Բլոգ">${tb('shell__bottom', 9, 'Блог', 'Բլոգ')}</span></a>
+      <a href="/about"><i class="fas fa-info-circle"></i><span data-ru="О нас" data-am="Մեր մասին" data-edit-key="shell__bottom" data-edit-idx="5">${tb('shell__bottom', 5, 'О нас', 'Մեր մասին')}</span></a>
+      <a href="/faq"><i class="fas fa-question-circle"></i><span data-ru="FAQ" data-am="ՀՏՀ" data-edit-key="shell__bottom" data-edit-idx="6">${tb('shell__bottom', 6, 'FAQ', 'ՀՏՀ')}</span></a>
+      <a href="/contacts"><i class="fas fa-envelope"></i><span data-ru="Контакты" data-am="Կոնտակտներ" data-edit-key="shell__bottom" data-edit-idx="7">${tb('shell__bottom', 7, 'Контакты', 'Կոնտակտներ')}</span></a>
+      <a href="/referral"><i class="fas fa-gift"></i><span data-ru="Бонусы" data-am="Բոնուսներ" data-edit-key="shell__bottom" data-edit-idx="8">${tb('shell__bottom', 8, 'Бонусы', 'Բոնուսներ')}</span></a>
+      <a href="/blog"><i class="fas fa-newspaper"></i><span data-ru="Блог" data-am="Բլոգ" data-edit-key="shell__bottom" data-edit-idx="9">${tb('shell__bottom', 9, 'Блог', 'Բլոգ')}</span></a>
     </div>
   </button>
 </div>
@@ -777,13 +778,13 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBloc
       <div class="ah-text">
         <div class="ah-eyebrow">
           <i class="fas fa-info-circle"></i>
-          <span data-ru="О компании" data-am="Ընկերության մասին">${tb('about__hero', 0, 'О компании', 'Ընկերության մասին')}</span>
+          <span data-ru="О компании" data-am="Ընկերության մասին" data-edit-key="about__hero" data-edit-idx="0">${tb('about__hero', 0, 'О компании', 'Ընկերության մասին')}</span>
         </div>
         <h1>
-          <span data-ru="О компании" data-am="Go to Top-ի մասին">${tb('about__hero', 1, 'О компании', 'Go to Top-ի մասին')}</span>
-          <span class="gr" data-ru="Go to Top" data-am="Go to Top">${tb('about__hero', 2, 'Go to Top', 'Go to Top')}</span>
+          <span data-ru="О компании" data-am="Go to Top-ի մասին" data-edit-key="about__hero" data-edit-idx="1">${tb('about__hero', 1, 'О компании', 'Go to Top-ի մասին')}</span>
+          <span class="gr" data-ru="Go to Top" data-am="Go to Top" data-edit-key="about__hero" data-edit-idx="2">${tb('about__hero', 2, 'Go to Top', 'Go to Top')}</span>
         </h1>
-        <p class="ah-desc" data-ru="Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года." data-am="Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։">${tb('about__hero', 3, 'Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года.', 'Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։')}</p>
+        <p class="ah-desc" data-ru="Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года." data-am="Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։" data-edit-key="about__hero" data-edit-idx="3">${tb('about__hero', 3, 'Маркетплейс-агентство из Еревана: продвигаем карточки на Wildberries вживую под ключ — выкупы реальными людьми, отзывы с фото, фотосессии и работа по ключевым запросам. Собственный склад, 1000+ аккаунтов и команда с опытом WB с 2021 года.', 'Մարքեթփլեյս գործակալություն Երևանից՝ Wildberries-ի քարտերի ամբողջական առաջխաղացում իրական մարդկանցով։ Գնումներ, լուսանկարներով կարծիքներ, լուսանկարահանումներ և բանալի բառերով աշխատանք։ Սեփական պահեստ, 1000+ հաշիվ և թիմ՝ WB-ի փորձով 2021 թվականից։')}</p>
         <div class="ah-stats">
           <div class="ah-stat">
             <div class="ah-stat-num">847</div>
@@ -892,13 +893,13 @@ function renderAboutPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBloc
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы начать?" data-am="Պատրա՞ստ եք սկսել">${tb('about__cta_strip', 0, 'Готовы начать?', 'Պատրա՞ստ եք սկսել')}</h3>
-        <p data-ru="Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу." data-am="Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։">${tb('about__cta_strip', 1, 'Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу.', 'Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։')}</p>
+        <h3 data-ru="Готовы начать?" data-am="Պատրա՞ստ եք սկսել" data-edit-key="about__cta_strip" data-edit-idx="0">${tb('about__cta_strip', 0, 'Готовы начать?', 'Պատրա՞ստ եք սկսել')}</h3>
+        <p data-ru="Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу." data-am="Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։" data-edit-key="about__cta_strip" data-edit-idx="1">${tb('about__cta_strip', 1, 'Откройте калькулятор, напишите в Telegram или закажите обратный звонок — мы подберём пакет под вашу задачу.', 'Բացեք հաշվիչը, գրեք Telegram-ով կամ պատվիրեք հետադարձ զանգ — մենք կընտրենք փաթեթ ձեր խնդրի համար։')}</p>
       </div>
       <div class="acs-actions">
         <a href="/#calculator" class="btn btn-primary">
           <i class="fas fa-calculator"></i>
-          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը">${tb('about__cta_strip', 2, 'Открыть калькулятор', 'Բացել հաշվիչը')}</span>
+          <span data-ru="Открыть калькулятор" data-am="Բացել հաշվիչը" data-edit-key="about__cta_strip" data-edit-idx="2">${tb('about__cta_strip', 2, 'Открыть калькулятор', 'Բացել հաշվիչը')}</span>
         </a>
         <a href="${PLACEHOLDER_TG_URL}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
@@ -1050,7 +1051,7 @@ export function renderPackagePage(opts: {
       <div class="pkg-other-thumb"><img src="${oCover}" alt="${escTitle(oTitle)}" loading="lazy" decoding="async"></div>
       <div class="pkg-other-body">
         <h3>${oTitle.replace(/</g, '&lt;')}</h3>
-        <span><span data-ru="Подробнее" data-am="Մանրամասն">${tb('package__chrome', 6, 'Подробнее', 'Մանրամասն')}</span> <i class="fas fa-arrow-right"></i></span>
+        <span><span data-ru="Подробнее" data-am="Մանրամասն" data-edit-key="package__chrome" data-edit-idx="6">${tb('package__chrome', 6, 'Подробнее', 'Մանրամասն')}</span> <i class="fas fa-arrow-right"></i></span>
       </div>
     </a>`
   }).join('')
@@ -1060,28 +1061,28 @@ export function renderPackagePage(opts: {
   <div class="container">
     <a class="pkg-back" href="/home${isAM ? '?lang=am' : ''}">
       <i class="fas fa-arrow-left"></i>
-      <span data-ru="Все пакеты" data-am="Բոլոր փաթեթները">${tb('package__chrome', 0, 'Все пакеты', 'Բոլոր փաթեթները')}</span>
+      <span data-ru="Все пакеты" data-am="Բոլոր փաթեթները" data-edit-key="package__chrome" data-edit-idx="0">${tb('package__chrome', 0, 'Все пакеты', 'Բոլոր փաթեթները')}</span>
     </a>
     <div class="pkg-detail-grid">
       <div class="pkg-detail-image">
         <img src="${cover}" alt="${escTitle(t(titleRu, titleAm))}" loading="eager" decoding="async">
       </div>
       <div class="pkg-detail-text">
-        <div class="pkg-eyebrow"><i class="fas fa-cube"></i> <span data-ru="Пакет" data-am="Փաթեթ">${tb('package__chrome', 1, 'Пакет', 'Փաթեթ')}</span></div>
+        <div class="pkg-eyebrow"><i class="fas fa-cube"></i> <span data-ru="Пакет" data-am="Փաթեթ" data-edit-key="package__chrome" data-edit-idx="1">${tb('package__chrome', 1, 'Пакет', 'Փաթեթ')}</span></div>
         <h1 data-ru="${escTitle(titleRu)}" data-am="${escTitle(titleAm)}"><span class="gr">${t(titleRu, titleAm)}</span></h1>
         <p class="pkg-desc" data-ru="${escTitle(descRu)}" data-am="${escTitle(descAm)}">${t(descRu, descAm)}</p>
         ${(priceRu || priceAm) ? `<div class="pkg-price">
-          <span class="pkg-price-label" data-ru="Стоимость" data-am="Արժեք">${tb('package__chrome', 2, 'Стоимость', 'Արժեք')}</span>
+          <span class="pkg-price-label" data-ru="Стоимость" data-am="Արժեք" data-edit-key="package__chrome" data-edit-idx="2">${tb('package__chrome', 2, 'Стоимость', 'Արժեք')}</span>
           <span class="pkg-price-value" data-ru="${escTitle(priceRu)}" data-am="${escTitle(priceAm)}">${t(priceRu, priceAm)}</span>
         </div>` : ''}
         <div class="pkg-detail-actions">
           <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary">
             <i class="fab fa-telegram"></i>
-            <span data-ru="Заказать пакет" data-am="Պատվիրել փաթեթ">${tb('package__chrome', 3, 'Заказать пакет', 'Պատվիրել փաթեթ')}</span>
+            <span data-ru="Заказать пакет" data-am="Պատվիրել փաթեթ" data-edit-key="package__chrome" data-edit-idx="3">${tb('package__chrome', 3, 'Заказать пакет', 'Պատվիրել փաթեթ')}</span>
           </a>
           <a href="/calculator${isAM ? '?lang=am' : ''}" class="btn btn-secondary">
             <i class="fas fa-calculator"></i>
-            <span data-ru="Рассчитать стоимость" data-am="Հաշվարկել արժեքը">${tb('package__chrome', 4, 'Рассчитать стоимость', 'Հաշվարկել արժեքը')}</span>
+            <span data-ru="Рассчитать стоимость" data-am="Հաշվարկել արժեքը" data-edit-key="package__chrome" data-edit-idx="4">${tb('package__chrome', 4, 'Рассчитать стоимость', 'Հաշվարկել արժեքը')}</span>
           </a>
         </div>
       </div>
@@ -1092,7 +1093,7 @@ export function renderPackagePage(opts: {
 ${otherPackages.length > 0 ? `
 <section class="pkg-others">
   <div class="container">
-    <h2 data-ru="Другие пакеты" data-am="Այլ փաթեթներ">${tb('package__chrome', 5, 'Другие пакеты', 'Այլ փաթեթներ')}</h2>
+    <h2 data-ru="Другие пакеты" data-am="Այլ փաթեթներ" data-edit-key="package__chrome" data-edit-idx="5">${tb('package__chrome', 5, 'Другие пакеты', 'Այլ փաթեթներ')}</h2>
     <div class="pkg-others-grid">${otherCards}</div>
   </div>
 </section>
@@ -1304,13 +1305,13 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
     <div class="sh-inner">
       <div class="sh-eyebrow">
         <i class="fas fa-th-large"></i>
-        <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${tb('services__hero', 0, 'Наши услуги', 'Մեր ծառայությունները')}</span>
+        <span data-ru="Наши услуги" data-am="Մեր ծառայությունները" data-edit-key="services__hero" data-edit-idx="0">${tb('services__hero', 0, 'Наши услуги', 'Մեր ծառայությունները')}</span>
       </div>
       <h1>
-        <span data-ru="Услуги" data-am="Ծառայություններ">${tb('services__hero', 1, 'Услуги', 'Ծառայություններ')}</span>
-        <span class="gr" data-ru="для Wildberries" data-am="Wildberries-ի համար">${tb('services__hero', 2, 'для Wildberries', 'Wildberries-ի համար')}</span>
+        <span data-ru="Услуги" data-am="Ծառայություններ" data-edit-key="services__hero" data-edit-idx="1">${tb('services__hero', 1, 'Услуги', 'Ծառայություններ')}</span>
+        <span class="gr" data-ru="для Wildberries" data-am="Wildberries-ի համար" data-edit-key="services__hero" data-edit-idx="2">${tb('services__hero', 2, 'для Wildberries', 'Wildberries-ի համար')}</span>
       </h1>
-      <p class="sh-desc" data-ru="Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет." data-am="Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։">${tb('services__hero', 3, 'Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет.', 'Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։')}</p>
+      <p class="sh-desc" data-ru="Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет." data-am="Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։" data-edit-key="services__hero" data-edit-idx="3">${tb('services__hero', 3, 'Выкупы реальными людьми, отзывы с фото и работа по ключевым запросам — полный пакет продвижения карточек на Wildberries. Рассчитайте стоимость в калькуляторе или соберите готовый пакет.', 'Իրական մարդկանցով գնումներ, լուսանկարներով կարծիքներ և բանալի բառերով աշխատանք — Wildberries-ի քարտերի առաջխաղացման ամբողջական փաթեթ։ Հաշվեք արժեքը հաշվիչում կամ ընտրեք պատրաստի փաթեթ։')}</p>
       <div class="sh-cta">
         <a href="#calculator" class="btn btn-primary btn-lg">
           <i class="fas fa-calculator"></i>
@@ -1625,13 +1626,13 @@ function renderServicesPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы заказать?" data-am="Պատրա՞ստ եք պատվիրել">${tb('services__cta_strip', 0, 'Готовы заказать?', 'Պատրա՞ստ եք պատվիրել')}</h3>
-        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${tb('services__cta_strip', 1, 'Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+        <h3 data-ru="Готовы заказать?" data-am="Պատրա՞ստ եք պատվիրել" data-edit-key="services__cta_strip" data-edit-idx="0">${tb('services__cta_strip', 0, 'Готовы заказать?', 'Պատրա՞ստ եք պատվիրել')}</h3>
+        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։" data-edit-key="services__cta_strip" data-edit-idx="1">${tb('services__cta_strip', 1, 'Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
-          <span data-ru="Telegram" data-am="Telegram">${tb('services__cta_strip', 2, 'Telegram', 'Telegram')}</span>
+          <span data-ru="Telegram" data-am="Telegram" data-edit-key="services__cta_strip" data-edit-idx="2">${tb('services__cta_strip', 2, 'Telegram', 'Telegram')}</span>
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
@@ -1946,13 +1947,13 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
     <div class="bh-inner">
       <div class="bh-eyebrow">
         <i class="fas fa-shopping-bag"></i>
-        <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն">${tb('buyouts__hero', 0, 'Услуга выкупа', 'Գնումի ծառայություն')}</span>
+        <span data-ru="Услуга выкупа" data-am="Գնումի ծառայություն" data-edit-key="buyouts__hero" data-edit-idx="0">${tb('buyouts__hero', 0, 'Услуга выкупа', 'Գնումի ծառայություն')}</span>
       </div>
       <h1>
-        <span data-ru="Выкупы на" data-am="Հետագնումներ">${tb('buyouts__hero', 1, 'Выкупы на', 'Հետագնումներ')}</span>
+        <span data-ru="Выкупы на" data-am="Հետագնումներ" data-edit-key="buyouts__hero" data-edit-idx="1">${tb('buyouts__hero', 1, 'Выкупы на', 'Հետագնումներ')}</span>
         <span class="gr">${tb('buyouts__hero', 2, 'Wildberries', 'Wildberries')}</span>
       </h1>
-      <p class="bh-desc" data-ru="Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване." data-am="Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։">${tb('buyouts__hero', 3, 'Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване.', 'Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։')}</p>
+      <p class="bh-desc" data-ru="Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване." data-am="Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։" data-edit-key="buyouts__hero" data-edit-idx="3">${tb('buyouts__hero', 3, 'Реальные выкупы живыми покупателями по нужным ключевым запросам — ваш товар поднимается в ТОП выдачи WB, закрепляется там и начинает получать органический трафик. Собственный склад и 200+ выкупов в день в Ереване.', 'Իրական հետագնումներ կենդանի գնորդների կողմից անհրաժեշտ բանալի բառերով — ձեր ապրանքը բարձրանում է WB-ի TOP-ում, ամրապնդվում է այնտեղ և սկսում է ստանալ օրգանական տրաֆիկ։ Սեփական պահեստ և 200+ հետագնում օրական Երևանում։')}</p>
       <div class="bh-cta">
         <a href="#calculator" class="btn btn-primary btn-lg">
           <i class="fas fa-calculator"></i>
@@ -1968,7 +1969,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 </section>
 
 <!-- ===== WB WARNING BANNER ===== -->
-<div class="wb-banner" data-section-id="wb-banner">
+<div class="wb-banner" data-section-id="wb-banner" data-block-key="home__wb_banner">
   <div class="container">
     <div class="wb-banner-inner">
       <div class="wb-banner-card">
@@ -1985,7 +1986,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 </div>
 
 <!-- ===== STATS BAR ===== -->
-<div class="stats-bar" data-section-id="stats-bar">
+<div class="stats-bar" data-section-id="stats-bar" data-block-key="home__stats_bar">
   <div class="container">
     <div class="stats-grid">
       <div class="stat-card">
@@ -2046,7 +2047,7 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
 </section>
 
 <!-- ===== WHY BUYOUTS WORK (6-step funnel) ===== -->
-<section class="section" id="why-buyouts" data-section-id="why-buyouts">
+<section class="section" id="why-buyouts" data-section-id="why-buyouts" data-block-key="home__why_buyouts">
   <div class="container">
     <div class="section-header">
       <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աշխատում">${t('Почему это работает', 'Ինչու է սա աշխատում')}</span></div>
@@ -2352,8 +2353,8 @@ section#fifty-vs-fifty .why-block .highlight-result{order:99!important}
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы начать выкупы?" data-am="Պատրա՞ստ եք սկսել գնումները">${tb('buyouts__cta_strip', 0, 'Готовы начать выкупы?', 'Պատրա՞ստ եք սկսել գնումները')}</h3>
-        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${tb('buyouts__cta_strip', 1, 'Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+        <h3 data-ru="Готовы начать выкупы?" data-am="Պատրա՞ստ եք սկսել գնումները" data-edit-key="buyouts__cta_strip" data-edit-idx="0">${tb('buyouts__cta_strip', 0, 'Готовы начать выкупы?', 'Պատրա՞ստ եք սկսել գնումները')}</h3>
+        <p data-ru="Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։" data-edit-key="buyouts__cta_strip" data-edit-idx="1">${tb('buyouts__cta_strip', 1, 'Напишите в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
@@ -2627,13 +2628,13 @@ function renderFaqPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageBlocks
     <div class="fh-inner">
       <div class="fh-eyebrow">
         <i class="fas fa-question-circle"></i>
-        <span data-ru="FAQ" data-am="ՀՏՀ">${tb('faq__hero', 0, 'FAQ', 'ՀՏՀ')}</span>
+        <span data-ru="FAQ" data-am="ՀՏՀ" data-edit-key="faq__hero" data-edit-idx="0">${tb('faq__hero', 0, 'FAQ', 'ՀՏՀ')}</span>
       </div>
       <h1>
-        <span data-ru="Часто задаваемые" data-am="Հաճախ տրվող">${tb('faq__hero', 1, 'Часто задаваемые', 'Հաճախ տրվող')}</span>
-        <span class="gr" data-ru="вопросы" data-am="հարցեր">${tb('faq__hero', 2, 'вопросы', 'հարցեր')}</span>
+        <span data-ru="Часто задаваемые" data-am="Հաճախ տրվող" data-edit-key="faq__hero" data-edit-idx="1">${tb('faq__hero', 1, 'Часто задаваемые', 'Հաճախ տրվող')}</span>
+        <span class="gr" data-ru="вопросы" data-am="հարցեր" data-edit-key="faq__hero" data-edit-idx="2">${tb('faq__hero', 2, 'вопросы', 'հարցեր')}</span>
       </h1>
-      <p class="fh-desc" data-ru="Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram." data-am="Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:">${tb('faq__hero', 3, 'Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram.', 'Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:')}</p>
+      <p class="fh-desc" data-ru="Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram." data-am="Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:" data-edit-key="faq__hero" data-edit-idx="3">${tb('faq__hero', 3, 'Ответы на ключевые вопросы по выкупам Wildberries: безопасность кабинета, сроки, оплата, документы и легальность. Не нашли ответ — напишите нам в Telegram.', 'Պատասխաններ Wildberries-ի հետագնումների վերաբերյալ հիմնական հարցերին՝ կաբինետի անվտանգություն, ժամկետներ, վճարում, փաստաթղթեր և օրինականություն: Չգտա՞ք պատասխանը — գրեք մեզ Telegram-ով:')}</p>
     </div>
   </div>
 </section>
@@ -2652,8 +2653,8 @@ ${faqItemsHtml}
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Не нашли ответ?" data-am="Չգտա՞ք պատասխանը:">${tb('faq__cta_strip', 0, 'Не нашли ответ?', 'Չգտա՞ք պատասխանը:')}</h3>
-        <p data-ru="Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։">${tb('faq__cta_strip', 1, 'Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
+        <h3 data-ru="Не нашли ответ?" data-am="Չգտա՞ք պատասխանը:" data-edit-key="faq__cta_strip" data-edit-idx="0">${tb('faq__cta_strip', 0, 'Не нашли ответ?', 'Չգտա՞ք պատասխանը:')}</h3>
+        <p data-ru="Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов." data-am="Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։" data-edit-key="faq__cta_strip" data-edit-idx="1">${tb('faq__cta_strip', 1, 'Напишите нам в Telegram, оставьте заявку на обратный звонок или перейдите в раздел контактов.', 'Գրեք մեզ Telegram-ով, թողեք հետադարձ զանգի հայտ կամ անցեք կոնտակտների բաժին։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
@@ -2662,11 +2663,11 @@ ${faqItemsHtml}
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
-          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('faq__cta_strip', 2, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք" data-edit-key="faq__cta_strip" data-edit-idx="2">${tb('faq__cta_strip', 2, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
         </button>
         <a href="/contacts" class="btn btn-primary">
           <i class="fas fa-envelope"></i>
-          <span data-ru="Контакты" data-am="Կոնտակտներ">${tb('faq__cta_strip', 3, 'Контакты', 'Կոնտակտներ')}</span>
+          <span data-ru="Контакты" data-am="Կոնտակտներ" data-edit-key="faq__cta_strip" data-edit-idx="3">${tb('faq__cta_strip', 3, 'Контакты', 'Կոնտակտներ')}</span>
         </a>
       </div>
     </div>
@@ -2827,13 +2828,13 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
     <div class="ch-inner">
       <div class="ch-eyebrow">
         <i class="fas fa-headset"></i>
-        <span data-ru="Контакты" data-am="Կապ">${tb('contacts__hero', 0, 'Контакты', 'Կապ')}</span>
+        <span data-ru="Контакты" data-am="Կապ" data-edit-key="contacts__hero" data-edit-idx="0">${tb('contacts__hero', 0, 'Контакты', 'Կապ')}</span>
       </div>
       <h1>
-        <span data-ru="Свяжитесь" data-am="Կապվեք">${tb('contacts__hero', 1, 'Свяжитесь', 'Կապվեք')}</span>
-        <span class="gr" data-ru="с нами" data-am="մեզ հետ">${tb('contacts__hero', 2, 'с нами', 'մեզ հետ')}</span>
+        <span data-ru="Свяжитесь" data-am="Կապվեք" data-edit-key="contacts__hero" data-edit-idx="1">${tb('contacts__hero', 1, 'Свяжитесь', 'Կապվեք')}</span>
+        <span class="gr" data-ru="с нами" data-am="մեզ հետ" data-edit-key="contacts__hero" data-edit-idx="2">${tb('contacts__hero', 2, 'с нами', 'մեզ հետ')}</span>
       </h1>
-      <p class="ch-desc" data-ru="Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время." data-am="Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:">${tb('contacts__hero', 3, 'Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время.', 'Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
+      <p class="ch-desc" data-ru="Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время." data-am="Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:" data-edit-key="contacts__hero" data-edit-idx="3">${tb('contacts__hero', 3, 'Выберите удобный канал — Telegram, WhatsApp, форма заявки или обратный звонок. Менеджер отвечает в среднем за 5 минут в рабочее время.', 'Ընտրեք ձեզ հարմար եղանակը՝ Telegram, WhatsApp, հայտի ձև կամ հետադարձ զանգ: Մենեջերը պատասխանում է միջինը 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
     </div>
   </div>
 </section>
@@ -2844,9 +2845,9 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
     <div class="cp-channels-grid">
       <div class="cp-channel cp-ch-tg">
         <div class="cp-channel-icon"><i class="fab fa-telegram"></i></div>
-        <h3 data-ru="Telegram — администратор" data-am="Telegram — ադմինիստրատոր">${tb('contacts__channels', 0, 'Telegram — администратор', 'Telegram — ադմինիստրատոր')}</h3>
+        <h3 data-ru="Telegram — администратор" data-am="Telegram — ադմինիստրատոր" data-edit-key="contacts__channels" data-edit-idx="0">${tb('contacts__channels', 0, 'Telegram — администратор', 'Telegram — ադմինիստրատոր')}</h3>
         <span class="cp-channel-handle" data-no-rewrite="1">@goo_to_top</span>
-        <p class="cp-channel-desc" data-ru="Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время." data-am="Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:">${tb('contacts__channels', 1, 'Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время.', 'Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
+        <p class="cp-channel-desc" data-ru="Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время." data-am="Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:" data-edit-key="contacts__channels" data-edit-idx="1">${tb('contacts__channels', 1, 'Готовы оплатить и стартовать? Менеджер ответит в течение 5 минут в рабочее время.', 'Պատրաստ եք վճարել և սկսել: Մենեջերը կպատասխանի 5 րոպեի ընթացքում աշխատանքային ժամերին:')}</p>
         <a href="${tgUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
           <i class="fab fa-telegram"></i>
           <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${t('Написать в Telegram', 'Գրել Telegram-ով')}</span>
@@ -2854,9 +2855,9 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
       </div>
       <div class="cp-channel cp-ch-tg">
         <div class="cp-channel-icon"><i class="fab fa-telegram"></i></div>
-        <h3 data-ru="Telegram — поддержка" data-am="Telegram — աջակցություն">${tb('contacts__channels', 2, 'Telegram — поддержка', 'Telegram — աջակցություն')}</h3>
+        <h3 data-ru="Telegram — поддержка" data-am="Telegram — աջակցություն" data-edit-key="contacts__channels" data-edit-idx="2">${tb('contacts__channels', 2, 'Telegram — поддержка', 'Telegram — աջակցություն')}</h3>
         <span class="cp-channel-handle" data-no-rewrite="1">@suport_admin_2</span>
-        <p class="cp-channel-desc" data-ru="Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер." data-am="Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:">${tb('contacts__channels', 3, 'Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер.', 'Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:')}</p>
+        <p class="cp-channel-desc" data-ru="Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер." data-am="Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:" data-edit-key="contacts__channels" data-edit-idx="3">${tb('contacts__channels', 3, 'Нужен детальный расчёт или консультация по продвижению? Пишите сюда — отвечает старший менеджер.', 'Պետք է մանրամասն հաշվարկ կամ խորհրդատվություն: Գրեք այստեղ — պատասխանում է ավագ մենեջերը:')}</p>
         <a href="${tgSupportUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
           <i class="fab fa-telegram"></i>
           <span data-ru="Написать в поддержку" data-am="Գրել աջակցությանը">${t('Написать в поддержку', 'Գրել աջակցությանը')}</span>
@@ -2864,9 +2865,9 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
       </div>
       <div class="cp-channel cp-ch-wa">
         <div class="cp-channel-icon"><i class="fab fa-whatsapp"></i></div>
-        <h3 data-ru="WhatsApp" data-am="WhatsApp">${tb('contacts__channels', 4, 'WhatsApp', 'WhatsApp')}</h3>
+        <h3 data-ru="WhatsApp" data-am="WhatsApp" data-edit-key="contacts__channels" data-edit-idx="4">${tb('contacts__channels', 4, 'WhatsApp', 'WhatsApp')}</h3>
         <span class="cp-channel-handle" data-no-rewrite="1">${waLabel}</span>
-        <p class="cp-channel-desc" data-ru="Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram." data-am="Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:">${tb('contacts__channels', 5, 'Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram.', 'Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:')}</p>
+        <p class="cp-channel-desc" data-ru="Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram." data-am="Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:" data-edit-key="contacts__channels" data-edit-idx="5">${tb('contacts__channels', 5, 'Удобно с телефона? Напишите в WhatsApp — отвечаем так же быстро, как в Telegram.', 'Հարմա՞ր է հեռախոսից: Գրեք WhatsApp-ով — պատասխանում ենք նույնքան արագ, որքան Telegram-ով:')}</p>
         <a href="${waUrl}" target="_blank" rel="noopener" class="cp-channel-cta">
           <i class="fab fa-whatsapp"></i>
           <span data-ru="Написать в WhatsApp" data-am="Գրել WhatsApp-ով">${t('Написать в WhatsApp', 'Գրել WhatsApp-ով')}</span>
@@ -2978,13 +2979,13 @@ function renderContactsPage(opts: { lang: 'ru' | 'am', siteOrigin: string, pageB
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Не нашли подходящий канал?" data-am="Չգտա՞ք ձեզ հարմար եղանակ:">${tb('contacts__cta_strip', 0, 'Не нашли подходящий канал?', 'Չգտա՞ք ձեզ հարմար եղանակ:')}</h3>
-        <p data-ru="Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом." data-am="Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:">${tb('contacts__cta_strip', 1, 'Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом.', 'Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:')}</p>
+        <h3 data-ru="Не нашли подходящий канал?" data-am="Չգտա՞ք ձեզ հարմար եղանակ:" data-edit-key="contacts__cta_strip" data-edit-idx="0">${tb('contacts__cta_strip', 0, 'Не нашли подходящий канал?', 'Չգտա՞ք ձեզ հարմար եղանակ:')}</h3>
+        <p data-ru="Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом." data-am="Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:" data-edit-key="contacts__cta_strip" data-edit-idx="1">${tb('contacts__cta_strip', 1, 'Закажите обратный звонок — менеджер перезвонит в удобное вам время и поможет с любым вопросом.', 'Պատվիրեք հետադարձ զանգ — մենեջերը կզանգահարի ձեզ հարմար ժամանակին և կօգնի ցանկացած հարցում:')}</p>
       </div>
       <div class="acs-actions">
         <button type="button" class="btn btn-primary" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
-          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('contacts__cta_strip', 2, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք" data-edit-key="contacts__cta_strip" data-edit-idx="2">${tb('contacts__cta_strip', 2, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
         </button>
       </div>
     </div>
@@ -3314,13 +3315,13 @@ ${bullets}
     <div class="rh-inner">
       <div class="rh-eyebrow">
         <i class="fas fa-handshake"></i>
-        <span data-ru="Партнёрская программа" data-am="Գործընկերային ծրագիր">${tb('referral__hero', 0, 'Партнёрская программа', 'Գործընկերային ծրագիր')}</span>
+        <span data-ru="Партнёрская программа" data-am="Գործընկերային ծրագիր" data-edit-key="referral__hero" data-edit-idx="0">${tb('referral__hero', 0, 'Партнёрская программа', 'Գործընկերային ծրագիր')}</span>
       </div>
       <h1>
-        <span data-ru="Реферальная программа" data-am="Հղման ծրագիր">${tb('referral__hero', 1, 'Реферальная программа', 'Հղման ծրագիր')}</span>
+        <span data-ru="Реферальная программа" data-am="Հղման ծրագիր" data-edit-key="referral__hero" data-edit-idx="1">${tb('referral__hero', 1, 'Реферальная программа', 'Հղման ծրագիր')}</span>
         <span class="gr">${tb('referral__hero', 2, 'Go to Top', 'Go to Top')}</span>
       </h1>
-      <p class="rh-desc" data-ru="Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD." data-am="Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։">${tb('referral__hero', 3, 'Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD.', 'Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։')}</p>
+      <p class="rh-desc" data-ru="Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD." data-am="Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։" data-edit-key="referral__hero" data-edit-idx="3">${tb('referral__hero', 3, 'Получайте бонусы за каждого приведённого клиента — от 5% до 15% с первой оплаты и индивидуальные условия для активных партнёров. Прозрачная сетка комиссий, выплаты в RUB или AMD.', 'Ստացեք բոնուսներ յուրաքանչյուր ձեր կողմից բերված հաճախորդի համար՝ 5%-ից 15% առաջին վճարումից և անհատական պայմաններ ակտիվ գործընկերների համար։ Թափանցիկ հանձնաժողովների ցանց, վճարումներ RUB-ով կամ AMD-ով։')}</p>
       <div class="rh-cta">
         <a href="${tgPromoUrl}" target="_blank" rel="noopener" class="btn btn-tg btn-lg">
           <i class="fab fa-telegram"></i>
@@ -3352,18 +3353,18 @@ ${bullets}
     <div class="rp-steps-grid">
       <div class="rp-step">
         <div class="rp-step-num">1</div>
-        <h3 data-ru="Получите промокод" data-am="Ստացեք պրոմո կոդ">${tb('referral__steps', 0, 'Получите промокод', 'Ստացեք պրոմո կոդ')}</h3>
-        <p data-ru="Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня." data-am="Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։">${tb('referral__steps', 1, 'Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня.', 'Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։')}</p>
+        <h3 data-ru="Получите промокод" data-am="Ստացեք պրոմո կոդ" data-edit-key="referral__steps" data-edit-idx="0">${tb('referral__steps', 0, 'Получите промокод', 'Ստացեք պրոմո կոդ')}</h3>
+        <p data-ru="Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня." data-am="Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։" data-edit-key="referral__steps" data-edit-idx="1">${tb('referral__steps', 1, 'Напишите менеджеру в Telegram — выдадим персональный промокод и партнёрскую ссылку в течение рабочего дня.', 'Գրեք մենեջերին Telegram-ով — կտրամադրենք անհատական պրոմո կոդ և գործընկերային հղում աշխատանքային օրվա ընթացքում։')}</p>
       </div>
       <div class="rp-step">
         <div class="rp-step-num">2</div>
-        <h3 data-ru="Делитесь с клиентами" data-am="Կիսվեք հաճախորդների հետ">${tb('referral__steps', 2, 'Делитесь с клиентами', 'Կիսվեք հաճախորդների հետ')}</h3>
-        <p data-ru="Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной." data-am="Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։">${tb('referral__steps', 3, 'Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной.', 'Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։')}</p>
+        <h3 data-ru="Делитесь с клиентами" data-am="Կիսվեք հաճախորդների հետ" data-edit-key="referral__steps" data-edit-idx="2">${tb('referral__steps', 2, 'Делитесь с клиентами', 'Կիսվեք հաճախորդների հետ')}</h3>
+        <p data-ru="Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной." data-am="Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։" data-edit-key="referral__steps" data-edit-idx="3">${tb('referral__steps', 3, 'Отправляйте код в личных переписках, добавляйте в посты, сторис и видео — клиент вводит его в калькуляторе на главной.', 'Ուղարկեք կոդը անձնական նամակագրություններում, ավելացրեք գրառումներում, ստորիներում և տեսանյութերում — հաճախորդը մուտքագրում է այն գլխավոր էջի հաշվիչում։')}</p>
       </div>
       <div class="rp-step">
         <div class="rp-step-num">3</div>
-        <h3 data-ru="Получайте бонус" data-am="Ստացեք բոնուս">${tb('referral__steps', 4, 'Получайте бонус', 'Ստացեք բոնուս')}</h3>
-        <p data-ru="Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию." data-am="Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։">${tb('referral__steps', 5, 'Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию.', 'Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։')}</p>
+        <h3 data-ru="Получайте бонус" data-am="Ստացեք բոնուս" data-edit-key="referral__steps" data-edit-idx="4">${tb('referral__steps', 4, 'Получайте бонус', 'Ստացեք բոնուս')}</h3>
+        <p data-ru="Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию." data-am="Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։" data-edit-key="referral__steps" data-edit-idx="5">${tb('referral__steps', 5, 'Бонус начисляется с каждой оплаты приведённого клиента — выплаты раз в две недели на карту в RUB или AMD по согласованию.', 'Բոնուսը հաշվարկվում է բերված հաճախորդի յուրաքանչյուր վճարումից — վճարումները երկու շաբաթը մեկ՝ քարտին RUB-ով կամ AMD-ով համաձայնության համաձայն։')}</p>
       </div>
     </div>
   </div>
@@ -3457,13 +3458,13 @@ ${faqItemsHtml}
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Готовы стать партнёром?" data-am="Պատրա՞ստ եք դառնալ գործընկեր">${tb('referral__cta_strip', 0, 'Готовы стать партнёром?', 'Պատրա՞ստ եք դառնալ գործընկեր')}</h3>
-        <p data-ru="Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов." data-am="Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։">${tb('referral__cta_strip', 1, 'Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов.', 'Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։')}</p>
+        <h3 data-ru="Готовы стать партнёром?" data-am="Պատրա՞ստ եք դառնալ գործընկեր" data-edit-key="referral__cta_strip" data-edit-idx="0">${tb('referral__cta_strip', 0, 'Готовы стать партнёром?', 'Պատրա՞ստ եք դառնալ գործընկեր')}</h3>
+        <p data-ru="Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов." data-am="Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։" data-edit-key="referral__cta_strip" data-edit-idx="1">${tb('referral__cta_strip', 1, 'Получите промокод за 5 минут, обсудите условия с менеджером или напишите нам на странице контактов.', 'Ստացեք պրոմո կոդ 5 րոպեում, քննարկեք պայմանները մենեջերի հետ կամ գրեք մեզ կոնտակտների էջից։')}</p>
       </div>
       <div class="acs-actions">
         <a href="${tgPromoUrl}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
-          <span data-ru="Получить код" data-am="Ստանալ կոդը">${tb('referral__cta_strip', 2, 'Получить код', 'Ստանալ կոդը')}</span>
+          <span data-ru="Получить код" data-am="Ստանալ կոդը" data-edit-key="referral__cta_strip" data-edit-idx="2">${tb('referral__cta_strip', 2, 'Получить код', 'Ստանալ կոդը')}</span>
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
@@ -3578,38 +3579,38 @@ export function renderNewHomePage(opts: {
 
   const mainHtml = `
 <!-- ===== HERO ===== -->
-<section class="hero" id="hero" data-section-id="hero">
+<section class="hero" id="hero" data-section-id="hero" data-block-key="home__hero">
 <div class="container">
 <div class="hero-grid">
   <div class="hero-el-title">
     <div class="hero-badge">
       <i class="fas fa-circle" style="color:var(--success);font-size:0.5rem"></i>
-      <span data-ru="Успешный опыт с 2021 года" data-am="Հաջողված փորձ 2021 թվականից">${tb('home__hero', 0, 'Успешный опыт с 2021 года', 'Հաջողված փորձ 2021 թվականից')}</span>
+      <span data-ru="Успешный опыт с 2021 года" data-am="Հաջողված փորձ 2021 թվականից" data-edit-key="home__hero" data-edit-idx="0">${tb('home__hero', 0, 'Успешный опыт с 2021 года', 'Հաջողված փորձ 2021 թվականից')}</span>
     </div>
     <h1>
-      <span data-ru="Выведем ваш товар" data-am="Մենք կբարձրացնենք ձեր ապրանքը">${tb('home__hero', 1, 'Выведем ваш товар', 'Մենք կբարձրացնենք ձեր ապրանքը')}</span><br>
-      <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի TOP">${tb('home__hero', 2, 'в ТОП Wildberries', 'Wildberries-ի TOP')}</span>
+      <span data-ru="Выведем ваш товар" data-am="Մենք կբարձրացնենք ձեր ապրանքը" data-edit-key="home__hero" data-edit-idx="1">${tb('home__hero', 1, 'Выведем ваш товар', 'Մենք կբարձրացնենք ձեր ապրանքը')}</span><br>
+      <span class="gr" data-ru="в ТОП Wildberries" data-am="Wildberries-ի TOP" data-edit-key="home__hero" data-edit-idx="2">${tb('home__hero', 2, 'в ТОП Wildberries', 'Wildberries-ի TOP')}</span>
     </h1>
   </div>
   <div class="hero-el-texts">
-    <p class="hero-desc" data-ru="Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:">${tb('home__hero', 3, 'Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване.', 'Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:')}</p>
+    <p class="hero-desc" data-ru="Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване." data-am="Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:" data-edit-key="home__hero" data-edit-idx="3">${tb('home__hero', 3, 'Самовыкупы с аккаунтов реальных пользователей по вашим ключевым словам. С нами ваши товары становятся ТОПами продаж на Wildberries. Собственный склад и более 1000 реальных аккаунтов в Ереване.', 'Իրական մարդկանց հաշիվներից ինքնագնումներ ձեր ցանկալի բանալի բառով: Մեզ հետ ձեր ապրանքները դառնում են Wildberries-ի TOP-ում վաճառվողներ: Սեփական պահեստ և ավելի քան 1000 իրական հաշիվ Երևանում:')}</p>
   </div>
   <div class="hero-el-stats">
     <div class="hero-stats">
-      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանքներ TOP-ում">${tb('home__hero', 4, 'товаров в ТОП', 'ապրանքներ TOP-ում')}</div></div>
-      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արգելափակում">${tb('home__hero', 5, 'блокировок', 'արգելափակում')}</div></div>
-      <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հաշիվներ">${tb('home__hero', 6, 'аккаунтов', 'հաշիվներ')}</div></div>
+      <div class="stat"><div class="stat-num" data-count="847">0</div><div class="stat-label" data-ru="товаров в ТОП" data-am="ապրանքներ TOP-ում" data-edit-key="home__hero" data-edit-idx="4">${tb('home__hero', 4, 'товаров в ТОП', 'ապրանքներ TOP-ում')}</div></div>
+      <div class="stat"><div class="stat-num" data-count="0">0</div><div class="stat-label" data-ru="блокировок" data-am="արգելափակում" data-edit-key="home__hero" data-edit-idx="5">${tb('home__hero', 5, 'блокировок', 'արգելափակում')}</div></div>
+      <div class="stat"><div class="stat-num" data-count="1000">0</div><div class="stat-label" data-ru="аккаунтов" data-am="հաշիվներ" data-edit-key="home__hero" data-edit-idx="6">${tb('home__hero', 6, 'аккаунтов', 'հաշիվներ')}</div></div>
     </div>
   </div>
   <div class="hero-el-buttons">
     <div class="hero-buttons">
       <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary btn-lg">
         <i class="fab fa-telegram"></i>
-        <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով">${tb('home__hero', 8, 'Написать в Telegram', 'Գրել Telegram-ով')}</span>
+        <span data-ru="Написать в Telegram" data-am="Գրել Telegram-ով" data-edit-key="home__hero" data-edit-idx="8">${tb('home__hero', 8, 'Написать в Telegram', 'Գրել Telegram-ով')}</span>
       </a>
       <a href="/calculator" class="btn btn-outline btn-lg">
         <i class="fas fa-calculator"></i>
-        <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը">${tb('home__hero', 7, 'Рассчитать стоимость', 'Հաշվել արժեքը')}</span>
+        <span data-ru="Рассчитать стоимость" data-am="Հաշվել արժեքը" data-edit-key="home__hero" data-edit-idx="7">${tb('home__hero', 7, 'Рассчитать стоимость', 'Հաշվել արժեքը')}</span>
       </a>
     </div>
   </div>
@@ -3650,48 +3651,48 @@ export function renderNewHomePage(opts: {
 </div>
 
 <!-- ===== WB BANNER ===== -->
-<div class="wb-banner fade-up" data-section-id="wb-banner">
+<div class="wb-banner fade-up" data-section-id="wb-banner" data-block-key="home__wb_banner">
 <div class="container">
 <div class="wb-banner-inner">
   <div class="wb-banner-card">
     <i class="fas fa-gavel wb-icon"></i>
-    <div class="wb-text" data-ru="WB официально отменил штрафы за выкупы!" data-am="WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!">${tb('home__wb_banner', 0, 'WB официально отменил штрафы за выкупы!', 'WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!')}</div>
+    <div class="wb-text" data-ru="WB официально отменил штрафы за выкупы!" data-am="WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!" data-edit-key="home__wb_banner" data-edit-idx="0">${tb('home__wb_banner', 0, 'WB официально отменил штрафы за выкупы!', 'WB-ն պաշտոնապես վերացրել է տուգանքները ինքնագնումների համար!')}</div>
   </div>
   <div class="wb-banner-right">
     <span class="wb-r-icon">🚀</span>
-    <div class="wb-r-text" data-ru="Повысь рейтинг магазина прямо сейчас" data-am="Բարձրացրեք խանութի վարկանիշը հիմա">${tb('home__wb_banner', 1, 'Повысь рейтинг магазина прямо сейчас', 'Բարձրացրեք խանութի վարկանիշը հիմա')}</div>
-    <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary"><span data-ru="Узнать" data-am="Իմանալ">${tb('home__wb_banner', 2, 'Узнать', 'Իմանալ')}</span></a>
+    <div class="wb-r-text" data-ru="Повысь рейтинг магазина прямо сейчас" data-am="Բարձրացրեք խանութի վարկանիշը հիմա" data-edit-key="home__wb_banner" data-edit-idx="1">${tb('home__wb_banner', 1, 'Повысь рейтинг магазина прямо сейчас', 'Բարձրացրեք խանութի վարկանիշը հիմա')}</div>
+    <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary"><span data-ru="Узнать" data-am="Իմանալ" data-edit-key="home__wb_banner" data-edit-idx="2">${tb('home__wb_banner', 2, 'Узнать', 'Իմանալ')}</span></a>
   </div>
 </div>
 </div>
 </div>
 
 <!-- ===== STATS BAR ===== -->
-<div class="stats-bar fade-up" data-section-id="stats-bar">
+<div class="stats-bar fade-up" data-section-id="stats-bar" data-block-key="home__stats_bar">
 <div class="container">
   <div class="stats-grid">
     <div class="stat-card">
       <div class="stat-big" data-count-s="500">0</div>
-      <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ">${tb('home__stats_bar', 0, 'поставщиков сотрудничают с нами', 'մատակարար համագործակցում է մեզ հետ')}</div>
+      <div class="stat-desc" data-ru="поставщиков сотрудничают с нами" data-am="մատակարար համագործակցում է մեզ հետ" data-edit-key="home__stats_bar" data-edit-idx="0">${tb('home__stats_bar', 0, 'поставщиков сотрудничают с нами', 'մատակարար համագործակցում է մեզ հետ')}</div>
     </div>
     <div class="stat-card">
       <div class="stat-big" data-count-s="1000">0+</div>
-      <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով">${tb('home__stats_bar', 1, 'аккаунтов с индивидуальной картой', 'հաշիվներ անհատական քարտով')}</div>
+      <div class="stat-desc" data-ru="аккаунтов с индивидуальной картой" data-am="հաշիվներ անհատական քարտով" data-edit-key="home__stats_bar" data-edit-idx="1">${tb('home__stats_bar', 1, 'аккаунтов с индивидуальной картой', 'հաշիվներ անհատական քարտով')}</div>
     </div>
     <div class="stat-card">
       <div class="stat-big" data-count-s="21">0</div>
-      <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="ապրանք TOP-ում օրական">${tb('home__stats_bar', 2, 'день до выхода в ТОП', 'ապրանք TOP-ում օրական')}</div>
+      <div class="stat-desc" data-ru="день до выхода в ТОП" data-am="ապրանք TOP-ում օրական" data-edit-key="home__stats_bar" data-edit-idx="2">${tb('home__stats_bar', 2, 'день до выхода в ТОП', 'ապրանք TOP-ում օրական')}</div>
     </div>
     <div class="stat-card">
       <div class="stat-big" data-count-s="200">0+</div>
-      <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր">${tb('home__stats_bar', 3, 'выкупов каждый день', 'գնում ամեն օր')}</div>
+      <div class="stat-desc" data-ru="выкупов каждый день" data-am="գնում ամեն օր" data-edit-key="home__stats_bar" data-edit-idx="3">${tb('home__stats_bar', 3, 'выкупов каждый день', 'գնում ամեն օր')}</div>
     </div>
   </div>
 </div>
 </div>
 
 <!-- ===== SERVICES ===== -->
-<section class="section" id="services" data-section-id="services">
+<section class="section" id="services" data-section-id="services" data-block-key="home__services">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">${t('Наши услуги', 'Մեր ծառայությունները')}</span></div>
@@ -3701,39 +3702,39 @@ export function renderNewHomePage(opts: {
   <div class="services-grid">
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-shopping-cart"></i></div>
-      <h3 data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի հարցումներով">${tb('home__services', 0, 'Выкупы по ключевым запросам', 'Գնումներ բանալի հարցումներով')}</h3>
-      <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану." data-am="Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:">${tb('home__services', 1, 'Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.', 'Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:')}</p>
+      <h3 data-ru="Выкупы по ключевым запросам" data-am="Գնումներ բանալի հարցումներով" data-edit-key="home__services" data-edit-idx="0">${tb('home__services', 0, 'Выкупы по ключевым запросам', 'Գնումներ բանալի հարցումներով')}</h3>
+      <p data-ru="Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану." data-am="Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:" data-edit-key="home__services" data-edit-idx="1">${tb('home__services', 1, 'Ваш товар выкупается реальными людьми с реальных аккаунтов в разные ПВЗ по всему Еревану.', 'Ձեր ապրանքը գնվում է իրական մարդկանցով։ Իրական հաշիվներից տարբեր ՊՎԶ-ներով ամբողջ Երևանում:')}</p>
       <ul class="svc-features">
         <li><i class="fas fa-check"></i> <span data-ru="Реальные аккаунты с историей покупок" data-am="Իրական հաշիվներ գնումների պատմությամբ">${t('Реальные аккаунты с историей покупок', 'Իրական հաշիվներ գնումների պատմությամբ')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Географическое распределение" data-am="Աշխարհագրական բաշխում">${t('Географическое распределение', 'Աշխարհագրական բաշխում')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Естественное поведение покупателей" data-am="Գնորդների բնական վարքագիծ">${t('Естественное поведение покупателей', 'Գնորդների բնական վարքագիծ')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Забор товара из ПВЗ" data-am="Ապրանքի ստացում ՊՎԶ-ից">${t('Забор товара из ПВЗ', 'Ապրանքի ստացում ՊՎԶ-ից')}</span></li>
       </ul>
-      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Повысить рейтинг" data-am="Բարձրացնել վարկանիշը">${tb('home__services', 2, 'Повысить рейтинг', 'Բարձրացնել վարկանիշը')}</span></a></div>
+      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Повысить рейтинг" data-am="Բարձրացնել վարկանիշը" data-edit-key="home__services" data-edit-idx="2">${tb('home__services', 2, 'Повысить рейтинг', 'Բարձրացնել վարկանիշը')}</span></a></div>
     </div>
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-star"></i></div>
-      <h3 data-ru="Отзывы и оценки" data-am="Կարծիքներ և գնահատականներ">${tb('home__services', 3, 'Отзывы и оценки', 'Կարծիքներ և գնահատականներ')}</h3>
-      <p data-ru="Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга." data-am="Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:">${tb('home__services', 4, 'Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.', 'Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:')}</p>
+      <h3 data-ru="Отзывы и оценки" data-am="Կարծիքներ և գնահատականներ" data-edit-key="home__services" data-edit-idx="3">${tb('home__services', 3, 'Отзывы и оценки', 'Կարծիքներ և գնահատականներ')}</h3>
+      <p data-ru="Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга." data-am="Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:" data-edit-key="home__services" data-edit-idx="4">${tb('home__services', 4, 'Развёрнутые отзывы с фото и видео от реальных аккаунтов для повышения рейтинга.', 'Մանրամասն կարծիքներ լուսանկարներով և տեսանյութով իրական հաշիվներից վարկանիշի բարձրացման համար:')}</p>
       <ul class="svc-features">
         <li><i class="fas fa-check"></i> <span data-ru="Текст отзыва + фото/видео" data-am="Կարծիքի տեքստ + լուսանկար/տեսանյութ">${t('Текст отзыва + фото/видео', 'Կարծիքի տեքստ + լուսանկար/տեսանյութ')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Профессиональная фотосессия" data-am="Մասնագիտական լուսանկարահանում">${t('Профессиональная фотосессия', 'Մասնագիտական լուսանկարահանում')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Разные локации и модели" data-am="Տարբեր վայրեր և մոդելներ">${t('Разные локации и модели', 'Տարբեր վայրեր և մոդելներ')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="До 50% отзывов от выкупов" data-am="Մինչև 50% կարծիքներ գնումներից">${t('До 50% отзывов от выкупов', 'Մինչև 50% կարծիքներ գնումներից')}</span></li>
       </ul>
-      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-success" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը">${tb('home__services', 5, 'Начать продвижение', 'Սկսել առաջխաղացումը')}</span></a></div>
+      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-success" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-rocket"></i> <span data-ru="Начать продвижение" data-am="Սկսել առաջխաղացումը" data-edit-key="home__services" data-edit-idx="5">${tb('home__services', 5, 'Начать продвижение', 'Սկսել առաջխաղացումը')}</span></a></div>
     </div>
     <div class="svc-card fade-up">
       <div class="svc-icon"><i class="fas fa-key"></i></div>
-      <h3 data-ru="Активация ключевых слов" data-am="Բանալի բառերի ակտիվացում">${tb('home__services', 6, 'Активация ключевых слов', 'Բանալի բառերի ակտիվացում')}</h3>
-      <p data-ru="Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере." data-am="Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգորիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։">${tb('home__services', 7, 'Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере.', 'Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգորիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։')}</p>
+      <h3 data-ru="Активация ключевых слов" data-am="Բանալի բառերի ակտիվացում" data-edit-key="home__services" data-edit-idx="6">${tb('home__services', 6, 'Активация ключевых слов', 'Բանալի բառերի ակտիվացում')}</h3>
+      <p data-ru="Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере." data-am="Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգորիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։" data-edit-key="home__services" data-edit-idx="7">${tb('home__services', 7, 'Есть ключевое слово, по которому хотите показываться, но алгоритмы не связывают его с вашей карточкой? Мы знаем решение — делаем целевые выкупы, которые активируют товар в нужном кластере.', 'Ունե՞ք բանալի բառ, որով ցանկանում եք, որ ձեր ապրանքը ցուցադրվի, բայց ալգորիթմները չեն կապում այն ձեր քարտին։ Մենք գիտենք լուծումը՝ կատարվում ենք նպատակային գնումներ, որոնք ակտիվացնում են ապրանքը ճիշտ կլաստերում։')}</p>
       <ul class="svc-features">
         <li><i class="fas fa-check"></i> <span data-ru="Органический трафик — резкий рост" data-am="Օրգանիկ տրաֆիկի կտրուկ աճ">${t('Органический трафик — резкий рост', 'Օրգանիկ տրաֆիկի կտրուկ աճ')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Укрепление позиций новыми ключевыми словами" data-am="Դիրքերի ամրապնդում նոր բանալի բառերով">${t('Укрепление позиций новыми ключевыми словами', 'Դիրքերի ամրապնդում նոր բանալի բառերով')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Подключение к целевым и прибыльным запросам" data-am="Միացում թիրախային և եկամտաբեր հարցումներին">${t('Подключение к целевым и прибыльным запросам', 'Միացում թիրախային և եկամտաբեր հարցումներին')}</span></li>
         <li><i class="fas fa-check"></i> <span data-ru="Стабильные позиции без рекламы" data-am="Կայուն դիրքեր առանց գովազդի">${t('Стабильные позиции без рекламы', 'Կայուն դիրքեր առանց գովազդի')}</span></li>
       </ul>
-      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-key"></i> <span data-ru="Активировать ключевые" data-am="Ակտիվացնել բանալիները">${tb('home__services', 8, 'Активировать ключевые', 'Ակտիվացնել բանալիները')}</span></a></div>
+      <div style="margin-top:20px;text-align:center"><a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-primary" style="font-size:0.85rem;padding:10px 20px"><i class="fas fa-key"></i> <span data-ru="Активировать ключевые" data-am="Ակտիվացնել բանալիները" data-edit-key="home__services" data-edit-idx="8">${tb('home__services', 8, 'Активировать ключевые', 'Ակտիվացնել բանալիները')}</span></a></div>
     </div>
   </div>
 </div>
@@ -3768,7 +3769,7 @@ ${landingPackages.length > 0 ? `
 ` : ''}
 
 <!-- ===== WHY BUYOUTS BY KEYWORDS ===== -->
-<section class="section" id="why-buyouts" data-section-id="why-buyouts">
+<section class="section" id="why-buyouts" data-section-id="why-buyouts" data-block-key="home__why_buyouts">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աշխատում.">${t('Почему это работает', 'Ինչու է սա աշխատում.')}</span></div>
@@ -3776,67 +3777,67 @@ ${landingPackages.length > 0 ? `
   </div>
 
   <div class="why-block fade-up">
-    <h3><i class="fas fa-funnel-dollar"></i> <span data-ru="Мы не просто покупаем ваш товар — мы прокачиваем всю воронку" data-am="Մենք ոչ միայն գնում ենք — մենք բարձրացնում ենք բոլոր քայլերի կոնվերսիաները">${tb('home__why_buyouts', 0, 'Мы не просто покупаем ваш товар — мы прокачиваем всю воронку', 'Մենք ոչ միայն գնում ենք — մենք բարձրացնում ենք բոլոր քայլերի կոնվերսիաները')}</span></h3>
+    <h3><i class="fas fa-funnel-dollar"></i> <span data-ru="Мы не просто покупаем ваш товар — мы прокачиваем всю воронку" data-am="Մենք ոչ միայն գնում ենք — մենք բարձրացնում ենք բոլոր քայլերի կոնվերսիաները" data-edit-key="home__why_buyouts" data-edit-idx="0">${tb('home__why_buyouts', 0, 'Мы не просто покупаем ваш товар — мы прокачиваем всю воронку', 'Մենք ոչ միայն գնում ենք — մենք բարձրացնում ենք բոլոր քայլերի կոնվերսիաները')}</span></h3>
     <p data-ru="Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:" data-am="Յուրաքանչյուր գնում բանալի բառով — լիարժեք առաջխաղացման մեթոդ.">${t('Каждый выкуп по ключевому запросу — это полноценное продвижение вашей карточки. Наши люди делают всё так, как это делает реальный покупатель. Вот что происходит при каждом выкупе:', 'Յուրաքանչյուր գնում բանալի բառով — լիարժեք առաջխաղացման մեթոդ.')}</p>
     <div class="why-steps">
-      <div class="why-step"><div class="why-step-num">1</div><div><h4 data-ru="Поиск по ключевому запросу" data-am="Որոնում բանալի բառով">${tb('home__why_buyouts', 1, 'Поиск по ключевому запросу', 'Որոնում բանալի բառով')}</h4><p data-ru="Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB" data-am="Գտնում ենք ձեր ապրանքը ճիշտ այնպես, ինչպես որոնում է իրական գնորդը՝ WB-ի որոնման տողի միջոցով">${tb('home__why_buyouts', 2, 'Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB', 'Գտնում ենք ձեր ապրանքը ճիշտ այնպես, ինչպես որոնում է իրական գնորդը՝ WB-ի որոնման տողի միջոցով')}</p></div></div>
-      <div class="why-step"><div class="why-step-num">2</div><div><h4 data-ru="Просмотр карточки" data-am="Քարտի դիտարկում">${tb('home__why_buyouts', 3, 'Просмотр карточки', 'Քարտի դիտարկում')}</h4><p data-ru="Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход" data-am="Լիարժեք ուսումնասիրում ենք ֆոտոները, վիդեոները, նկարագրությունը. Բարելավում ենք վարքագծային գործոնները և CTR ցուցանիշը">${tb('home__why_buyouts', 4, 'Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход', 'Լիարժեք ուսումնասիրում ենք ֆոտոները, վիդեոները, նկարագրությունը. Բարելավում ենք վարքագծային գործոնները և CTR ցուցանիշը')}</p></div></div>
-      <div class="why-step"><div class="why-step-num">3</div><div><h4 data-ru="Работа с отзывами" data-am="Աշխատանք կարծիքների հետ">${tb('home__why_buyouts', 5, 'Работа с отзывами', 'Աշխատանք կարծիքների հետ')}</h4><p data-ru="Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов" data-am="Թերթում ենք կարծիքները և հավանում դրականները՝ Հաճախորդները 70% ժամանակը անցկացնում են կարծիքների բաժնում">${tb('home__why_buyouts', 6, 'Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов', 'Թերթում ենք կարծիքները և հավանում դրականները՝ Հաճախորդները 70% ժամանակը անցկացնում են կարծիքների բաժնում')}</p></div></div>
-      <div class="why-step"><div class="why-step-num">4</div><div><h4 data-ru="Добавление конкурентов" data-am="Մրցակիցների ավելացում">${tb('home__why_buyouts', 7, 'Добавление конкурентов', 'Մրցակիցների ավելացում')}</h4><p data-ru="Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя" data-am="Զամբյուղում ավելացնում ենք մրցակիցների ապրանքներ ձերի հետ միասին՝ կրկնօրինակելով իրական գնորդի վարքագիծը">${tb('home__why_buyouts', 8, 'Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя', 'Զամբյուղում ավելացնում ենք մրցակիցների ապրանքներ ձերի հետ միասին՝ կրկնօրինակելով իրական գնորդի վարքագիծը')}</p></div></div>
-      <div class="why-step"><div class="why-step-num">5</div><div><h4 data-ru="Удаление конкурентов из корзины" data-am="Մրցակիցների հեռացում զամբյուղից">${tb('home__why_buyouts', 9, 'Удаление конкурентов из корзины', 'Մրցակիցների հեռացում զամբյուղից')}</h4><p data-ru="В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас" data-am="Պատվիրելու պահին մենք հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը. WB-ն տեսնում է, որ մարդիկ ընտրում են ձեզ">${tb('home__why_buyouts', 10, 'В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас', 'Պատվիրելու պահին մենք հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը. WB-ն տեսնում է, որ մարդիկ ընտրում են ձեզ')}</p></div></div>
-      <div class="why-step"><div class="why-step-num">6</div><div><h4 data-ru="Заказ и получение" data-am="Պատվեր և ստացում">${tb('home__why_buyouts', 11, 'Заказ и получение', 'Պատվեր և ստացում')}</h4><p data-ru="Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя" data-am="Պատվիրում ենք ապրանքը, վերցնում ենք այն ստացման կետից և թողնում ենք կարծիք՝ իրական հաճախորդի ամբողջական ճանապարհ">${tb('home__why_buyouts', 12, 'Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя', 'Պատվիրում ենք ապրանքը, վերցնում ենք այն ստացման կետից և թողնում ենք կարծիք՝ իրական հաճախորդի ամբողջական ճանապարհ')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">1</div><div><h4 data-ru="Поиск по ключевому запросу" data-am="Որոնում բանալի բառով" data-edit-key="home__why_buyouts" data-edit-idx="1">${tb('home__why_buyouts', 1, 'Поиск по ключевому запросу', 'Որոնում բանալի բառով')}</h4><p data-ru="Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB" data-am="Գտնում ենք ձեր ապրանքը ճիշտ այնպես, ինչպես որոնում է իրական գնորդը՝ WB-ի որոնման տողի միջոցով" data-edit-key="home__why_buyouts" data-edit-idx="2">${tb('home__why_buyouts', 2, 'Находим ваш товар именно так, как ищет реальный покупатель — через поисковую строку WB', 'Գտնում ենք ձեր ապրանքը ճիշտ այնպես, ինչպես որոնում է իրական գնորդը՝ WB-ի որոնման տողի միջոցով')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">2</div><div><h4 data-ru="Просмотр карточки" data-am="Քարտի դիտարկում" data-edit-key="home__why_buyouts" data-edit-idx="3">${tb('home__why_buyouts', 3, 'Просмотр карточки', 'Քարտի դիտարկում')}</h4><p data-ru="Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход" data-am="Լիարժեք ուսումնասիրում ենք ֆոտոները, վիդեոները, նկարագրությունը. Բարելավում ենք վարքագծային գործոնները և CTR ցուցանիշը" data-edit-key="home__why_buyouts" data-edit-idx="4">${tb('home__why_buyouts', 4, 'Полностью просматриваем фото и видео, листаем описание — повышаем конверсию из просмотра в переход', 'Լիարժեք ուսումնասիրում ենք ֆոտոները, վիդեոները, նկարագրությունը. Բարելավում ենք վարքագծային գործոնները և CTR ցուցանիշը')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">3</div><div><h4 data-ru="Работа с отзывами" data-am="Աշխատանք կարծիքների հետ" data-edit-key="home__why_buyouts" data-edit-idx="5">${tb('home__why_buyouts', 5, 'Работа с отзывами', 'Աշխատանք կարծիքների հետ')}</h4><p data-ru="Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов" data-am="Թերթում ենք կարծիքները և հավանում դրականները՝ Հաճախորդները 70% ժամանակը անցկացնում են կարծիքների բաժնում" data-edit-key="home__why_buyouts" data-edit-idx="6">${tb('home__why_buyouts', 6, 'Пролистываем отзывы, лайкаем положительные — это улучшает ранжирование лучших отзывов', 'Թերթում ենք կարծիքները և հավանում դրականները՝ Հաճախորդները 70% ժամանակը անցկացնում են կարծիքների բաժնում')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">4</div><div><h4 data-ru="Добавление конкурентов" data-am="Մրցակիցների ավելացում" data-edit-key="home__why_buyouts" data-edit-idx="7">${tb('home__why_buyouts', 7, 'Добавление конкурентов', 'Մրցակիցների ավելացում')}</h4><p data-ru="Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя" data-am="Զամբյուղում ավելացնում ենք մրցակիցների ապրանքներ ձերի հետ միասին՝ կրկնօրինակելով իրական գնորդի վարքագիծը" data-edit-key="home__why_buyouts" data-edit-idx="8">${tb('home__why_buyouts', 8, 'Добавляем в корзину товары конкурентов вместе с вашим — имитируем реальное поведение покупателя', 'Զամբյուղում ավելացնում ենք մրցակիցների ապրանքներ ձերի հետ միասին՝ կրկնօրինակելով իրական գնորդի վարքագիծը')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">5</div><div><h4 data-ru="Удаление конкурентов из корзины" data-am="Մրցակիցների հեռացում զամբյուղից" data-edit-key="home__why_buyouts" data-edit-idx="9">${tb('home__why_buyouts', 9, 'Удаление конкурентов из корзины', 'Մրցակիցների հեռացում զամբյուղից')}</h4><p data-ru="В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас" data-am="Պատվիրելու պահին մենք հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը. WB-ն տեսնում է, որ մարդիկ ընտրում են ձեզ" data-edit-key="home__why_buyouts" data-edit-idx="10">${tb('home__why_buyouts', 10, 'В момент заказа удаляем конкурентов и оставляем только ваш товар — WB видит, что выбирают именно вас', 'Պատվիրելու պահին մենք հեռացնում ենք մրցակիցներին և թողնում միայն ձեր ապրանքը. WB-ն տեսնում է, որ մարդիկ ընտրում են ձեզ')}</p></div></div>
+      <div class="why-step"><div class="why-step-num">6</div><div><h4 data-ru="Заказ и получение" data-am="Պատվեր և ստացում" data-edit-key="home__why_buyouts" data-edit-idx="11">${tb('home__why_buyouts', 11, 'Заказ и получение', 'Պատվեր և ստացում')}</h4><p data-ru="Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя" data-am="Պատվիրում ենք ապրանքը, վերցնում ենք այն ստացման կետից և թողնում ենք կարծիք՝ իրական հաճախորդի ամբողջական ճանապարհ" data-edit-key="home__why_buyouts" data-edit-idx="12">${tb('home__why_buyouts', 12, 'Оформляем заказ, забираем из ПВЗ, оставляем отзыв — полный цикл реального покупателя', 'Պատվիրում ենք ապրանքը, վերցնում ենք այն ստացման կետից և թողնում ենք կարծիք՝ իրական հաճախորդի ամբողջական ճանապարհ')}</p></div></div>
     </div>
     <div class="highlight-result" data-ru="Результат: повышаются ВСЕ конверсии вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать органический трафик. Чем выше позиция — тем больше органических продаж без дополнительных вложений." data-am="Արդյունքում՝ ձեր ապրանքը բարձրանում է 3-4-րդ էջերից և ամրապնդվում է TOP-ում 7-ից 14 օրերի ընթացքում՝ ձեր բանալի բառերով։ Ստանում եք բարձր վարկանիշ և կայուն օրգանիկ վաճառքներ։"><i class="fas fa-bolt"></i> ${tb('home__why_buyouts', 13, '<strong>Результат:</strong> повышаются <strong>ВСЕ конверсии</strong> вашей карточки: CTR, переходы, добавления в корзину, заказы. Карточка закрепляется в ТОПе и начинает получать <strong>органический трафик</strong>. Чем выше позиция — тем больше органических продаж без дополнительных вложений.', 'Արդյունքում՝ ձեր ապրանքը բարձրանում է 3-4-րդ էջերից և ամրապնդվում է TOP-ում 7-ից 14 օրերի ընթացքում՝ ձեր բանալի բառերով։ Ստանում եք բարձր վարկանիշ և կայուն օրգանիկ վաճառքներ։')}</div>
   </div>
 
   <div class="section-cta">
-    <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы" data-am="Սկսել գնումները">${tb('home__why_buyouts', 14, 'Начать выкупы', 'Սկսել գնումները')}</span></a>
+    <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-warning"><i class="fas fa-fire"></i> <span data-ru="Начать выкупы" data-am="Սկսել գնումները" data-edit-key="home__why_buyouts" data-edit-idx="14">${tb('home__why_buyouts', 14, 'Начать выкупы', 'Սկսել գնումները')}</span></a>
   </div>
 </div>
 </section>
 
 <!-- ===== ДЛЯ КОГО ПОЛЕЗЕН НАШ СЕРВИС ===== -->
-<section class="section nh-for-whom" id="for-whom" data-section-id="for-whom">
+<section class="section nh-for-whom" id="for-whom" data-section-id="for-whom" data-block-key="home__for_whom">
 <div class="container">
   <div class="section-header fade-up">
-    <div class="section-badge"><i class="fas fa-users"></i> <span data-ru="Для кого" data-am="Ում համար">${tb('home__for_whom', 0, 'Для кого', 'Ում համար')}</span></div>
+    <div class="section-badge"><i class="fas fa-users"></i> <span data-ru="Для кого" data-am="Ում համար" data-edit-key="home__for_whom" data-edit-idx="0">${tb('home__for_whom', 0, 'Для кого', 'Ում համար')}</span></div>
     <h2 class="section-title" data-ru="Для кого полезен наш сервис" data-am="Ում համար է օգտակար մեր ծառայությունը">${isAM ? `${tb('home__for_whom', 1, 'Для кого полезен', 'Ում համար է օգտակար')} <span class="gr">${tb('home__for_whom', 2, 'наш сервис', 'մեր ծառայությունը')}</span>` : `${tb('home__for_whom', 1, 'Для кого полезен', 'Ում համար է օգտակար')} <span class="gr">${tb('home__for_whom', 2, 'наш сервис', 'մեր ծառայությունը')}</span>`}</h2>
-    <p class="section-sub" data-ru="Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств" data-am="Մենք աշխատում ենք բիզնեսի տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև խոշոր գործակալություններ">${tb('home__for_whom', 3, 'Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств', 'Մենք աշխատում ենք բիզնեսի տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև խոշոր գործակալություններ')}</p>
+    <p class="section-sub" data-ru="Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств" data-am="Մենք աշխատում ենք բիզնեսի տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև խոշոր գործակալություններ" data-edit-key="home__for_whom" data-edit-idx="3">${tb('home__for_whom', 3, 'Мы работаем с разными форматами бизнеса — от отдельных менеджеров до крупных агентств', 'Մենք աշխատում ենք բիզնեսի տարբեր ձևաչափերի հետ՝ առանձին մենեջերներից մինչև խոշոր գործակալություններ')}</p>
   </div>
   <div class="fw-grid fade-up">
     <div class="fw-card">
       <div class="fw-photo"><img src="/static/img/for-whom-manager.png" alt="Менеджер по маркетплейсам" loading="lazy" decoding="async"></div>
       <div class="fw-body">
-        <h3 data-ru="Менеджер по маркетплейсам" data-am="Մարկետփլեյս մենեջեր">${tb('home__for_whom', 4, 'Менеджер по маркетплейсам', 'Մարկետփլեյս մենեջեր')}</h3>
-        <p data-ru="Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе" data-am="Ունեք մատակարարների մեծ բազա WB-ում և Ozon-ում — դարձեք մեր գործընկերը և վաստակեք յուրաքանչյուր պատվերից">${tb('home__for_whom', 5, 'Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе', 'Ունեք մատակարարների մեծ բազա WB-ում և Ozon-ում — դարձեք մեր գործընկերը և վաստակեք յուրաքանչյուր պատվերից')}</p>
+        <h3 data-ru="Менеджер по маркетплейсам" data-am="Մարկետփլեյս մենեջեր" data-edit-key="home__for_whom" data-edit-idx="4">${tb('home__for_whom', 4, 'Менеджер по маркетплейсам', 'Մարկետփլեյս մենեջեր')}</h3>
+        <p data-ru="Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе" data-am="Ունեք մատակարարների մեծ բազա WB-ում և Ozon-ում — դարձեք մեր գործընկերը և վաստակեք յուրաքանչյուր պատվերից" data-edit-key="home__for_whom" data-edit-idx="5">${tb('home__for_whom', 5, 'Имеете большую базу клиентов-поставщиков на WB и Ozon — станьте нашим партнёром и зарабатывайте на каждом заказе', 'Ունեք մատակարարների մեծ բազա WB-ում և Ozon-ում — դարձեք մեր գործընկերը և վաստակեք յուրաքանչյուր պատվերից')}</p>
       </div>
     </div>
     <div class="fw-card">
       <div class="fw-photo"><img src="/static/img/for-whom-agency.png" alt="Агентство или компания" loading="lazy" decoding="async"></div>
       <div class="fw-body">
-        <h3 data-ru="Агентство или компания" data-am="Գործակալություն կամ ընկերություն">${tb('home__for_whom', 6, 'Агентство или компания', 'Գործակալություն կամ ընկերություն')}</h3>
-        <p data-ru="Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход" data-am="Աշխատում եք մարկետփլեյսների մատակարարների հետ՝ ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթում և մեծացրեք եկամուտը">${tb('home__for_whom', 7, 'Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход', 'Աշխատում եք մարկետփլեյսների մատակարարների հետ՝ ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթում և մեծացրեք եկամուտը')}</p>
+        <h3 data-ru="Агентство или компания" data-am="Գործակալություն կամ ընկերություն" data-edit-key="home__for_whom" data-edit-idx="6">${tb('home__for_whom', 6, 'Агентство или компания', 'Գործակալություն կամ ընկերություն')}</h3>
+        <p data-ru="Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход" data-am="Աշխատում եք մարկետփլեյսների մատակարարների հետ՝ ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթում և մեծացրեք եկամուտը" data-edit-key="home__for_whom" data-edit-idx="7">${tb('home__for_whom', 7, 'Работаете с поставщиками маркетплейсов — добавьте услуги выкупов и отзывов в свой портфель и увеличьте доход', 'Աշխատում եք մարկետփլեյսների մատակարարների հետ՝ ավելացրեք գնումների և կարծիքների ծառայությունները ձեր փաթեթում և մեծացրեք եկամուտը')}</p>
       </div>
     </div>
     <div class="fw-card">
       <div class="fw-photo"><img src="/static/img/for-whom-blogger.png" alt="Владелец ресурса" loading="lazy" decoding="async"></div>
       <div class="fw-body">
-        <h3 data-ru="Владелец ресурса" data-am="Ռեսուրսի սեփականատեր">${tb('home__for_whom', 8, 'Владелец ресурса', 'Ռեսուրսի սեփականատեր')}</h3>
-        <p data-ru="Ведёте тематический блог, YouTube-канал или Telegram-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию" data-am="Վարում եք թեմատիկ բլոգ, YouTube-ալիք կամ Telegram-ալիք մարկետփլեյսների մասին՝ դարձեք գործընկեր և դրամայնացրեք լսարանը">${tb('home__for_whom', 9, 'Ведёте тематический блог, YouTube-канал или Telegram-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию', 'Վարում եք թեմատիկ բլոգ, YouTube-ալիք կամ Telegram-ալիք մարկետփլեյսների մասին՝ դարձեք գործընկեր և դրամայնացրեք լսարանը')}</p>
+        <h3 data-ru="Владелец ресурса" data-am="Ռեսուրսի սեփականատեր" data-edit-key="home__for_whom" data-edit-idx="8">${tb('home__for_whom', 8, 'Владелец ресурса', 'Ռեսուրսի սեփականատեր')}</h3>
+        <p data-ru="Ведёте тематический блог, YouTube-канал или Telegram-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию" data-am="Վարում եք թեմատիկ բլոգ, YouTube-ալիք կամ Telegram-ալիք մարկետփլեյսների մասին՝ դարձեք գործընկեր և դրամայնացրեք լսարանը" data-edit-key="home__for_whom" data-edit-idx="9">${tb('home__for_whom', 9, 'Ведёте тематический блог, YouTube-канал или Telegram-канал о маркетплейсах — станьте партнёром и монетизируйте аудиторию', 'Վարում եք թեմատիկ բլոգ, YouTube-ալիք կամ Telegram-ալիք մարկետփլեյսների մասին՝ դարձեք գործընկեր և դրամայնացրեք լսարանը')}</p>
       </div>
     </div>
     <div class="fw-card">
       <div class="fw-photo"><img src="/static/img/for-whom-school.png" alt="Онлайн-школа" loading="lazy" decoding="async"></div>
       <div class="fw-body">
-        <h3 data-ru="Онлайн-школа" data-am="Օնլայն-դպրոց">${tb('home__for_whom', 10, 'Онлайн-школа', 'Օնլայն-դպրոց')}</h3>
-        <p data-ru="Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение" data-am="Ուսուցանում եք մարկետփլեյսներում աշխատելը՝ խորհուրդ տվեք մեր ծառայությունը ուսանողներին և ստացեք ռեֆերալային պարգևատրում">${tb('home__for_whom', 11, 'Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение', 'Ուսուցանում եք մարկետփլեյսներում աշխատելը՝ խորհուրդ տվեք մեր ծառայությունը ուսանողներին և ստացեք ռեֆերալային պարգևատրում')}</p>
+        <h3 data-ru="Онлайн-школа" data-am="Օնլայն-դպրոց" data-edit-key="home__for_whom" data-edit-idx="10">${tb('home__for_whom', 10, 'Онлайн-школа', 'Օնլայն-դպրոց')}</h3>
+        <p data-ru="Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение" data-am="Ուսուցանում եք մարկետփլեյսներում աշխատելը՝ խորհուրդ տվեք մեր ծառայությունը ուսանողներին և ստացեք ռեֆերալային պարգևատրում" data-edit-key="home__for_whom" data-edit-idx="11">${tb('home__for_whom', 11, 'Обучаете работе с маркетплейсами — рекомендуйте наш сервис студентам и получайте реферальное вознаграждение', 'Ուսուցանում եք մարկետփլեյսներում աշխատելը՝ խորհուրդ տվեք մեր ծառայությունը ուսանողներին և ստացեք ռեֆերալային պարգևատրում')}</p>
       </div>
     </div>
     <div class="fw-card">
       <div class="fw-photo"><img src="/static/img/for-whom-course.png" alt="Интенсив или курс" loading="lazy" decoding="async"></div>
       <div class="fw-body">
-        <h3 data-ru="Интенсив или курс" data-am="Ինտենսիվ կամ դասընթաց">${tb('home__for_whom', 12, 'Интенсив или курс', 'Ինտենսիվ կամ դասընթաց')}</h3>
-        <p data-ru="Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами" data-am="Անցկացնում եք ուսուցում մարկետփլեյսների վերաբերյալ՝ ներառեք մեր ծառայությունը որպես գործնական գործիք և օգնեք ուսանողներին իրական գնումներով">${tb('home__for_whom', 13, 'Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами', 'Անցկացնում եք ուսուցում մարկետփլեյսների վերաբերյալ՝ ներառեք մեր ծառայությունը որպես գործնական գործիք և օգնեք ուսանողներին իրական գնումներով')}</p>
+        <h3 data-ru="Интенсив или курс" data-am="Ինտենսիվ կամ դասընթաց" data-edit-key="home__for_whom" data-edit-idx="12">${tb('home__for_whom', 12, 'Интенсив или курс', 'Ինտենսիվ կամ դասընթաց')}</h3>
+        <p data-ru="Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами" data-am="Անցկացնում եք ուսուցում մարկետփլեյսների վերաբերյալ՝ ներառեք մեր ծառայությունը որպես գործնական գործիք և օգնեք ուսանողներին իրական գնումներով" data-edit-key="home__for_whom" data-edit-idx="13">${tb('home__for_whom', 13, 'Проводите обучение по маркетплейсам — включите наш сервис как практический инструмент и помогайте ученикам с реальными выкупами', 'Անցկացնում եք ուսուցում մարկետփլեյսների վերաբերյալ՝ ներառեք մեր ծառայությունը որպես գործնական գործիք և օգնեք ուսանողներին իրական գնումներով')}</p>
       </div>
     </div>
   </div>
@@ -3850,26 +3851,26 @@ ${landingPackages.length > 0 ? `
 </section>
 
 <!-- ===== CONTACT CTA (above footer) ===== -->
-<section class="section nh-contact-cta" data-section-id="contact-cta">
+<section class="section nh-contact-cta" data-section-id="contact-cta" data-block-key="home__contact_cta">
 <div class="container">
   <div class="nh-contact-card">
     <div class="nh-contact-text">
-      <div class="section-badge"><i class="fas fa-phone-volume"></i> <span data-ru="Свяжитесь с нами" data-am="Կապ հաստատեք մեզ հետ">${tb('home__contact_cta', 0, 'Свяжитесь с нами', 'Կապ հաստատեք մեզ հետ')}</span></div>
-      <h2 data-ru="Готовы вывести ваш товар в ТОП?" data-am="Պատրա՞ստ եք ապրանքը հասցնել WB-ի TOP">${tb('home__contact_cta', 1, 'Готовы вывести ваш товар в ТОП?', 'Պատրա՞ստ եք ապրանքը հասցնել WB-ի TOP')}</h2>
-      <p data-ru="Напишите нам в WhatsApp или закажите обратный звонок — менеджер ответит на все вопросы, подберёт стратегию и пакет под ваш бюджет." data-am="Գրեք մեզ WhatsApp-ով կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի բոլոր հարցերին, կընտրի ստրատեգիան և փաթեթը՝ ձեր բյուջեի համար։">${tb('home__contact_cta', 2, 'Напишите нам в WhatsApp или закажите обратный звонок — менеджер ответит на все вопросы, подберёт стратегию и пакет под ваш бюджет.', 'Գրեք մեզ WhatsApp-ով կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի բոլոր հարցերին, կընտրի ստրատեգիան և փաթեթը՝ ձեր բյուջեի համար։')}</p>
+      <div class="section-badge"><i class="fas fa-phone-volume"></i> <span data-ru="Свяжитесь с нами" data-am="Կապ հաստատեք մեզ հետ" data-edit-key="home__contact_cta" data-edit-idx="0">${tb('home__contact_cta', 0, 'Свяжитесь с нами', 'Կապ հաստատեք մեզ հետ')}</span></div>
+      <h2 data-ru="Готовы вывести ваш товар в ТОП?" data-am="Պատրա՞ստ եք ապրանքը հասցնել WB-ի TOP" data-edit-key="home__contact_cta" data-edit-idx="1">${tb('home__contact_cta', 1, 'Готовы вывести ваш товар в ТОП?', 'Պատրա՞ստ եք ապրանքը հասցնել WB-ի TOP')}</h2>
+      <p data-ru="Напишите нам в WhatsApp или закажите обратный звонок — менеджер ответит на все вопросы, подберёт стратегию и пакет под ваш бюджет." data-am="Գրեք մեզ WhatsApp-ով կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի բոլոր հարցերին, կընտրի ստրատեգիան և փաթեթը՝ ձեր բյուջեի համար։" data-edit-key="home__contact_cta" data-edit-idx="2">${tb('home__contact_cta', 2, 'Напишите нам в WhatsApp или закажите обратный звонок — менеджер ответит на все вопросы, подберёт стратегию и пакет под ваш бюджет.', 'Գրեք մեզ WhatsApp-ով կամ պատվիրեք հետադարձ զանգ — մենեջերը կպատասխանի բոլոր հարցերին, կընտրի ստրատեգիան և փաթեթը՝ ձեր բյուջեի համար։')}</p>
     </div>
     <div class="nh-contact-actions">
       <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="btn nh-btn-whatsapp btn-lg">
         <i class="fab fa-whatsapp"></i>
-        <span data-ru="Написать в WhatsApp" data-am="Գրել WhatsApp-ով">${tb('home__contact_cta', 3, 'Написать в WhatsApp', 'Գրել WhatsApp-ով')}</span>
+        <span data-ru="Написать в WhatsApp" data-am="Գրել WhatsApp-ով" data-edit-key="home__contact_cta" data-edit-idx="3">${tb('home__contact_cta', 3, 'Написать в WhatsApp', 'Գրել WhatsApp-ով')}</span>
       </a>
       <a href="javascript:void(0)" onclick="openCallbackModal()" class="btn btn-outline btn-lg">
         <i class="fas fa-phone"></i>
-        <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('home__contact_cta', 4, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
+        <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք" data-edit-key="home__contact_cta" data-edit-idx="4">${tb('home__contact_cta', 4, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
       </a>
       <a href="/contacts" class="btn btn-outline btn-lg">
         <i class="fas fa-envelope-open-text"></i>
-        <span data-ru="Все контакты" data-am="Բոլոր կոնտակտները">${tb('home__contact_cta', 5, 'Все контакты', 'Բոլոր կոնտակտները')}</span>
+        <span data-ru="Все контакты" data-am="Բոլոր կոնտակտները" data-edit-key="home__contact_cta" data-edit-idx="5">${tb('home__contact_cta', 5, 'Все контакты', 'Բոլոր կոնտակտները')}</span>
       </a>
     </div>
   </div>
@@ -4153,14 +4154,14 @@ export function renderCalculatorPage(opts: { lang: 'ru' | 'am', siteOrigin: stri
 <section class="calc-hero">
   <div class="container">
     <div class="calc-hero-inner">
-      <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հաշվիչ">${tb('calculator__hero', 0, 'Калькулятор', 'Հաշվիչ')}</span></div>
-      <h1 class="calc-hero-title" data-ru="Рассчитайте стоимость продвижения" data-am="Հաշվեք առաջխաղացման արժեքը">${tb('calculator__hero', 1, 'Рассчитайте стоимость продвижения', 'Հաշվեք առաջխաղացման արժեքը')} ${tb('calculator__hero', 2, '', '')}</h1>
-      <p class="calc-hero-sub" data-ru="Выберите готовый пакет или соберите индивидуальный набор услуг — выкупы, отзывы, фотосессии и фулфилмент. Цены без скрытых комиссий, оплата в Telegram." data-am="Ընտրեք պատրաստ փաթեթ կամ հավաքեք անհատական ծառայությունների խումբ՝ գնումներ, կարծիքներ, լուսանկարահանումներ և ֆուլֆիլմենթ։ Գները՝ առանց թաքնված միջնորդավճարների, վճարումը՝ Telegram-ով։">${tb('calculator__hero', 3, 'Выберите готовый пакет или соберите индивидуальный набор услуг — выкупы, отзывы, фотосессии и фулфилмент. Цены без скрытых комиссий, оплата в Telegram.', 'Ընտրեք պատրաստ փաթեթ կամ հավաքեք անհատական ծառայությունների խումբ՝ գնումներ, կարծիքներ, լուսանկարահանումներ և ֆուլֆիլմենթ։ Գները՝ առանց թաքնված միջնորդավճարների, վճարումը՝ Telegram-ով։')}</p>
+      <div class="section-badge"><i class="fas fa-calculator"></i> <span data-ru="Калькулятор" data-am="Հաշվիչ" data-edit-key="calculator__hero" data-edit-idx="0">${tb('calculator__hero', 0, 'Калькулятор', 'Հաշվիչ')}</span></div>
+      <h1 class="calc-hero-title" data-ru="Рассчитайте стоимость продвижения" data-am="Հաշվեք առաջխաղացման արժեքը" data-edit-key="calculator__hero" data-edit-idx="1">${tb('calculator__hero', 1, 'Рассчитайте стоимость продвижения', 'Հաշվեք առաջխաղացման արժեքը')} ${tb('calculator__hero', 2, '', '')}</h1>
+      <p class="calc-hero-sub" data-ru="Выберите готовый пакет или соберите индивидуальный набор услуг — выкупы, отзывы, фотосессии и фулфилмент. Цены без скрытых комиссий, оплата в Telegram." data-am="Ընտրեք պատրաստ փաթեթ կամ հավաքեք անհատական ծառայությունների խումբ՝ գնումներ, կարծիքներ, լուսանկարահանումներ և ֆուլֆիլմենթ։ Գները՝ առանց թաքնված միջնորդավճարների, վճարումը՝ Telegram-ով։" data-edit-key="calculator__hero" data-edit-idx="3">${tb('calculator__hero', 3, 'Выберите готовый пакет или соберите индивидуальный набор услуг — выкупы, отзывы, фотосессии и фулфилмент. Цены без скрытых комиссий, оплата в Telegram.', 'Ընտրեք պատրաստ փաթեթ կամ հավաքեք անհատական ծառայությունների խումբ՝ գնումներ, կարծիքներ, լուսանկարահանումներ և ֆուլֆիլմենթ։ Գները՝ առանց թաքնված միջնորդավճարների, վճարումը՝ Telegram-ով։')}</p>
       <div class="calc-hero-features">
-        <div class="calc-hero-f"><i class="fas fa-bolt"></i><span data-ru="Мгновенный расчёт" data-am="Ակնթարթային հաշվարկ">${tb('calculator__hero', 4, 'Мгновенный расчёт', 'Ակնթարթային հաշվարկ')}</span></div>
-        <div class="calc-hero-f"><i class="fas fa-tag"></i><span data-ru="Готовые пакеты со скидкой" data-am="Պատրաստ փաթեթներ զեղչով">${tb('calculator__hero', 5, 'Готовые пакеты со скидкой', 'Պատրաստ փաթեթներ զեղչով')}</span></div>
-        <div class="calc-hero-f"><i class="fas fa-shield-alt"></i><span data-ru="Без скрытых комиссий" data-am="Առանց թաքնված միջնորդավճարների">${tb('calculator__hero', 6, 'Без скрытых комиссий', 'Առանց թաքնված միջնորդավճարների')}</span></div>
-        <div class="calc-hero-f"><i class="fas fa-percent"></i><span data-ru="Промокод снижает сумму" data-am="Պրոմոկոդը նվազեցնում է գումարը">${tb('calculator__hero', 7, 'Промокод снижает сумму', 'Պրոմոկոդը նվազեցնում է գումարը')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-bolt"></i><span data-ru="Мгновенный расчёт" data-am="Ակնթարթային հաշվարկ" data-edit-key="calculator__hero" data-edit-idx="4">${tb('calculator__hero', 4, 'Мгновенный расчёт', 'Ակնթարթային հաշվարկ')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-tag"></i><span data-ru="Готовые пакеты со скидкой" data-am="Պատրաստ փաթեթներ զեղչով" data-edit-key="calculator__hero" data-edit-idx="5">${tb('calculator__hero', 5, 'Готовые пакеты со скидкой', 'Պատրաստ փաթեթներ զեղչով')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-shield-alt"></i><span data-ru="Без скрытых комиссий" data-am="Առանց թաքնված միջնորդավճարների" data-edit-key="calculator__hero" data-edit-idx="6">${tb('calculator__hero', 6, 'Без скрытых комиссий', 'Առանց թաքնված միջնորդավճարների')}</span></div>
+        <div class="calc-hero-f"><i class="fas fa-percent"></i><span data-ru="Промокод снижает сумму" data-am="Պրոմոկոդը նվազեցնում է գումարը" data-edit-key="calculator__hero" data-edit-idx="7">${tb('calculator__hero', 7, 'Промокод снижает сумму', 'Պրոմոկոդը նվազեցնում է գումարը')}</span></div>
       </div>
     </div>
   </div>
@@ -4170,9 +4171,9 @@ export function renderCalculatorPage(opts: { lang: 'ru' | 'am', siteOrigin: stri
 <section class="section section-dark" id="calculator" data-section-id="calculator">
   <div class="container">
     <div class="section-header">
-      <div class="section-badge"><i class="fas fa-box-open"></i> <span data-ru="Готовые пакеты + индивидуальный расчёт" data-am="Պատրաստ փաթեթներ + անհատական հաշվարկ">${tb('calculator__packages_header', 0, 'Готовые пакеты + индивидуальный расчёт', 'Պատրաստ փաթեթներ + անհատական հաշվարկ')}</span></div>
+      <div class="section-badge"><i class="fas fa-box-open"></i> <span data-ru="Готовые пакеты + индивидуальный расчёт" data-am="Պատրաստ փաթեթներ + անհատական հաշվարկ" data-edit-key="calculator__packages_header" data-edit-idx="0">${tb('calculator__packages_header', 0, 'Готовые пакеты + индивидуальный расчёт', 'Պատրաստ փաթեթներ + անհատական հաշվարկ')}</span></div>
       <h2 class="section-title" data-ru="Выберите пакет или соберите свой" data-am="Ընտրեք փաթեթ կամ հավաքեք ձերը">${t('Выберите пакет или соберите свой', 'Ընտրեք փաթեթ կամ հավաքեք ձերը')}</h2>
-      <p class="section-sub" data-ru="Сверху — три готовых пакета с фиксированной скидкой. Ниже — конструктор: выберите вкладку, отметьте нужное количество, итоговая сумма пересчитывается автоматически." data-am="Վերևում՝ երեք պատրաստ փաթեթ՝ ֆիքսված զեղչով։ Ներքևում՝ կոնստրուկտոր. ընտրեք ներդիր, նշեք քանակ, ընդհանուր գումարը հաշվարկվում է ինքնաբերաբար։">${tb('calculator__packages_header', 1, 'Сверху — три готовых пакета с фиксированной скидкой. Ниже — конструктор: выберите вкладку, отметьте нужное количество, итоговая сумма пересчитывается автоматически.', 'Վերևում՝ երեք պատրաստ փաթեթ՝ ֆիքսված զեղչով։ Ներքևում՝ կոնստրուկտոր. ընտրեք ներդիր, նշեք քանակ, ընդհանուր գումարը հաշվարկվում է ինքնաբերաբար։')}</p>
+      <p class="section-sub" data-ru="Сверху — три готовых пакета с фиксированной скидкой. Ниже — конструктор: выберите вкладку, отметьте нужное количество, итоговая сумма пересчитывается автоматически." data-am="Վերևում՝ երեք պատրաստ փաթեթ՝ ֆիքսված զեղչով։ Ներքևում՝ կոնստրուկտոր. ընտրեք ներդիր, նշեք քանակ, ընդհանուր գումարը հաշվարկվում է ինքնաբերաբար։" data-edit-key="calculator__packages_header" data-edit-idx="1">${tb('calculator__packages_header', 1, 'Сверху — три готовых пакета с фиксированной скидкой. Ниже — конструктор: выберите вкладку, отметьте нужное количество, итоговая сумма пересчитывается автоматически.', 'Վերևում՝ երեք պատրաստ փաթեթ՝ ֆիքսված զեղչով։ Ներքևում՝ կոնստրուկտոր. ընտրեք ներդիր, նշեք քանակ, ընդհանուր գումարը հաշվարկվում է ինքնաբերաբար։')}</p>
     </div>
     <div class="calc-wrap">
       <div class="calc-packages" id="calcPackages" style="display:none"></div>
@@ -4225,24 +4226,24 @@ export function renderCalculatorPage(opts: { lang: 'ru' | 'am', siteOrigin: stri
 <section class="section calc-how">
   <div class="container">
     <div class="section-header">
-      <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как пользоваться" data-am="Ինչպես օգտվել">${tb('calculator__how_to', 0, 'Как пользоваться', 'Ինչպես օգտվել')}</span></div>
-      <h2 class="section-title" data-ru="3 шага до точной сметы" data-am="3 քայլ ճշգրիտ նախահաշվին">${tb('calculator__how_to', 1, '3 шага до точной сметы', '3 քայլ ճշգրիտ նախահաշվին')}</h2>
+      <div class="section-badge"><i class="fas fa-route"></i> <span data-ru="Как пользоваться" data-am="Ինչպես օգտվել" data-edit-key="calculator__how_to" data-edit-idx="0">${tb('calculator__how_to', 0, 'Как пользоваться', 'Ինչպես օգտվել')}</span></div>
+      <h2 class="section-title" data-ru="3 шага до точной сметы" data-am="3 քայլ ճշգրիտ նախահաշվին" data-edit-key="calculator__how_to" data-edit-idx="1">${tb('calculator__how_to', 1, '3 шага до точной сметы', '3 քայլ ճշգրիտ նախահաշվին')}</h2>
     </div>
     <div class="calc-how-grid">
       <div class="calc-how-card">
         <div class="calc-how-num">1</div>
-        <h4 data-ru="Выберите готовый пакет" data-am="Ընտրեք պատրաստ փաթեթ">${tb('calculator__how_to', 2, 'Выберите готовый пакет', 'Ընտրեք պատրաստ փաթեթ')}</h4>
-        <p data-ru="Базовый, Продвинутый или Максимальный — фиксированная скидка до −32%, состав сразу подгрузится в калькулятор." data-am="Բազային, Առաջադեմ կամ Մաքսիմալ՝ ֆիքսված զեղչ մինչև −32%, կազմը անմիջապես կբեռնվի հաշվիչում։">${tb('calculator__how_to', 3, 'Базовый, Продвинутый или Максимальный — фиксированная скидка до −32%, состав сразу подгрузится в калькулятор.', 'Բազային, Առաջադեմ կամ Մաքսիմալ՝ ֆիքսված զեղչ մինչև −32%, կազմը անմիջապես կբեռնվի հաշվիչում։')}</p>
+        <h4 data-ru="Выберите готовый пакет" data-am="Ընտրեք պատրաստ փաթեթ" data-edit-key="calculator__how_to" data-edit-idx="2">${tb('calculator__how_to', 2, 'Выберите готовый пакет', 'Ընտրեք պատրաստ փաթեթ')}</h4>
+        <p data-ru="Базовый, Продвинутый или Максимальный — фиксированная скидка до −32%, состав сразу подгрузится в калькулятор." data-am="Բազային, Առաջադեմ կամ Մաքսիմալ՝ ֆիքսված զեղչ մինչև −32%, կազմը անմիջապես կբեռնվի հաշվիչում։" data-edit-key="calculator__how_to" data-edit-idx="3">${tb('calculator__how_to', 3, 'Базовый, Продвинутый или Максимальный — фиксированная скидка до −32%, состав сразу подгрузится в калькулятор.', 'Բազային, Առաջադեմ կամ Մաքսիմալ՝ ֆիքսված զեղչ մինչև −32%, կազմը անմիջապես կբեռնվի հաշվիչում։')}</p>
       </div>
       <div class="calc-how-card">
         <div class="calc-how-num">2</div>
-        <h4 data-ru="Или соберите вручную" data-am="Կամ հավաքեք ձեռքով">${tb('calculator__how_to', 4, 'Или соберите вручную', 'Կամ հավաքեք ձեռքով')}</h4>
-        <p data-ru="Переключайте вкладки, добавляйте выкупы, отзывы, фотосессии, ФФ и логистику — итог пересчитывается мгновенно." data-am="Փոխարկեք ներդիրները, ավելացրեք գնումներ, կարծիքներ, լուսանկարահանումներ, ՖՖ և լոգիստիկա՝ ընդհանուրը հաշվարկվում է ակնթարթորեն։">${tb('calculator__how_to', 5, 'Переключайте вкладки, добавляйте выкупы, отзывы, фотосессии, ФФ и логистику — итог пересчитывается мгновенно.', 'Փոխարկեք ներդիրները, ավելացրեք գնումներ, կարծիքներ, լուսանկարահանումներ, ՖՖ և լոգիստիկա՝ ընդհանուրը հաշվարկվում է ակնթարթորեն։')}</p>
+        <h4 data-ru="Или соберите вручную" data-am="Կամ հավաքեք ձեռքով" data-edit-key="calculator__how_to" data-edit-idx="4">${tb('calculator__how_to', 4, 'Или соберите вручную', 'Կամ հավաքեք ձեռքով')}</h4>
+        <p data-ru="Переключайте вкладки, добавляйте выкупы, отзывы, фотосессии, ФФ и логистику — итог пересчитывается мгновенно." data-am="Փոխարկեք ներդիրները, ավելացրեք գնումներ, կարծիքներ, լուսանկարահանումներ, ՖՖ և լոգիստիկա՝ ընդհանուրը հաշվարկվում է ակնթարթորեն։" data-edit-key="calculator__how_to" data-edit-idx="5">${tb('calculator__how_to', 5, 'Переключайте вкладки, добавляйте выкупы, отзывы, фотосессии, ФФ и логистику — итог пересчитывается мгновенно.', 'Փոխարկեք ներդիրները, ավելացրեք գնումներ, կարծիքներ, լուսանկարահանումներ, ՖՖ և լոգիստիկա՝ ընդհանուրը հաշվարկվում է ակնթարթորեն։')}</p>
       </div>
       <div class="calc-how-card">
         <div class="calc-how-num">3</div>
-        <h4 data-ru="Введите промокод и оформите" data-am="Մուտքագրեք պրոմոկոդը և ձևակերպեք">${tb('calculator__how_to', 6, 'Введите промокод и оформите', 'Մուտքագրեք պրոմոկոդը և ձևակերպեք')}</h4>
-        <p data-ru="Если у вас есть промокод партнёра — введите в поле ниже и получите дополнительную скидку. Заказ оформляется в WhatsApp одной кнопкой." data-am="Եթե ունեք գործընկերոջ պրոմոկոդ՝ մուտքագրեք ստորև և ստացեք լրացուցիչ զեղչ։ Պատվերը ձևակերպվում է WhatsApp-ով՝ մեկ կոճակով։">${tb('calculator__how_to', 7, 'Если у вас есть промокод партнёра — введите в поле ниже и получите дополнительную скидку. Заказ оформляется в WhatsApp одной кнопкой.', 'Եթե ունեք գործընկերոջ պրոմոկոդ՝ մուտքագրեք ստորև և ստացեք լրացուցիչ զեղչ։ Պատվերը ձևակերպվում է WhatsApp-ով՝ մեկ կոճակով։')}</p>
+        <h4 data-ru="Введите промокод и оформите" data-am="Մուտքագրեք պրոմոկոդը և ձևակերպեք" data-edit-key="calculator__how_to" data-edit-idx="6">${tb('calculator__how_to', 6, 'Введите промокод и оформите', 'Մուտքագրեք պրոմոկոդը և ձևակերպեք')}</h4>
+        <p data-ru="Если у вас есть промокод партнёра — введите в поле ниже и получите дополнительную скидку. Заказ оформляется в WhatsApp одной кнопкой." data-am="Եթե ունեք գործընկերոջ պրոմոկոդ՝ մուտքագրեք ստորև և ստացեք լրացուցիչ զեղչ։ Պատվերը ձևակերպվում է WhatsApp-ով՝ մեկ կոճակով։" data-edit-key="calculator__how_to" data-edit-idx="7">${tb('calculator__how_to', 7, 'Если у вас есть промокод партнёра — введите в поле ниже и получите дополнительную скидку. Заказ оформляется в WhatsApp одной кнопкой.', 'Եթե ունեք գործընկերոջ պրոմոկոդ՝ մուտքագրեք ստորև և ստացեք լրացուցիչ զեղչ։ Պատվերը ձևակերպվում է WhatsApp-ով՝ մեկ կոճակով։')}</p>
       </div>
     </div>
   </div>
@@ -4253,21 +4254,21 @@ export function renderCalculatorPage(opts: { lang: 'ru' | 'am', siteOrigin: stri
   <div class="container">
     <div class="acs-card">
       <div class="acs-text">
-        <h3 data-ru="Не хотите считать сами?" data-am="Չե՞ք ուզում ինքներդ հաշվել">${tb('calculator__cta_strip', 0, 'Не хотите считать сами?', 'Չե՞ք ուզում ինքներդ հաշվել')}</h3>
-        <p data-ru="Напишите менеджеру в Telegram или WhatsApp — мы подберём пакет под ваш бюджет и нишу." data-am="Գրեք մենեջերին Telegram-ով կամ WhatsApp-ով՝ մենք կընտրենք փաթեթ ձեր բյուջեի և նիշայի համար։">${tb('calculator__cta_strip', 1, 'Напишите менеджеру в Telegram или WhatsApp — мы подберём пакет под ваш бюджет и нишу.', 'Գրեք մենեջերին Telegram-ով կամ WhatsApp-ով՝ մենք կընտրենք փաթեթ ձեր բյուջեի և նիշայի համար։')}</p>
+        <h3 data-ru="Не хотите считать сами?" data-am="Չե՞ք ուզում ինքներդ հաշվել" data-edit-key="calculator__cta_strip" data-edit-idx="0">${tb('calculator__cta_strip', 0, 'Не хотите считать сами?', 'Չե՞ք ուզում ինքներդ հաշվել')}</h3>
+        <p data-ru="Напишите менеджеру в Telegram или WhatsApp — мы подберём пакет под ваш бюджет и нишу." data-am="Գրեք մենեջերին Telegram-ով կամ WhatsApp-ով՝ մենք կընտրենք փաթեթ ձեր բյուջեի և նիշայի համար։" data-edit-key="calculator__cta_strip" data-edit-idx="1">${tb('calculator__cta_strip', 1, 'Напишите менеджеру в Telegram или WhatsApp — мы подберём пакет под ваш бюджет и нишу.', 'Գրեք մենեջերին Telegram-ով կամ WhatsApp-ով՝ մենք կընտրենք փաթեթ ձեր բյուջեի և նիշայի համար։')}</p>
       </div>
       <div class="acs-actions">
         <a href="https://wa.me/37455226224" target="_blank" rel="noopener" class="btn nh-btn-whatsapp">
           <i class="fab fa-whatsapp"></i>
-          <span data-ru="WhatsApp" data-am="WhatsApp">${tb('calculator__cta_strip', 2, 'WhatsApp', 'WhatsApp')}</span>
+          <span data-ru="WhatsApp" data-am="WhatsApp" data-edit-key="calculator__cta_strip" data-edit-idx="2">${tb('calculator__cta_strip', 2, 'WhatsApp', 'WhatsApp')}</span>
         </a>
         <a href="${tgUrl}" target="_blank" rel="noopener" class="btn btn-tg">
           <i class="fab fa-telegram"></i>
-          <span data-ru="Telegram" data-am="Telegram">${tb('calculator__cta_strip', 3, 'Telegram', 'Telegram')}</span>
+          <span data-ru="Telegram" data-am="Telegram" data-edit-key="calculator__cta_strip" data-edit-idx="3">${tb('calculator__cta_strip', 3, 'Telegram', 'Telegram')}</span>
         </a>
         <button type="button" class="btn btn-outline" onclick="openCallbackModal()">
           <i class="fas fa-phone"></i>
-          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք">${tb('calculator__cta_strip', 4, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
+          <span data-ru="Перезвоните мне" data-am="Հետ զանգահարեք" data-edit-key="calculator__cta_strip" data-edit-idx="4">${tb('calculator__cta_strip', 4, 'Перезвоните мне', 'Հետ զանգահարեք')}</span>
         </button>
       </div>
     </div>
@@ -5601,7 +5602,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </header>
 
 <!-- ===== HERO ===== -->
-<section class="hero" id="hero" data-section-id="hero">
+<section class="hero" id="hero" data-section-id="hero" data-block-key="home__hero">
 <div class="container">
 <div class="hero-grid">
   <div class="hero-el-title">
@@ -5676,7 +5677,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 
 <!-- ===== WB BANNER ===== -->
-<div class="wb-banner fade-up" data-section-id="wb-banner">
+<div class="wb-banner fade-up" data-section-id="wb-banner" data-block-key="home__wb_banner">
 <div class="container">
 <div class="wb-banner-inner">
   <div class="wb-banner-card">
@@ -5693,7 +5694,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </div>
 
 <!-- ===== STATS BAR ===== -->
-<div class="stats-bar fade-up" data-section-id="stats-bar">
+<div class="stats-bar fade-up" data-section-id="stats-bar" data-block-key="home__stats_bar">
 <div class="container">
   <div class="stats-grid">
     <div class="stat-card">
@@ -5832,7 +5833,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </section>
 
 <!-- ===== SERVICES ===== -->
-<section class="section" id="services" data-section-id="services">
+<section class="section" id="services" data-section-id="services" data-block-key="home__services">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-rocket"></i> <span data-ru="Наши услуги" data-am="Մեր ծառայությունները">Наши услуги</span></div>
@@ -5920,7 +5921,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 
 <!-- ===== WHY BUYOUTS BY KEYWORDS ===== -->
-<section class="section" id="why-buyouts" data-section-id="why-buyouts">
+<section class="section" id="why-buyouts" data-section-id="why-buyouts" data-block-key="home__why_buyouts">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-chart-line"></i> <span data-ru="Почему это работает" data-am="Ինչու է սա աշխատում.">Почему это работает</span></div>
@@ -6344,7 +6345,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 
 
 <!-- ===== FOR WHOM ===== -->
-<section class="section" id="for-whom" data-section-id="for-whom">
+<section class="section" id="for-whom" data-section-id="for-whom" data-block-key="home__for_whom">
 <div class="container">
   <div class="section-header fade-up">
     <div class="section-badge"><i class="fas fa-users"></i> <span data-ru="Для кого" data-am="Ум hамар">Для кого</span></div>
@@ -6641,6 +6642,7 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 </div>
 
 <script src="/static/landing.js?v=${CACHE_VERSION}" defer></script>
+<script src="/static/editor.js?v=${CACHE_VERSION}" defer></script>
 
 <!-- Bottom Navigation Bar (mobile) -->
 <nav class="bottom-nav" id="bottomNav">
