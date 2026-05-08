@@ -5,6 +5,66 @@
 
 ---
 
+## Phase 5.1 — Inline Editor: критические багфиксы + расширение (2026-05-08)
+
+**Кэш:** CACHE_VERSION `v29 → v30`.
+
+### Что фиксили (отчёт пользователя)
+1. Не удавалось кликнуть на текст и редактировать (только подсвечивались рамки).
+2. Подсвечивались НЕ все блоки — только те, что уже в CMS через `tb()`.
+3. Drag-and-drop блоков не работал.
+4. Кнопки/ссылки нельзя было редактировать — popup не появлялся.
+5. Переключатель RU/AM не менял язык в режиме редактирования.
+6. Кнопка «Отменить» исчезала после сохранения и говорила «Нечего отменять».
+7. После «+ Добавить блок здесь» новый блок не появлялся даже после reload.
+
+### Что сделали
+
+**A. Новая инфраструктура для редактирования ВСЕХ текстов:**
+- Новая таблица `site_text_overrides (page, txt_id, text_ru, text_am, href)` в `src/lib/db.ts`.
+- Новая таблица `site_custom_blocks` для произвольных блоков, добавленных из inline-редактора.
+- Файл `src/api/routes/admin-text-overrides.ts` — CRUD API для overrides + custom-blocks (admin).
+- Публичные endpoints `GET /api/text-overrides/:page` и `GET /api/custom-blocks/:page` в `src/routes/public-api.ts` (без auth, кешируются 60 секунд).
+
+**B. Полностью переписан `public/static/editor.js` (~1100 строк):**
+- `assignTextIds()` — на init проходит по DOM, всем `[data-ru]/[data-am]` без `data-edit-key` назначает стабильные `data-edit-text="<page>__txt_<N>"`.
+- `applyOverridesFromServer()` — на init (для ВСЕХ посетителей, не только админов) загружает overrides и применяет их к DOM.
+- Click-to-edit теперь работает на ЛЮБОМ тексте, не только на CMS-блоках. Сохранение идёт в одну из двух таблиц: CMS-блоки → `site_blocks`, остальное → `site_text_overrides`.
+- Undo: `undoStack` теперь правильно заполняется на `focus` (первая правка) и **сохраняется после сохранения** — пользователь может откатить уже сохранённые изменения.
+- Drag-and-drop: правильный `draggable: '[data-block-key]'`, контейнер вычисляется как `parentNode` первого блока (не `<main>`), `forceFallback: true` для touch-устройств.
+- Button popup: каждая кнопка/ссылка в режиме редактирования получает иконку «✎», клик — popup с тремя полями (RU, AM, URL). Также автоматически открывается popup при клике на саму кнопку (вместо блокировки).
+- RU/AM toggle: больше не перезагружает страницу. Переключает текст всех editable элементов мгновенно. Если есть несохранённые изменения — спрашивает подтверждение.
+
+**C. SSR-рендер кастомных блоков:**
+- Новый helper `loadCustomBlocks(db, page)` + `renderCustomBlock(block, lang)` в `src/routes/landing.ts`.
+- В `/home` route добавлен параллельный запрос `loadCustomBlocks(c.env.DB, 'home')`.
+- В `renderNewHomePage` добавлен параметр `customBlocks` и логика splice'инга: блок вставляется ПОСЛЕ якоря `position_after` (по `data-block-key`), либо в конец `mainHtml`.
+- Новый блок имеет стабильный `data-block-key="<page>__custom_<id>"` + `data-edit-text` ids — его тексты тут же редактируются inline-редактором.
+
+**D. Багфикс в `landing.js`:**
+- `switchLang` для `/home`, `/calculator`, `/blog`, `/package/*` теперь обрабатывается как для subpages: меняется URL `?lang=am`, страница перезагружается. Раньше `/home` падал в ветку «редирект на `/am`» (старый длинный лендинг).
+
+### Изменённые файлы
+- `src/lib/db.ts` — новые таблицы + миграции
+- `src/api/routes/admin-text-overrides.ts` (новый файл)
+- `src/api/admin.ts` — регистрация нового роутера
+- `src/routes/public-api.ts` — публичные endpoints
+- `src/routes/landing.ts` — `loadCustomBlocks` + `renderCustomBlock` + интеграция в `/home`
+- `public/static/editor.js` — полный переписанный inline-редактор
+- `public/static/landing.js` — fix `switchLang` для `/home`/`/calculator`/`/blog`
+- `src/lib/cache-config.ts` — `v29 → v30`
+
+### Что теперь работает
+- Любой текст на странице (не только CMS-блоки) можно редактировать кликом.
+- Drag-and-drop блоков с сохранением в DB.
+- Кнопки и ссылки редактируются через popup (текст RU/AM + URL).
+- RU/AM переключатель работает в edit-режиме без перезагрузки.
+- Undo сохраняется после save и позволяет откатить сохранённые изменения.
+- «+ Добавить блок» создаёт реальный блок, который появляется после reload (рендерится через SSR).
+- Все правки сохраняются в одну из двух таблиц и применяются автоматически для всех посетителей сайта.
+
+---
+
 ## Phase 5 — Инлайн-редактор (Visual Page Builder) (2026-05-08)
 
 **Кэш:** CACHE_VERSION `v28 → v29`.

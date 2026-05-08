@@ -409,4 +409,45 @@ app.get('/api/photo-blocks', async (c) => {
   } catch { return c.json({ blocks: [] }); }
 })
 
+// ===== PUBLIC TEXT OVERRIDES (Phase 5.1) =====
+// Returns all text/href overrides for a page so SSR + editor.js can apply
+// them. No auth required (overrides should be visible to every visitor).
+// Cache-Control no-store so changes appear within one full page reload.
+app.get('/api/text-overrides/:page', async (c) => {
+  try {
+    const db = c.env.DB;
+    const page = c.req.param('page');
+    if (!page) return c.json({ overrides: {} });
+    const rows = await db.prepare(
+      'SELECT txt_id, text_ru, text_am, href FROM site_text_overrides WHERE page = ?'
+    ).bind(page).all();
+    const overrides: Record<string, { ru: string; am: string; href?: string }> = {};
+    for (const r of (rows.results || []) as any[]) {
+      overrides[r.txt_id as string] = {
+        ru: (r.text_ru as string) || '',
+        am: (r.text_am as string) || '',
+        href: (r.href as string) || ''
+      };
+    }
+    c.header('Cache-Control', 'public, max-age=10, s-maxage=60');
+    return c.json({ overrides });
+  } catch { return c.json({ overrides: {} }); }
+})
+
+// ===== PUBLIC CUSTOM BLOCKS (Phase 5.1) =====
+// Returns custom blocks for a page so editor.js can render previews
+// before SSR catches up.
+app.get('/api/custom-blocks/:page', async (c) => {
+  try {
+    const db = c.env.DB;
+    const page = c.req.param('page');
+    if (!page) return c.json({ blocks: [] });
+    const rows = await db.prepare(
+      'SELECT * FROM site_custom_blocks WHERE page = ? AND is_visible = 1 ORDER BY sort_order, id'
+    ).bind(page).all();
+    c.header('Cache-Control', 'public, max-age=10, s-maxage=60');
+    return c.json({ blocks: rows.results || [] });
+  } catch { return c.json({ blocks: [] }); }
+})
+
 }

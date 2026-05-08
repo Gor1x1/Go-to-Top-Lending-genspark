@@ -678,6 +678,76 @@ export async function loadShellBlocks(db: D1Database | undefined): Promise<Recor
 }
 
 // =====================================================================
+// loadCustomBlocks — Phase 5.1: blocks added through the inline editor's
+// "+ Добавить блок". Returned in sort_order so the renderer can splice
+// them into the page near the requested anchor (`position_after`) or
+// append them at the bottom when the anchor is missing.
+// =====================================================================
+export interface CustomBlock {
+  id: number
+  page: string
+  position_after: string
+  title_ru: string
+  title_am: string
+  text_ru: string
+  text_am: string
+  button_text_ru: string
+  button_text_am: string
+  button_url: string
+  is_visible: number
+  sort_order: number
+}
+
+export async function loadCustomBlocks(
+  db: D1Database | undefined,
+  page: string
+): Promise<CustomBlock[]> {
+  if (!db) return []
+  try {
+    const res = await db.prepare(
+      'SELECT * FROM site_custom_blocks WHERE page = ? AND is_visible = 1 ORDER BY sort_order, id'
+    ).bind(page).all()
+    return (res.results || []) as unknown as CustomBlock[]
+  } catch {
+    return []
+  }
+}
+
+// Render a single custom block as a styled section. Includes data-edit-text
+// ids so the inline editor can edit its texts AFTER reload.
+export function renderCustomBlock(b: CustomBlock, lang: 'ru' | 'am'): string {
+  const isAM = lang === 'am'
+  const title = isAM ? (b.title_am || b.title_ru) : (b.title_ru || b.title_am)
+  const text = isAM ? (b.text_am || b.text_ru) : (b.text_ru || b.text_am)
+  const btnText = isAM ? (b.button_text_am || b.button_text_ru) : (b.button_text_ru || b.button_text_am)
+  const blockKey = `${b.page}__custom_${b.id}`
+  const esc = (s: string) => String(s || '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+  return `
+<section class="section gtt-custom-block" data-block-key="${esc(blockKey)}" data-custom-block-id="${b.id}">
+  <div class="container">
+    <div class="gtt-custom-card">
+      <h2 data-ru="${esc(b.title_ru)}" data-am="${esc(b.title_am)}" data-edit-text="${esc(blockKey)}__title">${esc(title)}</h2>
+      <p data-ru="${esc(b.text_ru)}" data-am="${esc(b.text_am)}" data-edit-text="${esc(blockKey)}__text">${esc(text)}</p>
+      ${btnText ? `<a href="${esc(b.button_url || '#')}" class="btn btn-primary" data-edit-text="${esc(blockKey)}__btn"><span data-ru="${esc(b.button_text_ru)}" data-am="${esc(b.button_text_am)}">${esc(btnText)}</span></a>` : ''}
+    </div>
+  </div>
+</section>
+<style>
+.gtt-custom-block{padding:60px 0}
+.gtt-custom-card{max-width:880px;margin:0 auto;text-align:center;padding:40px 32px;background:var(--bg-card,#1A1128);border:1px solid var(--border,rgba(139,92,246,0.15));border-radius:24px}
+.gtt-custom-card h2{font-size:clamp(1.6rem,3.5vw,2.4rem);font-weight:800;margin-bottom:18px;background:linear-gradient(135deg,#8B5CF6,#A78BFA);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.gtt-custom-card p{font-size:1.05rem;color:var(--text-sec,#A5A0B8);line-height:1.7;margin-bottom:24px}
+</style>
+`
+}
+
+export function renderCustomBlocksHtml(blocks: CustomBlock[], lang: 'ru' | 'am'): string {
+  if (!blocks || blocks.length === 0) return ''
+  return blocks.map(b => renderCustomBlock(b, lang)).join('\n')
+}
+
+// =====================================================================
 // renderAboutPage — phase 2A "light" page for /about.
 // Reuses three sections from `/`: hero (founder), #about (who we are),
 // #guarantee (team & office). No full calculator — only a compact CTA
@@ -3532,8 +3602,9 @@ export function renderNewHomePage(opts: {
     price_text_ru?: string; price_text_am?: string;
     sort_order?: number;
   }>,
+  customBlocks?: CustomBlock[],
 }): string {
-  const { lang, siteOrigin, pageBlocks, shellBlocks, landingPackages = [] } = opts
+  const { lang, siteOrigin, pageBlocks, shellBlocks, landingPackages = [], customBlocks = [] } = opts
   const isAM = lang === 'am'
   const t = (ru: string, am: string) => isAM ? am : ru
 
@@ -4098,13 +4169,33 @@ ${landingPackages.length > 0 ? `
     ]
   })}</script>`
 
+  // Phase 5.1 — splice custom blocks (added via inline editor) into mainHtml.
+  // Each block has `position_after` = data-block-key value; we insert the
+  // block's HTML right after the matching </section> or </div>. If the
+  // anchor isn't found (or empty), we append the block at the very end.
+  let mainHtmlWithCustom = mainHtml
+  for (const cb of customBlocks) {
+    const cbHtml = renderCustomBlock(cb, lang)
+    const anchor = (cb.position_after || '').trim()
+    if (anchor) {
+      // Find the closing tag of the section/div with that data-block-key
+      const re = new RegExp(`(<(?:section|div)[^>]*data-block-key="${anchor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"[\\s\\S]*?</(?:section|div)>)`, 'i')
+      const m = mainHtmlWithCustom.match(re)
+      if (m) {
+        mainHtmlWithCustom = mainHtmlWithCustom.replace(m[0], m[0] + '\n' + cbHtml)
+        continue
+      }
+    }
+    mainHtmlWithCustom = mainHtmlWithCustom + '\n' + cbHtml
+  }
+
   return renderPageShell({
     page: 'home-new',
     lang,
     siteOrigin,
     seo,
     bodyClass: 'home-page',
-    mainHtml,
+    mainHtml: mainHtmlWithCustom,
     extraHead: extraHead + jsonLd,
   })
 }
@@ -7845,9 +7936,10 @@ app.get('/home', async (c) => {
   // parallel via the standard loadSubpageBlocks/loadShellBlocks helpers.
   // Both fall back silently to {} on any DB error so the renderer's
   // hardcoded fallbacks always render the page identically.
-  const [pageBlocks, shellBlocks] = await Promise.all([
+  const [pageBlocks, shellBlocks, customBlocks] = await Promise.all([
     loadSubpageBlocks(c.env.DB, 'home'),
     loadShellBlocks(c.env.DB),
+    loadCustomBlocks(c.env.DB, 'home'),
   ]);
 
   // Heavy page: prefetch /api/site-data in parallel so client JS doesn't
@@ -7875,7 +7967,7 @@ app.get('/home', async (c) => {
       }
     } catch { /* malformed JSON — keep empty */ }
   }
-  let pageHtml = renderNewHomePage({ lang, siteOrigin, pageBlocks, shellBlocks, landingPackages });
+  let pageHtml = renderNewHomePage({ lang, siteOrigin, pageBlocks, shellBlocks, landingPackages, customBlocks });
   if (siteDataJson) {
     const safeSiteData = siteDataJson.replace(/<\//g, '<\\/');
     pageHtml = pageHtml.replace(

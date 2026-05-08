@@ -1508,8 +1508,9 @@ switchLang = function(l) {
   // /contacts, /referral. They have no /am prefix yet, so language is
   // carried via ?lang=am while preserving the current path.
   // Preserve any non-lang query params (UTM, fbclid, ref, etc.) via URLSearchParams.
-  var subPages = ['/about', '/buyouts', '/services', '/faq', '/contacts', '/referral'];
-  if (subPages.indexOf(path) !== -1) {
+  var subPages = ['/about', '/buyouts', '/services', '/faq', '/contacts', '/referral', '/home', '/calculator', '/blog'];
+  var isSubPage = subPages.indexOf(path) !== -1 || path.indexOf('/package/') === 0 || path.indexOf('/blog/') === 0;
+  if (isSubPage) {
     localStorage.setItem('gtt_lang', l);
     try {
       var subUrl = new URL(window.location.href);
