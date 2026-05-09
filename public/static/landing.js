@@ -4,6 +4,19 @@ window.scrollTo(0, 0);
 /* ===== LANGUAGE ===== */
 let lang = localStorage.getItem('gtt_lang') || 'ru';
 
+/** Read gtt_lang cookie — must stay in sync with SSR (readLangCookie in landing.ts). */
+function readCookieLang() {
+  try {
+    var raw = document.cookie || '';
+    var m = /(?:^|;\s*)gtt_lang=([^;]+)/i.exec(raw);
+    if (!m) return '';
+    var v = decodeURIComponent(m[1] || '').toLowerCase();
+    if (v === 'am' || v === 'hy') return 'am';
+    if (v === 'ru') return 'ru';
+  } catch (_e) {}
+  return '';
+}
+
 /* ===== CURRENCY HELPERS =====
    Currency is bound to language: RU language → ₽, AM language → ֏.
    For each price source we prefer the explicit RUB column when it's > 0,
@@ -101,6 +114,40 @@ function _persistLang(l) {
   } catch (_e2) {}
 }
 
+/**
+ * Map admin nav targets to real URLs on subpages. Long landing (`main[data-page="home"]`)
+ * keeps #fragment links for in-page scroll.
+ */
+function navHrefForAdminTarget(target) {
+  if (!target) return '#';
+  var t = String(target).replace(/_/g, '-').replace(/^\#/, '').trim();
+  var map = {
+    about: '/about',
+    services: '/services',
+    buyouts: '/buyouts',
+    calculator: '/calculator',
+    faq: '/faq',
+    contact: '/contacts',
+    contacts: '/contacts',
+    home: '/home',
+    blog: '/blog',
+    referral: '/referral',
+    warehouse: '/#warehouse',
+    guarantee: '/#guarantee',
+  };
+  var path = map[t];
+  if (!path) path = '/#' + t;
+  if (path.charAt(0) === '#') return path;
+  if (path.indexOf('/#') === 0) return path;
+  if (lang === 'am') return path + (path.indexOf('?') >= 0 ? '&' : '?') + 'lang=am';
+  return path;
+}
+
+function mainPageId() {
+  var m = document.querySelector('main[data-page]');
+  return (m && m.getAttribute('data-page')) || '';
+}
+
 /** Apply [data-am]/[data-ru] chrome + placeholders without touching browser URL (click handlers navigate). */
 function applyLangDomNoNavigation(l) {
   lang = l;
@@ -118,12 +165,18 @@ function applyLangDomNoNavigation(l) {
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
 }
 
-/* ===== INIT: URL + localStorage; never rewrite pathname (/about → /am) ===== */
+/* ===== INIT: URL > cookie > localStorage (matches SSR readLangCookie + ?lang=) ===== */
 (function initLang() {
   var fromUrl = detectUrlLangFromLocation();
+  var fromCookie = readCookieLang();
   if (fromUrl) {
     lang = fromUrl;
     _persistLang(fromUrl);
+  } else if (fromCookie) {
+    lang = fromCookie;
+    try { localStorage.setItem('gtt_lang', fromCookie); } catch (_ls) {}
+  } else {
+    lang = localStorage.getItem('gtt_lang') || 'ru';
   }
   applyLangDomNoNavigation(lang);
 })();
@@ -1654,7 +1707,7 @@ function finalizeLangAfterSiteData() {
   var page = (document.querySelector('main[data-page]') || {}).dataset && document.querySelector('main[data-page]').dataset.page;
   var isSubpage = page && page !== 'home';
   if (isServerInjected) {
-    document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(sec) {
+    document.querySelectorAll('main section, main .stats-bar, main div.wb-banner, main div.slot-counter-bar, main div.ticker').forEach(function(sec) {
       sec.classList.add('section-revealed');
       sec.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { el.classList.add('visible'); });
     });
@@ -1896,10 +1949,12 @@ function finalizeLangAfterSiteData() {
         ph += '</div>';
         ph += '<div class="calc-packages-grid' + (isSingle ? ' single-pkg' : '') + '">';
         // Sort: cheaper packages left, gold center, expensive right.
-        // On RU language we drop packages that have no RUB price set so customers don't see ֏ prices on /ru.
+        // On RU language we prefer RUB-priced packages; if none have RUB yet, show AMD
+        // so the grid is never empty on /ru.
         var allPkgs = db.packages.slice();
         if (lang === 'ru') {
-          allPkgs = allPkgs.filter(function(p) { return Number(p.package_price_rub) > 0; });
+          var rubPkgs = allPkgs.filter(function(p) { return Number(p.package_price_rub) > 0; });
+          if (rubPkgs.length > 0) allPkgs = rubPkgs;
         }
         var sortedPkgs = allPkgs;
         var _goldPkg = null;
@@ -3155,6 +3210,8 @@ function finalizeLangAfterSiteData() {
       if (navBf && navBf.texts_ru && navBf.texts_ru.length > 0) {
         var navUl = document.getElementById('navLinks');
         if (navUl) {
+          var _pgNav = mainPageId();
+          var _useHashNav = _pgNav === 'home';
           // Build nav_links map: idx -> target
           var navTargetMap = {};
           if (navBf.nav_links) {
@@ -3185,7 +3242,9 @@ function finalizeLangAfterSiteData() {
               var exA = existingLis[ui].querySelector('a');
               if (!exA) continue;
               var di = dbNavItems[ui];
-              if (di.target) exA.setAttribute('href', '#' + di.target);
+              if (di.target) {
+                exA.setAttribute('href', _useHashNav ? ('#' + di.target) : navHrefForAdminTarget(di.target));
+              }
               exA.setAttribute('data-ru', di.ru);
               exA.setAttribute('data-am', di.am);
               var navTxt = lang === 'am' && di.am ? di.am : di.ru;
@@ -3202,13 +3261,13 @@ function finalizeLangAfterSiteData() {
               var d = dbNavItems[ci];
               var li = document.createElement('li');
               var a = document.createElement('a');
-              a.setAttribute('href', d.target ? '#' + d.target : '#');
+              a.setAttribute('href', d.target ? (_useHashNav ? '#' + d.target : navHrefForAdminTarget(d.target)) : '#');
               a.setAttribute('data-ru', d.ru);
               a.setAttribute('data-am', d.am);
               a.textContent = lang === 'am' && d.am ? d.am : d.ru;
               a.addEventListener('click', function(e) {
                 var href = this.getAttribute('href');
-                if (href && href.charAt(0) === '#' && href.length > 1) {
+                if (href && href.indexOf('#') === 0 && href.length > 1 && _useHashNav) {
                   e.preventDefault();
                   var targetEl = document.getElementById(href.substring(1)) || document.querySelector('[data-section-id="' + href.substring(1) + '"]');
                   if (targetEl) {
@@ -3240,11 +3299,12 @@ function finalizeLangAfterSiteData() {
               // Skip items without section target (CTA buttons like _telegram, _cta)
               if (!fnItem.target || fnItem.target.charAt(0) === '_') continue;
               var fnText = lang === 'am' && fnItem.am ? fnItem.am : fnItem.ru;
-              footerNavHtml += '<li><a href="#' + fnItem.target + '" data-ru="' + fnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (fnItem.am||'').replace(/"/g,'&quot;') + '" data-no-rewrite="1">' + fnText + '</a></li>';
+              var fnHref = _useHashNav ? ('#' + fnItem.target) : navHrefForAdminTarget(fnItem.target);
+              footerNavHtml += '<li><a href="' + fnHref.replace(/"/g,'&quot;') + '" data-ru="' + fnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (fnItem.am||'').replace(/"/g,'&quot;') + '" data-no-rewrite="1">' + fnText + '</a></li>';
               footerNavCount++;
             }
             footerNavList.innerHTML = footerNavHtml;
-            // Add smooth scroll to footer nav links
+            if (_useHashNav) {
             footerNavList.querySelectorAll('a[href^="#"]').forEach(function(a) {
               a.addEventListener('click', function(e) {
                 e.preventDefault();
@@ -3255,6 +3315,7 @@ function finalizeLangAfterSiteData() {
                 }
               });
             });
+            }
             console.log('[DB] Footer nav synced with header:', footerNavCount, 'items');
           }
           } // end !serverOrdered check for footer nav
@@ -3277,7 +3338,8 @@ function finalizeLangAfterSiteData() {
               var bnItem = bnMain[bni];
               var bnIcon = bnIconMap[bnItem.target] || 'fas fa-link';
               var bnText = lang === 'am' && bnItem.am ? bnItem.am : bnItem.ru;
-              bnHtml += '<a href="#' + bnItem.target + '" class="bottom-nav-item"><i class="' + bnIcon + '"></i><span data-ru="' + bnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (bnItem.am||'').replace(/"/g,'&quot;') + '">' + bnText + '</span></a>';
+              var bnHref = _useHashNav ? ('#' + bnItem.target) : navHrefForAdminTarget(bnItem.target);
+              bnHtml += '<a href="' + bnHref.replace(/"/g,'&quot;') + '" class="bottom-nav-item"><i class="' + bnIcon + '"></i><span data-ru="' + bnItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (bnItem.am||'').replace(/"/g,'&quot;') + '">' + bnText + '</span></a>';
             }
             if (bnMore.length > 0) {
               var bnMoreText = lang === 'am' ? '\u0531\u057E\u0565\u056C\u056B\u0576' : '\u0415\u0449\u0451';
@@ -3288,7 +3350,8 @@ function finalizeLangAfterSiteData() {
                 if (!bmItem.target || bmItem.target.charAt(0) === '_') continue;
                 var bmIcon = bnIconMap[bmItem.target] || 'fas fa-link';
                 var bmText = lang === 'am' && bmItem.am ? bmItem.am : bmItem.ru;
-                bnHtml += '<a href="#' + bmItem.target + '"><i class="' + bmIcon + '"></i><span data-ru="' + bmItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (bmItem.am||'').replace(/"/g,'&quot;') + '">' + bmText + '</span></a>';
+                var bmHref = _useHashNav ? ('#' + bmItem.target) : navHrefForAdminTarget(bmItem.target);
+                bnHtml += '<a href="' + bmHref.replace(/"/g,'&quot;') + '"><i class="' + bmIcon + '"></i><span data-ru="' + bmItem.ru.replace(/"/g,'&quot;') + '" data-am="' + (bmItem.am||'').replace(/"/g,'&quot;') + '">' + bmText + '</span></a>';
               }
               bnHtml += '</div></button>';
             }
@@ -3495,6 +3558,8 @@ function finalizeLangAfterSiteData() {
       knownSections['floating_tg'] = true;
       knownSections['floating-tg'] = true;
       knownSections['popup'] = true;
+      knownSections['calculator'] = true;
+      knownSections['stats-bar'] = true;
       // Keep dynamically created slot counters and photo blocks
       // Also add all blockFeature keys as known sections
       if (_bfLoaded) {
@@ -3530,6 +3595,10 @@ function finalizeLangAfterSiteData() {
       // Check 1: Section exists in sectionOrder but NOT in blockFeatures → template/orphan
       // Only apply this check if blockFeatures actually loaded (otherwise keep everything visible)
       if (!_bfLoaded) return; // No blockFeatures data — skip orphan check entirely
+      // Never strip SSR calculator / buyouts-services blocks — the key may be absent from
+      // blockFeatures on subpages even though the section is intentional (full calc HTML).
+      if (sec.querySelector('.calc-wrap')) return;
+      if (sidNorm === 'calculator') return;
       var inBF = _bfKeySet[sid] || _bfKeySet[sidNorm] || _bfKeySet[sidAlt];
       if (!inBF) {
         // Not in blockFeatures — hide it (it's an orphaned template section)
@@ -3606,7 +3675,7 @@ function finalizeLangAfterSiteData() {
     
     // ===== STAGGERED SECTION REVEAL =====
     // When server-injected, sections are already visible via CSS – add classes instantly
-    var allSections = document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker');
+    var allSections = document.querySelectorAll('main section, main .stats-bar, main div.wb-banner, main div.slot-counter-bar, main div.ticker');
     if (serverInjected) {
       allSections.forEach(function(sec) {
         sec.classList.add('section-revealed');
@@ -3652,7 +3721,7 @@ function finalizeLangAfterSiteData() {
   } catch(e) {
     console.log('[DB] Error:', e.message || e);
     // Fallback: reveal all sections immediately if data loading fails
-    document.querySelectorAll('section.section, div.wb-banner, div.stats-bar, div.slot-counter-bar, div.ticker').forEach(function(s) {
+    document.querySelectorAll('main section, main .stats-bar, main div.wb-banner, main div.slot-counter-bar, main div.ticker').forEach(function(s) {
       s.classList.add('section-revealed');
     });
 
@@ -3661,7 +3730,7 @@ function finalizeLangAfterSiteData() {
 
 // Safety fallback: if sections still hidden after 8s (mobile / slow network), reveal everything
 setTimeout(function() {
-  document.querySelectorAll('section.section:not(.section-revealed), div.wb-banner:not(.section-revealed), div.stats-bar:not(.section-revealed), div.slot-counter-bar:not(.section-revealed), div.ticker:not(.section-revealed)').forEach(function(s) {
+  document.querySelectorAll('main section:not(.section-revealed), main .stats-bar:not(.section-revealed), main div.wb-banner:not(.section-revealed), main div.slot-counter-bar:not(.section-revealed), main div.ticker:not(.section-revealed)').forEach(function(s) {
     s.classList.add('section-revealed');
   });
   // Also reveal footer if still hidden

@@ -293,8 +293,11 @@ export function renderPageShell(opts: {
   // until phase 2 introduces /am/{page} routes.
   const hrefAm = path === '/' ? `${siteOrigin}/am` : `${siteOrigin}${path}?lang=am`
 
+  // server-injected: all SSR pages from this shell ship final RU/AM copy; client
+  // loadSiteData must use the light textMap path (update data-am only) so DB
+  // overrides never flash stale Russian over fresh inline-editor / CMS content.
   return `<!DOCTYPE html>
-<html lang="${htmlLang}">
+<html lang="${htmlLang}" class="server-injected">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
@@ -558,6 +561,48 @@ ${mainHtml}
     </form>
   </div>
 </div>
+
+<!-- ===== INLINE BULLETPROOF COUNTER TRIGGER (shared shell) =====
+     Animates every [data-count] / [data-count-s] number on the page within
+     ~80-2000ms regardless of IntersectionObserver, opacity reveals or
+     deferred landing.js execution. Idempotent: skips elements already
+     marked counterDone="1" by landing.js so it never restarts a running
+     tween. Lives in the shared shell so /home, /about, /services,
+     /buyouts and every other subpage gets the same guarantee. -->
+<script>
+(function(){
+  function _animate(el, target, suffix){
+    if (el.dataset.counterDone === '1') return;
+    el.dataset.counterDone = '1';
+    if (!target || target <= 0) { el.textContent = '0' + (suffix || ''); return; }
+    var dur = 1800, start = performance.now();
+    function step(now){
+      var p = Math.min((now - start) / dur, 1);
+      var v = Math.floor(target * (1 - Math.pow(1 - p, 3)));
+      try { el.textContent = v.toLocaleString('ru-RU') + (suffix || ''); }
+      catch(_){ el.textContent = v + (suffix || ''); }
+      if (p < 1) requestAnimationFrame(step);
+      else { try { el.textContent = target.toLocaleString('ru-RU') + (suffix || ''); }
+            catch(_){ el.textContent = target + (suffix || ''); } }
+    }
+    requestAnimationFrame(step);
+  }
+  function _fire(){
+    document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el){
+      _animate(el, parseInt(el.getAttribute('data-count')) || 0, '');
+    });
+    document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el){
+      var hasPlus = (el.textContent || '').indexOf('+') !== -1;
+      _animate(el, parseInt(el.getAttribute('data-count-s')) || 0, hasPlus ? '+' : '');
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_fire, 80); });
+  } else { setTimeout(_fire, 80); }
+  setTimeout(_fire, 600);
+  setTimeout(_fire, 2000);
+})();
+</script>
 
 <script src="/static/landing.js?v=${CACHE_VERSION}" defer></script>
 <script src="/static/editor.js?v=${CACHE_VERSION}" defer></script>
@@ -4857,7 +4902,11 @@ app.get('/', async (c) => {
   // Browser: 30s fresh, Edge: 600s via Cache API wrapper (index.tsx).
   // stale-while-revalidate=600 means the browser can show a stale page
   // for up to 10 min while revalidating in the background — eliminates white-screen waits.
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+  // Browsers must revalidate every refresh (max-age=0) so admin text/photo
+  // edits never produce a "show old → flash new" delay; edge keeps the page
+  // hot for ~10min via s-maxage so first-paint stays fast for new visitors.
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=600, stale-while-revalidate=600');
+  c.header('Vary', 'Accept-Encoding, Cookie');
   
   // Start site-data fetch in parallel with SSR (will be awaited at the end)
   const siteDataPromise = (async () => {
@@ -7095,6 +7144,45 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
   </div>
 </div>
 
+<!-- ===== INLINE BULLETPROOF COUNTER TRIGGER (long landing) =====
+     Same guarantee as the shared shell: every [data-count]/[data-count-s]
+     number animates within 80-2000ms even if IntersectionObserver / the
+     section-revealed cascade / landing.js are slow. Idempotent. -->
+<script>
+(function(){
+  function _animateLL(el, target, suffix){
+    if (el.dataset.counterDone === '1') return;
+    el.dataset.counterDone = '1';
+    if (!target || target <= 0) { el.textContent = '0' + (suffix || ''); return; }
+    var dur = 1800, start = performance.now();
+    function step(now){
+      var p = Math.min((now - start) / dur, 1);
+      var v = Math.floor(target * (1 - Math.pow(1 - p, 3)));
+      try { el.textContent = v.toLocaleString('ru-RU') + (suffix || ''); }
+      catch(_){ el.textContent = v + (suffix || ''); }
+      if (p < 1) requestAnimationFrame(step);
+      else { try { el.textContent = target.toLocaleString('ru-RU') + (suffix || ''); }
+            catch(_){ el.textContent = target + (suffix || ''); } }
+    }
+    requestAnimationFrame(step);
+  }
+  function _fireLL(){
+    document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el){
+      _animateLL(el, parseInt(el.getAttribute('data-count')) || 0, '');
+    });
+    document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el){
+      var hasPlus = (el.textContent || '').indexOf('+') !== -1;
+      _animateLL(el, parseInt(el.getAttribute('data-count-s')) || 0, hasPlus ? '+' : '');
+    });
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setTimeout(_fireLL, 80); });
+  } else { setTimeout(_fireLL, 80); }
+  setTimeout(_fireLL, 600);
+  setTimeout(_fireLL, 2000);
+})();
+</script>
+
 <script src="/static/landing.js?v=${CACHE_VERSION}" defer></script>
 <script src="/static/editor.js?v=${CACHE_VERSION}" defer></script>
 
@@ -8019,8 +8107,18 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
     }
     
     // ===== 7. SERVER-SIDE NAV LINKS INJECTION =====
-    // Replace hard-coded header nav and footer nav with DB values
-    const navBf = blockFeatures.find((b: any) => b.key === 'nav');
+    // Replace hard-coded header nav and footer nav with DB values.
+    //
+    // Subpages (renderPageShell) read nav text from `shell__nav` block.
+    // The legacy long landing used to read it from `nav`. To unify both
+    // surfaces — so admin edits to nav text appear on `/`, `/home`,
+    // `/about` etc. simultaneously — we now prefer `shell__nav` first
+    // and fall back to `nav` only when `shell__nav` is empty/missing.
+    const shellNavBf = blockFeatures.find((b: any) => b.key === 'shell__nav');
+    const legacyNavBf = blockFeatures.find((b: any) => b.key === 'nav');
+    const navBf = (shellNavBf && shellNavBf.texts_ru && shellNavBf.texts_ru.length > 0)
+      ? shellNavBf
+      : legacyNavBf;
     if (navBf && navBf.texts_ru && navBf.texts_ru.length > 0) {
       const defaultTargets = ['about', 'services', 'calculator', 'warehouse', 'guarantee', 'faq', 'contact'];
       const navLinks = navBf.nav_links || [];
@@ -8332,7 +8430,11 @@ section[data-section-id^="photo-block"] .container{padding-bottom:0}
 // __SITE_DATA injection mirrors /services and /buyouts so any future
 // calculator block on this page can render without an extra DB round-trip.
 app.get('/home', async (c) => {
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+  // Browsers must revalidate every refresh (max-age=0) so admin text/photo
+  // edits never produce a "show old → flash new" delay; edge keeps the page
+  // hot for ~10min via s-maxage so first-paint stays fast for new visitors.
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=600, stale-while-revalidate=600');
+  c.header('Vary', 'Accept-Encoding, Cookie');
 
   const reqUrl = new URL(c.req.url);
   const urlLang = reqUrl.searchParams.get('lang') || '';
@@ -8394,7 +8496,11 @@ app.get('/home', async (c) => {
 // for the cross-link grid at the bottom, and renders via renderPackagePage.
 // Returns a 404 HTML page if slug is missing or hidden.
 app.get('/package/:slug', async (c) => {
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+  // Browsers must revalidate every refresh (max-age=0) so admin text/photo
+  // edits never produce a "show old → flash new" delay; edge keeps the page
+  // hot for ~10min via s-maxage so first-paint stays fast for new visitors.
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=600, stale-while-revalidate=600');
+  c.header('Vary', 'Accept-Encoding, Cookie');
 
   const reqUrl = new URL(c.req.url);
   const urlLang = reqUrl.searchParams.get('lang') || '';
@@ -8459,7 +8565,11 @@ const PLACEHOLDER_PAGES: PlaceholderPage[] = ['about', 'buyouts', 'services', 'f
 for (const page of PLACEHOLDER_PAGES) {
   app.get(`/${page}`, async (c) => {
     // Same cache header strategy as `/` — wrapped by edge cache in src/index.tsx.
-    c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+    // Browsers must revalidate every refresh (max-age=0) so admin text/photo
+    // edits never produce a "show old → flash new" delay; edge keeps the page
+    // hot for ~10min via s-maxage so first-paint stays fast for new visitors.
+    c.header('Cache-Control', 'public, max-age=0, s-maxage=600, stale-while-revalidate=600');
+    c.header('Vary', 'Accept-Encoding, Cookie');
 
     // Language detection mirrors `/`: URL path, ?lang= query, gtt_lang cookie,
     // then default RU.
@@ -8583,7 +8693,11 @@ for (const page of PLACEHOLDER_PAGES) {
 // /services/buyouts so window._calcPackages and the tab/qty/total wiring
 // in landing.js initialise the calculator without an extra fetch.
 app.get('/calculator', async (c) => {
-  c.header('Cache-Control', 'public, max-age=30, s-maxage=600, stale-while-revalidate=600');
+  // Browsers must revalidate every refresh (max-age=0) so admin text/photo
+  // edits never produce a "show old → flash new" delay; edge keeps the page
+  // hot for ~10min via s-maxage so first-paint stays fast for new visitors.
+  c.header('Cache-Control', 'public, max-age=0, s-maxage=600, stale-while-revalidate=600');
+  c.header('Vary', 'Accept-Encoding, Cookie');
   const reqUrl = new URL(c.req.url);
   const urlLang = reqUrl.searchParams.get('lang') || '';
   const cookieLang = readLangCookie(c);
