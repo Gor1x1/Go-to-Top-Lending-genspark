@@ -43,15 +43,21 @@ app.post('/api/admin/purge-cache', async (c) => {
   try {
     const cache = caches.default;
     const origin = new URL(c.req.url).origin;
-    // Purge all cached landing page variants
-    const paths = CACHE_PATHS;
-    // Also purge versioned cache keys
-    const vPaths = paths.map(p => p.includes('?') ? p + '&_cv=' + CACHE_VERSION : p + '?_cv=' + CACHE_VERSION);
-    // Purge ALL known origins (not just the requesting one)
+    // Build all cache-key variants (bare, versioned, cookie-lang) so we
+    // delete every shape the same path could have been stored under.
+    // Mirrors the cache-key construction in the main worker fetch handler.
+    const variants: string[] = [];
+    for (const p of CACHE_PATHS) {
+      variants.push(p);
+      const sep = p.includes('?') ? '&' : '?';
+      variants.push(p + sep + '_cv=' + CACHE_VERSION);
+      variants.push(p + sep + 'cklang=am&_cv=' + CACHE_VERSION);
+      variants.push(p + sep + 'cklang=ru&_cv=' + CACHE_VERSION);
+    }
     const origins = new Set([origin, ...KNOWN_ORIGINS]);
     const purgePromises: Promise<boolean>[] = [];
     for (const o of origins) {
-      for (const p of [...paths, ...vPaths]) {
+      for (const p of variants) {
         purgePromises.push(cache.delete(new Request(o + p)).catch(() => false));
       }
     }
@@ -250,10 +256,20 @@ export default {
     }
 
     const cache = caches.default;
-    // Normalize cache key: strip query params except lang
+    // Normalize cache key: keep `lang` query param + `gtt_lang` cookie (so
+    // AM and RU visitors don't share a single cached HTML when the cookie
+    // alone determines the rendered language). `_cv` busts old caches on
+    // every deploy.
     const cacheUrl = new URL(url.origin + url.pathname);
     const langParam = url.searchParams.get('lang');
     if (langParam) cacheUrl.searchParams.set('lang', langParam);
+    if (!langParam) {
+      const cookieRaw = request.headers.get('Cookie') || '';
+      const m = /(?:^|;\s*)gtt_lang=([^;]+)/i.exec(cookieRaw);
+      const ck = m ? decodeURIComponent(m[1] || '').toLowerCase() : '';
+      if (ck === 'am' || ck === 'hy') cacheUrl.searchParams.set('cklang', 'am');
+      else if (ck === 'ru') cacheUrl.searchParams.set('cklang', 'ru');
+    }
     cacheUrl.searchParams.set('_cv', CACHE_VERSION);
     const cacheKey = new Request(cacheUrl.toString());
 
@@ -272,19 +288,29 @@ export default {
 
     // Only cache successful HTML responses
     if (response.status === 200 && response.headers.get('content-type')?.includes('text/html')) {
-      // Clone and set cache headers
+      // Clone and set cache headers.
+      //
+      // Caching strategy:
+      //   - browser (`max-age=0`)  → always revalidate. Crucial: if the user
+      //     refreshes after editing text in the admin, we never want the
+      //     browser to paint a 30-second-stale copy before our JS overlay
+      //     swaps it back to the new text (that flicker is exactly what the
+      //     "old text → new text on refresh" bug is about).
+      //   - edge   (`s-maxage`)    → cached for CACHE_TTL on the Cloudflare
+      //     edge. Admin writes auto-purge the edge cache (see
+      //     src/api/admin.ts), so the next browser revalidation pulls a
+      //     fresh SSR render from origin within milliseconds.
       const body = await response.arrayBuffer();
       const cachedResponse = new Response(body, {
         status: 200,
         headers: {
           ...Object.fromEntries(response.headers.entries()),
-          'Cache-Control': `public, max-age=30, s-maxage=${CACHE_TTL}, stale-while-revalidate=${CACHE_TTL}`,
+          'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL}, stale-while-revalidate=${CACHE_TTL}`,
           'CDN-Cache-Control': `max-age=${CACHE_TTL}`,
           'X-Cache-Status': 'MISS',
-          'Vary': 'Accept-Encoding',
+          'Vary': 'Accept-Encoding, Cookie',
         },
       });
-      // Store in cache (non-blocking)
       ctx.waitUntil(cache.put(cacheKey, cachedResponse.clone()));
       return cachedResponse;
     }

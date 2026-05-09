@@ -11,6 +11,20 @@ import { renderPageShell } from './landing'
 
 type Bindings = { DB: D1Database; MEDIA: R2Bucket }
 
+/** Local copy of the gtt_lang cookie reader so blog routes can honour the
+ *  visitor's last-chosen language on first paint (mirrors landing.ts). */
+function readBlogLangCookie(c: { req: { header: (k: string) => string | undefined } }): 'am' | 'ru' | '' {
+  try {
+    const raw = c.req.header('Cookie') || c.req.header('cookie') || ''
+    const m = /(?:^|;\s*)gtt_lang=([^;]+)/i.exec(raw)
+    if (!m) return ''
+    const v = decodeURIComponent(m[1] || '').toLowerCase()
+    if (v === 'am' || v === 'hy') return 'am'
+    if (v === 'ru') return 'ru'
+  } catch {}
+  return ''
+}
+
 // Blog-specific styles only. Header/nav/footer styles come from renderPageShell.
 const BLOG_CSS = `
 <style>
@@ -100,7 +114,8 @@ export function register(app: Hono<{ Bindings: Bindings }>) {
     const reqUrl = new URL(c.req.url);
     const siteOrigin = reqUrl.origin;
     const urlLang = reqUrl.searchParams.get('lang') || '';
-    const isAM = urlLang === 'am' || urlLang === 'hy';
+    const cookieLang = readBlogLangCookie(c);
+    const isAM = urlLang === 'am' || urlLang === 'hy' || (urlLang === '' && cookieLang === 'am');
     const lang: 'ru' | 'am' = isAM ? 'am' : 'ru';
     const catFilter = reqUrl.searchParams.get('cat') || '';
 
@@ -189,7 +204,8 @@ export function register(app: Hono<{ Bindings: Bindings }>) {
     const reqUrl = new URL(c.req.url);
     const siteOrigin = reqUrl.origin;
     const urlLang = reqUrl.searchParams.get('lang') || '';
-    const isAM = urlLang === 'am' || urlLang === 'hy';
+    const cookieLang = readBlogLangCookie(c);
+    const isAM = urlLang === 'am' || urlLang === 'hy' || (urlLang === '' && cookieLang === 'am');
     const lang: 'ru' | 'am' = isAM ? 'am' : 'ru';
     const slug = c.req.param('slug');
 

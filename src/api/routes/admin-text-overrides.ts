@@ -81,6 +81,24 @@ export function register(api: Hono<{ Bindings: Bindings }>, authMiddleware: Auth
     return c.json({ success: true });
   });
 
+  // Phase 5.1.4: bulk-delete by txt_id prefix. Used to wipe stale `__order__*`
+  // rows that were saved by the previous (broken) drag-drop reorder feature.
+  // Admin-protected so it can't be abused.
+  api.post('/text-overrides/cleanup-prefix', authMiddleware, async (c) => {
+    try {
+      const { prefix } = await c.req.json();
+      if (!prefix || typeof prefix !== 'string' || prefix.length < 3) {
+        return c.json({ error: 'prefix required (min 3 chars)' }, 400);
+      }
+      const res = await c.env.DB.prepare(
+        'DELETE FROM site_text_overrides WHERE txt_id LIKE ?'
+      ).bind(prefix + '%').run();
+      return c.json({ success: true, deleted: (res as any).meta?.changes ?? 0 });
+    } catch (e: any) {
+      return c.json({ error: String(e?.message || e) }, 500);
+    }
+  });
+
   // ─────────────────── CUSTOM BLOCKS ─────────────────────────────────────────
 
   // List custom blocks for a page (admin)

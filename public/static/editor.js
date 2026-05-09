@@ -137,14 +137,59 @@
   // overrides or activate edit mode, so the same elements get the same ids
   // across reloads.
   function assignTextIds() {
-    var nodes = document.querySelectorAll('[data-ru], [data-am]');
+    // Assign a stable txt_id to EVERY editable text element. Two SSR conventions
+    // exist on this site:
+    //   1. [data-ru]/[data-am] — bilingual text (most blocks)
+    //   2. [data-edit-key] — Phase 5 script-injected attribute on plain <span>/<h*>
+    //      WITHOUT data-ru/am. These also need a stable txt_id so the override
+    //      path can save them.
+    // We deliberately union both selectors and skip elements already addressed.
+    var nodes = document.querySelectorAll('[data-ru], [data-am], [data-edit-key]');
     var n = 0;
+    var withDataRu = 0, withoutDataRu = 0;
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
       if (shouldSkip(el)) continue;
-      if (el.getAttribute('data-edit-key')) continue;       // CMS block — already addressable
       if (el.getAttribute('data-edit-text')) continue;       // already assigned
-      el.setAttribute('data-edit-text', PAGE + '__txt_' + (n++));
+      // Build stable id. If element has data-edit-key + data-edit-idx, prefer
+      // that as a deterministic id (so it's reproducible across reloads).
+      var key = el.getAttribute('data-edit-key');
+      var idx = el.getAttribute('data-edit-idx');
+      var txtId;
+      if (key && idx !== null) {
+        txtId = PAGE + '__' + key + '__' + idx;
+        withoutDataRu++;
+      } else {
+        txtId = PAGE + '__txt_' + (n++);
+        withDataRu++;
+      }
+      el.setAttribute('data-edit-text', txtId);
+    }
+  }
+
+  /** Hash path portion of img src — stable ids survive DOM reorder across reloads. */
+  function _imgSrcKey(src) {
+    var s = (src || '').trim();
+    s = s.replace(/^https?:\/\/[^/?#]+/i, '').split('#')[0].replace(/\?.*/, '');
+    if (!s) return '_empty';
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = ((h << 5) - h + s.charCodeAt(i)) | 0;
+    var hex = ('00000000' + ((h >>> 0).toString(16))).slice(-8);
+    var slug = s.replace(/[\s]+/g, '_').replace(/[^a-zA-Z0-9._~-]/g, '_').replace(/^_+/, '').slice(-80);
+    return slug ? hex + '_' + slug : hex;
+  }
+
+  // Phase 5.1.2: Assign stable IDs to <img> elements so we can persist src
+  // overrides via site_text_overrides (re-using `href` column for image src).
+  function assignImageIds() {
+    var imgs = document.querySelectorAll('img');
+    for (var i = 0; i < imgs.length; i++) {
+      var el = imgs[i];
+      if (shouldSkip(el)) continue;
+      if (el.closest && el.closest('#gtt-admin-bar')) continue;
+      if (el.getAttribute('data-edit-img')) continue;
+      var key = _imgSrcKey(el.getAttribute('src') || '');
+      el.setAttribute('data-edit-img', PAGE + '__img_h_' + key);
     }
   }
 
@@ -152,16 +197,34 @@
   // Public endpoint, no auth required. Lets the editor.js script also serve
   // as the runtime patch for static texts.
   function applyOverridesFromServer() {
-    return fetch('/api/text-overrides/' + encodeURIComponent(PAGE), { credentials: 'omit' })
-      .then(function (r) { return r.ok ? r.json() : { overrides: {} }; })
-      .catch(function () { return { overrides: {} }; })
+    // Phase 5.1.2: Prefer SSR-inlined overrides (window.__GTT_OVERRIDES) so the
+    // first paint already shows latest text — eliminates the FOUC where the
+    // old version flashes before the JS-fetched override applies.
+    var inlinePromise;
+    if (window.__GTT_OVERRIDES) {
+      inlinePromise = Promise.resolve({ overrides: window.__GTT_OVERRIDES });
+    } else {
+      inlinePromise = fetch('/api/text-overrides/' + encodeURIComponent(PAGE), { credentials: 'omit' })
+        .then(function (r) { return r.ok ? r.json() : { overrides: {} }; })
+        .catch(function () { return { overrides: {} }; });
+    }
+    return inlinePromise
       .then(function (data) {
         var ov = (data && data.overrides) || {};
+        // Phase 5.1.4: Block-order application disabled — see comment above
+        // activateDragDrop. Any pre-existing __order__ rows in DB are ignored
+        // so the page renders in natural SSR sequence.
         var lang = detectPageLang();
         Object.keys(ov).forEach(function (txtId) {
-          var els = document.querySelectorAll('[data-edit-text="' + cssEsc(txtId) + '"]');
+          if (txtId.indexOf('__order__') === 0) return;     // internal — skip render
+          var els = document.querySelectorAll('[data-edit-text="' + cssEsc(txtId) + '"], [data-edit-img="' + cssEsc(txtId) + '"]');
           var rec = ov[txtId];
           els.forEach(function (el) {
+            // <img> override path: rec.href stores the new src.
+            if (el.tagName === 'IMG') {
+              if (rec.href) el.setAttribute('src', rec.href);
+              return;
+            }
             // Update data-ru/data-am attributes so landing.js's switchLang
             // reads the latest text on subsequent language switches.
             if (rec.ru) el.setAttribute('data-ru', rec.ru);
@@ -243,8 +306,13 @@
 
       activateTextEditing();
       activateButtonEditing();
+      activateImageEditing();
       activateBlockManagement();
-      activateDragDrop();
+      // Phase 5.1.4: Section drag-drop disabled per user request — DOM layout
+      // breaks because [data-block-key] elements aren't always direct siblings
+      // (legacy landing nests them under different containers). Re-enable only
+      // after we have a reliable cross-container reordering strategy.
+      // activateDragDrop();
 
       toast('Режим редактирования включён. Кликайте на любой текст или кнопку.', 'success', 3500);
     });
@@ -263,6 +331,7 @@
 
     deactivateTextEditing();
     deactivateButtonEditing();
+    deactivateImageEditing();
     deactivateBlockManagement();
     if (sortableInstance) { try { sortableInstance.destroy(); } catch (e) {} sortableInstance = null; }
     closeAllPopups();
@@ -274,10 +343,12 @@
   function activateTextEditing() {
     // Every CMS-backed AND every plain data-ru/data-am element is editable.
     var els = document.querySelectorAll('[data-edit-key], [data-edit-text]');
+    var activated = 0, skipped = 0, inPopup = 0;
     for (var i = 0; i < els.length; i++) {
       var el = els[i];
-      if (shouldSkip(el)) continue;
-      if (isInlineButton(el)) continue;     // buttons handled separately
+      if (shouldSkip(el)) { skipped++; continue; }
+      if (isInlineButton(el)) { skipped++; continue; }
+      if (el.closest && el.closest('#callbackModal')) inPopup++;
 
       el.setAttribute('contenteditable', 'true');
       el.setAttribute('spellcheck', 'false');
@@ -285,6 +356,7 @@
       el.addEventListener('input', onTextInput);
       el.addEventListener('keydown', onEditKeydown);
       el.addEventListener('click', onEditableClick);
+      activated++;
     }
   }
 
@@ -485,16 +557,25 @@
         } else if (r.kind === 'overrides') {
           if (r.ok) {
             savedOv = r.saved || ovKeys.length;
-            // We trust server, clear pending overrides
             pendingOverrides = {};
           } else { errors++; }
         }
       });
       updateCounter();
-      // Note: undoStack is intentionally PRESERVED across save so the user
-      // can still revert what they just saved (next save would push new entry).
       var totalSaved = savedCms + savedOv;
-      if (errors === 0) {
+      // Purge edge cache so the next page reload paints the *new* text in SSR
+      // (otherwise the cached HTML keeps showing the old version for up to 10
+      // min before JS overlays the fresh override — exactly the "show old then
+      // new after refresh" bug the editor is meant to avoid).
+      if (errors === 0 && totalSaved > 0) {
+        try {
+          adminAPI('/purge-cache', { method: 'POST', body: '{}' })
+            .then(function () { toast('✓ Сохранено ' + totalSaved + ' изменений! Кеш сброшен.', 'success', 4000); })
+            .catch(function () { toast('✓ Сохранено ' + totalSaved + ' изменений (кеш не сброшен).', 'success', 4000); });
+        } catch (_e) {
+          toast('✓ Сохранено ' + totalSaved + ' изменений!', 'success', 4000);
+        }
+      } else if (errors === 0) {
         toast('✓ Сохранено ' + totalSaved + ' изменений! Кеш сброшен.', 'success', 4000);
       } else {
         toast(totalSaved + ' сохранено, ' + errors + ' ошибок', 'error', 4000);
@@ -565,9 +646,11 @@
       var el = blocks[i];
       var key = el.getAttribute('data-block-key');
       var block = blockMap[key];
-      if (!block) continue;
-
-      el.setAttribute('data-block-id', block.id);
+      // Phase 5.1.4: Only render a toolbar when the block has a DB-backed id
+      // (visibility/duplicate/delete actions). For SSR-only sections the
+      // toolbar would be visual noise without any usable controls, since
+      // drag-drop is disabled until cross-container reordering is reliable.
+      if (!block || !block.id) continue;
 
       var pos = window.getComputedStyle(el).position;
       if (pos === 'static') el.style.position = 'relative';
@@ -576,8 +659,9 @@
       toolbar.className = 'gtt-block-toolbar';
       toolbar.setAttribute('data-toolbar-for', key);
       toolbar.setAttribute('contenteditable', 'false');
+
+      el.setAttribute('data-block-id', block.id);
       toolbar.innerHTML =
-        '<span class="gtt-drag-handle" title="Перетащить блок">⠿</span>' +
         '<span class="gtt-block-label">' + key + '</span>' +
         '<button class="gtt-block-btn" title="Скрыть/Показать блок" onclick="gttEditorToggleVisible(\'' + key + '\',' + block.id + ',' + block.is_visible + ')">👁</button>' +
         '<button class="gtt-block-btn" title="Дублировать блок" onclick="gttEditorDuplicate(' + block.id + ')">⧉</button>' +
@@ -729,15 +813,22 @@
       is_visible: 1,
       sort_order: Date.now() % 100000
     };
-    adminAPI('/custom-blocks', {
-      method: 'POST', body: JSON.stringify(payload)
+    var token = getToken();
+    fetch(API_BASE + '/custom-blocks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify(payload)
+    }).then(function (resp) {
+      return resp.json().catch(function() { return null; });
     }).then(function (r) {
       if (r && r.success) {
         toast('✓ Блок создан! Перезагружаем страницу...', 'success', 2000);
         setTimeout(function () { window.location.reload(); }, 1500);
       } else {
-        toast('Ошибка создания блока', 'error');
+        toast('Ошибка создания блока: ' + JSON.stringify(r || 'no response'), 'error', 5000);
       }
+    }).catch(function (err) {
+      toast('Сетевая ошибка: ' + String(err), 'error', 5000);
     });
   }
 
@@ -753,6 +844,12 @@
       document.head.appendChild(script);
     }
   }
+
+  // Special txt_id for storing the block order map for the current page.
+  // Uses the existing site_text_overrides infrastructure (no new schema)
+  // so the legacy landing AND new pages can persist drag-drop order with
+  // the same code path.
+  function ORDER_TXT_ID() { return '__order__' + PAGE; }
 
   function initSortable() {
     // Sort blocks where they actually live in the DOM. For new home page
@@ -772,16 +869,41 @@
         forceFallback: true,                  // helps on touch devices
         fallbackOnBody: true,
         onEnd: function (evt) {
+          // 1) For DB-backed blocks, save sort_order via /site-blocks/reorder
           var items = container.querySelectorAll('[data-block-id]');
           var orders = [];
           for (var i = 0; i < items.length; i++) {
             var bid = parseInt(items[i].getAttribute('data-block-id') || '0', 10);
             if (bid) orders.push({ id: bid, sort_order: (i + 1) * 10 });
           }
-          adminAPI('/site-blocks/reorder', {
-            method: 'POST', body: JSON.stringify({ orders: orders })
-          }).then(function (r) {
-            if (r && r.success) toast('✓ Порядок блоков сохранён', 'success');
+          // 2) ALWAYS save the visible block-key sequence as an override —
+          //    works for both DB blocks and SSR-only sections (the common case).
+          var keyOrder = [];
+          var allBlocks = container.querySelectorAll('[data-block-key]');
+          for (var j = 0; j < allBlocks.length; j++) {
+            var k = allBlocks[j].getAttribute('data-block-key');
+            if (k) keyOrder.push(k);
+          }
+          var orderTxtId = ORDER_TXT_ID();
+          var promises = [];
+          if (orders.length) {
+            promises.push(adminAPI('/site-blocks/reorder', {
+              method: 'POST', body: JSON.stringify({ orders: orders })
+            }));
+          }
+          promises.push(adminAPI('/text-overrides', {
+            method: 'PUT',
+            body: JSON.stringify({
+              page: PAGE,
+              txt_id: orderTxtId,
+              text_ru: JSON.stringify(keyOrder),
+              text_am: '',
+              href: ''
+            })
+          }));
+          Promise.all(promises).then(function (results) {
+            var anyOk = results.some(function (r) { return r && r.success; });
+            if (anyOk) toast('✓ Порядок блоков сохранён', 'success');
             else toast('Ошибка сохранения порядка', 'error');
           });
         }
@@ -791,25 +913,141 @@
     }
   }
 
+  // Apply previously-saved block order to DOM on page load. Runs for ALL
+  // visitors (not just admins) so the order persists for everyone.
+  function applyBlockOrderFromOverrides(overrides) {
+    if (!overrides) return;
+    var rec = overrides[ORDER_TXT_ID()];
+    if (!rec || !rec.ru) return;
+    var keyOrder;
+    try { keyOrder = JSON.parse(rec.ru); } catch (e) { return; }
+    if (!Array.isArray(keyOrder) || keyOrder.length === 0) return;
+
+    var firstBlock = document.querySelector('[data-block-key]');
+    if (!firstBlock || !firstBlock.parentNode) return;
+    var container = firstBlock.parentNode;
+
+    // Move each block to the requested order. Skip keys that don't exist
+    // in DOM (e.g. visibility-hidden blocks). Append in given sequence.
+    keyOrder.forEach(function (key) {
+      var el = container.querySelector('[data-block-key="' + cssEsc(key) + '"]');
+      if (el) container.appendChild(el);
+    });
+  }
+
+  // ─── Image editing (Phase 5.1.2) ───────────────────────────────────────────
+  function activateImageEditing() {
+    var imgs = document.querySelectorAll('img[data-edit-img]');
+    for (var i = 0; i < imgs.length; i++) {
+      var img = imgs[i];
+      if (shouldSkip(img)) continue;
+      if (img.closest && img.closest('#gtt-admin-bar')) continue;
+      var parent = img.parentElement;
+      if (!parent || parent.querySelector('.gtt-img-edit-overlay[data-for="' + img.getAttribute('data-edit-img') + '"]')) continue;
+
+      var pos = window.getComputedStyle(parent).position;
+      if (pos === 'static') parent.style.position = 'relative';
+      var overlay = document.createElement('button');
+      overlay.type = 'button';
+      overlay.className = 'gtt-img-edit-overlay';
+      overlay.setAttribute('contenteditable', 'false');
+      overlay.setAttribute('data-for', img.getAttribute('data-edit-img'));
+      overlay.title = 'Заменить изображение';
+      overlay.innerHTML = '📷 Заменить';
+      overlay.addEventListener('click', function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        var btn = e.currentTarget;
+        var imgId = btn.getAttribute('data-for');
+        var targetImg = document.querySelector('img[data-edit-img="' + cssEsc(imgId) + '"]');
+        if (!targetImg) return;
+        openImageReplaceDialog(targetImg);
+      });
+      parent.appendChild(overlay);
+    }
+  }
+
+  function deactivateImageEditing() {
+    document.querySelectorAll('.gtt-img-edit-overlay').forEach(function (o) {
+      o.parentNode && o.parentNode.removeChild(o);
+    });
+  }
+
+  function openImageReplaceDialog(targetImg) {
+    var imgId = targetImg.getAttribute('data-edit-img');
+    var input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.style.display = 'none';
+    document.body.appendChild(input);
+    input.addEventListener('change', function () {
+      var file = input.files && input.files[0];
+      if (!file) { document.body.removeChild(input); return; }
+      var fd = new FormData();
+      fd.append('file', file);
+      var token = getToken();
+      toast('Загружаю изображение…', 'info', 2000);
+      fetch(API_BASE + '/upload-image', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token },
+        body: fd
+      }).then(function (r) { return r.json().catch(function() { return null; }); })
+        .then(function (resp) {
+          if (!resp || !resp.success) {
+            toast('Ошибка загрузки изображения', 'error', 4000);
+            return;
+          }
+          var newSrc = resp.url || resp.data_url;
+          if (!newSrc) { toast('Не удалось получить URL', 'error', 4000); return; }
+          // Apply immediately
+          targetImg.setAttribute('src', newSrc);
+          // Save as override (using href column for image src)
+          pendingOverrides[imgId] = pendingOverrides[imgId] || { text_ru: '', text_am: '', href: '' };
+          pendingOverrides[imgId].href = newSrc;
+          undoStack.push({ kind: 'override', txtId: imgId, oldRu: '', oldAm: '' });
+          updateCounter();
+          toast('✓ Изображение заменено. Нажмите «Сохранить всё».', 'success', 3500);
+        })
+        .catch(function (err) {
+          toast('Сетевая ошибка: ' + String(err), 'error', 4000);
+        })
+        .finally(function () {
+          if (input.parentNode) input.parentNode.removeChild(input);
+        });
+    });
+    input.click();
+  }
+
   // ─── Button/Link editing (Sprint 6) ────────────────────────────────────────
   function isInlineButton(el) {
     if (!el) return false;
-    if (el.tagName === 'A' && el.classList && (el.classList.contains('btn') ||
-        el.classList.contains('nav-cta') || el.classList.contains('btn-tg') ||
-        el.classList.contains('btn-primary') || el.classList.contains('btn-outline') ||
-        el.classList.contains('tg-float') || el.classList.contains('calc-float'))) return true;
-    if (el.tagName === 'BUTTON' && el.classList && (el.classList.contains('btn') ||
-        el.classList.contains('nav-cta'))) return true;
+    // Treat ANY <a href> or <button> as an inline button so the contenteditable
+    // text-edit handler skips it and the button-pen handler picks it up instead.
+    if (el.tagName === 'A' && el.hasAttribute('href')) return true;
+    if (el.tagName === 'BUTTON') return true;
     return false;
   }
 
+  // Heuristic: skip language switchers and links that are pure icon containers
+  // (no visible text). Edits to those don't make sense.
+  function buttonShouldHaveEditPen(el) {
+    if (!el) return false;
+    if (el.id === 'lang-toggle' || (el.classList && el.classList.contains('lang-toggle'))) return false;
+    if (el.closest && el.closest('#gtt-admin-bar')) return false;
+    var txt = (el.textContent || '').trim();
+    // Allow even icon-only buttons IF they have data-ru or aria-label, otherwise skip
+    if (!txt && !el.hasAttribute('data-ru') && !el.hasAttribute('aria-label')) return false;
+    return true;
+  }
+
   function activateButtonEditing() {
-    // Edit pen-icon overlays for each link/button on the page (excluding lang switcher).
-    var btns = document.querySelectorAll('a.btn, a.nav-cta, a.btn-primary, a.btn-outline, a.btn-tg, a.tg-float, a.calc-float, button.btn, button.nav-cta');
+    // Edit pen-icon overlays for EVERY link/button (universal coverage),
+    // excluding only the language switcher and admin-bar internals.
+    var btns = document.querySelectorAll('a[href], button');
     for (var i = 0; i < btns.length; i++) {
       var el = btns[i];
       if (shouldSkip(el)) continue;
-      // Pen icon overlay
+      if (!buttonShouldHaveEditPen(el)) continue;
       if (el.querySelector('.gtt-btn-edit-pen')) continue;
       var pen = document.createElement('span');
       pen.className = 'gtt-btn-edit-pen';
@@ -867,6 +1105,17 @@
     var editKey = inner.getAttribute('data-edit-key') || el.getAttribute('data-edit-key') || '';
     var editIdx = inner.getAttribute('data-edit-idx') || el.getAttribute('data-edit-idx') || '0';
 
+    // Phase 5.1.3: If the link wraps an <img> (e.g. QR codes, photo cards),
+    // expose a "Заменить фото" button so user can replace the image without
+    // hunting for a hover-overlay (which the popup intercepts on click).
+    var innerImg = el.querySelector('img');
+    var imgEditId = innerImg ? innerImg.getAttribute('data-edit-img') : '';
+    var imgBtnHtml = '';
+    if (innerImg) {
+      imgBtnHtml = '<button class="gtt-bar-btn gtt-btn-img-replace" onclick="gttEditorReplaceLinkedImage(\'' +
+                   escAttr(imgEditId || '') + '\')">📷 Заменить фото</button>';
+    }
+
     var popup = document.createElement('div');
     popup.id = 'gtt-btn-popup';
     popup.className = 'gtt-btn-popup';
@@ -877,7 +1126,7 @@
 
     popup.innerHTML =
       '<div class="gtt-btn-popup-header">' +
-        '<span>Кнопка / Ссылка</span>' +
+        '<span>Кнопка / Ссылка' + (innerImg ? ' / Фото' : '') + '</span>' +
         '<button onclick="gttEditorClosePopups()">&times;</button>' +
       '</div>' +
       '<div class="gtt-btn-popup-body">' +
@@ -890,6 +1139,7 @@
         '<input id="gtt-btn-meta-key" type="hidden" value="' + escAttr(editKey) + '">' +
         '<input id="gtt-btn-meta-idx" type="hidden" value="' + escAttr(editIdx) + '">' +
         '<input id="gtt-btn-meta-txt" type="hidden" value="' + escAttr(txtId) + '">' +
+        (imgBtnHtml ? '<div style="margin-top:8px">' + imgBtnHtml + '</div>' : '') +
         '<div class="gtt-btn-popup-actions">' +
           '<button class="gtt-bar-btn gtt-btn-save" onclick="gttEditorSaveButton()">💾 Сохранить кнопку</button>' +
           '<button class="gtt-bar-btn" onclick="gttEditorClosePopups()">Отмена</button>' +
@@ -898,6 +1148,25 @@
     document.body.appendChild(popup);
     document.getElementById('gtt-btn-text-ru').focus();
   }
+
+  // Public: invoked from the popup "Заменить фото" button. Looks up the <img>
+  // by its data-edit-img id and triggers the same upload flow as the corner overlay.
+  window.gttEditorReplaceLinkedImage = function (imgId) {
+    if (!imgId) {
+      // Fallback: find the img inside the currently open link (popup target)
+      var popup = document.getElementById('gtt-btn-popup');
+      if (!popup) return;
+      var anchor = document.querySelector('.gtt-btn-edit-pen');
+      if (!anchor) return;
+      var link = anchor.parentElement;
+      var img = link && link.querySelector('img');
+      if (!img) { toast('Картинка не найдена', 'error'); return; }
+      imgId = img.getAttribute('data-edit-img');
+    }
+    var targetImg = document.querySelector('img[data-edit-img="' + cssEsc(imgId) + '"]');
+    if (!targetImg) { toast('Картинка не найдена', 'error'); return; }
+    openImageReplaceDialog(targetImg);
+  };
 
   window.gttEditorSaveButton = function () {
     var ru = (document.getElementById('gtt-btn-text-ru') || {}).value || '';
@@ -1032,7 +1301,8 @@
       'body.gtt-edit-mode [contenteditable="true"]:focus{outline:2px solid #a78bfa!important;background:rgba(139,92,246,0.12);caret-color:#a78bfa}',
       /* Block toolbars */
       '.gtt-block-toolbar{position:absolute;top:0;left:0;right:0;z-index:500;display:flex;align-items:center;gap:6px;padding:4px 10px;background:rgba(15,10,26,0.92);border-bottom:1px solid rgba(139,92,246,0.35);backdrop-filter:blur(12px);opacity:0;transition:opacity 0.2s;pointer-events:none}',
-      'body.gtt-edit-mode [data-block-key]:hover>.gtt-block-toolbar,body.gtt-edit-mode [data-block-key]>.gtt-block-toolbar:hover{opacity:1;pointer-events:auto}',
+      'body.gtt-edit-mode [data-block-key]>.gtt-block-toolbar{opacity:0.55;pointer-events:auto}',
+      'body.gtt-edit-mode [data-block-key]:hover>.gtt-block-toolbar,body.gtt-edit-mode [data-block-key]>.gtt-block-toolbar:hover{opacity:1}',
       '.gtt-drag-handle{cursor:grab;font-size:1rem;color:#8b5cf6;user-select:none;padding:0 4px}',
       '.gtt-drag-handle:active{cursor:grabbing}',
       '.gtt-block-label{font-size:0.65rem;color:#9ca3af;flex:1;font-family:monospace}',
@@ -1069,6 +1339,8 @@
       '.gtt-btn-edit-pen{display:none;position:absolute;top:-8px;right:-8px;z-index:30;width:24px;height:24px;border-radius:50%;background:#8b5cf6;color:white;font-size:0.7rem;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(139,92,246,0.5);user-select:none;pointer-events:auto;font-style:normal;line-height:1}',
       'body.gtt-edit-mode .gtt-btn-edit-pen{display:flex}',
       '.gtt-btn-edit-pen:hover{background:#a78bfa;transform:scale(1.1)}',
+      '.gtt-img-edit-overlay{position:absolute;top:8px;right:8px;z-index:40;padding:6px 10px;border:none;border-radius:8px;background:rgba(15,10,26,0.85);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(8px);user-select:none}',
+      '.gtt-img-edit-overlay:hover{background:#8b5cf6}',
       /* Body padding to account for fixed admin bar */
       'body.gtt-has-admin-bar{padding-bottom:max(56px,calc(56px + env(safe-area-inset-bottom)))!important}',
       '@media(max-width:900px){body.gtt-has-admin-bar{padding-bottom:max(128px,calc(128px + env(safe-area-inset-bottom)))!important}.gtt-bar-logo{display:none}}'
@@ -1078,8 +1350,10 @@
 
   // ─── Init ──────────────────────────────────────────────────────────────────
   function init() {
-    // 1. Always assign stable ids to all data-ru/data-am elements (even for guests)
+    // 1. Always assign stable ids to all data-ru/data-am elements + <img> tags
+    //    (even for guests, so override application is consistent across reloads).
     assignTextIds();
+    assignImageIds();
 
     // 2. Always apply server-side text overrides (for guests AND admins)
     applyOverridesFromServer();

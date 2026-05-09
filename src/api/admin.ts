@@ -49,14 +49,22 @@ api.use('*', async (c, next) => {
     try {
       const cache = caches.default;
       const origin = new URL(c.req.url).origin;
-      // Build versioned + unversioned paths
-      const vPaths = CACHEABLE_PATHS.map(p => p.includes('?') ? p + '&_cv=' + CACHE_VERSION : p + '?_cv=' + CACHE_VERSION);
-      const allPaths = [...CACHEABLE_PATHS, ...vPaths];
-      // Purge from ALL known origins (not just the requesting origin)
+      // Build path variants: bare, with cache-version, and with cookie-lang
+      // markers (`cklang=am`/`cklang=ru`). The main worker builds cache keys
+      // from `_cv` + (URL `lang` query OR `gtt_lang` cookie → cklang), so we
+      // need to delete every shape the same path can have been stored under.
+      const baseVariants: string[] = [];
+      for (const p of CACHEABLE_PATHS) {
+        baseVariants.push(p);
+        const sep = p.includes('?') ? '&' : '?';
+        baseVariants.push(p + sep + '_cv=' + CACHE_VERSION);
+        baseVariants.push(p + sep + 'cklang=am&_cv=' + CACHE_VERSION);
+        baseVariants.push(p + sep + 'cklang=ru&_cv=' + CACHE_VERSION);
+      }
       const origins = new Set([origin, ...KNOWN_ORIGINS]);
       const purgePromises: Promise<boolean>[] = [];
       for (const o of origins) {
-        for (const p of allPaths) {
+        for (const p of baseVariants) {
           purgePromises.push(cache.delete(new Request(o + p)).catch(() => false));
         }
       }

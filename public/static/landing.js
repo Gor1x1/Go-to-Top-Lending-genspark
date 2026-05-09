@@ -77,35 +77,55 @@ function _setTextPreserveIcons(el, t) {
     el.textContent = t;
   }
 }
-function switchLang(l) {
+function detectUrlLangFromLocation() {
+  try {
+    var u = new URL(window.location.href);
+    var qp = u.searchParams.get('lang');
+    if (qp === 'am') return 'am';
+    if (qp === 'ru') return 'ru';
+    var p = u.pathname.replace(/\/+$/, '') || '/';
+    if (p === '/am') return 'am';
+    if (p === '/ru') return 'ru';
+  } catch (_e) {}
+  return '';
+}
+
+/** Persist chosen language so SSR can honour it on the very next request,
+ *  eliminating the "loads in RU then flashes to AM" reload bug. Also keeps
+ *  localStorage in sync so existing client-side code keeps working. */
+function _persistLang(l) {
+  try { localStorage.setItem('gtt_lang', l); } catch (_e) {}
+  try {
+    var oneYear = 60 * 60 * 24 * 365;
+    document.cookie = 'gtt_lang=' + encodeURIComponent(l) + '; path=/; max-age=' + oneYear + '; SameSite=Lax';
+  } catch (_e2) {}
+}
+
+/** Apply [data-am]/[data-ru] chrome + placeholders without touching browser URL (click handlers navigate). */
+function applyLangDomNoNavigation(l) {
   lang = l;
-  localStorage.setItem('gtt_lang', l);
-  document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === l));
-  document.querySelectorAll('[data-' + l + ']').forEach(el => {
-    const t = el.getAttribute('data-' + l);
+  _persistLang(l);
+  document.querySelectorAll('.lang-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.lang === l);
+  });
+  document.querySelectorAll('[data-' + l + ']').forEach(function(el) {
+    var t = el.getAttribute('data-' + l);
     if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
   });
-  // Update input placeholders for current language
   document.querySelectorAll('[data-placeholder-' + l + ']').forEach(function(el) {
     el.placeholder = el.getAttribute('data-placeholder-' + l) || '';
   });
   document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
-  // Update URL path to /am or /ru (without page reload) so shared links carry language
-  var newPath = l === 'am' ? '/am' : '/ru';
-  if (window.location.pathname !== newPath) {
-    history.replaceState(null, '', newPath + window.location.hash);
-  }
 }
 
-/* ===== INIT: apply default language on load ===== */
+/* ===== INIT: URL + localStorage; never rewrite pathname (/about → /am) ===== */
 (function initLang() {
-  // Detect language from URL path /am or /ru
-  var pathLang = window.location.pathname === '/am' ? 'am' : (window.location.pathname === '/ru' ? 'ru' : '');
-  if (pathLang) {
-    lang = pathLang;
-    localStorage.setItem('gtt_lang', pathLang);
+  var fromUrl = detectUrlLangFromLocation();
+  if (fromUrl) {
+    lang = fromUrl;
+    _persistLang(fromUrl);
   }
-  switchLang(lang);
+  applyLangDomNoNavigation(lang);
 })();
 
 /* ===== HEADER SCROLL ===== */
@@ -1006,12 +1026,25 @@ var obs = new IntersectionObserver(function(entries) {
 }, {threshold:0.1, rootMargin:'0px 0px -50px 0px'});
 document.querySelectorAll('.fade-up').forEach(function(el) { obs.observe(el); });
 
+function _counterTarget(el) {
+  var a = el.getAttribute('data-count');
+  var v = a != null && a !== '' ? a : (el.dataset.count != null ? el.dataset.count : '0');
+  var n = parseInt(String(v), 10);
+  return isNaN(n) ? 0 : n;
+}
+function _counterTargetS(el) {
+  var a = el.getAttribute('data-count-s');
+  var v = a != null && a !== '' ? a : (el.dataset.countS != null ? el.dataset.countS : '0');
+  var n = parseInt(String(v), 10);
+  return isNaN(n) ? 0 : n;
+}
+
 /* ===== COUNTER ANIMATION ===== */
 var cObs = new IntersectionObserver(function(entries) {
   entries.forEach(function(entry) {
     if (entry.isIntersecting) {
       var el = entry.target;
-      var target = parseInt(el.dataset.count);
+      var target = _counterTarget(el);
       var dur = 2000; var start = performance.now();
       function anim(now) {
         var p = Math.min((now - start) / dur, 1);
@@ -1023,14 +1056,14 @@ var cObs = new IntersectionObserver(function(entries) {
     }
   });
 }, {threshold:0.5});
-document.querySelectorAll('.stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
+document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
 
 /* Stats bar counter animation */
 var sObs = new IntersectionObserver(function(entries) {
   entries.forEach(function(entry) {
     if (entry.isIntersecting) {
       var el = entry.target;
-      var target = parseInt(el.dataset.countS) || 0;
+      var target = _counterTargetS(el);
       if (isNaN(target) || target === 0) { sObs.unobserve(el); return; }
       var dur = 2000; var start = performance.now();
       function animS(now) {
@@ -1044,13 +1077,13 @@ var sObs = new IntersectionObserver(function(entries) {
     }
   });
 }, {threshold:0.5});
-document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
+document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el) { sObs.observe(el); });
 
 // Re-observe counters on server-injected pages (sections already revealed above)
 if (document.documentElement.classList.contains('server-injected')) {
   setTimeout(function() {
-    document.querySelectorAll('.stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
-    document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
+    document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
+    document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el) { sObs.observe(el); });
     document.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
   }, 100);
 }
@@ -1059,9 +1092,9 @@ if (document.documentElement.classList.contains('server-injected')) {
    If IntersectionObserver fails (e.g. server-injected reveal, lazy load issues),
    force counters to animate after page load to guarantee numbers are never stuck at 0. */
 function forceRunCounters() {
-  document.querySelectorAll('.stat-num[data-count]').forEach(function(el) {
+  document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el) {
     if (el.dataset.counterDone === '1') return;
-    var target = parseInt(el.dataset.count) || 0;
+    var target = _counterTarget(el);
     el.dataset.counterDone = '1';
     if (target === 0) { el.textContent = '0'; return; }
     var dur = 1800; var start = performance.now();
@@ -1073,9 +1106,9 @@ function forceRunCounters() {
     }
     requestAnimationFrame(anim);
   });
-  document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) {
+  document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el) {
     if (el.dataset.counterDone === '1') return;
-    var target = parseInt(el.dataset.countS) || 0;
+    var target = _counterTargetS(el);
     el.dataset.counterDone = '1';
     if (target === 0) return;
     var hasPlus = el.textContent.includes('+');
@@ -1108,13 +1141,13 @@ setTimeout(forceRunCounters, 1500);
 setTimeout(function() {
   try {
     document.querySelectorAll('.stats-bar:not(.section-revealed),.wb-banner:not(.section-revealed),.ticker:not(.section-revealed),.slot-counter-bar:not(.section-revealed)').forEach(function(s) { s.classList.add('section-revealed'); });
-    document.querySelectorAll('.stat-num[data-count]').forEach(function(el) {
-      var t = parseInt(el.dataset.count) || 0;
+    document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el) {
+      var t = _counterTarget(el);
       var stuck = el.textContent.replace(/[^0-9]/g, '') === '0' && t > 0;
       if (stuck) { el.textContent = t.toLocaleString('ru-RU'); el.dataset.counterDone = '1'; }
     });
-    document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) {
-      var t = parseInt(el.dataset.countS) || 0;
+    document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el) {
+      var t = _counterTargetS(el);
       var hasPlus = (el.textContent || '').indexOf('+') !== -1;
       var stuck = el.textContent.replace(/[^0-9]/g, '') === '0' && t > 0;
       if (stuck) { el.textContent = t.toLocaleString('ru-RU') + (hasPlus ? '+' : ''); el.dataset.counterDone = '1'; }
@@ -1239,6 +1272,8 @@ function getSelectedPackage() {
 }
 
 function recalcDynamic() {
+  var calcTotalEl = document.getElementById('calcTotal');
+  if (!calcTotalEl) return;
   var total = 0, items = [];
   var linkedTotal = 0; // subtotal of services that match linked_services
   var hasLinkedFilter = typeof _refLinkedServices !== 'undefined' && _refLinkedServices.length > 0;
@@ -1260,8 +1295,20 @@ function recalcDynamic() {
       } catch(e) {}
     }
   });
-  document.querySelectorAll('.calc-row:not([data-price="tiered"])').forEach(function(row) {
-    var price = parseInt(row.getAttribute('data-price'));
+  var buyEl = document.getElementById('buyoutQty');
+  if (buyEl && typeof getBuyoutTotal === 'function') {
+    var buyQty = parseInt(buyEl.value || '0', 10) || 0;
+    if (buyQty > 0) {
+      total += getBuyoutTotal(buyQty);
+      var brow = document.getElementById('buyoutRow');
+      var blab = brow && brow.querySelector('.calc-label');
+      var lt = blab ? blab.textContent : '';
+      var pcsW = lang === 'am' ? 'հատ' : 'шт';
+      items.push(lt + ': ' + buyQty + ' ' + pcsW);
+    }
+  }
+  document.querySelectorAll('.calc-row:not([data-price="tiered"]):not(#buyoutRow)').forEach(function(row) {
+    var price = parseInt(row.getAttribute('data-price'), 10);
     var inp = row.querySelector('.calc-input input');
     var qty = parseInt(inp ? inp.value : 0);
     if (!isNaN(price) && qty > 0) {
@@ -1279,7 +1326,7 @@ function recalcDynamic() {
   var selectedPkg = getSelectedPackage();
   var packageAmount = 0;
   if (selectedPkg) {
-    packageAmount = selectedPkg.package_price || 0;
+    packageAmount = pkgPrice(selectedPkg);
     total += packageAmount;
   }
   // Apply referral discount based on linked services and packages
@@ -1305,7 +1352,6 @@ function recalcDynamic() {
     }
   }
   var totalDiscountAmount = discountAmount + packageDiscountAmount;
-  var calcTotalEl = document.getElementById('calcTotal');
   calcTotalEl.setAttribute('data-total', total);
   // Store package data for PDF submission
   if (selectedPkg) calcTotalEl.setAttribute('data-package', JSON.stringify({ package_id: selectedPkg.id, name: lang==='am'?(selectedPkg.name_am||selectedPkg.name_ru):selectedPkg.name_ru, name_ru: selectedPkg.name_ru, name_am: selectedPkg.name_am, package_price: selectedPkg.package_price, original_price: selectedPkg.original_price, items: selectedPkg.items }));
@@ -1504,66 +1550,98 @@ function updateTelegramLinks() {
 // minus the flipped prices.
 switchLang = function(l) {
   var path = window.location.pathname;
-  // Phase 1C: secondary pages live at /about, /buyouts, /services, /faq,
-  // /contacts, /referral. They have no /am prefix yet, so language is
-  // carried via ?lang=am while preserving the current path.
-  // Preserve any non-lang query params (UTM, fbclid, ref, etc.) via URLSearchParams.
   var subPages = ['/about', '/buyouts', '/services', '/faq', '/contacts', '/referral', '/home', '/calculator', '/blog'];
   var isSubPage = subPages.indexOf(path) !== -1 || path.indexOf('/package/') === 0 || path.indexOf('/blog/') === 0;
+  _persistLang(l);
+
+  /** True when SSR URL already reflects `l`, so skip full reload (fixes RU↔AM nav flash). */
+  function urlAlreadyMatchesLang() {
+    try {
+      var cur = new URL(window.location.href);
+      var ql = cur.searchParams.get('lang');
+      var p = cur.pathname.replace(/\/+$/, '') || '/';
+      if (isSubPage) {
+        var wantLang = l === 'am';
+        var hasAm = ql === 'am';
+        return wantLang === hasAm;
+      }
+      var wantRoot = l === 'am' ? '/am' : '/ru';
+      var curRoot = p === '/am' || p === '/ru' ? p : '';
+      return curRoot === wantRoot || (wantRoot === '/ru' && (p === '/' || ql === 'ru'));
+    } catch (_e2) {}
+    return false;
+  }
+
   if (isSubPage) {
-    localStorage.setItem('gtt_lang', l);
     try {
       var subUrl = new URL(window.location.href);
       subUrl.pathname = path;
-      if (l === 'am') {
-        subUrl.searchParams.set('lang', 'am');
-      } else {
-        subUrl.searchParams.delete('lang');
-      }
+      if (l === 'am') subUrl.searchParams.set('lang', 'am');
+      else subUrl.searchParams.delete('lang');
       subUrl.hash = window.location.hash;
-      window.location.assign(subUrl.toString());
-    } catch (e) {
-      var target = l === 'am' ? path + '?lang=am' : path;
-      window.location.assign(target + window.location.hash);
+      var targetStr = subUrl.toString();
+      try {
+        var curU = new URL(window.location.href);
+        var tgU = new URL(targetStr);
+        if (curU.origin === tgU.origin && curU.pathname === tgU.pathname && curU.search === tgU.search) {
+        applyLangDomNoNavigation(l);
+        try { updateTelegramLinks(); } catch (_tg) {}
+        try {
+          var bp = document.getElementById('buyoutPriceLabel');
+          if (bp) {
+            var bpQty = parseInt((document.getElementById('buyoutQty') || {}).value || '0') || 0;
+            bp.textContent = bpQty > 0 ? formatNum(getBuyoutPrice(bpQty)) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
+          }
+        } catch (_b) {}
+        try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch (_r) {}
+        return;
+        }
+      } catch (_cmp) {}
+      window.location.assign(targetStr);
+    } catch (_e3) {
+      var targetLegacy = l === 'am' ? path + '?lang=am' : path;
+      window.location.assign(targetLegacy + window.location.hash);
     }
     return;
   }
   var newPath = l === 'am' ? '/am' : '/ru';
-  if (path !== newPath) {
-    localStorage.setItem('gtt_lang', l);
+  if (!urlAlreadyMatchesLang() && path.replace(/\/+$/, '') !== newPath.replace(/\/+$/, '')) {
     try {
       var rootUrl = new URL(window.location.href);
       rootUrl.pathname = newPath;
       rootUrl.searchParams.delete('lang');
       rootUrl.hash = window.location.hash;
       window.location.assign(rootUrl.toString());
-    } catch (e) {
+    } catch (_e4) {
       window.location.assign(newPath + window.location.hash);
     }
     return;
   }
-  lang = l;
-  localStorage.setItem('gtt_lang', l);
-  document.querySelectorAll('.lang-btn').forEach(function(b) { b.classList.toggle('active', b.dataset.lang === l); });
-  document.querySelectorAll('[data-' + l + ']').forEach(function(el) {
-    var t = el.getAttribute('data-' + l);
-    if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
-  });
-  // Update input placeholders for current language
-  document.querySelectorAll('[data-placeholder-' + l + ']').forEach(function(el) {
-    el.placeholder = el.getAttribute('data-placeholder-' + l) || '';
-  });
-  document.documentElement.lang = l === 'am' ? 'hy' : 'ru';
-  updateTelegramLinks();
+  applyLangDomNoNavigation(l);
+  try { updateTelegramLinks(); } catch (_tg0) {}
+  try {
+    var bp = document.getElementById('buyoutPriceLabel');
+    if (bp) {
+      var bpQty2 = parseInt((document.getElementById('buyoutQty') || {}).value || '0') || 0;
+      bp.textContent = bpQty2 > 0 ? formatNum(getBuyoutPrice(bpQty2)) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
+    }
+  } catch (_bp) {}
+  try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch (_rx) {}
+};
+
+/** After DB rebuild: sync data-* UI & TG links without navigation (avoids subpage reload flash). */
+function finalizeLangAfterSiteData() {
+  applyLangDomNoNavigation(lang);
+  try { updateTelegramLinks(); } catch (_tg) {}
   try {
     var bp = document.getElementById('buyoutPriceLabel');
     if (bp) {
       var bpQty = parseInt((document.getElementById('buyoutQty') || {}).value || '0') || 0;
       bp.textContent = bpQty > 0 ? formatNum(getBuyoutPrice(bpQty)) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
     }
-  } catch(e) {}
-  try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch(e) {}
-};
+  } catch (_b) {}
+  try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch (_r) {}
+}
 
 // ===== IMMEDIATE SECTION REVEAL (before loadSiteData) =====
 // On server-injected pages, reveal all sections IMMEDIATELY — don't wait for data loading.
@@ -1676,9 +1754,12 @@ switchLang = function(l) {
         if (!section) return;
         var contentTexts = db.content[contentKey];
         if (!contentTexts || contentTexts.length === 0) return;
-        // Skip injection for sections with structured HTML layouts
-        // These sections have specific design (compare-box, why-steps, etc.) that plain text would break
-        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid, .calc-wrap, .services-grid');
+        // Skip injection for sections with structured HTML layouts.
+        // These sections have specific design (compare-box, why-steps, hero-grid, etc.)
+        // that plain text would break. The hero grid in particular has its content
+        // arranged in named slots (hero-el-title / -texts / -stats / -buttons / -image)
+        // and an injected paragraph would visually break that layout.
+        var hasStructuredContent = section.querySelector('.compare-box, .why-steps, .buyout-grid, .process-grid, .wh-grid, .stats-grid, .about-grid, .calc-wrap, .services-grid, .hero-grid, .hero-image, .guarantee-card');
         if (hasStructuredContent) return;
         // Collect ALL existing data-ru values in this section
         var existingRuValues = {};
@@ -1925,6 +2006,10 @@ switchLang = function(l) {
             });
           });
         })();
+      } else if (pkgsContainer) {
+        pkgsContainer.innerHTML = '';
+        pkgsContainer.style.display = 'none';
+        window._calcPackages = [];
       }
     }
     
@@ -2374,14 +2459,25 @@ switchLang = function(l) {
         var section = document.querySelector('[data-section-id="' + sectionId + '"]');
         if (!section) return;
         
-        // Replace main photo if photo_url is set AND different from current
+        // Replace main photo if photo_url is set — but ONLY for sections that don't
+        // have a static design photo container. Sections like .hero-image / .about-img /
+        // .about-hero / .wh-grid / .guarantee-card have their images baked into the SSR
+        // template; overriding them here proved fragile (admins occasionally uploaded
+        // unrelated screenshots that then ended up showing where founder/team photos
+        // should be). For those sections, photo replacement goes through the inline
+        // visual editor (site_text_overrides), which is scoped to a specific <img>.
         if (bf.photo_url) {
-          var heroImg = section.querySelector('.hero-image img, img[alt]');
-          if (heroImg) {
-            var currentSrc = heroImg.getAttribute('src') || '';
-            // Only replace if URL actually changed (avoid re-triggering image load)
-            if (currentSrc !== bf.photo_url && !currentSrc.endsWith(bf.photo_url.split('/').pop())) {
-              heroImg.setAttribute('src', bf.photo_url);
+          var hasDesignLockedPhoto = !!section.querySelector(
+            '.hero-image, .hero-grid, .hero-photo-wrap, .about-img, .about-hero, .wh-grid, .wh-item, .guarantee-card, .ah-image'
+          );
+          if (!hasDesignLockedPhoto) {
+            var heroImg = section.querySelector('img[alt]');
+            if (heroImg) {
+              var currentSrc = heroImg.getAttribute('src') || '';
+              // Only replace if URL actually changed (avoid re-triggering image load)
+              if (currentSrc !== bf.photo_url && !currentSrc.endsWith(bf.photo_url.split('/').pop())) {
+                heroImg.setAttribute('src', bf.photo_url);
+              }
             }
           }
         }
@@ -2398,8 +2494,9 @@ switchLang = function(l) {
           if (existingReviewCarousel) existingReviewCarousel.remove();
           
           // Check if section has NATIVE content containers (grid, gallery, carousel already in HTML)
-          // This catches static templates like warehouse (.wh-grid), about (.about-grid), etc.
-          var hasStaticPhotoContainer = !!(section.querySelector('.wh-grid, .wh-item, .about-grid, .guarantee-card'));
+          // This catches static templates like warehouse (.wh-grid), about (.about-grid), hero (.hero-image), etc.
+          // Sections with these containers have their own designed image areas — never inject extra galleries.
+          var hasStaticPhotoContainer = !!(section.querySelector('.wh-grid, .wh-item, .about-grid, .guarantee-card, .hero-image, .hero-grid, .hero-photo-wrap'));
           
           // Check if section has NATIVE images (from HTML template, not our injection)
           var nativeImgs = section.querySelectorAll('img:not(.block-photo-gallery img):not(.rv-carousel img):not(.reviews-carousel-wrap img)');
@@ -3519,8 +3616,8 @@ switchLang = function(l) {
       if (_footer) { _footer.style.opacity = '1'; }
       // Re-observe counters after sections are revealed (IntersectionObserver may have missed them)
       setTimeout(function() {
-        document.querySelectorAll('.stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
-        document.querySelectorAll('.stat-big[data-count-s]').forEach(function(el) { sObs.observe(el); });
+        document.querySelectorAll('.stat-num[data-count], .ah-stat-num[data-count]').forEach(function(el) { cObs.observe(el); });
+        document.querySelectorAll('.stat-big[data-count-s], .ah-stat-num[data-count-s]').forEach(function(el) { sObs.observe(el); });
         document.querySelectorAll('.fade-up:not(.visible)').forEach(function(el) { obs.observe(el); });
       }, 100);
     } else {
@@ -3545,11 +3642,11 @@ switchLang = function(l) {
     // Final safety: re-apply language to any newly-created/modified elements
     // When __SITE_DATA is inlined, loadSiteData runs synchronously in <head>
     // BEFORE <body> is parsed — bottom nav, footer etc. don't exist in DOM yet.
-    // Defer switchLang until the full DOM is available.
+    // Never call switchLang() here (it can assign() on subpages); DOM-only sync is enough.
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', function() { switchLang(lang); });
+      document.addEventListener('DOMContentLoaded', finalizeLangAfterSiteData);
     } else {
-      switchLang(lang);
+      finalizeLangAfterSiteData();
     }
     console.log('[DB] All dynamic data applied v7 – loading overlay removed');
   } catch(e) {

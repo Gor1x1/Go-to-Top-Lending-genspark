@@ -353,8 +353,9 @@ api.post('/site-blocks/import-from-site', authMiddleware, async (c) => {
     if (existingBlock) {
       try {
         const existOpts = JSON.parse(existingBlock.custom_html as string || '{}');
-        // Preserve ALL existing custom_html if it has meaningful settings (photos, show_slots, etc.)
-        if ((existOpts.photos && existOpts.photos.length > 0) || existOpts.show_slots || existOpts.show_photos || existOpts.bg_class) {
+        // Preserve ALL existing custom_html if it has meaningful settings (photos, photo_url, show_slots, etc.)
+        // NOTE: existOpts.photo_url is included so a custom main photo set via admin isn't lost on re-import.
+        if ((existOpts.photos && existOpts.photos.length > 0) || existOpts.photo_url || existOpts.show_slots || existOpts.show_photos || existOpts.bg_class) {
           customHtml = existOpts; // Preserve ALL existing custom_html (photos, settings, etc.)
         } else if (photoMap[key]) {
           customHtml = photoMap[key];
