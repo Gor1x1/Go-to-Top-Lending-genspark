@@ -155,6 +155,16 @@ app.get('/api/site-data', async (c) => {
       // here to guarantee subpage blocks (block_key with '__') never leak
       // into the home page's __SITE_DATA payload.
       if (typeof blk.block_key === 'string' && blk.block_key.includes('__')) continue;
+      // The legacy `nav` block holds the obsolete 6-item anchor-based menu
+      // (Услуги / Почему мы / Калькулятор / Гарантии / FAQ / Контакты →
+      // `#about` …). Both the legacy `/` page and every renderPageShell
+      // subpage now SSR the canonical 9-item subpage nav (/home, /about,
+      // /services, …); admins edit the labels via the `shell__nav` block
+      // which the SSR honors. Exposing `nav` to landing.js caused the
+      // client-side rebuild to overwrite the correct SSR nav with the old
+      // anchor links — defense-in-depth: don't send it at all so older
+      // cached landing.js bundles also see nothing to rebuild from.
+      if (blk.block_key === 'nav') continue;
       let socials: any[] = [];
       try { let parsed = JSON.parse(blk.social_links as string || '[]'); if (typeof parsed === 'string') { try { parsed = JSON.parse(parsed); } catch { parsed = []; } } socials = Array.isArray(parsed) ? parsed : []; } catch {}
       let blockOpts: any = {};
@@ -186,8 +196,8 @@ app.get('/api/site-data', async (c) => {
     let siteSettings: Record<string, string> = {};
     for (const row of (settingsRes.results || [])) { siteSettings[row.key as string] = row.value as string; }
 
-    // Allow short caching — data changes rarely, CDN + stale-while-revalidate for speed
-    c.header('Cache-Control', 'public, max-age=30, s-maxage=120, stale-while-revalidate=600');
+    // No caching — data changes on every admin save; must-revalidate ensures stale content is never served
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
     return c.json({
       content: dbContent,
       textMap, // original_ru -> {ru, am} for changed texts only
@@ -394,6 +404,7 @@ app.get('/api/footer', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     let row = await db.prepare('SELECT * FROM footer_settings LIMIT 1').first();
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
     if (!row) return c.json({});
     return c.json(row);
   } catch { return c.json({}); }
@@ -405,6 +416,7 @@ app.get('/api/photo-blocks', async (c) => {
     const db = c.env.DB;
     await initDatabase(db);
     const rows = await db.prepare('SELECT * FROM photo_blocks WHERE is_visible = 1 ORDER BY sort_order').all();
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
     return c.json({ blocks: rows.results || [] });
   } catch { return c.json({ blocks: [] }); }
 })
@@ -418,9 +430,11 @@ app.get('/api/text-overrides/:page', async (c) => {
     const db = c.env.DB;
     const page = c.req.param('page');
     if (!page) return c.json({ overrides: {} });
+    // Fetch both page-specific and shared shell overrides so the client
+    // applies shell edits (floating buttons, nav CTA) made on any page.
     const rows = await db.prepare(
-      'SELECT txt_id, text_ru, text_am, href FROM site_text_overrides WHERE page = ?'
-    ).bind(page).all();
+      'SELECT txt_id, text_ru, text_am, href FROM site_text_overrides WHERE page = ? OR page = ?'
+    ).bind(page, 'shell').all();
     const overrides: Record<string, { ru: string; am: string; href?: string }> = {};
     for (const r of (rows.results || []) as any[]) {
       overrides[r.txt_id as string] = {
@@ -429,7 +443,7 @@ app.get('/api/text-overrides/:page', async (c) => {
         href: (r.href as string) || ''
       };
     }
-    c.header('Cache-Control', 'public, max-age=10, s-maxage=60');
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
     return c.json({ overrides });
   } catch { return c.json({ overrides: {} }); }
 })
@@ -445,7 +459,7 @@ app.get('/api/custom-blocks/:page', async (c) => {
     const rows = await db.prepare(
       'SELECT * FROM site_custom_blocks WHERE page = ? AND is_visible = 1 ORDER BY sort_order, id'
     ).bind(page).all();
-    c.header('Cache-Control', 'public, max-age=10, s-maxage=60');
+    c.header('Cache-Control', 'no-store, no-cache, must-revalidate');
     return c.json({ blocks: rows.results || [] });
   } catch { return c.json({ blocks: [] }); }
 })

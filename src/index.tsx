@@ -37,7 +37,6 @@ app.get('/admin', (c) => {
   return c.html(getAdminHTML())
 })
 
-// ===== CACHE PURGE ENDPOINT =====
 // Called by admin panel after any content save to invalidate edge cache
 app.post('/api/admin/purge-cache', async (c) => {
   try {
@@ -53,6 +52,11 @@ app.post('/api/admin/purge-cache', async (c) => {
       variants.push(p + sep + '_cv=' + CACHE_VERSION);
       variants.push(p + sep + 'cklang=am&_cv=' + CACHE_VERSION);
       variants.push(p + sep + 'cklang=ru&_cv=' + CACHE_VERSION);
+      // Also purge ?lang=am / ?lang=ru URL-param variants (used when visitor
+      // explicitly navigates to /home?lang=am — different cache key from the
+      // cookie-based cklang variant, so must be deleted separately).
+      variants.push(p + sep + 'lang=am&_cv=' + CACHE_VERSION);
+      variants.push(p + sep + 'lang=ru&_cv=' + CACHE_VERSION);
     }
     const origins = new Set([origin, ...KNOWN_ORIGINS]);
     const purgePromises: Promise<boolean>[] = [];
@@ -139,6 +143,7 @@ app.get('/sitemap.xml', async (c) => {
   <url><loc>${origin}/about</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/buyouts</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/services</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>${origin}/services/reviews</loc><changefreq>monthly</changefreq><priority>0.72</priority></url>
   <url><loc>${origin}/calculator</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/faq</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
   <url><loc>${origin}/contacts</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
@@ -223,7 +228,12 @@ a{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius
 // Cache key = full URL (normalized). On cache HIT the Worker returns
 // immediately without touching D1, giving ~50ms TTFB.
 // TTL = 600s (10 min). Admin saves auto-purge via /api/admin middleware.
-const CACHE_TTL = 600; // seconds — edge cache lifetime (10 min; short TTL ensures stale content expires fast even if purge misses some PoPs)
+// Edge cache lifetime in seconds. 24h is safe because every admin save calls
+// /api/admin/purge-cache (see src/api/admin.ts middleware) which deletes all
+// cached variants across known origins. The long TTL maximises edge HIT-rate
+// for the typical visitor flow (no admin edits between requests) without
+// risking stale content after edits.
+const CACHE_TTL = 86400; // seconds (24h)
 const CACHEABLE_PATHS = new Set(CACHE_PATHS);
 
 // ===== DOMAIN CONSOLIDATION =====
@@ -291,21 +301,20 @@ export default {
       // Clone and set cache headers.
       //
       // Caching strategy:
-      //   - browser (`max-age=0`)  → always revalidate. Crucial: if the user
-      //     refreshes after editing text in the admin, we never want the
-      //     browser to paint a 30-second-stale copy before our JS overlay
-      //     swaps it back to the new text (that flicker is exactly what the
-      //     "old text → new text on refresh" bug is about).
+      //   - browser (`max-age=0`)  → always revalidate. Ensures browser never
+      //     paints stale content after an admin edit.
       //   - edge   (`s-maxage`)    → cached for CACHE_TTL on the Cloudflare
       //     edge. Admin writes auto-purge the edge cache (see
       //     src/api/admin.ts), so the next browser revalidation pulls a
       //     fresh SSR render from origin within milliseconds.
+      //   - `must-revalidate`      → no stale-while-revalidate; once the TTL
+      //     expires the edge must fetch a fresh response before serving.
       const body = await response.arrayBuffer();
       const cachedResponse = new Response(body, {
         status: 200,
         headers: {
           ...Object.fromEntries(response.headers.entries()),
-          'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL}, stale-while-revalidate=${CACHE_TTL}`,
+          'Cache-Control': `public, max-age=0, s-maxage=${CACHE_TTL}, must-revalidate`,
           'CDN-Cache-Control': `max-age=${CACHE_TTL}`,
           'X-Cache-Status': 'MISS',
           'Vary': 'Accept-Encoding, Cookie',

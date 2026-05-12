@@ -1,0 +1,112 @@
+/* Referral page (renderReferralPage) */
+/* Extracted from src/routes/landing.ts to /static/css/page-referral.css for long-cache and smaller HTML responses. */
+.referral-page{padding-top:88px}
+/* Hero */
+.rp-hero{padding:24px 0 40px}
+.rp-hero .rh-inner{max-width:820px;margin:0 auto;text-align:center}
+.rp-hero .rp-back{text-align:left;margin-bottom:16px}
+.rp-hero .rp-back-link{display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border-radius:10px;font-size:0.88rem;font-weight:600;color:var(--text-sec);background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.15);text-decoration:none;transition:background .15s,color .15s,transform .15s}
+.rp-hero .rp-back-link:hover{background:rgba(139,92,246,0.18);color:var(--text-pri);transform:translateX(-3px)}
+.rp-hero .rp-back-link i{font-size:0.78rem}
+.rp-hero .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:18px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-hero h1{font-size:clamp(1.9rem,3.6vw,2.8rem);font-weight:800;line-height:1.16;margin-bottom:14px;letter-spacing:-0.02em}
+.rp-hero h1 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-hero .rh-desc{font-size:1.02rem;color:var(--text-sec);margin:0 auto 24px;line-height:1.7;max-width:680px}
+.rp-hero .rh-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.rp-hero .rh-cta .btn{padding:13px 22px;font-size:0.95rem}
+/* How it works — 3 numbered steps */
+.rp-steps{padding:32px 0}
+.rp-steps-header{text-align:center;max-width:700px;margin:0 auto 32px}
+.rp-steps-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-steps-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-steps-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-steps-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.rp-steps-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;max-width:1080px;margin:0 auto}
+.rp-step{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:28px 24px;display:flex;flex-direction:column;gap:12px;position:relative;transition:var(--t)}
+.rp-step:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-3px);box-shadow:0 12px 30px rgba(0,0,0,0.2)}
+.rp-step-num{width:42px;height:42px;border-radius:12px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));display:flex;align-items:center;justify-content:center;font-size:1.05rem;font-weight:800;color:#fff;box-shadow:0 6px 18px rgba(139,92,246,0.35)}
+.rp-step h3{font-size:1.08rem;font-weight:700;line-height:1.3;margin:0}
+.rp-step p{color:var(--text-sec);font-size:0.92rem;line-height:1.7;margin:0}
+/* Audience grid (mirrors home #for-whom) */
+.rp-audience{padding:48px 0}
+.rp-audience-header{text-align:center;max-width:700px;margin:0 auto 28px}
+.rp-audience-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-audience-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-audience-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-audience-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.rp-aud-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;max-width:1200px;margin:0 auto}
+.rp-aud-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:24px 22px;display:flex;flex-direction:column;gap:12px;transition:var(--t)}
+.rp-aud-card:hover{border-color:rgba(139,92,246,0.35);transform:translateY(-3px);box-shadow:0 10px 28px rgba(0,0,0,0.2)}
+.rp-aud-icon{width:48px;height:48px;border-radius:12px;background:linear-gradient(135deg,rgba(139,92,246,0.18),rgba(139,92,246,0.06));border:1px solid rgba(139,92,246,0.22);display:flex;align-items:center;justify-content:center;font-size:1.25rem;color:var(--purple)}
+.rp-aud-card h3{font-size:1rem;font-weight:700;line-height:1.3;margin:0}
+.rp-aud-card p{color:var(--text-sec);font-size:0.88rem;line-height:1.7;margin:0}
+/* Bonus tiers */
+.rp-tiers{padding:32px 0 48px}
+.rp-tiers-header{text-align:center;max-width:720px;margin:0 auto 32px}
+.rp-tiers-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-tiers-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-tiers-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-tiers-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.rp-tiers-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;max-width:1100px;margin:0 auto}
+.rp-tier{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r-lg);padding:32px 26px;display:flex;flex-direction:column;gap:14px;position:relative;transition:var(--t)}
+.rp-tier:hover{transform:translateY(-4px);box-shadow:0 14px 36px rgba(0,0,0,0.25)}
+.rp-tier-pro{border-color:rgba(139,92,246,0.45);background:linear-gradient(180deg,rgba(139,92,246,0.08),rgba(139,92,246,0.02))}
+.rp-tier-pro::after{content:attr(data-badge);position:absolute;top:-12px;right:20px;padding:4px 12px;background:linear-gradient(135deg,var(--purple),var(--purple-deep));color:#fff;font-size:0.68rem;font-weight:700;border-radius:50px;letter-spacing:0.5px;text-transform:uppercase}
+.rp-tier-vip{border-color:rgba(245,158,11,0.4);background:linear-gradient(180deg,rgba(245,158,11,0.07),rgba(245,158,11,0.02))}
+.rp-tier-vip .rp-tier-icon{background:linear-gradient(135deg,rgba(245,158,11,0.22),rgba(245,158,11,0.08));border-color:rgba(245,158,11,0.3);color:#F59E0B}
+.rp-tier-vip .rp-tier-pct{background:linear-gradient(135deg,#F59E0B,#FBBF24);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-tier-icon{width:54px;height:54px;border-radius:14px;background:linear-gradient(135deg,rgba(139,92,246,0.18),rgba(139,92,246,0.06));border:1px solid rgba(139,92,246,0.22);display:flex;align-items:center;justify-content:center;font-size:1.4rem;color:var(--purple)}
+.rp-tier h3{font-size:1.15rem;font-weight:700;margin:0;line-height:1.3}
+.rp-tier-pct{font-size:2.4rem;font-weight:900;line-height:1;background:linear-gradient(135deg,var(--purple),var(--accent));-webkit-background-clip:text;-webkit-text-fill-color:transparent;letter-spacing:-0.02em}
+.rp-tier-pct-label{font-size:0.78rem;font-weight:600;color:var(--text-muted);margin-top:4px;letter-spacing:0.3px;margin-bottom:10px}
+.rp-tier-desc{color:var(--text-sec);font-size:0.92rem;line-height:1.7;margin:0}
+.rp-tier-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:8px}
+.rp-tier-list li{display:flex;gap:10px;align-items:flex-start;font-size:0.88rem;color:var(--text-sec);line-height:1.55}
+.rp-tier-list li i{color:#10B981;margin-top:4px;flex-shrink:0;font-size:0.85rem}
+.rp-tier-note{font-size:0.74rem;color:var(--text-muted);text-align:center;margin:18px auto 0;max-width:640px;line-height:1.6}
+.rp-tier-note i{margin-right:6px;color:var(--accent)}
+/* FAQ — copies /faq accordion so toggleFaq() works unchanged */
+.rp-faq{padding:32px 0 48px}
+.rp-faq-header{text-align:center;max-width:700px;margin:0 auto 28px}
+.rp-faq-header .rh-eyebrow{display:inline-flex;align-items:center;gap:8px;padding:6px 16px;background:rgba(139,92,246,0.1);border:1px solid rgba(139,92,246,0.2);border-radius:50px;font-size:0.78rem;font-weight:600;color:var(--accent);margin-bottom:14px;text-transform:uppercase;letter-spacing:0.5px}
+.rp-faq-header h2{font-size:clamp(1.5rem,2.8vw,2.1rem);font-weight:800;margin-bottom:10px;letter-spacing:-0.02em}
+.rp-faq-header h2 .gr{background:linear-gradient(135deg,var(--purple),var(--accent-light));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.rp-faq-header p{color:var(--text-sec);font-size:0.95rem;line-height:1.7;margin:0}
+.faq-list{max-width:820px;margin:0 auto}
+.faq-item{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:var(--t)}
+.faq-item.active{border-color:rgba(139,92,246,0.3)}
+.faq-q{padding:20px 24px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:16px;font-weight:600;font-size:0.95rem;line-height:1.4}
+.faq-q span{flex:1}
+.faq-q i{color:var(--purple);transition:var(--t);font-size:0.78rem;flex-shrink:0}
+.faq-item.active .faq-q i{transform:rotate(180deg)}
+.faq-a{padding:0 24px;max-height:0;overflow:hidden;transition:max-height 0.4s ease,padding 0.4s ease}
+.faq-item.active .faq-a{max-height:600px;padding:0 24px 20px}
+.faq-a p{color:var(--text-sec);font-size:0.92rem;line-height:1.75}
+/* Final CTA strip — same shape as faq/contacts */
+.rp-cta-strip{padding:8px 0 64px}
+.rp-cta-strip .acs-card{background:linear-gradient(135deg,rgba(139,92,246,0.12),rgba(139,92,246,0.04));border:1px solid rgba(139,92,246,0.25);border-radius:var(--r-lg);padding:28px 32px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;box-shadow:0 12px 40px rgba(0,0,0,0.18)}
+.rp-cta-strip .acs-text h3{font-size:1.4rem;font-weight:800;margin-bottom:6px}
+.rp-cta-strip .acs-text p{color:var(--text-sec);font-size:0.92rem;margin:0;max-width:380px}
+.rp-cta-strip .acs-actions{display:flex;gap:12px;flex-wrap:wrap}
+.rp-cta-strip .acs-actions .btn{padding:12px 20px;font-size:0.9rem}
+@media(max-width:1000px){
+  .rp-aud-grid{grid-template-columns:repeat(2,1fr)}
+}
+@media(max-width:900px){
+  .referral-page{padding-top:80px}
+  .rp-steps-grid{grid-template-columns:1fr;gap:14px}
+  .rp-tiers-grid{grid-template-columns:1fr;gap:16px}
+  .rp-cta-strip .acs-card{padding:24px 20px;flex-direction:column;align-items:flex-start}
+  .rp-cta-strip .acs-actions{width:100%}
+  .rp-cta-strip .acs-actions .btn{flex:1;justify-content:center;min-width:140px}
+}
+@media(max-width:600px){
+  .rp-aud-grid{grid-template-columns:1fr;gap:12px}
+  .rp-aud-card{padding:20px 18px}
+  .rp-tier{padding:26px 20px}
+  .rp-tier-pct{font-size:2rem}
+  .rp-cta-strip .acs-actions{flex-direction:column}
+  .rp-cta-strip .acs-actions .btn{width:100%}
+  .faq-q{padding:16px 18px;font-size:0.9rem}
+  .faq-item.active .faq-a{padding:0 18px 18px}
+}

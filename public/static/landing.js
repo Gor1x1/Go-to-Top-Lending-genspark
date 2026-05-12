@@ -1,6 +1,46 @@
+// #region agent log
+(function(){
+  function _gttDebugLog(loc, msg, data){
+    var payload = {sessionId:'fa41d2', location:loc, message:msg, data:data, timestamp:Date.now()};
+    try{ console.log('[GTT_DEBUG]', JSON.stringify(payload)); }catch(_){}
+    try{
+      fetch('http://127.0.0.1:7503/ingest/454fc33d-0744-4120-a486-dd14541fe1e4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'fa41d2'},body:JSON.stringify(payload),mode:'cors'}).catch(function(){
+        // Fallback: no-cors send (response opaque but server receives)
+        try{ fetch('http://127.0.0.1:7503/ingest/454fc33d-0744-4120-a486-dd14541fe1e4',{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(payload)}).catch(function(){}); }catch(_){}
+      });
+    }catch(_){}
+  }
+  window._gttDebugLog = _gttDebugLog;
+  _gttDebugLog('landing.js:top','script_top_load',{
+    href: window.location.href,
+    ua: navigator.userAgent.substring(0,150),
+    script_marker: 'GTT_DEBUG_V57_MOBILE_DROPDOWN'
+  });
+})();
+// #endregion
+
 // Force page to start from top on every load (prevent iOS scroll restoration)
 if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
 window.scrollTo(0, 0);
+
+// Apply SSR href overrides that were set on inner elements (not <a> directly)
+(function applyPendingHrefs() {
+  function _run() {
+    var els = document.querySelectorAll('[data-pending-href]');
+    for (var i = 0; i < els.length; i++) {
+      var el = els[i];
+      var href = el.getAttribute('data-pending-href');
+      if (!href) continue;
+      var link = el.tagName === 'A' ? el : el.closest('a');
+      if (link) link.setAttribute('href', href);
+    }
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _run);
+  } else {
+    _run();
+  }
+})();
 /* ===== LANGUAGE ===== */
 let lang = localStorage.getItem('gtt_lang') || 'ru';
 
@@ -148,17 +188,26 @@ function mainPageId() {
   return (m && m.getAttribute('data-page')) || '';
 }
 
-/** Apply [data-am]/[data-ru] chrome + placeholders without touching browser URL (click handlers navigate). */
+/** Apply [data-am]/[data-ru] chrome + placeholders without touching browser URL (click handlers navigate).
+ *  When SSR already rendered the page in the target language (server-injected + matching <html lang>),
+ *  we SKIP the bulk text rewrite — it would only re-set the same strings and visibly flicker.
+ *  Placeholders + lang-btn states still update unconditionally (they're cheap and the SSR may leave them stale). */
 function applyLangDomNoNavigation(l) {
   lang = l;
   _persistLang(l);
   document.querySelectorAll('.lang-btn').forEach(function(b) {
     b.classList.toggle('active', b.dataset.lang === l);
   });
-  document.querySelectorAll('[data-' + l + ']').forEach(function(el) {
-    var t = el.getAttribute('data-' + l);
-    if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
-  });
+  var ssrLang = (document.documentElement.getAttribute('lang') || '').toLowerCase();
+  var ssrIsAm = ssrLang === 'hy';
+  var ssrMatches = (l === 'am' && ssrIsAm) || (l === 'ru' && !ssrIsAm);
+  var skipBulkRewrite = document.documentElement.classList.contains('server-injected') && ssrMatches;
+  if (!skipBulkRewrite) {
+    document.querySelectorAll('[data-' + l + ']').forEach(function(el) {
+      var t = el.getAttribute('data-' + l);
+      if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
+    });
+  }
   document.querySelectorAll('[data-placeholder-' + l + ']').forEach(function(el) {
     el.placeholder = el.getAttribute('data-placeholder-' + l) || '';
   });
@@ -180,6 +229,23 @@ function applyLangDomNoNavigation(l) {
   }
   applyLangDomNoNavigation(lang);
 })();
+
+/* ===== REVEAL PAGE =====
+   Phase 5.1.5: gtt-loading was the previous fix for "old text → new text"
+   flicker — it hid <body> via CSS until JS finished its first pass. The
+   side effect was a long blank/dark page (the "black flash") that the
+   site owner reported as a critical UX bug. As of Phase 5.1.5 the SSR
+   layer applies inline-editor overrides directly into the HTML before it
+   leaves the worker (see applyTextOverridesSSR in src/routes/landing.ts),
+   so the first paint is already correct and there's nothing to hide.
+   We keep this helper as a no-op safety net: if any cached HTML still
+   ships the legacy `gtt-loading` class, this strips it so the user is
+   never stuck with an invisible body. */
+function _revealPage() {
+  if (document.documentElement.classList.contains('gtt-loading')) {
+    document.documentElement.classList.remove('gtt-loading');
+  }
+}
 
 /* ===== HEADER SCROLL ===== */
 window.addEventListener('scroll', () => {
@@ -248,13 +314,14 @@ document.addEventListener('click', function(e) {
 // Re-uses the same .bottom-nav-item.active CSS class so styling is unified.
 (function() {
   var scrollTimer = null;
-  var SUBPAGE_PATHS = ['/about','/services','/buyouts','/faq','/contacts','/referral'];
+  var SUBPAGE_PATHS = ['/about','/services','/services/reviews','/buyouts','/faq','/contacts','/referral'];
   function isSubpage() {
     var p = (location.pathname || '/').replace(/\/+$/, '') || '/';
     return SUBPAGE_PATHS.indexOf(p) !== -1;
   }
   function highlightByPath() {
     var current = (location.pathname || '/').replace(/\/+$/, '') || '/';
+    if (current === '/services/reviews') current = '/services';
     var navItems = document.querySelectorAll('.bottom-nav-item[href]');
     var moreLinks = document.querySelectorAll('.bottom-nav-more-menu a[href]');
     var matched = false;
@@ -379,9 +446,14 @@ document.querySelectorAll('.nav-links a').forEach(function(a) {
 });
 
 /* Close menu when tapping outside nav links (on overlay area) */
-document.getElementById('navLinks').addEventListener('click', function(e) {
-  if (e.target === this) closeMenu();
-});
+(function(){
+  var _navLinksEl = document.getElementById('navLinks');
+  if (_navLinksEl) {
+    _navLinksEl.addEventListener('click', function(e) {
+      if (e.target === this) closeMenu();
+    });
+  }
+})();
 
 /* ===== TICKER ===== */
 (function() {
@@ -396,6 +468,12 @@ document.getElementById('navLinks').addEventListener('click', function(e) {
     {icon:"fa-truck", ru:"Доставка на склады WB", am:"Առաքում WB պահեստներ"}
   ];
   const track = document.getElementById("tickerTrack");
+  // #region agent log
+  try{ window._gttDebugLog && window._gttDebugLog('landing.js:ticker','ticker_block',{has_track: !!track, hypothesis:'H1'}); }catch(_){}
+  // #endregion
+  if (!track) return; // Subpages don't have a ticker — skipping prevents
+                      // a TypeError that would crash the rest of this file
+                      // (including the later `window.switchLang` assignment).
   let h = "";
   for (let i = 0; i < 2; i++) {
     items.forEach(it => {
@@ -936,8 +1014,11 @@ if (document.readyState === 'loading') {
   _initAllPhoneItis();
 }
 
-/* Form submit */
-document.getElementById('popupForm').addEventListener('submit', function(e) {
+/* Form submit — popupForm only exists on the legacy home page; on /home, /about,
+ * /services etc. it's absent, so guard against null to keep the rest of the
+ * script (including window.switchLang) from crashing. */
+var _popupFormEl = document.getElementById('popupForm');
+if (_popupFormEl) _popupFormEl.addEventListener('submit', function(e) {
   e.preventDefault();
   var popupName = (document.getElementById('popupName') || {}).value || '';
   var buyouts = document.getElementById('popupBuyouts').value;
@@ -1593,94 +1674,96 @@ function updateTelegramLinks() {
   if (typeof recalcDynamic === 'function') recalcDynamic();
 }
 
-// Override switchLang to always use latest data-ru/data-am and update Telegram links.
-// Currency is bound to language (RU → ₽, AM → ֏). The calculator/package DOM is
-// rebuilt from db on first load (loadSiteData IIFE) and bakes the chosen currency
-// into data-price / data-tiers / .calc-price text. Cleanly re-rendering all that
-// from JS on the fly would duplicate ~200 lines of render logic, so on a real
-// language change we just navigate to the corresponding /ru or /am URL — the SSR
-// layer already pre-renders the right currency, and the page comes up identical
-// minus the flipped prices.
-switchLang = function(l) {
-  var path = window.location.pathname;
-  var subPages = ['/about', '/buyouts', '/services', '/faq', '/contacts', '/referral', '/home', '/calculator', '/blog'];
-  var isSubPage = subPages.indexOf(path) !== -1 || path.indexOf('/package/') === 0 || path.indexOf('/blog/') === 0;
-  _persistLang(l);
-
-  /** True when SSR URL already reflects `l`, so skip full reload (fixes RU↔AM nav flash). */
-  function urlAlreadyMatchesLang() {
-    try {
-      var cur = new URL(window.location.href);
-      var ql = cur.searchParams.get('lang');
-      var p = cur.pathname.replace(/\/+$/, '') || '/';
-      if (isSubPage) {
-        var wantLang = l === 'am';
-        var hasAm = ql === 'am';
-        return wantLang === hasAm;
-      }
-      var wantRoot = l === 'am' ? '/am' : '/ru';
-      var curRoot = p === '/am' || p === '/ru' ? p : '';
-      return curRoot === wantRoot || (wantRoot === '/ru' && (p === '/' || ql === 'ru'));
-    } catch (_e2) {}
-    return false;
-  }
-
-  if (isSubPage) {
-    try {
-      var subUrl = new URL(window.location.href);
-      subUrl.pathname = path;
-      if (l === 'am') subUrl.searchParams.set('lang', 'am');
-      else subUrl.searchParams.delete('lang');
-      subUrl.hash = window.location.hash;
-      var targetStr = subUrl.toString();
-      try {
-        var curU = new URL(window.location.href);
-        var tgU = new URL(targetStr);
-        if (curU.origin === tgU.origin && curU.pathname === tgU.pathname && curU.search === tgU.search) {
-        applyLangDomNoNavigation(l);
-        try { updateTelegramLinks(); } catch (_tg) {}
-        try {
-          var bp = document.getElementById('buyoutPriceLabel');
-          if (bp) {
-            var bpQty = parseInt((document.getElementById('buyoutQty') || {}).value || '0') || 0;
-            bp.textContent = bpQty > 0 ? formatNum(getBuyoutPrice(bpQty)) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
-          }
-        } catch (_b) {}
-        try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch (_r) {}
-        return;
-        }
-      } catch (_cmp) {}
-      window.location.assign(targetStr);
-    } catch (_e3) {
-      var targetLegacy = l === 'am' ? path + '?lang=am' : path;
-      window.location.assign(targetLegacy + window.location.hash);
+// #region agent log
+(function(){
+  var _log = window._gttDebugLog || function(){};
+  _log('landing.js:1642','script_loaded_switchlang_section',{
+    href: window.location.href,
+    pathname: window.location.pathname,
+    hash: window.location.hash,
+    cookie_lang: (document.cookie.match(/gtt_lang=([^;]+)/)||['','none'])[1],
+    ls_lang: (function(){try{return localStorage.getItem('gtt_lang')}catch(e){return 'err:'+e.message}})(),
+    has_persistLang: typeof _persistLang
+  });
+  // Attach a capture-phase click listener to detect ANY click on a .lang-btn,
+  // independent of the inline onclick handler (tests H2).
+  document.addEventListener('click', function(e){
+    var t = e.target && e.target.closest ? e.target.closest('.lang-btn') : null;
+    if (t) {
+      _log('landing.js:capture-click','lang_btn_capture_click',{
+        data_lang: t.getAttribute('data-lang'),
+        defaultPrevented: e.defaultPrevented,
+        cancelable: e.cancelable,
+        phase: e.eventPhase,
+        onclick_attr: t.getAttribute('onclick'),
+        has_window_switchLang: typeof window.switchLang,
+        hypothesis: 'H2'
+      });
     }
+  }, true);
+})();
+// #endregion
+
+// Language switcher — bound to window so inline onclick handlers can find it
+window.switchLang = function(l) {
+  // #region agent log
+  try { (window._gttDebugLog||function(){})('landing.js:switchLang-entry','switchLang_called',{l:l, href: window.location.href, hypothesis:'H1'}); } catch(_){}
+  // #endregion
+  if (l !== 'am' && l !== 'ru') {
+    // #region agent log
+    try { (window._gttDebugLog||function(){})('landing.js:switchLang-invalid','invalid_lang_arg',{l:l, hypothesis:'H1'}); } catch(_){}
+    // #endregion
     return;
   }
-  var newPath = l === 'am' ? '/am' : '/ru';
-  if (!urlAlreadyMatchesLang() && path.replace(/\/+$/, '') !== newPath.replace(/\/+$/, '')) {
-    try {
-      var rootUrl = new URL(window.location.href);
-      rootUrl.pathname = newPath;
-      rootUrl.searchParams.delete('lang');
-      rootUrl.hash = window.location.hash;
-      window.location.assign(rootUrl.toString());
-    } catch (_e4) {
-      window.location.assign(newPath + window.location.hash);
-    }
-    return;
-  }
-  applyLangDomNoNavigation(l);
-  try { updateTelegramLinks(); } catch (_tg0) {}
   try {
-    var bp = document.getElementById('buyoutPriceLabel');
-    if (bp) {
-      var bpQty2 = parseInt((document.getElementById('buyoutQty') || {}).value || '0') || 0;
-      bp.textContent = bpQty2 > 0 ? formatNum(getBuyoutPrice(bpQty2)) + ' ' + curSym() + '/' + _pcsWord() : _buyoutDefaultLabel();
-    }
-  } catch (_bp) {}
-  try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch (_rx) {}
+    _persistLang(l);
+    // #region agent log
+    try { (window._gttDebugLog||function(){})('landing.js:after-persist','persistLang_ok',{l:l, cookie: document.cookie, hypothesis:'H4'}); } catch(_){}
+    // #endregion
+  } catch (_persist) {
+    // #region agent log
+    try { (window._gttDebugLog||function(){})('landing.js:persist-catch','persistLang_threw',{err:String(_persist), hypothesis:'H4'}); } catch(_){}
+    // #endregion
+  }
+
+  var path = window.location.pathname;
+  var hash = window.location.hash || '';
+  var subPages = ['/about', '/buyouts', '/services', '/services/reviews', '/faq', '/contacts', '/referral', '/home', '/calculator', '/blog'];
+  var isSubPage = subPages.indexOf(path) !== -1 || path.indexOf('/package/') === 0 || path.indexOf('/blog/') === 0;
+
+  var target;
+  if (isSubPage) {
+    target = path + (l === 'am' ? '?lang=am' : '') + hash;
+  } else {
+    target = (l === 'am' ? '/am' : '/ru') + hash;
+  }
+
+  // #region agent log
+  try { (window._gttDebugLog||function(){})('landing.js:before-assign','about_to_navigate',{from: window.location.href, to: target, isSubPage:isSubPage, hypothesis:'H1'}); } catch(_){}
+  // #endregion
+
+  try {
+    window.location.assign(target);
+    // #region agent log
+    try { (window._gttDebugLog||function(){})('landing.js:after-assign','assign_returned',{to: target, currentHref: window.location.href, hypothesis:'H1'}); } catch(_){}
+    // #endregion
+  } catch (_e) {
+    // #region agent log
+    try { (window._gttDebugLog||function(){})('landing.js:assign-catch','assign_threw',{err:String(_e), to:target, hypothesis:'H1'}); } catch(_){}
+    // #endregion
+    window.location.href = target;
+  }
 };
+
+// #region agent log
+try {
+  (window._gttDebugLog||function(){})('landing.js:after-assign-window-switchLang','window_switchLang_set',{
+    type: typeof window.switchLang,
+    bare_type: (function(){ try { return typeof switchLang; } catch(e){ return 'ref-err'; } })(),
+    hypothesis: 'H1'
+  });
+} catch(_){}
+// #endregion
 
 /** After DB rebuild: sync data-* UI & TG links without navigation (avoids subpage reload flash). */
 function finalizeLangAfterSiteData() {
@@ -1694,6 +1777,16 @@ function finalizeLangAfterSiteData() {
     }
   } catch (_b) {}
   try { if (typeof recalcDynamic === 'function') recalcDynamic(); } catch (_r) {}
+  // Phase 5.1.6: After every loadSiteData() pass (calc rebuild, ticker,
+  // blockFeatures, popup texts, footer, extra-text injection, telegram-link
+  // pass, etc.) re-stamp data-edit-text IDs and re-apply site_text_overrides
+  // on the freshly-written DOM. Without this, any path that calls
+  // setAttribute('data-ru'/'data-am') or innerHTML= would wipe inline-editor
+  // edits saved in site_text_overrides for those nodes (the user reported
+  // "edits revert on refresh"). gttReapplyOverrides is exposed by editor.js;
+  // when the editor script hasn't loaded yet (defer order quirk) the call is
+  // a no-op and the editor's own init() will catch up on first run.
+  try { if (typeof window.gttReapplyOverrides === 'function') window.gttReapplyOverrides(); } catch (_ov) {}
 }
 
 // ===== IMMEDIATE SECTION REVEAL (before loadSiteData) =====
@@ -1807,6 +1900,12 @@ function finalizeLangAfterSiteData() {
         if (!section) return;
         var contentTexts = db.content[contentKey];
         if (!contentTexts || contentTexts.length === 0) return;
+        // Skip sections that have their own carefully designed layouts where
+        // injected plain-text paragraphs would break the visual structure.
+        // wb-banner and wb-official have card/badge layouts on both home and
+        // buyouts pages — plain extra-texts must not appear there.
+        var skipSectionIds = ['wb-banner', 'wb-official'];
+        if (skipSectionIds.indexOf(sectionId) !== -1) return;
         // Skip injection for sections with structured HTML layouts.
         // These sections have specific design (compare-box, why-steps, hero-grid, etc.)
         // that plain text would break. The hero grid in particular has its content
@@ -1856,12 +1955,20 @@ function finalizeLangAfterSiteData() {
           etEl.setAttribute('data-am', et.am || '');
           etEl.style.cssText = 'text-align:center;color:var(--text-sec);margin-bottom:16px;max-width:700px;margin-left:auto;margin-right:auto;font-size:0.95rem;line-height:1.7';
           etEl.textContent = etText;
-          if (insertRef) { container.insertBefore(etEl, insertRef); }
+          // Guard: insertRef may have been reparented by a previous iteration.
+          if (insertRef && insertRef.parentNode === container) { container.insertBefore(etEl, insertRef); }
           else { container.appendChild(etEl); }
           injected++;
         }
         if (injected > 0) console.log('[DB] Extra texts injected in', sectionId, ':', injected, 'new');
       });
+      // Re-assign data-edit-text IDs to newly injected elements and re-apply
+      // any saved text overrides so edits made in the inline editor persist
+      // across page reloads (especially for pages where __SITE_DATA is loaded
+      // asynchronously and editor.js's init() ran before injection completed).
+      if (typeof window.gttReapplyOverrides === 'function') {
+        window.gttReapplyOverrides();
+      }
     }
     
     // ===== 2. REBUILD CALCULATOR FROM DB =====
@@ -1926,7 +2033,10 @@ function finalizeLangAfterSiteData() {
             }
           });
           group.innerHTML = gh;
-          calcTotal.parentNode.insertBefore(group, calcTotal);
+          // Guard: calcTotal may have been removed/replaced by a previous tab rebuild.
+          var _calcParent = calcTotal && calcTotal.parentNode;
+          if (_calcParent) { _calcParent.insertBefore(group, calcTotal); }
+          else { calcWrap.appendChild(group); }
         });
         console.log('[DB] Calculator rebuilt:', db.services.length, 'services,', db.tabs.length, 'tabs');
       }
@@ -2283,6 +2393,9 @@ function finalizeLangAfterSiteData() {
         _existingSectionIds[sid.replace(/-/g, '_')] = true;
         _existingSectionIds[sid.replace(/_/g, '-')] = true;
       });
+      // #region agent log (H2: extra sections injected before footer — remove after verification)
+      try { fetch('http://127.0.0.1:7503/ingest/454fc33d-0744-4120-a486-dd14541fe1e4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ff8651'},body:JSON.stringify({sessionId:'ff8651',hypothesisId:'H2',location:'landing.js:2358',message:'sectionCreate:enter',data:{dataPage:(document.querySelector('main[data-page]')||{}).getAttribute&&document.querySelector('main[data-page]').getAttribute('data-page')||'',existingIds:Object.keys(_existingSectionIds).length,bfCount:db.blockFeatures.length,url:location.pathname},timestamp:Date.now()})}).catch(function(){}); } catch(_){}
+      // #endregion
       // Resolve button icon: manual > auto-detect from URL > default
       function resolveIcon(ic, url) {
         var defs = ['fas fa-link','fas fa-arrow-right',''];
@@ -2343,8 +2456,8 @@ function finalizeLangAfterSiteData() {
             '<div class="section-cta" style="padding-bottom:16px"></div>' +
           '</div>';
           
-          // Insert before footer
-          if (footer5) mainParent5.insertBefore(scEl, footer5);
+          // Insert before footer — guard: footer5 may have been moved by a prior iteration.
+          if (footer5 && footer5.parentNode === mainParent5) mainParent5.insertBefore(scEl, footer5);
           else mainParent5.appendChild(scEl);
           _existingSectionIds[scSectionId] = true;
           _existingSectionIds[bf.key] = true;
@@ -2355,6 +2468,14 @@ function finalizeLangAfterSiteData() {
         var sectionId = bf.key.replace(/_/g, '-');
         // Check BOTH formats to prevent duplicate creation
         if (_existingSectionIds[sectionId] || _existingSectionIds[bf.key]) return;
+        // New SSR shells (`<main data-page="…">` — every page except the
+        // legacy `/` long landing) intentionally render only the sections
+        // that belong on that page. Fabricating extra sections from
+        // `blockFeatures` would dump legacy paragraphs (warehouse,
+        // guarantee, why_buyouts, fifty_vs_fifty, important, wb_official…)
+        // above the footer on every subpage. SSR is the canonical source
+        // of truth for what sections each subpage should display.
+        if (mainPageId()) return;
         // Check visibility from sectionOrder
         if (db.sectionOrder) {
           for (var oi = 0; oi < db.sectionOrder.length; oi++) {
@@ -2410,12 +2531,16 @@ function finalizeLangAfterSiteData() {
         secH += '<div class="section-cta"></div>';
         secH += '</div>';
         newSec.innerHTML = secH;
-        if (footer5 && mainParent5) { mainParent5.insertBefore(newSec, footer5); }
+        // Guard: footer5 may have been moved or detached by a prior iteration.
+        if (footer5 && mainParent5 && footer5.parentNode === mainParent5) { mainParent5.insertBefore(newSec, footer5); }
         else if (mainParent5) { mainParent5.appendChild(newSec); }
         // Register so we don't create duplicates
         _existingSectionIds[sectionId] = true;
         _existingSectionIds[bf.key] = true;
         console.log('[DB] Created missing section:', sectionId);
+        // #region agent log (H2: confirm extra section was inserted before footer — remove after verification)
+        try { fetch('http://127.0.0.1:7503/ingest/454fc33d-0744-4120-a486-dd14541fe1e4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ff8651'},body:JSON.stringify({sessionId:'ff8651',hypothesisId:'H2',location:'landing.js:2496',message:'sectionCreate:injected',data:{sectionId:sectionId,bfKey:bf.key,blockType:bf.block_type,url:location.pathname,titlePreview:(blockTexts[0]&&(blockTexts[0].ru||blockTexts[0].am)||'').slice(0,40)},timestamp:Date.now()})}).catch(function(){}); } catch(_){}
+        // #endregion
       });
     }
     
@@ -3014,7 +3139,15 @@ function finalizeLangAfterSiteData() {
           if (typeof updateMessengerIcon === 'function') updateMessengerIcon(floatEl, fb.url);
         }
         // Also update nav CTA button (desktop + mobile) from same floating block button[0]
-        if (floatBf.buttons[0]) {
+        // On new SSR shells (every subpage), the nav CTA is the canonical
+        // "Перезвоните мне" (phone icon + openCallbackModal()) rendered from
+        // `shell__nav` block index 8. Overwriting it here with the WhatsApp
+        // float button data swaps text/icon/href AFTER first paint on every
+        // page navigation — that's the visible "flicker" admin reported.
+        // Keep the legacy behaviour for the legacy `/` long landing (no
+        // `<main data-page>`) where the CTA was never managed by shell__nav.
+        var _onShellPage = !!(document.querySelector('main[data-page]'));
+        if (!_onShellPage && floatBf.buttons[0]) {
           var fb0 = floatBf.buttons[0];
           // Desktop nav CTA
           var navCta = document.querySelector('.nav-cta');
@@ -3206,12 +3339,33 @@ function finalizeLangAfterSiteData() {
       }
       
       // ===== APPLY NAV LINKS from blockFeatures (nav block) =====
-      var navBf = db.blockFeatures.find(function(b) { return b.key === 'nav'; });
+      // The SSR (legacy `/` AND every renderPageShell subpage) now emits
+      // the canonical 9-item subpage navigation:
+      // Главная / О нас / Услуги / Выкупы / Калькулятор / FAQ / Контакты /
+      // Промокоды / Блог → /home, /about, /services, /buyouts, /calculator,
+      // /faq, /contacts, /referral, /blog.
+      // The legacy CMS `nav` block contains an obsolete 6-item anchor-based
+      // menu (Услуги / Почему мы / Калькулятор / Гарантии / FAQ / Контакты
+      // pointing to `#services`, `#fifty_vs_fifty`, …) that, when applied
+      // client-side, replaces the SSR nav and breaks every link by pointing
+      // it at anchors on the legacy long landing.
+      // Admin nav text is now editable via the `shell__nav` block which the
+      // SSR honors via tb() inside renderPageShell — no client-side rewrite
+      // is required.
+      var navBf = null; // intentionally disabled — keep SSR nav as source of truth
       if (navBf && navBf.texts_ru && navBf.texts_ru.length > 0) {
         var navUl = document.getElementById('navLinks');
         if (navUl) {
           var _pgNav = mainPageId();
           var _useHashNav = _pgNav === 'home';
+          // #region agent log (H1: nav rebuild path — remove after verification)
+          try {
+            var _ssrItems = navUl.querySelectorAll('li:not(.nav-mobile-cta) a');
+            var _ssrHrefs = [];
+            for (var _i = 0; _i < _ssrItems.length && _i < 12; _i++) _ssrHrefs.push(_ssrItems[_i].getAttribute('href'));
+            fetch('http://127.0.0.1:7503/ingest/454fc33d-0744-4120-a486-dd14541fe1e4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ff8651'},body:JSON.stringify({sessionId:'ff8651',hypothesisId:'H1',location:'landing.js:3292',message:'navRebuild:enter',data:{dataPage:_pgNav,useHashNav:_useHashNav,ssrItemCount:_ssrItems.length,ssrHrefs:_ssrHrefs,dbNavTextsRu:navBf.texts_ru,dbNavLinks:navBf.nav_links||[],url:location.pathname},timestamp:Date.now()})}).catch(function(){});
+          } catch(_){}
+          // #endregion
           // Build nav_links map: idx -> target
           var navTargetMap = {};
           if (navBf.nav_links) {
@@ -3251,6 +3405,9 @@ function finalizeLangAfterSiteData() {
               if (navTxt && exA.textContent !== navTxt) exA.textContent = navTxt;
             }
           } else {
+            // #region agent log (H1: nav rebuild count mismatch — SSR items removed and replaced with CMS items)
+            try { fetch('http://127.0.0.1:7503/ingest/454fc33d-0744-4120-a486-dd14541fe1e4',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ff8651'},body:JSON.stringify({sessionId:'ff8651',hypothesisId:'H1',location:'landing.js:3336',message:'navRebuild:countMismatch_rebuilding',data:{ssrCount:existingLis.length,dbCount:dbNavItems.length,dbItemTargets:dbNavItems.map(function(d){return d.target}),url:location.pathname},timestamp:Date.now()})}).catch(function(){}); } catch(_){}
+            // #endregion
             // Count changed — rebuild nav items
             for (var rli = 0; rli < existingLis.length; rli++) {
               existingLis[rli].remove();
@@ -3280,7 +3437,8 @@ function finalizeLangAfterSiteData() {
                 }
               });
               li.appendChild(a);
-              if (ctaLi) navUl.insertBefore(li, ctaLi);
+              // Guard: ctaLi may have been moved/detached by a prior nav rebuild.
+              if (ctaLi && ctaLi.parentNode === navUl) navUl.insertBefore(li, ctaLi);
               else navUl.appendChild(li);
             }
           }
@@ -3817,12 +3975,13 @@ async function checkRefCode() {
 /* Old standalone fetch removed — counters are managed as site_blocks in admin */
 
 /* ===== DYNAMIC FOOTER FROM DB ===== */
-/* Footer is now server-side injected to prevent flash. Client-side only updates attributes for:
+/* Footer is server-side injected to prevent flash. Client-side only updates attributes for:
    - Language switching (data-ru/data-am on new elements)
    - Elements not covered by server injection (custom_html)
-   This prevents the "old content -> new content" flash on page load. */
+   This prevents the "old content -> new content" flash on page load.
+   Optimization: when SSR injects window.__FOOTER, skip the network fetch entirely. */
 (function() {
-  fetch('/api/footer').then(function(r){return r.json()}).then(function(f) {
+  function applyFooter(f) {
     if (!f || (!f.contacts_json && !f.brand_text_ru && !f.copyright_ru)) return;
     var footer = document.querySelector('footer.footer');
     if (!footer) return;
@@ -3918,13 +4077,21 @@ async function checkRefCode() {
         if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
       });
     }
-  }).catch(function(){});
+  }
+  // Use SSR-inlined footer data when present (no fetch, no flicker).
+  if (window.__FOOTER && typeof window.__FOOTER === 'object') {
+    try { applyFooter(window.__FOOTER); } catch (_e) {}
+  } else {
+    fetch('/api/footer').then(function(r){return r.json()}).then(applyFooter).catch(function(){});
+  }
 })();
 
-/* ===== DYNAMIC PHOTO BLOCKS FROM DB (mobile-first) ===== */
+/* ===== DYNAMIC PHOTO BLOCKS FROM DB (mobile-first) =====
+   When SSR provides window.__PHOTO_BLOCKS we render synchronously (no fetch, no flicker).
+   Falls back to /api/photo-blocks for legacy paths that don't inline the data. */
 (function() {
-  fetch('/api/photo-blocks').then(function(r){return r.json()}).then(function(data) {
-    var blocks = data.blocks || [];
+  function renderPhotoBlocks(data) {
+    var blocks = (data && data.blocks) || [];
     if (!blocks.length) return;
 
     /* --- inject CSS for review cards --- */
@@ -4041,7 +4208,13 @@ async function checkRefCode() {
         })(carId);
       }
     });
-  }).catch(function(){});
+  }
+  // Prefer SSR-inlined data (zero network wait, zero flicker).
+  if (window.__PHOTO_BLOCKS && Array.isArray(window.__PHOTO_BLOCKS)) {
+    try { renderPhotoBlocks({ blocks: window.__PHOTO_BLOCKS }); } catch (_e) {}
+  } else {
+    fetch('/api/photo-blocks').then(function(r){return r.json()}).then(renderPhotoBlocks).catch(function(){});
+  }
 })();
 
 /* ===== PDF DOWNLOAD — FORM + BUTTON ===== */
@@ -4244,3 +4417,16 @@ async function checkRefCode() {
     }).catch(function(){});
   } catch(e) {}
 })();
+
+/* ===== FINAL REVEAL =====
+   By this point the script has finished its synchronous initial pass:
+   text overlay applied, footer rendered (inline data), photo-blocks rendered
+   (inline data). Strip gtt-loading on the next frame so the browser commits
+   the final layout in a single paint. requestAnimationFrame ensures the
+   reveal happens AFTER the current render task — no chance of a half-painted
+   intermediate frame leaking through. */
+if (typeof requestAnimationFrame === 'function') {
+  requestAnimationFrame(function() { requestAnimationFrame(_revealPage); });
+} else {
+  _revealPage();
+}

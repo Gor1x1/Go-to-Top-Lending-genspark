@@ -16,6 +16,18 @@ var sbPageFilter = 'all'; // 'all' | 'home' | 'services' | 'buyouts' | 'about' |
 // Phase 3C: subpage prefix → human-readable label (admin RU only)
 var SUBPAGE_LABELS = { services: 'Услуги', buyouts: 'Выкупы', about: 'О нас', faq: 'FAQ', contacts: 'Контакты', referral: 'Партнёрка' };
 
+/** API may return texts_ru as JSON string — normalize for .some() / .filter. */
+function sbNormTextsArrPG(v) {
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string' && v.trim()) {
+    try {
+      var p = JSON.parse(v);
+      return Array.isArray(p) ? p : [];
+    } catch (e) { return []; }
+  }
+  return [];
+}
+
 // Returns the page label for a block (used in the page badge on each card)
 function sbBlockPageLabel(blockKey) {
   if (!blockKey || (blockKey + '').indexOf('__') < 0) return 'Главная';
@@ -35,8 +47,17 @@ function sbChipStyle(active) {
 // Count how many blocks fall under a given page filter (used for chip badge)
 function sbCountForPage(allBlocks, pageId) {
   if (!pageId || pageId === 'all') return allBlocks.length;
+  // Phase 5.1.6: "home" chip now matches BOTH legacy unprefixed keys (hero,
+  // wb_banner, services, …) AND the new home__* family. The previous
+  // implementation skipped home__* and hid most of the main page's blocks
+  // from the admin, causing the "не все данные скачались" report. Other
+  // prefixes (shell__, calculator__, package__, blog__, services__, etc.)
+  // are matched by simple prefix.
   if (pageId === 'home') {
-    return allBlocks.filter(function(b) { return ((b.block_key || '') + '').indexOf('__') < 0; }).length;
+    return allBlocks.filter(function(b) {
+      var k = (b.block_key || '') + '';
+      return k.indexOf('__') < 0 || k.indexOf('home__') === 0;
+    }).length;
   }
   var prefix = pageId + '__';
   return allBlocks.filter(function(b) { return ((b.block_key || '') + '').indexOf(prefix) === 0; }).length;
@@ -71,10 +92,18 @@ function renderSiteBlocks() {
   // Define which blocks can have social links
   var socialBlocks = { hero: true, about: true, services: true, contact: true, footer: true, wb_banner: true, wb_official: true };
   
-  // Phase 3C: filter by page (chips above the list)
+  // Phase 3C / 5.1.6: filter by page (chips above the list).
+  // "home" now keeps legacy unprefixed keys AND home__* — they all render on
+  // /home (legacy = the page's own seed blocks; home__* = new shell layout
+  // populated by seedProBlocks). Keeping them together prevents the bug where
+  // a freshly-imported main-page block (home__hero, home__wb_banner, …) was
+  // invisible in the admin because the chip only matched no-prefix keys.
   if (sbPageFilter && sbPageFilter !== 'all') {
     if (sbPageFilter === 'home') {
-      blocks = blocks.filter(function(b) { return ((b.block_key || '') + '').indexOf('__') < 0; });
+      blocks = blocks.filter(function(b) {
+        var k = ((b.block_key || '') + '');
+        return k.indexOf('__') < 0 || k.indexOf('home__') === 0;
+      });
     } else {
       var sbPagePrefix = sbPageFilter + '__';
       blocks = blocks.filter(function(b) { return ((b.block_key || '') + '').indexOf(sbPagePrefix) === 0; });
@@ -86,8 +115,8 @@ function renderSiteBlocks() {
     var q = sbSearchQuery.toLowerCase();
     blocks = blocks.filter(function(b) {
       return (b.title_ru || '').toLowerCase().includes(q) || (b.title_am || '').toLowerCase().includes(q) || (b.block_key || '').toLowerCase().includes(q) ||
-        (b.texts_ru || []).some(function(t) { return (t || '').toLowerCase().includes(q); }) ||
-        (b.texts_am || []).some(function(t) { return (t || '').toLowerCase().includes(q); });
+        sbNormTextsArrPG(b.texts_ru).some(function(t) { return (t || '').toLowerCase().includes(q); }) ||
+        sbNormTextsArrPG(b.texts_am).some(function(t) { return (t || '').toLowerCase().includes(q); });
     });
   }
   
@@ -143,16 +172,24 @@ function renderSiteBlocks() {
     return h;
   }
 
-  // ── Phase 3C: Page-filter chips + Seed-subpages button ──
+  // ── Phase 3C / 5.1.6: Page-filter chips + Seed-subpages button ──
+  // Added: "Шапка/футер" (shell__*) — header/footer/modal/floats/bottom nav,
+  // "Калькулятор" (calculator__*), "Пакеты" (package__*), "Блог" (blog__*).
+  // Without these chips the corresponding CMS blocks were invisible in the
+  // admin even though import-from-site now seeds them automatically.
   var sbPageChips = [
     { id: 'all', label: 'Все' },
     { id: 'home', label: 'Главная' },
+    { id: 'shell', label: 'Шапка / футер' },
     { id: 'services', label: 'Услуги' },
     { id: 'buyouts', label: 'Выкупы' },
     { id: 'about', label: 'О нас' },
+    { id: 'calculator', label: 'Калькулятор' },
     { id: 'faq', label: 'FAQ' },
     { id: 'contacts', label: 'Контакты' },
-    { id: 'referral', label: 'Партнёрка' }
+    { id: 'referral', label: 'Партнёрка' },
+    { id: 'package', label: 'Пакеты' },
+    { id: 'blog', label: 'Блог' }
   ];
   h += '<div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap;align-items:center">' +
     '<span style="font-size:0.78rem;color:#94a3b8;font-weight:600;margin-right:4px">Страница:</span>';
@@ -2530,14 +2567,27 @@ async function seedSubpageBlocks() {
 }
 
 // ── Import all blocks from site ──
+// Phase 5.1.6: import-from-site now ALSO calls seedProBlocks(db) on the backend
+// so a single click populates legacy blocks (nav/hero/footer/...) + Phase 4
+// chrome blocks (shell__nav, shell__footer, shell__bottom, shell__floats,
+// shell__modal) + subpage blocks (home__*, calculator__*, package__chrome,
+// blog__chrome). Without the shell__* rows the inline editor's nav/footer
+// edits silently revert (SSR ignores site_text_overrides for shell__*), so
+// merging this seed into the import step keeps everything in sync after one
+// download. INSERT OR IGNORE preserves any existing admin edits.
 async function importSiteBlocks() {
   if (data.siteBlocks && data.siteBlocks.length > 0) {
-    if (!confirm('Все текущие блоки будут заменены данными с сайта. Продолжить?')) return;
+    if (!confirm('Все текущие блоки будут заменены данными с сайта. Продолжить?\\n\\n(Заголовки/шапка/футер сайта — shell__nav, shell__footer и т.д. — будут добавлены только если их ещё нет; существующие правки не перезаписываются.)')) return;
   }
   toast('Загрузка блоков с сайта...');
   var result = await api('/site-blocks/import-from-site', { method: 'POST' });
   if (result && result.success) {
-    toast('Загружено ' + (result.imported || 0) + ' блоков и ' + (result.tg_messages || 0) + ' кнопок-сообщений!');
+    var msg = 'Загружено ' + (result.imported || 0) + ' блоков и ' + (result.tg_messages || 0) + ' кнопок-сообщений';
+    if (typeof result.pro_seeded === 'number' && result.pro_seeded > 0) {
+      msg += ', + ' + result.pro_seeded + ' шаблонов меню/футера';
+    }
+    if (result.pro_error) msg += ' (предупреждение: ' + result.pro_error + ')';
+    toast(msg + '!');
   } else {
     toast('Ошибка загрузки: ' + (result?.error || 'unknown'), 'error');
   }

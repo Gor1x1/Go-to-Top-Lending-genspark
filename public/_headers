@@ -1,0 +1,25 @@
+# Cloudflare Pages headers configuration.
+# Applies to files served from the build output directory.
+# Docs: https://developers.cloudflare.com/pages/configuration/headers/
+
+# ===== STATIC ASSETS — long-lived immutable cache =====
+# All files under /static/* are versioned via the ?v=CACHE_VERSION query param
+# (see CACHE_VERSION in src/lib/cache-config.ts). When CACHE_VERSION bumps,
+# the URL changes and browsers fetch fresh copies. Until then, browsers can
+# safely use the cached copy without revalidating, which makes intra-site
+# navigation feel instant (logo, JS bundle, fonts CSS, images already in cache).
+/static/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# Image subfolders specifically — same rule, but listed for clarity.
+/static/img/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/static/img/qr/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/static/img/reviews/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/static/img/real/*
+  Cache-Control: public, max-age=31536000, immutable

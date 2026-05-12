@@ -55,8 +55,14 @@ export function register(api: Hono<{ Bindings: Bindings }>, authMiddleware: Auth
     const { items } = await c.req.json();
     if (!Array.isArray(items)) return c.json({ error: 'items array required' }, 400);
     let saved = 0;
+    let skipped = 0;
+    // Phase 5.1.6: surface row-level failures instead of silently swallowing
+    // them. Previously the catch block ate every SQLite error and returned
+    // `{ success: true, saved: < items.length }`, so the inline editor cleared
+    // pendingOverrides and the admin lost edits without any UI signal.
+    const errors: Array<{ txt_id: string; page: string; error: string }> = [];
     for (const it of items) {
-      if (!it || !it.page || !it.txt_id) continue;
+      if (!it || !it.page || !it.txt_id) { skipped++; continue; }
       try {
         await db.prepare(
           `INSERT INTO site_text_overrides (page, txt_id, text_ru, text_am, href, updated_at)
@@ -68,9 +74,15 @@ export function register(api: Hono<{ Bindings: Bindings }>, authMiddleware: Auth
              updated_at = CURRENT_TIMESTAMP`
         ).bind(it.page, it.txt_id, it.text_ru || '', it.text_am || '', it.href || '').run();
         saved++;
-      } catch (e) {}
+      } catch (e: any) {
+        errors.push({ txt_id: String(it.txt_id), page: String(it.page), error: String(e?.message || e) });
+      }
     }
-    return c.json({ success: true, saved });
+    // success === full pass-through (every well-formed item written).
+    // Partial writes return success:false so editor.js keeps pendingOverrides
+    // for the failed txt_ids and can retry on the next "Сохранить всё".
+    const okAll = errors.length === 0;
+    return c.json({ success: okAll, saved, skipped, errors });
   });
 
   // Delete an override (admin) — useful for "reset to original"

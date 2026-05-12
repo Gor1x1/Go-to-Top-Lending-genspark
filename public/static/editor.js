@@ -36,7 +36,12 @@
     var p = window.location.pathname.replace(/^\/+|\/+$/g, '');
     if (!p || p === 'am' || p === 'ru') return 'home_legacy';
     if (p === 'home') return 'home';
-    if (p.indexOf('package/') === 0) return 'package';
+    if (p === 'services/reviews') return 'reviews';
+    if (p.indexOf('package/') === 0) {
+      var slug = p.substring('package/'.length).split(/[/?#]/)[0];
+      slug = (slug || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+      return slug ? 'package__' + slug : 'package';
+    }
     if (p === 'blog' || p.indexOf('blog/') === 0) return 'blog';
     var first = p.split('/')[0];
     return first || 'home';
@@ -145,7 +150,21 @@
     //      path can save them.
     // We deliberately union both selectors and skip elements already addressed.
     var nodes = document.querySelectorAll('[data-ru], [data-am], [data-edit-key]');
+    // Phase 5.1.5: Since SSR (applyTextOverridesSSR in src/routes/landing.ts)
+    // now pre-stamps `data-edit-text` server-side, the page may already have
+    // ids like `<page>__txt_0`...`<page>__txt_99` baked in. Bootstrapping the
+    // client counter at 0 would then collide with SSR ids when the client
+    // later injects new bilingual nodes (db.content / dynamic blocks). Find
+    // the highest existing txt_N stamp and resume the counter past it so
+    // client-injected elements get fresh, non-colliding ids.
     var n = 0;
+    var pos = PAGE + '__txt_';
+    for (var k = 0; k < nodes.length; k++) {
+      var existing = nodes[k].getAttribute('data-edit-text');
+      if (!existing || existing.indexOf(pos) !== 0) continue;
+      var num = parseInt(existing.slice(pos.length), 10);
+      if (!isNaN(num) && num + 1 > n) n = num + 1;
+    }
     var withDataRu = 0, withoutDataRu = 0;
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
@@ -157,7 +176,12 @@
       var idx = el.getAttribute('data-edit-idx');
       var txtId;
       if (key && idx !== null) {
-        txtId = PAGE + '__' + key + '__' + idx;
+        // Shell elements use page-agnostic IDs (no PAGE prefix) to match SSR.
+        if (key.indexOf('shell__') === 0) {
+          txtId = key + '__' + idx;
+        } else {
+          txtId = PAGE + '__' + key + '__' + idx;
+        }
         withoutDataRu++;
       } else {
         txtId = PAGE + '__txt_' + (n++);
@@ -200,6 +224,8 @@
     // Phase 5.1.2: Prefer SSR-inlined overrides (window.__GTT_OVERRIDES) so the
     // first paint already shows latest text — eliminates the FOUC where the
     // old version flashes before the JS-fetched override applies.
+    // SSR now fetches both page-specific AND shell overrides in one query,
+    // so __GTT_OVERRIDES already contains shell entries too.
     var inlinePromise;
     if (window.__GTT_OVERRIDES) {
       inlinePromise = Promise.resolve({ overrides: window.__GTT_OVERRIDES });
@@ -284,37 +310,97 @@
         toast('Ошибка загрузки. Проверьте авторизацию.', 'error');
         return;
       }
+      function normStrArr(v) {
+        if (Array.isArray(v)) return v;
+        if (typeof v === 'string' && v.trim()) {
+          try {
+            var p = JSON.parse(v);
+            return Array.isArray(p) ? p : [];
+          } catch (e) { return []; }
+        }
+        return [];
+      }
       blockMap = {};
       for (var i = 0; i < data.blocks.length; i++) {
         var b = data.blocks[i];
         blockMap[b.block_key] = {
           id: b.id,
           sort_order: b.sort_order || 0,
-          texts_ru: Array.isArray(b.texts_ru) ? b.texts_ru : [],
-          texts_am: Array.isArray(b.texts_am) ? b.texts_am : [],
+          texts_ru: normStrArr(b.texts_ru),
+          texts_am: normStrArr(b.texts_am),
           is_visible: b.is_visible,
-          buttons: Array.isArray(b.buttons) ? b.buttons : []
+          buttons: normStrArr(b.buttons)
         };
       }
+      // Auto-bootstrap: if any [data-edit-key^="shell__"] element on this page
+      // has no matching CMS block (blockMap[key] missing), the inline editor's
+      // CMS-save path would fall back to site_text_overrides — but SSR
+      // intentionally skips overrides for shell__* (see applyTextOverridesSSR
+      // in src/routes/landing.ts), causing edits to silently revert on reload.
+      // Calling /site-blocks/seed-pro is idempotent (INSERT OR IGNORE) so it
+      // only inserts the missing rows and never overwrites prior admin edits.
+      // After the seed we reload /site-blocks once so blockMap picks up the
+      // freshly created shell__* rows BEFORE the admin can start editing
+      // (activation is serialised behind this promise to avoid the race where
+      // a fast click would land an edit in the overrides path).
+      var needsSeed = false;
+      var editables = document.querySelectorAll('[data-edit-key^="shell__"]');
+      for (var ei = 0; ei < editables.length; ei++) {
+        var k = editables[ei].getAttribute('data-edit-key');
+        if (k && !blockMap[k]) { needsSeed = true; break; }
+      }
+      function _mergeBlocks(d2) {
+        if (!d2 || !d2.blocks) return;
+        for (var j = 0; j < d2.blocks.length; j++) {
+          var b2 = d2.blocks[j];
+          blockMap[b2.block_key] = {
+            id: b2.id,
+            sort_order: b2.sort_order || 0,
+            texts_ru: normStrArr(b2.texts_ru),
+            texts_am: normStrArr(b2.texts_am),
+            is_visible: b2.is_visible,
+            buttons: normStrArr(b2.buttons)
+          };
+        }
+      }
+      function _activate() {
+        editMode = true;
+        document.body.classList.add('gtt-edit-mode');
+        var btn = document.getElementById('gtt-edit-toggle');
+        if (btn) { btn.textContent = '✖ Выйти из редактирования'; btn.classList.add('active'); }
+        var actions = document.getElementById('gtt-bar-actions');
+        if (actions) actions.style.display = 'flex';
 
-      editMode = true;
-      document.body.classList.add('gtt-edit-mode');
-      var btn = document.getElementById('gtt-edit-toggle');
-      if (btn) { btn.textContent = '✖ Выйти из редактирования'; btn.classList.add('active'); }
-      var actions = document.getElementById('gtt-bar-actions');
-      if (actions) actions.style.display = 'flex';
+        activateTextEditing();
+        activateButtonEditing();
+        activateImageEditing();
+        activateBlockManagement();
+        // Phase 5.1.4: Section drag-drop disabled per user request — DOM layout
+        // breaks because [data-block-key] elements aren't always direct siblings
+        // (legacy landing nests them under different containers). Re-enable only
+        // after we have a reliable cross-container reordering strategy.
+        // activateDragDrop();
 
-      activateTextEditing();
-      activateButtonEditing();
-      activateImageEditing();
-      activateBlockManagement();
-      // Phase 5.1.4: Section drag-drop disabled per user request — DOM layout
-      // breaks because [data-block-key] elements aren't always direct siblings
-      // (legacy landing nests them under different containers). Re-enable only
-      // after we have a reliable cross-container reordering strategy.
-      // activateDragDrop();
-
-      toast('Режим редактирования включён. Кликайте на любой текст или кнопку.', 'success', 3500);
+        toast('Режим редактирования включён. Кликайте на любой текст или кнопку.', 'success', 3500);
+      }
+      if (needsSeed) {
+        toast('Создаём шаблоны меню/футера...', 'info', 2000);
+        adminAPI('/site-blocks/seed-pro', { method: 'POST', body: '{}' })
+          .then(function (r) {
+            if (!r || !r.success) {
+              toast('Не удалось создать шаблоны (будет работать только обычное редактирование)', 'error', 4000);
+              _activate();
+              return;
+            }
+            adminAPI('/site-blocks').then(function (d2) {
+              _mergeBlocks(d2);
+              _activate();
+            });
+          })
+          .catch(function () { _activate(); });
+      } else {
+        _activate();
+      }
     });
   }
 
@@ -527,10 +613,13 @@
     });
 
     // Static text overrides → POST /text-overrides/bulk
+    // Shell-keyed elements (shell__nav, shell__floats, etc.) are saved with
+    // page='shell' so the same edit applies on every page, not just the current one.
     if (ovKeys.length) {
       var items = ovKeys.map(function (txtId) {
+        var isShell = txtId.indexOf('shell__') === 0;
         return {
-          page: PAGE,
+          page: isShell ? 'shell' : PAGE,
           txt_id: txtId,
           text_ru: pendingOverrides[txtId].text_ru || '',
           text_am: pendingOverrides[txtId].text_am || '',
@@ -555,7 +644,16 @@
             delete pendingChanges[r.key];
           } else { errors++; }
         } else if (r.kind === 'overrides') {
-          if (r.ok) {
+          // Phase 5.1.6: detect partial DB writes. The bulk endpoint wraps each
+          // INSERT in a try/catch (admin-text-overrides.ts) so a SQLite error
+          // on one row would return `success: true, saved: < items.length`.
+          // Treat any short-count as a partial failure: keep the un-saved
+          // pendingOverrides so user can retry, and surface the gap in the
+          // toast instead of clearing state and silently losing edits.
+          if (r.ok && typeof r.saved === 'number' && r.saved < ovKeys.length) {
+            savedOv = r.saved;
+            errors += (ovKeys.length - r.saved);
+          } else if (r.ok) {
             savedOv = r.saved || ovKeys.length;
             pendingOverrides = {};
           } else { errors++; }
@@ -1058,6 +1156,7 @@
       var pos = window.getComputedStyle(el).position;
       if (pos === 'static') el.style.position = 'relative';
       el.appendChild(pen);
+      applyBtnColorFromUrl(el, el.getAttribute('href') || '');
       // Suppress nav on click in edit mode
       el.addEventListener('click', onButtonClickInEditMode, true);
     }
@@ -1168,6 +1267,17 @@
     openImageReplaceDialog(targetImg);
   };
 
+  function applyBtnColorFromUrl(btn, url) {
+    if (!btn) return;
+    var u = (url || btn.getAttribute('href') || '').toLowerCase();
+    btn.classList.remove('btn-color-tg', 'btn-color-wa');
+    if (u.indexOf('t.me') !== -1 || u.indexOf('telegram') !== -1) {
+      btn.classList.add('btn-color-tg');
+    } else if (u.indexOf('wa.me') !== -1 || u.indexOf('whatsapp') !== -1) {
+      btn.classList.add('btn-color-wa');
+    }
+  }
+
   window.gttEditorSaveButton = function () {
     var ru = (document.getElementById('gtt-btn-text-ru') || {}).value || '';
     var am = (document.getElementById('gtt-btn-text-am') || {}).value || '';
@@ -1194,6 +1304,7 @@
       setTextPreserveIcons(target, displayText);
     }
     if (link) link.setAttribute('href', href);
+    if (link) applyBtnColorFromUrl(link, href);
 
     // Save: CMS path or override path
     if (editKey && blockMap[editKey]) {
@@ -1210,7 +1321,7 @@
         oldRu: blockMap[editKey].texts_ru[editIdx] || '',
         oldAm: blockMap[editKey].texts_am[editIdx] || '' });
     }
-    if (txtId || (link && !editKey)) {
+    if (txtId || link) {
       // Need a stable txtId for this button — if missing, generate one for the link itself.
       if (!txtId && link) {
         if (!link.getAttribute('data-edit-text')) {
@@ -1339,6 +1450,8 @@
       '.gtt-btn-edit-pen{display:none;position:absolute;top:-8px;right:-8px;z-index:30;width:24px;height:24px;border-radius:50%;background:#8b5cf6;color:white;font-size:0.7rem;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 2px 8px rgba(139,92,246,0.5);user-select:none;pointer-events:auto;font-style:normal;line-height:1}',
       'body.gtt-edit-mode .gtt-btn-edit-pen{display:flex}',
       '.gtt-btn-edit-pen:hover{background:#a78bfa;transform:scale(1.1)}',
+      '.btn-color-tg{background:linear-gradient(135deg,#229ED9,#1A7FB0)!important;border-color:transparent!important}',
+      '.btn-color-wa{background:linear-gradient(135deg,#25D366,#1AAE50)!important;border-color:transparent!important}',
       '.gtt-img-edit-overlay{position:absolute;top:8px;right:8px;z-index:40;padding:6px 10px;border:none;border-radius:8px;background:rgba(15,10,26,0.85);color:#fff;font-size:0.78rem;font-weight:600;cursor:pointer;box-shadow:0 4px 12px rgba(0,0,0,0.4);backdrop-filter:blur(8px);user-select:none}',
       '.gtt-img-edit-overlay:hover{background:#8b5cf6}',
       /* Body padding to account for fixed admin bar */
@@ -1363,6 +1476,16 @@
       createAdminBar();
     }
   }
+
+  // Exposed so landing.js can call this after asynchronously injecting extra-text
+  // elements. Re-assigns data-edit-text IDs to any newly added nodes and then
+  // re-applies server overrides so edits made in the inline editor persist when
+  // the injection finishes after editor.js's init() already ran.
+  window.gttReapplyOverrides = function () {
+    assignTextIds();
+    assignImageIds();
+    applyOverridesFromServer();
+  };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
