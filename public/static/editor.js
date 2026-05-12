@@ -474,6 +474,38 @@
     var idx = parseInt(el.getAttribute('data-edit-idx') || '0', 10);
     var txtId = el.getAttribute('data-edit-text');
 
+    // For shell__* elements the SSR layer reads from `site_blocks` ONLY
+    // (applyTextOverridesSSR explicitly skips overrides for shell__*).
+    // If `blockMap` doesn't have the key yet (auto-bootstrap still pending
+    // or it failed), the override-path fallback below would write to
+    // `site_text_overrides` — which SSR ignores, making the save look like
+    // it persisted while the visible text never changes. Block the edit
+    // here and lazy-seed so the user's next click lands in the CMS path.
+    if (key && key.indexOf('shell__') === 0 && !blockMap[key]) {
+      el.blur();
+      try { el.removeAttribute('contenteditable'); } catch (_e) {}
+      toast('Загружаем шаблоны меню/футера, попробуйте ещё раз через секунду…', 'info', 2500);
+      adminAPI('/site-blocks/seed-pro', { method: 'POST', body: '{}' }).then(function () {
+        adminAPI('/site-blocks').then(function (data) {
+          if (data && data.blocks) {
+            for (var bi = 0; bi < data.blocks.length; bi++) {
+              var b = data.blocks[bi];
+              blockMap[b.block_key] = {
+                id: b.id, sort_order: b.sort_order || 0,
+                texts_ru: (function (raw) { try { var p = JSON.parse(raw || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } })(b.texts_ru),
+                texts_am: (function (raw) { try { var p = JSON.parse(raw || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } })(b.texts_am),
+                is_visible: b.is_visible,
+                buttons: (function (raw) { try { var p = JSON.parse(raw || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } })(b.buttons)
+              };
+            }
+          }
+          try { el.setAttribute('contenteditable', 'true'); } catch (_e2) {}
+          toast('Готово, теперь можно редактировать.', 'success', 2000);
+        });
+      });
+      return;
+    }
+
     if (key && blockMap[key]) {
       if (!pendingChanges[key]) {
         pendingChanges[key] = {
@@ -496,7 +528,12 @@
           text_am: el.getAttribute('data-am') || '',
           href: '',
           _origRu: el.getAttribute('data-ru') || '',
-          _origAm: el.getAttribute('data-am') || ''
+          _origAm: el.getAttribute('data-am') || '',
+          // Track WHICH language the admin actually changed. Save logic uses
+          // these flags so untouched languages are NOT written to DB (lets
+          // seed text remain authoritative when only one lang was edited).
+          _editedRu: false,
+          _editedAm: false
         };
         undoStack.push({
           kind: 'override', txtId: txtId,
@@ -518,8 +555,13 @@
       if (editLang === 'am') pendingChanges[key].texts_am[idx] = newText;
       else pendingChanges[key].texts_ru[idx] = newText;
     } else if (txtId && pendingOverrides[txtId]) {
-      if (editLang === 'am') pendingOverrides[txtId].text_am = newText;
-      else pendingOverrides[txtId].text_ru = newText;
+      if (editLang === 'am') {
+        pendingOverrides[txtId].text_am = newText;
+        pendingOverrides[txtId]._editedAm = true;
+      } else {
+        pendingOverrides[txtId].text_ru = newText;
+        pendingOverrides[txtId]._editedRu = true;
+      }
       // Also update data-ru/am attribute live so language switch keeps the new text
       el.setAttribute(editLang === 'am' ? 'data-am' : 'data-ru', newText);
     }
@@ -618,12 +660,16 @@
     if (ovKeys.length) {
       var items = ovKeys.map(function (txtId) {
         var isShell = txtId.indexOf('shell__') === 0;
+        var p = pendingOverrides[txtId];
+        // Send ONLY the language the admin actually edited. Untouched languages
+        // go as '' so SSR keeps the seed text for them (see applyTextOverridesSSR
+        // in src/routes/landing.ts — empty `ru`/`am` is treated as "no value").
         return {
           page: isShell ? 'shell' : PAGE,
           txt_id: txtId,
-          text_ru: pendingOverrides[txtId].text_ru || '',
-          text_am: pendingOverrides[txtId].text_am || '',
-          href: pendingOverrides[txtId].href || ''
+          text_ru: p._editedRu ? (p.text_ru || '') : '',
+          text_am: p._editedAm ? (p.text_am || '') : '',
+          href: p.href || ''
         };
       });
       promises.push(adminAPI('/text-overrides/bulk', {
@@ -1286,6 +1332,31 @@
     var editIdx = parseInt((document.getElementById('gtt-btn-meta-idx') || {}).value || '0', 10);
     var txtId = (document.getElementById('gtt-btn-meta-txt') || {}).value || '';
 
+    // Shell__* buttons must save via CMS — if blockMap missed it (auto-seed
+    // race), don't silently route to overrides (SSR ignores them). Bail with
+    // a clear toast and trigger a lazy seed so the next click works.
+    if (editKey && editKey.indexOf('shell__') === 0 && !blockMap[editKey]) {
+      toast('Загружаем шаблоны меню/футера, попробуйте ещё раз через секунду…', 'info', 2500);
+      adminAPI('/site-blocks/seed-pro', { method: 'POST', body: '{}' }).then(function () {
+        adminAPI('/site-blocks').then(function (data) {
+          if (data && data.blocks) {
+            for (var bi = 0; bi < data.blocks.length; bi++) {
+              var b = data.blocks[bi];
+              blockMap[b.block_key] = {
+                id: b.id, sort_order: b.sort_order || 0,
+                texts_ru: (function (raw) { try { var p = JSON.parse(raw || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } })(b.texts_ru),
+                texts_am: (function (raw) { try { var p = JSON.parse(raw || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } })(b.texts_am),
+                is_visible: b.is_visible,
+                buttons: (function (raw) { try { var p = JSON.parse(raw || '[]'); return Array.isArray(p) ? p : []; } catch (_) { return []; } })(b.buttons)
+              };
+            }
+          }
+          toast('Готово, нажмите «Сохранить» ещё раз.', 'success', 2500);
+        });
+      });
+      return;
+    }
+
     // Find target element on page (where text lives)
     var target = null;
     if (editKey) target = document.querySelector('[data-edit-key="' + cssEsc(editKey) + '"][data-edit-idx="' + editIdx + '"]');
@@ -1321,7 +1392,11 @@
         oldRu: blockMap[editKey].texts_ru[editIdx] || '',
         oldAm: blockMap[editKey].texts_am[editIdx] || '' });
     }
-    if (txtId || link) {
+    // For shell__* buttons we MUST go through the CMS path (handled above).
+    // Skip the override path so saves don't silently land in a table SSR
+    // ignores for shell elements (see applyTextOverridesSSR in landing.ts).
+    var isShellBtn = editKey && editKey.indexOf('shell__') === 0;
+    if (!isShellBtn && (txtId || link)) {
       // Need a stable txtId for this button — if missing, generate one for the link itself.
       if (!txtId && link) {
         if (!link.getAttribute('data-edit-text')) {
@@ -1335,6 +1410,9 @@
         pendingOverrides[txtId].text_ru = ru;
         pendingOverrides[txtId].text_am = am;
         pendingOverrides[txtId].href = href;
+        // Mark both languages as edited so bulk-save sends both values.
+        pendingOverrides[txtId]._editedRu = true;
+        pendingOverrides[txtId]._editedAm = true;
         undoStack.push({ kind: 'override', txtId: txtId,
           oldRu: pendingOverrides[txtId]._origRu || ru,
           oldAm: pendingOverrides[txtId]._origAm || am });

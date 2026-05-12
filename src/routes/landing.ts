@@ -4508,8 +4508,10 @@ async function applyTextOverridesSSR(
         const ov = overrides[txtId];
         if (!ov) return;
 
-        // Always update both languages so landing.js's switchLang() picks
-        // up the latest text on subsequent in-page language toggles too.
+        // Update language attributes ONLY when the override has a real value
+        // for that language. Empty `ru`/`am` means "admin only touched the
+        // other language" — keep the seed attribute so language-switch and
+        // future re-edits show the correct original text.
         if (ov.ru) el.setAttribute('data-ru', ov.ru);
         if (ov.am) el.setAttribute('data-am', ov.am);
         if (ov.href) {
@@ -4522,8 +4524,11 @@ async function applyTextOverridesSSR(
           }
         }
 
-        const newText = lang === 'am' ? (ov.am || ov.ru) : (ov.ru || ov.am);
-        if (newText) el.setInnerContent(newText);
+        // Apply visible text ONLY when the CURRENT page language has a real
+        // override value. If only the other language was edited, we leave the
+        // seed text visible (SSR template already wrote it correctly).
+        const currentLangVal = lang === 'am' ? ov.am : ov.ru;
+        if (currentLangVal) el.setInnerContent(currentLangVal);
       }
     })
     .on('img', {

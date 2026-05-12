@@ -1861,9 +1861,17 @@ function finalizeLangAfterSiteData() {
           var newAm = amMap[currentRu.trim()];
           if (newAm) {
             el.setAttribute('data-am', newAm);
-            // Update visible text for current language
+            // Update visible text ONLY if it actually differs from what SSR
+            // already rendered. Calling _setTextPreserveIcons on every match
+            // even when the value is identical was the source of the AM→RU
+            // flicker on subpage navigation (user-reported "вижу брифли
+            // русский текст потом армянский"). The textContent re-write
+            // briefly cleared the AM string before re-painting it.
             var t = el.getAttribute('data-' + lang);
-            if (t && el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA') _setTextPreserveIcons(el, t);
+            if (!t || el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') return;
+            var currentVisible = (el.textContent || '').trim();
+            if (currentVisible === t.trim()) return;
+            _setTextPreserveIcons(el, t);
           }
         });
         console.log('[DB] Server-injected texts: only AM updated client-side');
